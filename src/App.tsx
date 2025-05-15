@@ -22,10 +22,6 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import ClinicianDetails from "./pages/ClinicianDetails";
 import MyClients from "./pages/MyClients";
-import PatientDashboard from "./pages/PatientDashboard";
-import PatientDocuments from "./pages/PatientDocuments";
-import ProfileSetup from "./pages/ProfileSetup";
-import TherapistSelection from "./pages/TherapistSelection";
 import ClinicianDashboard from "./pages/ClinicianDashboard";
 import ResetPassword from "./pages/ResetPassword";
 import UpdatePassword from "./pages/UpdatePassword";
@@ -52,31 +48,9 @@ function App() {
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/update-password" element={<UpdatePassword />} />
                 
-                {/* Client accessible routes */}
-                <Route path="/profile-setup" element={<ProfileSetup />} />
-                
-                {/* Routes that block "New" clients */}
-                <Route path="/therapist-selection" element={
-                  <ProtectedRoute allowedRoles={['client', 'admin']} blockNewClients={true}>
-                    <TherapistSelection />
-                  </ProtectedRoute>
-                } />
-                
-                <Route path="/patient-dashboard" element={
-                  <ProtectedRoute allowedRoles={['client', 'admin']} blockNewClients={true}>
-                    <PatientDashboard />
-                  </ProtectedRoute>
-                } />
-                
-                <Route path="/patient-documents" element={
-                  <ProtectedRoute allowedRoles={['client', 'admin']} blockNewClients={true}>
-                    <PatientDocuments />
-                  </ProtectedRoute>
-                } />
-                
                 {/* Allow clinicians and admins to view client details */}
                 <Route path="/clients/:clientId" element={
-                  <ProtectedRoute allowedRoles={['admin', 'moderator', 'clinician', 'client']} blockNewClients={true}>
+                  <ProtectedRoute allowedRoles={['admin', 'moderator', 'clinician']}>
                     <ClientDetails />
                   </ProtectedRoute>
                 } />

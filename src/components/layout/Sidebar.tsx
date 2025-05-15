@@ -11,7 +11,6 @@ import {
   ChevronLeft,
   UserCheck,
   LayoutDashboard,
-  UserSearch,
   User
 } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
@@ -22,12 +21,10 @@ import { useToast } from '@/hooks/use-toast';
 const Sidebar = () => {
   const location = useLocation();
   const currentPath = location.pathname;
-  const { userRole, clientStatus, isLoading, userId, authInitialized } = useUser();
+  const { userRole, isLoading, userId, authInitialized } = useUser();
   const { toast } = useToast();
-  const isClient = userRole === 'client';
   const isClinician = userRole === 'clinician';
   const isAdmin = userRole === 'admin';
-  const isNewClient = isClient && clientStatus === 'New';
   const [clinicianId, setClinicianId] = useState<string | null>(null);
   const [loadingError, setLoadingError] = useState<string | null>(null);
   const [loadingTimeout, setLoadingTimeout] = useState(false);
@@ -122,6 +119,11 @@ const Sidebar = () => {
     );
   }
 
+  // If user is not a clinician or admin, they shouldn't see this sidebar
+  if (userRole !== 'clinician' && userRole !== 'admin') {
+    return null;
+  }
+
   return (
     <div className="w-[220px] min-h-screen border-r bg-white flex flex-col">
       <div className="p-4 flex items-center gap-2 border-b">
@@ -139,76 +141,40 @@ const Sidebar = () => {
       </div>
       
       <nav className="flex-1 py-4 space-y-1 px-2">
-        {/* Links only visible to non-new clients */}
-        {isClient && !isNewClient && (
-          <>
-            <Link 
-              to="/patient-dashboard" 
-              className={`sidebar-link ${isActive('/patient-dashboard') ? 'active' : ''}`}
-            >
-              <LayoutDashboard size={18} />
-              <span>Patient Dashboard</span>
-            </Link>
-            
-            <Link 
-              to="/therapist-selection" 
-              className={`sidebar-link ${isActive('/therapist-selection') ? 'active' : ''}`}
-            >
-              <UserSearch size={18} />
-              <span>Therapist Selection</span>
-            </Link>
-            
-            {/* Remove Patient Profile link for client role users */}
-            {userId && !isClient && (
-              <Link 
-                to={`/clients/${userId}`} 
-                className={`sidebar-link ${isActive(`/clients/${userId}`) ? 'active' : ''}`}
-              >
-                <User size={18} />
-                <span>Patient Profile</span>
-              </Link>
-            )}
-          </>
+        {/* Clinician and Admin links */}
+        <Link 
+          to="/clinician-dashboard" 
+          className={`sidebar-link ${isActive('/clinician-dashboard') ? 'active' : ''}`}
+        >
+          <LayoutDashboard size={18} />
+          <span>Dashboard</span>
+        </Link>
+        
+        {clinicianId && (
+          <Link 
+            to={`/clinicians/${clinicianId}`} 
+            className={`sidebar-link ${isActive(`/clinicians/${clinicianId}`) ? 'active' : ''}`}
+          >
+            <User size={18} />
+            <span>Profile</span>
+          </Link>
         )}
         
-        {/* Clinician and Admin links */}
-        {(isClinician || isAdmin) && (
-          <>
-            <Link 
-              to="/clinician-dashboard" 
-              className={`sidebar-link ${isActive('/clinician-dashboard') ? 'active' : ''}`}
-            >
-              <LayoutDashboard size={18} />
-              <span>Dashboard</span>
-            </Link>
-            
-            {clinicianId && (
-              <Link 
-                to={`/clinicians/${clinicianId}`} 
-                className={`sidebar-link ${isActive(`/clinicians/${clinicianId}`) ? 'active' : ''}`}
-              >
-                <User size={18} />
-                <span>Profile</span>
-              </Link>
-            )}
-            
-            <Link 
-              to="/my-clients" 
-              className={`sidebar-link ${isActive('/my-clients') ? 'active' : ''}`}
-            >
-              <UserCheck size={18} />
-              <span>My Clients</span>
-            </Link>
-            
-            <Link 
-              to="/calendar" 
-              className={`sidebar-link ${isActive('/calendar') ? 'active' : ''}`}
-            >
-              <Calendar size={18} />
-              <span>Calendar</span>
-            </Link>
-          </>
-        )}
+        <Link 
+          to="/my-clients" 
+          className={`sidebar-link ${isActive('/my-clients') ? 'active' : ''}`}
+        >
+          <UserCheck size={18} />
+          <span>My Clients</span>
+        </Link>
+        
+        <Link 
+          to="/calendar" 
+          className={`sidebar-link ${isActive('/calendar') ? 'active' : ''}`}
+        >
+          <Calendar size={18} />
+          <span>Calendar</span>
+        </Link>
         
         {/* Admin/Staff only links */}
         {isAdmin && (

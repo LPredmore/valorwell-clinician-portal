@@ -9,7 +9,7 @@ import AuthStateMonitor from '@/components/auth/AuthStateMonitor';
 const Index = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { userRole, isLoading, authInitialized, clientStatus, userId } = useUser();
+  const { userRole, isLoading, authInitialized, userId } = useUser();
   const [loadingTimeout, setLoadingTimeout] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [forceRedirectTimer, setForceRedirectTimer] = useState(0);
@@ -52,7 +52,7 @@ const Index = () => {
     };
   }, [isLoading, authInitialized, authError, toast]);
 
-  // NEW: Reduced force redirect timer from 15 to 10 seconds for faster experience
+  // Reduced force redirect timer from 15 to 10 seconds for faster experience
   useEffect(() => {
     let forcedRedirectTimer: NodeJS.Timeout;
     
@@ -80,9 +80,16 @@ const Index = () => {
           navigate('/settings');
         } else if (userRole === 'clinician') {
           navigate('/clinician-dashboard');
+        } else if (userRole === 'client') {
+          // Inform client users they are on the wrong portal
+          toast({
+            title: "Client Portal Access",
+            description: "This is the clinician portal. Please use the client portal.",
+            variant: "destructive"
+          });
+          navigate('/login');
         } else {
-          // Default to patient dashboard for clients or unknown roles
-          navigate('/patient-dashboard');
+          navigate('/login');
         }
       }, 10000); // 10 seconds (reduced from 15)
       
@@ -93,11 +100,11 @@ const Index = () => {
     }
     
     return () => {};
-  }, [userId, authInitialized, isLoading, userRole, navigate]);
+  }, [userId, authInitialized, isLoading, userRole, navigate, toast]);
 
   useEffect(() => {
     console.log("[Index] Checking redirect conditions - userId:", userId, "authInitialized:", authInitialized, "isLoading:", isLoading);
-    console.log("[Index] Index page mounted, isLoading:", isLoading, "userRole:", userRole, "authInitialized:", authInitialized, "clientStatus:", clientStatus);
+    console.log("[Index] Index page mounted, isLoading:", isLoading, "userRole:", userRole, "authInitialized:", authInitialized);
     
     // Only make redirect decisions if the UserContext is fully initialized
     if (authInitialized && !isLoading && userId) {
@@ -116,17 +123,15 @@ const Index = () => {
         navigate('/clinician-dashboard');
         redirected = true;
       } else if (userRole === 'client') {
-        // For clients, check their status
-        if (clientStatus === 'New') {
-          console.log("[Index] Redirecting new client to Profile Setup");
-          navigate('/profile-setup');
-          redirected = true;
-        } else {
-          console.log("[Index] Redirecting client to Patient Dashboard");
-          navigate('/patient-dashboard');
-          redirected = true;
-        }
-      } 
+        console.log("[Index] Client on clinician portal - redirecting to login with message");
+        toast({
+          title: "Clinician Portal",
+          description: "This portal is for clinicians only. Please use the client portal.",
+          variant: "destructive"
+        });
+        navigate('/login');
+        redirected = true;
+      }
       
       // Only redirect to login if not loading, auth is initialized AND no valid role was found
       if (!redirected && !userRole) {
@@ -140,7 +145,7 @@ const Index = () => {
     } else {
       console.log("[Index] Waiting for user context to fully initialize before redirecting");
     }
-  }, [navigate, userRole, isLoading, authInitialized, clientStatus, userId]);
+  }, [navigate, userRole, isLoading, authInitialized, userId, toast]);
 
   return (
     <div className="min-h-screen flex items-center justify-center">

@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Navigate, useParams } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import { useUser } from '@/context/UserContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useEffect, useState } from 'react';
@@ -9,17 +9,14 @@ import { useToast } from '@/hooks/use-toast';
 interface ProtectedRouteProps {
   children: React.ReactNode;
   allowedRoles: string[];
-  blockNewClients?: boolean; // New prop to block "New" clients
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
   children, 
-  allowedRoles,
-  blockNewClients = false
+  allowedRoles
 }) => {
-  const { userRole, clientStatus, isLoading, authInitialized } = useUser();
+  const { userRole, isLoading, authInitialized } = useUser();
   const { toast } = useToast();
-  const { clinicianId, clientId } = useParams();
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isCheckingUser, setIsCheckingUser] = useState(false);
   const [loadingTimeout, setLoadingTimeout] = useState(false);
@@ -50,48 +47,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     };
   }, [isLoading, authInitialized, isCheckingUser, loadingError, toast]);
 
-  useEffect(() => {
-    const getCurrentUserId = async () => {
-      if (clinicianId || clientId) {
-        console.log("[ProtectedRoute] Fetching current user ID for route validation");
-        setIsCheckingUser(true);
-        try {
-          const { data, error } = await supabase.auth.getUser();
-          
-          if (error) {
-            console.error("[ProtectedRoute] Error fetching user:", error);
-            setLoadingError("Failed to verify user access");
-            toast({
-              title: "Authentication Error",
-              description: "Failed to verify your access to this resource.",
-              variant: "destructive"
-            });
-            return;
-          }
-          
-          if (data?.user) {
-            console.log("[ProtectedRoute] User ID fetched successfully:", data.user.id);
-            setCurrentUserId(data.user.id);
-          } else {
-            console.warn("[ProtectedRoute] No user data returned");
-            setLoadingError("User data not available");
-          }
-        } catch (error) {
-          console.error("[ProtectedRoute] Exception in getCurrentUserId:", error);
-          setLoadingError("An unexpected error occurred");
-        } finally {
-          setIsCheckingUser(false);
-        }
-      }
-    };
-    
-    if (authInitialized) {
-      getCurrentUserId();
-    }
-  }, [clinicianId, clientId, authInitialized, toast]);
-  
   // Log the current state for debugging
-  console.log(`[ProtectedRoute] Status: isLoading=${isLoading}, authInitialized=${authInitialized}, userRole=${userRole}, clientStatus=${clientStatus}, blockNewClients=${blockNewClients}`);
+  console.log(`[ProtectedRoute] Status: isLoading=${isLoading}, authInitialized=${authInitialized}, userRole=${userRole}`);
   
   // Wait for UserContext to be fully initialized before making routing decisions
   // Handle loading states - distinguish between initial auth and data fetching
@@ -143,6 +100,17 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   if (!userRole || !allowedRoles.includes(userRole)) {
     console.log(`[ProtectedRoute] User role '${userRole}' not in allowed roles: [${allowedRoles.join(', ')}]`);
     
+    // Check if this is a client trying to access clinician functionality
+    if (userRole === 'client') {
+      console.log("[ProtectedRoute] Client attempting to access clinician portal");
+      toast({
+        title: "Access Denied",
+        description: "This portal is only for clinicians. Please use the client portal.",
+        variant: "destructive"
+      });
+      return <Navigate to="/login" replace />;
+    }
+    
     // Admin can access all routes
     if (userRole === 'admin') {
       console.log("[ProtectedRoute] Admin override - allowing access");
@@ -153,22 +121,11 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       console.log("[ProtectedRoute] Redirecting clinician to Calendar");
       return <Navigate to="/calendar" replace />;
     }
-    // Redirect clients to patient dashboard
-    else if (userRole === 'client') {
-      console.log("[ProtectedRoute] Redirecting client to patient dashboard");
-      return <Navigate to="/patient-dashboard" replace />;
-    }
     // Redirect everyone else to login
     else {
       console.log("[ProtectedRoute] No valid role, redirecting to login");
       return <Navigate to="/login" replace />;
     }
-  }
-  
-  // For clients, check if they're "New" and should be blocked from this route
-  if (userRole === 'client' && blockNewClients && clientStatus === 'New') {
-    console.log("[ProtectedRoute] Blocking new client, redirecting to profile setup");
-    return <Navigate to="/profile-setup" replace />;
   }
   
   // Allow access to the protected route
