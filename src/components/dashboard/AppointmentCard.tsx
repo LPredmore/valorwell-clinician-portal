@@ -42,7 +42,7 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-semibold flex items-center">
             <UserCircle className="h-4 w-4 mr-2" />
-            {appointment.client?.client_first_name} {appointment.client?.client_last_name}
+            {appointment.clientName || 'Unknown Client'}
           </CardTitle>
           <CardDescription className="flex items-center">
             <Calendar className="h-4 w-4 mr-2" />
@@ -102,7 +102,7 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
         <div className="flex items-center">
           <UserCircle className="h-4 w-4 mr-2" />
           <span className="text-sm">
-            {appointment.client?.client_first_name} {appointment.client?.client_last_name}
+            {appointment.clientName || 'Unknown Client'}
           </span>
         </div>
         <div className="text-sm mt-1">{appointment.type}</div>
