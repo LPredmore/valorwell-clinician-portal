@@ -124,6 +124,8 @@ const WeekView: React.FC<WeekViewProps> = ({
       console.log('[DROP] dragDataJson:', dragDataJson);
       
       const dragData = JSON.parse(dragDataJson);
+      console.log('[DROP] Parsed drag data:', dragData);
+      
       const appointmentId = dragData.appointmentId;
       
       // Find the original appointment

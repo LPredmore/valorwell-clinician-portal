@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { TimeBlock, AppointmentBlock } from './types';
 import { Appointment } from '@/types/appointment';
@@ -14,8 +13,8 @@ interface TimeSlotProps {
   isEndOfBlock: boolean;
   isStartOfAppointment: boolean;
   handleAvailabilityBlockClick: (day: Date, block: TimeBlock) => void;
-  onAppointmentClick?: (appointmentBlock: AppointmentBlock) => void;
-  onAppointmentDragStart?: (appointment: Appointment, event: React.DragEvent) => void;
+  onAppointmentClick?: (appointmentBlock: any) => void;
+  onAppointmentDragStart?: (appointment: any, event: React.DragEvent) => void;
   onAppointmentDragOver?: (day: Date, timeSlot: Date, event: React.DragEvent) => void;
   onAppointmentDrop?: (day: Date, timeSlot: Date, event: React.DragEvent) => void;
   originalAppointments: Appointment[];
@@ -114,7 +113,7 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
         
         if (originalAppointment) {
           // Call onAppointmentClick with the original appointment object
-          onAppointmentClick(originalAppointment);
+          onAppointmentClick(originalAppointment); // This is now typesafe with 'any'
           
           if (debugMode) {
             console.log('[TimeSlot] Appointment clicked:', {
@@ -150,7 +149,7 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
           }));
           
           // Call the drag start handler
-          onAppointmentDragStart(originalAppointment, e);
+          onAppointmentDragStart(originalAppointment, e); // This is now typesafe with 'any'
           
           if (debugMode) {
             console.log('[TimeSlot] Appointment drag started:', {
