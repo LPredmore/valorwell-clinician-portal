@@ -80,6 +80,26 @@ export const formatClientName = (client: {
 };
 
 /**
+ * Format time for display in a user-friendly way
+ * @param timeStr Time string in 24-hour format (HH:mm)
+ * @param timezone User's timezone
+ * @returns Formatted time string (e.g. "9:00 AM")
+ */
+export const formatTimeDisplay = (timeStr: string, timezone: string): string => {
+  try {
+    const dateTime = TimeZoneService.fromTimeString(timeStr);
+    if (!dateTime.isValid) {
+      console.error('Invalid time string for formatting:', timeStr);
+      return timeStr; // Return original if parsing fails
+    }
+    return dateTime.toFormat('h:mm a'); // Format as "9:00 AM"
+  } catch (error) {
+    console.error('Error formatting time display:', error);
+    return timeStr; // Return original on error
+  }
+};
+
+/**
  * Ensure consistent ID format for database queries
  */
 export const ensureStringId = (id: string | null): string | null => {
