@@ -187,7 +187,7 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
     // For the start of an appointment, show client name
     if (isStartOfAppointment) {
       if (debugMode) {
-        console.log('[TimeSlot] RENDERING APPOINTMENT START with class:', ${baseAppointmentClass} ${positionClass});
+        console.log(`[TimeSlot] RENDERING APPOINTMENT START with class: ${baseAppointmentClass} ${positionClass}`);
       }
       
       className = ${baseAppointmentClass} ${positionClass} text-xs font-medium truncate appointment-start;
