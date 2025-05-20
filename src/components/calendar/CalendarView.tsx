@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import WeekView from './WeekView';
 import MonthView from './MonthView';
@@ -97,7 +96,7 @@ const CalendarView = ({
     }
   }, [appointments, clinicianId, error, view, validTimeZone, combinedRefreshTrigger]);
 
-  // Handler for appointment clicked in calendar
+  // Handle click on an appointment clicked in calendar
   const handleAppointmentClick = (appointment: Appointment) => {
     console.log(`[CalendarView] Appointment clicked:`, {
       id: appointment.id,
@@ -111,7 +110,7 @@ const CalendarView = ({
     setIsAppointmentDialogOpen(true);
   };
 
-  // Handler for availability block clicked in calendar
+  // Handle availability block clicked in calendar
   const handleAvailabilityClick = (date: DateTime | Date, availabilityBlock: AvailabilityBlock) => {
     // Convert Date to DateTime if needed for consistent handling
     const dateTime = date instanceof Date ? 
@@ -150,7 +149,7 @@ const CalendarView = ({
             appointments={appointments}
             onAppointmentClick={handleAppointmentClick}
             onAvailabilityClick={handleAvailabilityClick}
-            onAppointmentUpdated={handleAppointmentDragUpdate}
+            onAppointmentUpdate={handleAppointmentDragUpdate}
             userTimeZone={validTimeZone}
             isLoading={isLoading}
             error={error}
