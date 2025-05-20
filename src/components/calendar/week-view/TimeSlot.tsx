@@ -12,6 +12,7 @@ interface TimeSlotProps {
   isStartOfBlock: boolean;
   isEndOfBlock: boolean;
   isStartOfAppointment: boolean;
+  isEndOfAppointment?: boolean;
   handleAvailabilityBlockClick: (day: Date, block: TimeBlock) => void;
   onAppointmentClick?: (appointmentBlock: any) => void;
   onAppointmentDragStart?: (appointment: any, event: React.DragEvent) => void;
@@ -29,6 +30,7 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
   isStartOfBlock,
   isEndOfBlock,
   isStartOfAppointment,
+  isEndOfAppointment = false,
   handleAvailabilityBlockClick,
   onAppointmentClick,
   onAppointmentDragStart,
@@ -65,9 +67,12 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
   let onDragStart = undefined;
 
   if (appointment) {
-    onClick = () => {
-      const originalAppointment = originalAppointments.find(a => a.id === appointment.id);
-      onAppointmentClick?.(originalAppointment || appointment);
+    onClick = (e: React.MouseEvent) => {
+      e.stopPropagation(); // Stop event propagation
+      const originalAppointment = originalAppointments?.find(a => a.id === appointment.id);
+      if (originalAppointment || appointment) {
+        onAppointmentClick?.(originalAppointment || appointment);
+      }
     };
 
     const baseAppointmentClass = 'p-1 bg-blue-100 border-l-4 border-blue-500 h-full w-full cursor-pointer transition-colors hover:bg-blue-200 z-20 relative bg-green-300/50';
@@ -82,15 +87,15 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
     };
 
     let positionClass = '';
+    const isMiddleOfAppointment = appointment && !isStartOfAppointment && !isEndOfAppointment;
+    
     if (isStartOfAppointment) {
       positionClass = 'rounded-t border-t border-r border-l';
-      if (!isEndOfBlock) positionClass += ' border-b-0';
-    } else {
-      positionClass = 'border-r border-l border-t-0';
-      if (!isEndOfBlock) positionClass += ' border-b-0';
-    }
-    if (isEndOfBlock) {
-      positionClass += ' rounded-b border-b';
+      if (!isEndOfAppointment) positionClass += ' border-b-0';
+    } else if (isMiddleOfAppointment) {
+      positionClass = 'border-r border-l border-t-0 border-b-0';
+    } else if (isEndOfAppointment) {
+      positionClass = 'rounded-b border-r border-l border-b border-t-0';
     }
 
     title = `${appointment.clientName || 'Unknown Client'} - ${appointment.start.toFormat('h:mm a')} to ${appointment.end.toFormat('h:mm a')}`;
@@ -99,6 +104,9 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
     if (isStartOfAppointment) {
       className = `${baseAppointmentClass} ${positionClass} text-xs font-medium truncate appointment-start`;
       content = appointment.clientName || 'Unknown Client';
+    } else if (isEndOfAppointment) {
+      className = `${baseAppointmentClass} ${positionClass} text-xs opacity-75 appointment-end`;
+      content = '\u00A0';
     } else {
       className = `${baseAppointmentClass} ${positionClass} text-xs opacity-75 appointment-continuation`;
       content = '\u00A0';

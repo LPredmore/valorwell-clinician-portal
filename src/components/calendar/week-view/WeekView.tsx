@@ -112,6 +112,7 @@ const WeekView: React.FC<WeekViewProps> = ({
               const isStartOfBlock = block && slotDt.toFormat('HH:mm') === block.start.toFormat('HH:mm');
               const isEndOfBlock = block && slotDt.plus({ minutes: 30 }).toFormat('HH:mm') === block.end.toFormat('HH:mm');
               const isStartOfAppointment = appt && slotDt.toFormat('HH:mm') === appt.start.toFormat('HH:mm');
+              const isEndOfAppointment = appt && slotDt.plus({ minutes: 30 }).toFormat('HH:mm') === appt.end.toFormat('HH:mm');
 
               return (
                 <div key={i} className="h-10 border-b border-l">
@@ -124,6 +125,7 @@ const WeekView: React.FC<WeekViewProps> = ({
                     isStartOfBlock={!!isStartOfBlock}
                     isEndOfBlock={!!isEndOfBlock}
                     isStartOfAppointment={!!isStartOfAppointment}
+                    isEndOfAppointment={!!isEndOfAppointment}
                     handleAvailabilityBlockClick={() => {}}
                     onAppointmentClick={handleAppointmentClick}
                     originalAppointments={appointments}

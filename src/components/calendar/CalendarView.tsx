@@ -32,7 +32,7 @@ const CalendarView = ({
   isLoading = false,
   error = null
 }: CalendarProps) => {
-  const [selectedAppointmentId, setSelectedAppointmentId] = useState<string | null>(null);
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [isAppointmentDialogOpen, setIsAppointmentDialogOpen] = useState(false);
   
   // Ensure we have a valid IANA timezone
@@ -53,11 +53,6 @@ const CalendarView = ({
     day.setDate(startOfWeek.getDate() + i);
     return day;
   });
-  
-  // Find the selected appointment from the ID
-  const selectedAppointment = selectedAppointmentId 
-    ? appointments.find(a => a.id === selectedAppointmentId) 
-    : null;
   
   // Log appointments data for debugging - CRITICAL FIX: Guard the map call
   if (Array.isArray(appointments)) {
@@ -116,8 +111,8 @@ const CalendarView = ({
       startAt: appointment.start_at
     });
     
-    // Store the appointment ID and open the dialog
-    setSelectedAppointmentId(appointment.id);
+    // Store the full appointment object and open the dialog
+    setSelectedAppointment(appointment);
     setIsAppointmentDialogOpen(true);
   };
 
