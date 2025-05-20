@@ -1,6 +1,7 @@
 
 import { TimeZoneService } from './timeZoneService';
 import { DateTime } from 'luxon';
+import { Appointment } from '@/types/appointment';
 
 // Default values
 export const DEFAULT_START_TIME = "09:00";
@@ -48,18 +49,34 @@ export const calculateEndTime = (startTimeStr: string, durationMinutes: number =
 };
 
 /**
- * Format client name for display
+ * Format client name for display - standardized across the application
+ * @param client Client data object containing name fields
+ * @returns Consistently formatted client name string
  */
 export const formatClientName = (client: {
-  client_first_name?: string,
-  client_preferred_name?: string,
-  client_last_name?: string
+  client_first_name?: string | null;
+  client_preferred_name?: string | null;
+  client_last_name?: string | null;
 } | null): string => {
-  if (!client) return 'Unnamed Client';
+  if (!client) return 'Unknown Client';
   
-  const firstName = client.client_preferred_name || client.client_first_name || '';
-  const lastName = client.client_last_name || '';
-  return `${firstName} ${lastName}`.trim() || 'Unnamed Client';
+  // STANDARDIZED CLIENT NAME FORMATTING LOGIC:
+  // 1. Preferred name + last name if both exist
+  // 2. First name + last name if both exist
+  // 3. Whatever combination of names we can get
+  if (client.client_preferred_name && client.client_last_name) {
+    return `${client.client_preferred_name} ${client.client_last_name}`;
+  } else if (client.client_first_name && client.client_last_name) {
+    return `${client.client_first_name} ${client.client_last_name}`;
+  } else {
+    // Handle edge cases by joining whatever we have
+    const nameComponents = [
+      client.client_preferred_name || client.client_first_name || '', 
+      client.client_last_name || ''
+    ].filter(Boolean);
+    
+    return nameComponents.join(' ').trim() || 'Unknown Client';
+  }
 };
 
 /**
@@ -108,17 +125,32 @@ export const generateRecurringDates = (
 };
 
 /**
- * Format time for display using TimeZoneService
+ * Format appointment time for display using TimeZoneService
+ * @param utcTimestamp UTC ISO timestamp string
+ * @param userTimeZone IANA timezone string
+ * @returns Formatted time string in user's timezone
  */
-export const formatTimeDisplay = (timeString: string, userTimeZone: string): string => {
+export const formatAppointmentTime = (utcTimestamp: string, userTimeZone: string): string => {
   try {
-    // Create a DateTime object from the time string
-    const dt = TimeZoneService.fromTimeString(timeString, userTimeZone);
-    
-    // Format with AM/PM
-    return TimeZoneService.formatTime(dt);
+    return TimeZoneService.formatUTCInTimezone(utcTimestamp, userTimeZone, 'h:mm a');
   } catch (error) {
-    console.error('Error formatting time display:', error);
-    return timeString;
+    console.error('Error formatting appointment time:', error);
+    return 'Invalid time';
+  }
+};
+
+/**
+ * Format appointment date for display using TimeZoneService
+ * @param utcTimestamp UTC ISO timestamp string
+ * @param userTimeZone IANA timezone string
+ * @returns Formatted date string in user's timezone
+ */
+export const formatAppointmentDate = (utcTimestamp: string, userTimeZone: string): string => {
+  try {
+    const localDate = TimeZoneService.fromUTC(utcTimestamp, userTimeZone);
+    return localDate.toFormat('EEEE, MMMM d, yyyy');
+  } catch (error) {
+    console.error('Error formatting appointment date:', error);
+    return 'Invalid date';
   }
 };

@@ -175,7 +175,7 @@ const CalendarView = ({
         </div>
       )}
       
-      {/* Appointment Details Dialog - properly pass the selected appointment and remove clientTimeZone */}
+      {/* Appointment Details Dialog - using only userTimeZone now */}
       <AppointmentDetailsDialog
         isOpen={isAppointmentDialogOpen}
         onClose={() => setIsAppointmentDialogOpen(false)}

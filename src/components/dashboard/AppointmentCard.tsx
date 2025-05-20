@@ -3,8 +3,8 @@ import React from 'react';
 import { Calendar, Clock, UserCircle, Video, FileText, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { TimeZoneService } from '@/utils/timeZoneService';
 import { Appointment } from '@/types/appointment';
+import { formatAppointmentDate, formatAppointmentTime } from '@/utils/appointmentUtils';
 
 export interface AppointmentCardProps {
   appointment: Appointment;
@@ -25,17 +25,6 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
   onDocumentSession,
   onSessionDidNotOccur
 }) => {
-  // Format time for display in user's time zone directly from UTC timestamps
-  const formatTimeDisplay = (utcTimestamp: string) => {
-    return TimeZoneService.formatUTCInTimezone(utcTimestamp, userTimeZone, 'h:mm a');
-  };
-  
-  // Format date from UTC timestamp
-  const formatDateDisplay = (utcTimestamp: string) => {
-    const localDate = TimeZoneService.fromUTC(utcTimestamp, userTimeZone);
-    return localDate.toFormat('EEEE, MMMM d, yyyy');
-  };
-
   if (onDocumentSession) {
     return (
       <Card key={appointment.id} className="mb-3">
@@ -46,14 +35,14 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
           </CardTitle>
           <CardDescription className="flex items-center">
             <Calendar className="h-4 w-4 mr-2" />
-            {formatDateDisplay(appointment.start_at)}
+            {formatAppointmentDate(appointment.start_at, userTimeZone)}
           </CardDescription>
         </CardHeader>
         <CardContent className="pb-2">
           <div className="flex items-center">
             <Clock className="h-4 w-4 mr-2" />
             <span className="text-sm">
-              {formatTimeDisplay(appointment.start_at)} - {formatTimeDisplay(appointment.end_at)}
+              {formatAppointmentTime(appointment.start_at, userTimeZone)} - {formatAppointmentTime(appointment.end_at, userTimeZone)}
             </span>
           </div>
           <div className="text-sm mt-1">{appointment.type}</div>
@@ -90,12 +79,12 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
       <CardHeader className="pb-2">
         <CardTitle className="text-base font-semibold flex items-center">
           <Clock className="h-4 w-4 mr-2" />
-          {formatTimeDisplay(appointment.start_at)} - {formatTimeDisplay(appointment.end_at)} 
+          {formatAppointmentTime(appointment.start_at, userTimeZone)} - {formatAppointmentTime(appointment.end_at, userTimeZone)} 
           <span className="text-xs text-gray-500 ml-1">({timeZoneDisplay})</span>
         </CardTitle>
         <CardDescription className="flex items-center">
           <Calendar className="h-4 w-4 mr-2" />
-          {formatDateDisplay(appointment.start_at)}
+          {formatAppointmentDate(appointment.start_at, userTimeZone)}
         </CardDescription>
       </CardHeader>
       <CardContent className="pb-2">

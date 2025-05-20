@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { TimeZoneService } from "@/utils/timeZoneService";
 import { DateTime } from "luxon";
 import { Appointment } from "@/types/appointment";
+import { formatClientName } from "@/utils/appointmentUtils";
 
 // Interface for the raw Supabase response
 interface RawSupabaseAppointment {
@@ -208,12 +209,11 @@ export const useAppointments = (
         `[useAppointments] Fetched ${rawDataAny.length || 0} raw appointments.`
       );
 
-      // Safely process the data with standardized client name formatting
+      // Safely process the data with standardized client name formatting using our shared function
       return rawDataAny.map((rawAppt: any): Appointment => {
         // Process client data, ensure we handle nested objects correctly
         const rawClientData = rawAppt.clients;
         let clientData: Appointment["client"] | undefined;
-        let clientName = "Unknown Client";
 
         if (rawClientData) {
           // Handle both object and array structures (depending on Supabase's response format)
@@ -227,35 +227,11 @@ export const useAppointments = (
               client_last_name: clientInfo.client_last_name || "",
               client_preferred_name: clientInfo.client_preferred_name || "",
             };
-
-            // STANDARDIZED CLIENT NAME FORMATTING:
-            // First check if both preferred_name AND last_name exist (AND condition)
-            // Only use preferred_name + last_name when both exist, otherwise fall back
-            if (
-              clientData.client_preferred_name &&
-              clientData.client_last_name
-            ) {
-              clientName = `${clientData.client_preferred_name} ${clientData.client_last_name}`;
-            } else if (
-              clientData.client_first_name &&
-              clientData.client_last_name
-            ) {
-              clientName = `${clientData.client_first_name} ${clientData.client_last_name}`;
-            } else {
-              // Handle edge cases
-              clientName =
-                [
-                  clientData.client_preferred_name ||
-                    clientData.client_first_name ||
-                    "",
-                  clientData.client_last_name || "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")
-                  .trim() || "Unknown Client";
-            }
           }
         }
+
+        // Use our standardized client name formatting function
+        const clientName = formatClientName(clientData);
 
         return {
           id: rawAppt.id,

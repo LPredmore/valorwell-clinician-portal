@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -22,8 +21,6 @@ interface AppointmentDetailsDialogProps {
   appointment: Appointment | null;
   onAppointmentUpdated: () => void;
   userTimeZone: string;
-  // Define clientTimeZone as optional to fix the type error
-  clientTimeZone?: string;
 }
 
 const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
@@ -31,8 +28,7 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
   onClose,
   appointment,
   onAppointmentUpdated,
-  userTimeZone,
-  clientTimeZone // Include in destructuring
+  userTimeZone
 }) => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
