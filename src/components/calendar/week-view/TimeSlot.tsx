@@ -179,7 +179,7 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
     }
 
     // Set title for tooltip
-    title = ${appointment.clientName || 'Unknown Client'} - ${appointment.start.toFormat('h:mm a')} to ${appointment.end.toFormat('h:mm a')};
+    title = `${appointment.clientName || 'Unknown Client'} - ${appointment.start.toFormat('h:mm a')} to ${appointment.end.toFormat('h:mm a')}`;
     
     // Enable dragging
     draggable = true;
