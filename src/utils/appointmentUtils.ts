@@ -201,12 +201,40 @@ export const convertAppointmentBlockToAppointment = (
   const start_at = appointmentBlock.start?.toUTC?.()?.toISO?.() || '';
   const end_at = appointmentBlock.end?.toUTC?.()?.toISO?.() || '';
   
-  // Create a minimal client object
+  // Extract client name parts if available
+  let firstName = '';
+  let lastName = '';
+  if (appointmentBlock.clientName) {
+    const nameParts = appointmentBlock.clientName.split(' ');
+    if (nameParts.length > 1) {
+      // If there are multiple parts, assume last part is last name
+      lastName = nameParts.pop() || '';
+      firstName = nameParts.join(' ');
+    } else {
+      // If only one part, assume it's first name
+      firstName = appointmentBlock.clientName;
+    }
+  }
+  
+  // Create a more complete client object
   const client = {
-    client_first_name: '',
-    client_last_name: '',
-    client_preferred_name: ''
+    client_first_name: firstName,
+    client_last_name: lastName,
+    client_preferred_name: firstName
   };
+  
+  // Log the conversion for debugging
+  console.log('[convertAppointmentBlockToAppointment] Converting block to appointment:', {
+    id: appointmentBlock.id,
+    clientId: appointmentBlock.clientId,
+    clientName: appointmentBlock.clientName,
+    start: appointmentBlock.start?.toString(),
+    end: appointmentBlock.end?.toString(),
+    convertedStart: start_at,
+    convertedEnd: end_at,
+    extractedFirstName: firstName,
+    extractedLastName: lastName
+  });
   
   // Return a new Appointment object with the data from the AppointmentBlock
   return {

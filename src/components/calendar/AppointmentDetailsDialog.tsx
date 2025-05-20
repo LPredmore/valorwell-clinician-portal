@@ -124,23 +124,36 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
     }
   };
   
-  // Get client name with fallbacks
+  // Get client name with fallbacks - FIXED to always include last name
   const getClientName = () => {
-    if (appointment.clientName) {
+    // First try to use the pre-formatted clientName
+    if (appointment.clientName && appointment.clientName.includes(' ')) {
       return appointment.clientName;
     }
     
+    // If we have client object, construct the name properly
     if (appointment.client) {
       const { client_preferred_name, client_first_name, client_last_name } = appointment.client;
+      
+      // Use preferred name + last name if available
       if (client_preferred_name && client_last_name) {
         return `${client_preferred_name} ${client_last_name}`;
-      } else if (client_first_name && client_last_name) {
-        return `${client_first_name} ${client_last_name}`;
-      } else if (client_preferred_name || client_first_name) {
-        return client_preferred_name || client_first_name || '';
-      } else if (client_last_name) {
-        return client_last_name;
       }
+      // Use first name + last name if available
+      else if (client_first_name && client_last_name) {
+        return `${client_first_name} ${client_last_name}`;
+      }
+      // Use whatever combination we can get
+      else {
+        const firstName = client_preferred_name || client_first_name || '';
+        const lastName = client_last_name || '';
+        return [firstName, lastName].filter(Boolean).join(' ') || 'Unknown Client';
+      }
+    }
+    
+    // If we have clientName but no space (just first name), try to add client_id
+    if (appointment.clientName) {
+      return `${appointment.clientName} (ID: ${appointment.client_id || 'unknown'})`;
     }
     
     return 'Unknown Client';
@@ -267,6 +280,11 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
                 </span>
               </div>
               
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-500">Client ID:</span>
+                <span className="text-xs font-mono">{appointment.client_id || 'Unknown'}</span>
+              </div>
+              
               {isRecurring && (
                 <div className="flex items-center gap-2">
                   <Badge variant="outline" className="bg-blue-50">
@@ -285,6 +303,11 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
                     Warning: Client data incomplete
                   </Badge>
                 )}
+              </div>
+              
+              <div className="text-xs text-gray-500 mt-2">
+                <div><strong>Start:</strong> {appointment.start_at || 'Not set'}</div>
+                <div><strong>End:</strong> {appointment.end_at || 'Not set'}</div>
               </div>
             </div>
           </div>
