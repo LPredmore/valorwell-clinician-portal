@@ -202,10 +202,10 @@ const PersonalInfoTab: React.FC<TabProps> = ({
             />
             <FormField
               control={form.control}
-              name="client_state"
+              name="client_address"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>State</FormLabel>
+                  <FormLabel>Address</FormLabel>
                   <FormControl>
                     <Input {...field} readOnly={!isEditing} />
                   </FormControl>
@@ -213,6 +213,47 @@ const PersonalInfoTab: React.FC<TabProps> = ({
                 </FormItem>
               )}
             />
+            <div className="grid grid-cols-3 gap-2">
+              <FormField
+                control={form.control}
+                name="client_city"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>City</FormLabel>
+                    <FormControl>
+                      <Input {...field} readOnly={!isEditing} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="client_state"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>State</FormLabel>
+                    <FormControl>
+                      <Input {...field} readOnly={!isEditing} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="client_zipcode"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Zip Code</FormLabel>
+                    <FormControl>
+                      <Input {...field} readOnly={!isEditing} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
             <FormField
               control={form.control}
               name="client_time_zone"

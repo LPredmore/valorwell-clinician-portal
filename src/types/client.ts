@@ -1,4 +1,3 @@
-
 export interface ClientDetails {
   id: string;
   client_first_name: string | null;
@@ -88,11 +87,30 @@ export interface ClientDetails {
   client_tricare_policy_id: string | null;
   client_tricare_has_referral: string | null;
   client_tricare_referral_number: string | null;
-  // Added field for recent discharge date explicitly as string to clarify type expectations
+  // Added fields from the schema
   client_recentdischarge: string | null;
-  client_branchOS?: string | null;
-  client_disabilityrating?: string | null;
-  client_relationship?: string | null;
+  client_branchOS: string | null;
+  client_disabilityrating: string | null;
+  client_relationship: string | null;
+  client_is_profile_complete: string | null;
+  client_treatmentplan_startdate: string | null;
+  client_temppassword: string | null;
+  client_primary_payer_id: string | null;
+  client_secondary_payer_id: string | null;
+  client_tertiary_payer_id: string | null;
+  eligibility_status_primary: string | null;
+  eligibility_last_checked_primary: string | null;
+  eligibility_claimmd_id_primary: string | null;
+  eligibility_response_details_primary_json: any | null;
+  eligibility_copay_primary: number | null;
+  eligibility_deductible_primary: number | null;
+  eligibility_coinsurance_primary_percent: number | null;
+  stripe_customer_id: string | null;
+  client_city: string | null;
+  client_zipcode: string | null;
+  client_address: string | null;
+  client_zip_code: string | null;
+  // Keep existing fields for compatibility
   client_veteran_relationship?: string | null;
   client_situation_explanation?: string | null;
   client_mental_health_referral?: string | null;

@@ -138,6 +138,12 @@ const ClientDetails = () => {
     client_tricare_policy_id: z.string().optional().nullable(),
     client_tricare_has_referral: z.string().optional().nullable(),
     client_tricare_referral_number: z.string().optional().nullable(),
+    client_city: z.string().optional().nullable(),
+    client_zipcode: z.string().optional().nullable(),
+    client_address: z.string().optional().nullable(),
+    client_zip_code: z.string().optional().nullable(),
+    client_treatmentplan_startdate: z.date().optional().nullable(),
+    client_is_profile_complete: z.string().optional().nullable(),
   });
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -192,6 +198,12 @@ const ClientDetails = () => {
       client_tricare_policy_id: clientData?.client_tricare_policy_id || "",
       client_tricare_has_referral: clientData?.client_tricare_has_referral || "",
       client_tricare_referral_number: clientData?.client_tricare_referral_number || "",
+      client_city: clientData?.client_city || "",
+      client_zipcode: clientData?.client_zipcode || "",
+      client_address: clientData?.client_address || "",
+      client_zip_code: clientData?.client_zip_code || "",
+      client_treatmentplan_startdate: clientData?.client_treatmentplan_startdate ? parseDateString(clientData.client_treatmentplan_startdate) : null,
+      client_is_profile_complete: clientData?.client_is_profile_complete || "",
     },
   });
 
@@ -247,6 +259,12 @@ const ClientDetails = () => {
         client_tricare_policy_id: clientData.client_tricare_policy_id || "",
         client_tricare_has_referral: clientData.client_tricare_has_referral || "",
         client_tricare_referral_number: clientData.client_tricare_referral_number || "",
+        client_city: clientData.client_city || "",
+        client_zipcode: clientData.client_zipcode || "",
+        client_address: clientData.client_address || "",
+        client_zip_code: clientData.client_zip_code || "",
+        client_treatmentplan_startdate: clientData.client_treatmentplan_startdate ? parseDateString(clientData.client_treatmentplan_startdate) : null,
+        client_is_profile_complete: clientData.client_is_profile_complete || "",
       });
     }
   }, [clientData, form]);
@@ -260,6 +278,7 @@ const ClientDetails = () => {
         client_subscriber_dob_secondary: values.client_subscriber_dob_secondary ? formatDateForDB(values.client_subscriber_dob_secondary) : null,
         client_subscriber_dob_tertiary: values.client_subscriber_dob_tertiary ? formatDateForDB(values.client_subscriber_dob_tertiary) : null,
         client_age: values.client_age ? parseInt(values.client_age) : null,
+        client_treatmentplan_startdate: values.client_treatmentplan_startdate ? formatDateForDB(values.client_treatmentplan_startdate) : null,
       };
 
       const { error } = await supabase
