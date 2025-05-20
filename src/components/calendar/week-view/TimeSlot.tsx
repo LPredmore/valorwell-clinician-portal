@@ -60,14 +60,54 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
     });
   }
 
-  // For appointments, handle styling to ensure visual continuity
+  // Handle drag over event for empty time slots
+  const handleDragOver = (e: React.DragEvent) => {
+    if (onAppointmentDragOver) {
+      e.preventDefault(); // Allow drop - CRITICAL for drag and drop to work
+      onAppointmentDragOver(day, timeSlot, e);
+      
+      if (debugMode) {
+        console.log('[TimeSlot] Drag over:', {
+          day: new Date(day).toISOString().split('T')[0],
+          time: `${timeSlot.getHours()}:${timeSlot.getMinutes().toString().padStart(2, '0')}`,
+          type: appointment ? 'appointment' : (isAvailable && currentBlock) ? 'availability' : 'empty'
+        });
+      }
+    }
+  };
+  
+  // Handle drop event for empty time slots
+  const handleDrop = (e: React.DragEvent) => {
+    if (onAppointmentDrop) {
+      e.preventDefault();
+      onAppointmentDrop(day, timeSlot, e);
+      
+      if (debugMode) {
+        console.log('[TimeSlot] Appointment dropped on:', {
+          day: new Date(day).toISOString().split('T')[0],
+          time: `${timeSlot.getHours()}:${timeSlot.getMinutes().toString().padStart(2, '0')}`,
+          type: appointment ? 'appointment' : (isAvailable && currentBlock) ? 'availability' : 'empty'
+        });
+      }
+    }
+  };
+
+  // APPOINTMENT RENDERING LOGIC
+  let content = null;
+  let className = "";
+  let title = "";
+  let onClick = undefined;
+  let draggable = false;
+  let onDragStart = undefined;
+
+  // 1. APPOINTMENT RENDERING
   if (appointment) {
     if (debugMode) {
       console.log('[TimeSlot] RENDERING APPOINTMENT PATH');
     }
     
     // Handle appointment click event
-    const handleAppointmentClick = () => {
+    onClick = () => {
       if (onAppointmentClick && appointment) {
         // Find the original appointment in the originalAppointments array
         const originalAppointment = originalAppointments.find(a => a.id === appointment.id);
@@ -94,10 +134,10 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
     };
     
     // Base appointment styling that's consistent for all cells
-    const baseAppointmentClass = "p-1 bg-blue-100 border-l-4 border-blue-500 h-full w-full cursor-pointer transition-colors hover:bg-blue-200 z-20 relative";
+    const baseAppointmentClass = "p-1 bg-blue-100 border-l-4 border-blue-500 h-full w-full cursor-pointer transition-colors hover:bg-blue-200 z-20 relative bg-green-300/50";
     
     // Handle drag start event
-    const handleDragStart = (e: React.DragEvent) => {
+    onDragStart = (e: React.DragEvent) => {
       if (onAppointmentDragStart && appointment) {
         // Find the original appointment in the originalAppointments array
         const originalAppointment = originalAppointments.find(a => a.id === appointment.id);
@@ -144,45 +184,32 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
       positionClass += " rounded-b border-b";
     }
 
+    // Set title for tooltip
+    title = `${appointment.clientName || 'Unknown Client'} - ${appointment.start.toFormat('h:mm a')} to ${appointment.end.toFormat('h:mm a')}`;
+    
+    // Enable dragging
+    draggable = true;
+
     // For the start of an appointment, show client name
     if (isStartOfAppointment) {
       if (debugMode) {
         console.log('[TimeSlot] RENDERING APPOINTMENT START with class:', `${baseAppointmentClass} ${positionClass}`);
       }
       
-      return (
-        <div
-          className={`${baseAppointmentClass} ${positionClass} text-xs font-medium truncate`}
-          onClick={handleAppointmentClick}
-          draggable={true}
-          onDragStart={handleDragStart}
-          title={`${appointment.clientName || 'Unknown Client'} - ${appointment.start.toFormat('h:mm a')} to ${appointment.end.toFormat('h:mm a')}`}
-        >
-          {appointment.clientName || 'Unknown Client'}
-        </div>
-      );
-    } 
-    
-    // For continuation cells
-    if (debugMode) {
-      console.log('[TimeSlot] RENDERING APPOINTMENT CONTINUATION with class:', `${baseAppointmentClass} ${positionClass}`);
+      className = `${baseAppointmentClass} ${positionClass} text-xs font-medium truncate appointment-start`;
+      content = appointment.clientName || 'Unknown Client';
+    } else {
+      // For continuation cells
+      if (debugMode) {
+        console.log('[TimeSlot] RENDERING APPOINTMENT CONTINUATION with class:', `${baseAppointmentClass} ${positionClass}`);
+      }
+      
+      className = `${baseAppointmentClass} ${positionClass} text-xs opacity-75 appointment-continuation`;
+      content = '\u00A0'; // Non-breaking space
     }
-    
-    return (
-      <div
-        className={`${baseAppointmentClass} ${positionClass} text-xs opacity-75`}
-        onClick={handleAppointmentClick}
-        draggable={true}
-        onDragStart={handleDragStart}
-        title={`${appointment.clientName || 'Unknown Client'} - ${appointment.start.toFormat('h:mm a')} to ${appointment.end.toFormat('h:mm a')}`}
-      >
-        &nbsp;
-      </div>
-    );
-  } 
-  
-  // For availability blocks, ensure visual continuity
-  if (isAvailable && currentBlock && !appointment) {
+  }
+  // 2. AVAILABILITY BLOCK RENDERING
+  else if (isAvailable && currentBlock && !appointment) {
     if (debugMode) {
       console.log('[TimeSlot] RENDERING AVAILABLE PATH - isAvailable && currentBlock are both true');
     }
@@ -192,86 +219,83 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
       : 'bg-green-100 border-green-500';
     
     // Complete class set for availability, with consistent borders
-    let availabilityClass = `p-1 ${availabilityBaseClass} border-l-4 border-r border-l w-full h-full cursor-pointer hover:bg-opacity-80 transition-colors z-10 relative`;
+    className = `p-1 ${availabilityBaseClass} border-l-4 border-r border-l w-full h-full cursor-pointer hover:bg-opacity-80 transition-colors z-10 relative availability-block bg-blue-300/50`;
     
     // Apply top/bottom borders and rounding based on position
     if (isStartOfBlock) {
-      availabilityClass += " border-t rounded-t";
+      className += " border-t rounded-t";
     } else {
-      availabilityClass += " border-t-0";
+      className += " border-t-0";
     }
     
     if (isEndOfBlock) {
-      availabilityClass += " border-b rounded-b";
+      className += " border-b rounded-b";
     } else {
-      availabilityClass += " border-b-0";
+      className += " border-b-0";
     }
     
     // Debug for specific date we're looking for
     if (debugMode) {
-      console.log('[TimeSlot] RENDERING AVAILABLE SLOT with class:', availabilityClass);
+      console.log('[TimeSlot] RENDERING AVAILABLE SLOT with class:', className);
     }
     
-    return (
-      <div
-        className={availabilityClass}
-        onClick={() => currentBlock && handleAvailabilityBlockClick(day, currentBlock)}
-      >
-        {isStartOfBlock && (
-          <div className="font-medium truncate flex items-center text-xs">
-            Available
-            {currentBlock?.isException && (
-              <span className="ml-1 text-[10px] px-1 py-0.5 bg-teal-200 text-teal-800 rounded-full">Modified</span>
-            )}
-          </div>
-        )}
-      </div>
-    );
-  }
-  
-  // Debug log when we expected availability but it's not showing
-  if (debugMode) {
-    if (isAvailable && !currentBlock) {
-      console.log('[TimeSlot] WARNING: isAvailable is TRUE but currentBlock is UNDEFINED');
-    }
+    // Set click handler
+    onClick = () => currentBlock && handleAvailabilityBlockClick(day, currentBlock);
     
-    console.log('[TimeSlot] RENDERING UNAVAILABLE PATH - final fallback', {
-      isAvailableProp: isAvailable,
-      hasCurrentBlock: !!currentBlock
-    });
-  }
-  
-  // Handle drag over event for empty time slots
-  const handleDragOver = (e: React.DragEvent) => {
-    if (onAppointmentDragOver) {
-      e.preventDefault(); // Allow drop
-      onAppointmentDragOver(day, timeSlot, e);
+    // Set content
+    if (isStartOfBlock) {
+      content = (
+        <div className="font-medium truncate flex items-center text-xs">
+          Available
+          {currentBlock?.isException && (
+            <span className="ml-1 text-[10px] px-1 py-0.5 bg-teal-200 text-teal-800 rounded-full">Modified</span>
+          )}
+        </div>
+      );
     }
-  };
-  
-  // Handle drop event for empty time slots
-  const handleDrop = (e: React.DragEvent) => {
-    if (onAppointmentDrop) {
-      e.preventDefault();
-      onAppointmentDrop(day, timeSlot, e);
-      
-      if (debugMode) {
-        console.log('[TimeSlot] Appointment dropped on:', {
-          day: new Date(day).toISOString().split('T')[0],
-          time: `${timeSlot.getHours()}:${timeSlot.getMinutes().toString().padStart(2, '0')}`
-        });
+  }
+  // 3. EMPTY SLOT RENDERING
+  else {
+    // Debug log when we expected availability but it's not showing
+    if (debugMode) {
+      if (isAvailable && !currentBlock) {
+        console.log('[TimeSlot] WARNING: isAvailable is TRUE but currentBlock is UNDEFINED');
       }
+      
+      console.log('[TimeSlot] RENDERING EMPTY SLOT - no appointment or availability', {
+        isAvailableProp: isAvailable,
+        hasCurrentBlock: !!currentBlock
+      });
     }
-  };
+    
+    // Empty cell with no text, just drag handlers
+    // Make sure it's fully interactive for drag and drop
+    className = "h-full w-full z-0 relative empty-slot bg-red-300/50 cursor-pointer";
+  }
+
+  // Debug class for easier inspection
+  const debugClass = appointment ? "has-appointment" :
+                    (isAvailable && currentBlock) ? "has-availability" :
+                    "empty-slot";
+
+  // Determine if this slot should accept drops
+  // We allow drops on empty slots and availability blocks, but not on existing appointments
+  const shouldAcceptDrops = !appointment;
   
-  // Default empty cell with faded "Unavailable" text on hover
+  // Single return statement with conditional rendering
   return (
     <div
-      className="h-full w-full opacity-0 group-hover:opacity-100 flex items-center justify-center text-[10px] text-gray-400 z-0 relative"
-      onDragOver={handleDragOver}
-      onDrop={handleDrop}
+      className={`${className} ${debugClass}`}
+      onClick={onClick}
+      draggable={draggable}
+      onDragStart={onDragStart}
+      onDragOver={shouldAcceptDrops ? handleDragOver : undefined}
+      onDrop={shouldAcceptDrops ? handleDrop : undefined}
+      title={title}
+      data-testid={`timeslot-${formattedDay}-${formattedTime}`}
+      data-slot-type={appointment ? 'appointment' : (isAvailable && currentBlock) ? 'availability' : 'empty'}
     >
-      Unavailable
+      {content}
     </div>
   );
 };
