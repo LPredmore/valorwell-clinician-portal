@@ -13,14 +13,16 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useToast } from '@/hooks/use-toast';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import EditAppointmentDialog from './EditAppointmentDialog';
+import { Appointment } from '@/types/appointment';
 
 interface AppointmentDetailsDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  appointment: any | null;
+  appointment: Appointment | null;
   onAppointmentUpdated: () => void;
   userTimeZone: string;
-  clientTimeZone?: string; // Add clientTimeZone prop as optional
+  // Define clientTimeZone as optional to fix the type error
+  clientTimeZone?: string;
 }
 
 const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
@@ -47,19 +49,32 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
     }
   }, [appointment]);
 
+  // Return null if appointment is null to prevent errors
   if (!appointment) return null;
 
-  // Format date for display
-  const formatDate = (dateString: string) => {
+  // Enhanced logging to debug appointment data
+  console.log('[AppointmentDetailsDialog] Rendering with appointment:', {
+    id: appointment.id,
+    clientName: appointment.clientName,
+    clientId: appointment.client_id,
+    client: appointment.client,
+    start_at: appointment.start_at,
+    end_at: appointment.end_at
+  });
+
+  // Format date for display - with better error handling
+  const formatDate = (dateString: string | undefined) => {
+    if (!dateString) return 'No date available';
     try {
       return format(new Date(dateString), 'EEEE, MMMM d, yyyy');
     } catch (error) {
       console.error('Error formatting date:', error);
-      return dateString;
+      return 'Invalid date format';
     }
   };
   
-  const formatTime = (timeString: string) => {
+  const formatTime = (timeString: string | undefined) => {
+    if (!timeString) return 'N/A';
     try {
       const [hours, minutes] = timeString.split(':').map(Number);
       const date = new Date();
@@ -67,7 +82,7 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
       return format(date, 'h:mm a');
     } catch (error) {
       console.error('Error formatting time:', error);
-      return timeString;
+      return 'Invalid time format';
     }
   };
 
@@ -179,14 +194,14 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-gray-500" />
-                <span>{appointment.date ? formatDate(appointment.date) : 'No date'}</span>
+                <span>{formatDate(appointment.date)}</span>
               </div>
               
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4 text-gray-500" />
                 <span>
-                  {appointment.start_time ? formatTime(appointment.start_time) : 'N/A'} - 
-                  {appointment.end_time ? formatTime(appointment.end_time) : 'N/A'}
+                  {formatTime(appointment.start_time)} - 
+                  {formatTime(appointment.end_time)}
                 </span>
               </div>
               

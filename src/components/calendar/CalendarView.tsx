@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import WeekView from './WeekView';
 import MonthView from './MonthView';
@@ -75,7 +76,7 @@ const CalendarView = ({
       const sampleSize = Math.min(3, appointments.length);
       console.log(`[CalendarView] Sample of ${sampleSize} appointments:`);
       appointments.slice(0, sampleSize).forEach((app, idx) => {
-        console.log(`[CalendarView] Sample appointment ${idx+1}:`, {
+        console.log(`[CalendarView] Sample appointment ${idx+1}/${samplesToLog}:`, {
           id: app.id,
           startAt: app.start_at,
           endAt: app.end_at,
@@ -98,14 +99,16 @@ const CalendarView = ({
 
   // Handler for appointment clicked in calendar
   const handleAppointmentClick = (appointment: Appointment) => {
-    setSelectedAppointmentId(appointment.id);
-    setIsAppointmentDialogOpen(true);
     console.log(`[CalendarView] Appointment clicked:`, {
       id: appointment.id,
       clientName: appointment.clientName,
       clientId: appointment.client_id,
       startAt: appointment.start_at
     });
+    
+    // Store the appointment ID and open the dialog
+    setSelectedAppointmentId(appointment.id);
+    setIsAppointmentDialogOpen(true);
   };
 
   // Handler for availability block clicked in calendar
@@ -172,7 +175,7 @@ const CalendarView = ({
         </div>
       )}
       
-      {/* Appointment Details Dialog - fixed by removing clientTimeZone prop */}
+      {/* Appointment Details Dialog - properly pass the selected appointment and remove clientTimeZone */}
       <AppointmentDetailsDialog
         isOpen={isAppointmentDialogOpen}
         onClose={() => setIsAppointmentDialogOpen(false)}
