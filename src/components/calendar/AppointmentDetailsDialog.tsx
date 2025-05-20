@@ -1,20 +1,37 @@
-
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogFooter,
+  DialogClose
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { format } from 'date-fns';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Calendar, Clock, User, MoreVertical, Trash, Edit } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { supabase } from '@/integrations/supabase/client';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Appointment } from '@/types/appointment';
 import { DateTime } from 'luxon';
-import EditAppointmentDialog from './week-view/EditAppointmentDialog';
+import { format } from 'date-fns';
+import { 
+  FormField,
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormMessage,
+  Form
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
+import { supabase } from '@/integrations/supabase/client';
 
 interface AppointmentDetailsDialogProps {
   isOpen: boolean;
@@ -35,11 +52,23 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [deleteOption, setDeleteOption] = useState<'single' | 'series'>('single');
   const [isRecurring, setIsRecurring] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   const { toast } = useToast();
 
+  const formSchema = z.object({
+    start_at: z.string().min(1, 'Start time is required'),
+    end_at: z.string().min(1, 'End time is required'),
+  });
+
+  const form = useForm({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      start_at: appointment ? DateTime.fromISO(appointment.start_at).toFormat('yyyy-MM-dd\'T\'HH:mm') : '',
+      end_at: appointment ? DateTime.fromISO(appointment.end_at).toFormat('yyyy-MM-dd\'T\'HH:mm') : '',
+    },
+  });
+
   useEffect(() => {
-    // Check if appointment is part of a recurring series
     if (appointment?.recurring_group_id) {
       setIsRecurring(true);
     } else {
@@ -47,123 +76,53 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
     }
   }, [appointment]);
 
-  // Return null if appointment is null to prevent errors
+  useEffect(() => {
+    if (appointment) {
+      form.reset({
+        start_at: DateTime.fromISO(appointment.start_at).toFormat('yyyy-MM-dd\'T\'HH:mm'),
+        end_at: DateTime.fromISO(appointment.end_at).toFormat('yyyy-MM-dd\'T\'HH:mm'),
+      });
+    }
+  }, [appointment, form]);
+
   if (!appointment) return null;
 
-  // Enhanced logging to debug appointment data
-  console.log('[AppointmentDetailsDialog] Rendering with appointment:', {
-    id: appointment.id,
-    clientName: appointment.clientName,
-    clientId: appointment.client_id,
-    client: appointment.client ? {
-      firstName: appointment.client.client_first_name,
-      lastName: appointment.client.client_last_name,
-      preferredName: appointment.client.client_preferred_name
-    } : 'No client data',
-    hasClient: !!appointment.client,
-    start_at: appointment.start_at,
-    end_at: appointment.end_at
-  });
-  
-  // Validate required fields are present
-  if (!appointment.id || !appointment.start_at || !appointment.end_at) {
-    console.error('[AppointmentDetailsDialog] Appointment is missing required fields:', {
-      hasId: !!appointment.id,
-      hasStartAt: !!appointment.start_at,
-      hasEndAt: !!appointment.end_at
-    });
-  }
+  const handleSubmit = async (values: z.infer<typeof formSchema>) => {
+    setIsLoading(true);
+    try {
+      const { error } = await supabase
+        .from('appointments')
+        .update({
+          start_at: values.start_at,
+          end_at: values.end_at
+        })
+        .eq('id', appointment.id);
 
-  // Format date for display - with better error handling
-  const formatDate = (dateString: string | undefined) => {
-    if (!dateString) return 'No date available';
-    try {
-      return format(new Date(dateString), 'EEEE, MMMM d, yyyy');
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Appointment updated successfully",
+      });
+
+      setIsEditing(false);
+      onAppointmentUpdated();
     } catch (error) {
-      console.error('Error formatting date:', error);
-      return 'Invalid date format';
+      console.error('Error updating appointment:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update appointment",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
     }
-  };
-  
-  // Ensure client data is available
-  const ensureClientData = () => {
-    if (!appointment.client) {
-      console.warn('[AppointmentDetailsDialog] No client data available, creating default client object');
-      appointment.client = {
-        client_first_name: '',
-        client_last_name: '',
-        client_preferred_name: ''
-      };
-    }
-  };
-  
-  // Call the function to ensure client data is available
-  ensureClientData();
-  
-  // Use start_at to format the date
-  const getFormattedDate = () => {
-    if (!appointment.start_at) return 'No date available';
-    try {
-      const date = new Date(appointment.start_at);
-      return format(date, 'EEEE, MMMM d, yyyy');
-    } catch (error) {
-      console.error('Error formatting start_at date:', error);
-      return 'Invalid date format';
-    }
-  };
-  
-  // Parse time from ISO string
-  const getFormattedTime = (isoString: string | undefined) => {
-    if (!isoString) return 'N/A';
-    try {
-      const date = new Date(isoString);
-      return format(date, 'h:mm a');
-    } catch (error) {
-      console.error('Error formatting time from ISO:', error);
-      return 'Invalid time format';
-    }
-  };
-  
-  // Get client name with fallbacks - FIXED to always include last name
-  const getClientName = () => {
-    // First try to use the pre-formatted clientName
-    if (appointment.clientName && appointment.clientName.includes(' ')) {
-      return appointment.clientName;
-    }
-    
-    // If we have client object, construct the name properly
-    if (appointment.client) {
-      const { client_preferred_name, client_first_name, client_last_name } = appointment.client;
-      
-      // Use preferred name + last name if available
-      if (client_preferred_name && client_last_name) {
-        return `${client_preferred_name} ${client_last_name}`;
-      }
-      // Use first name + last name if available
-      else if (client_first_name && client_last_name) {
-        return `${client_first_name} ${client_last_name}`;
-      }
-      // Use whatever combination we can get
-      else {
-        const firstName = client_preferred_name || client_first_name || '';
-        const lastName = client_last_name || '';
-        return [firstName, lastName].filter(Boolean).join(' ') || 'Unknown Client';
-      }
-    }
-    
-    // If we have clientName but no space (just first name), try to add client_id
-    if (appointment.clientName) {
-      return `${appointment.clientName} (ID: ${appointment.client_id || 'unknown'})`;
-    }
-    
-    return 'Unknown Client';
   };
 
   const handleDeleteAppointment = async () => {
     setIsLoading(true);
     try {
       if (isRecurring && deleteOption === 'series') {
-        // Delete all future appointments in the series
         const { error } = await supabase
           .from('appointments')
           .delete()
@@ -177,7 +136,6 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
           description: "All future recurring appointments have been deleted.",
         });
       } else {
-        // Delete only this specific appointment
         const { error } = await supabase
           .from('appointments')
           .delete()
@@ -206,6 +164,56 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
     }
   };
 
+  const getClientName = () => {
+    if (appointment.clientName && appointment.clientName.includes(' ')) {
+      return appointment.clientName;
+    }
+    
+    if (appointment.client) {
+      const { client_preferred_name, client_first_name, client_last_name } = appointment.client;
+      
+      if (client_preferred_name && client_last_name) {
+        return `${client_preferred_name} ${client_last_name}`;
+      }
+      else if (client_first_name && client_last_name) {
+        return `${client_first_name} ${client_last_name}`;
+      }
+      else {
+        const firstName = client_preferred_name || client_first_name || '';
+        const lastName = client_last_name || '';
+        return [firstName, lastName].filter(Boolean).join(' ') || 'Unknown Client';
+      }
+    }
+    
+    if (appointment.clientName) {
+      return `${appointment.clientName} (ID: ${appointment.client_id || 'unknown'})`;
+    }
+    
+    return 'Unknown Client';
+  };
+
+  const getFormattedDate = () => {
+    if (!appointment.start_at) return 'No date available';
+    try {
+      const date = new Date(appointment.start_at);
+      return format(date, 'EEEE, MMMM d, yyyy');
+    } catch (error) {
+      console.error('Error formatting start_at date:', error);
+      return 'Invalid date format';
+    }
+  };
+
+  const getFormattedTime = (isoString: string | undefined) => {
+    if (!isoString) return 'N/A';
+    try {
+      const date = new Date(isoString);
+      return format(date, 'h:mm a');
+    } catch (error) {
+      console.error('Error formatting time from ISO:', error);
+      return 'Invalid time format';
+    }
+  };
+
   const getRecurrenceText = () => {
     if (!appointment.recurring_group_id) return '';
     
@@ -221,100 +229,135 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
     }
   };
 
-  const handleEditClick = () => {
-    setIsEditDialogOpen(true);
-  };
-
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>Appointment Details</DialogTitle>
+            <DialogTitle>
+              {isEditing ? 'Edit Appointment' : 'Appointment Details'}
+            </DialogTitle>
           </DialogHeader>
           
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <User className="h-4 w-4 text-gray-500" />
-                <span className="font-medium">
-                  {getClientName()}
-                </span>
-              </div>
-              
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon">
-                    <MoreVertical className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={handleEditClick}>
-                    <Edit className="h-4 w-4 mr-2" />
-                    Edit Appointment
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    className="text-destructive focus:text-destructive" 
-                    onClick={() => setIsDeleteDialogOpen(true)}
+          {isEditing ? (
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+                <div>
+                  <h3 className="text-sm font-medium mb-2">Client: {getClientName()}</h3>
+                </div>
+                
+                <FormField
+                  control={form.control}
+                  name="start_at"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Start Time</FormLabel>
+                      <FormControl>
+                        <Input type="datetime-local" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="end_at"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>End Time</FormLabel>
+                      <FormControl>
+                        <Input type="datetime-local" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <DialogFooter className="flex gap-2">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => setIsEditing(false)}
                   >
-                    <Trash className="h-4 w-4 mr-2" />
-                    Delete Appointment
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-            
-            <Separator />
-            
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-gray-500" />
-                <span>{getFormattedDate()}</span>
-              </div>
-              
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-gray-500" />
-                <span>
-                  {appointment.start_at ? getFormattedTime(appointment.start_at) : 'N/A'} -
-                  {appointment.end_at ? getFormattedTime(appointment.end_at) : 'N/A'}
-                </span>
-              </div>
-              
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-500">Client ID:</span>
-                <span className="text-xs font-mono">{appointment.client_id || 'Unknown'}</span>
-              </div>
-              
-              {isRecurring && (
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={isLoading}>
+                    {isLoading ? 'Saving...' : 'Save Changes'}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="bg-blue-50">
-                    <Calendar className="h-3 w-3 mr-1" />
-                    {getRecurrenceText()}
+                  <User className="h-4 w-4 text-gray-500" />
+                  <span className="font-medium">
+                    {getClientName()}
+                  </span>
+                </div>
+                
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => setIsEditing(true)}>
+                      <Edit className="h-4 w-4 mr-2" />
+                      Edit Appointment
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      className="text-destructive focus:text-destructive" 
+                      onClick={() => setIsDeleteDialogOpen(true)}
+                    >
+                      <Trash className="h-4 w-4 mr-2" />
+                      Delete Appointment
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+              
+              <Separator />
+              
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-gray-500" />
+                  <span>{getFormattedDate()}</span>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-gray-500" />
+                  <span>
+                    {getFormattedTime(appointment.start_at)} - {getFormattedTime(appointment.end_at)}
+                  </span>
+                </div>
+                
+                {isRecurring && (
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="bg-blue-50">
+                      <Calendar className="h-3 w-3 mr-1" />
+                      {getRecurrenceText()}
+                    </Badge>
+                  </div>
+                )}
+                
+                <div>
+                  <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
+                    {appointment.status || 'Scheduled'}
                   </Badge>
                 </div>
-              )}
-              
-              <div>
-                <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
-                  {appointment.status || 'Scheduled'}
-                </Badge>
-                {appointment.client_id && !appointment.client && (
-                  <Badge className="ml-2 bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
-                    Warning: Client data incomplete
-                  </Badge>
-                )}
               </div>
               
-              <div className="text-xs text-gray-500 mt-2">
-                <div><strong>Start:</strong> {appointment.start_at || 'Not set'}</div>
-                <div><strong>End:</strong> {appointment.end_at || 'Not set'}</div>
-              </div>
+              <DialogFooter>
+                <DialogClose asChild>
+                  <Button variant="outline">Close</Button>
+                </DialogClose>
+              </DialogFooter>
             </div>
-          </div>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={onClose}>Close</Button>
-          </DialogFooter>
+          )}
         </DialogContent>
       </Dialog>
       
@@ -351,23 +394,6 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      
-      {appointment && isEditDialogOpen && (
-        <EditAppointmentDialog
-          isOpen={isEditDialogOpen} 
-          appointment={appointment}
-          onClose={() => setIsEditDialogOpen(false)}
-          onUpdate={(updatedAppt) => {
-            setIsEditDialogOpen(false);
-            onAppointmentUpdated();
-          }}
-          onDelete={(id) => {
-            setIsEditDialogOpen(false);
-            onAppointmentUpdated();
-          }}
-          onAppointmentUpdated={onAppointmentUpdated}
-        />
-      )}
     </>
   );
 };
