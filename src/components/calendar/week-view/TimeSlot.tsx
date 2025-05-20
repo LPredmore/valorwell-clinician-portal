@@ -41,7 +41,7 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
   const formattedDay = new Date(day).toISOString().split('T')[0];
   const slotHour = timeSlot.getHours();
   const slotMinutes = timeSlot.getMinutes();
-  const formattedTime = ${slotHour}:${slotMinutes.toString().padStart(2, '0')};
+  const formattedTime = `${slotHour}:${slotMinutes.toString().padStart(2, '0')}`;
   const debugMode = formattedDay === specificDate && (slotHour >= 8 && slotHour <= 18);
   
   if (debugMode) {
