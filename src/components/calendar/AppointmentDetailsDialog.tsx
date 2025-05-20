@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { 
   Dialog, 
@@ -33,6 +34,7 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { supabase } from '@/integrations/supabase/client';
 import { formatClientName } from '@/utils/appointmentUtils';
+import { TimeZoneService } from '@/utils/timeZoneService';
 
 interface AppointmentDetailsDialogProps {
   isOpen: boolean;
@@ -56,16 +58,15 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const { toast } = useToast();
 
+  // Modified schema to only require start_at
   const formSchema = z.object({
     start_at: z.string().min(1, 'Start time is required'),
-    end_at: z.string().min(1, 'End time is required'),
   });
 
   const form = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
       start_at: appointment ? DateTime.fromISO(appointment.start_at).toFormat('yyyy-MM-dd\'T\'HH:mm') : '',
-      end_at: appointment ? DateTime.fromISO(appointment.end_at).toFormat('yyyy-MM-dd\'T\'HH:mm') : '',
     },
   });
 
@@ -81,7 +82,6 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
     if (appointment) {
       form.reset({
         start_at: DateTime.fromISO(appointment.start_at).toFormat('yyyy-MM-dd\'T\'HH:mm'),
-        end_at: DateTime.fromISO(appointment.end_at).toFormat('yyyy-MM-dd\'T\'HH:mm'),
       });
     }
   }, [appointment, form]);
@@ -91,11 +91,21 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsLoading(true);
     try {
+      // Convert start time to DateTime object in user timezone
+      const startDateTime = DateTime.fromISO(values.start_at, { zone: userTimeZone });
+      
+      // Calculate end time as 1 hour after start time
+      const endDateTime = startDateTime.plus({ hours: 1 });
+      
+      // Convert both to UTC for storage in database
+      const startUtc = startDateTime.toUTC().toISO();
+      const endUtc = endDateTime.toUTC().toISO();
+
       const { error } = await supabase
         .from('appointments')
         .update({
-          start_at: values.start_at,
-          end_at: values.end_at
+          start_at: startUtc,
+          end_at: endUtc
         })
         .eq('id', appointment.id);
 
@@ -240,25 +250,14 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
                   name="start_at"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Start Time</FormLabel>
+                      <FormLabel>Start Time (1 hour appointment)</FormLabel>
                       <FormControl>
                         <Input type="datetime-local" {...field} />
                       </FormControl>
                       <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="end_at"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>End Time</FormLabel>
-                      <FormControl>
-                        <Input type="datetime-local" {...field} />
-                      </FormControl>
-                      <FormMessage />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        End time will be automatically set to 1 hour after start time
+                      </p>
                     </FormItem>
                   )}
                 />
@@ -322,6 +321,7 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
                   <span>
                     {getFormattedTime(appointment.start_at)} - {getFormattedTime(appointment.end_at)}
                   </span>
+                  <span className="text-xs text-muted-foreground">(1 hour)</span>
                 </div>
                 
                 {isRecurring && (
