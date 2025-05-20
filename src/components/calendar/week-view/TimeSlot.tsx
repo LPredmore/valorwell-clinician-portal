@@ -61,8 +61,18 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
     
     // Handle appointment click event
     const handleAppointmentClick = () => {
-      if (onAppointmentClick) {
+      if (onAppointmentClick && appointment) {
+        // Fixed: Directly call onAppointmentClick with the appointment
         onAppointmentClick(appointment);
+        
+        if (debugMode) {
+          console.log('[TimeSlot] Appointment clicked:', {
+            id: appointment.id,
+            clientName: appointment.clientName,
+            start: appointment.start.toFormat('HH:mm'),
+            end: appointment.end.toFormat('HH:mm')
+          });
+        }
       }
     };
     
