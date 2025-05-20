@@ -67,7 +67,7 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
     };
     
     // Base appointment styling that's consistent for all cells
-    const baseAppointmentClass = "p-1 bg-blue-100 border-l-4 border-blue-500 h-full w-full cursor-pointer transition-colors";
+    const baseAppointmentClass = "p-1 bg-blue-100 border-l-4 border-blue-500 h-full w-full cursor-pointer transition-colors hover:bg-blue-200";
     
     // Position-specific styling
     let positionClass = "";
@@ -99,7 +99,7 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
       
       return (
         <div 
-          className={`${baseAppointmentClass} ${positionClass} text-xs font-medium truncate hover:bg-blue-200`}
+          className={`${baseAppointmentClass} ${positionClass} text-xs font-medium truncate`}
           onClick={handleAppointmentClick}
           title={`${appointment.clientName || 'Unknown Client'} - ${appointment.start.toFormat('h:mm a')} to ${appointment.end.toFormat('h:mm a')}`}
         >
@@ -115,7 +115,7 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
     
     return (
       <div 
-        className={`${baseAppointmentClass} ${positionClass} text-xs opacity-75 hover:bg-blue-200`}
+        className={`${baseAppointmentClass} ${positionClass} text-xs opacity-75`}
         onClick={handleAppointmentClick}
         title={`${appointment.clientName || 'Unknown Client'} - ${appointment.start.toFormat('h:mm a')} to ${appointment.end.toFormat('h:mm a')}`}
       >
@@ -135,7 +135,7 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
       : 'bg-green-100 border-green-500';
     
     // Complete class set for availability, with consistent borders
-    let availabilityClass = `p-1 ${availabilityBaseClass} border-l-4 border-r border-l w-full h-full`;
+    let availabilityClass = `p-1 ${availabilityBaseClass} border-l-4 border-r border-l w-full h-full cursor-pointer hover:bg-opacity-80 transition-colors`;
     
     // Apply top/bottom borders and rounding based on position
     if (isStartOfBlock) {
@@ -157,11 +157,11 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
     
     return (
       <div
-        className={`${availabilityClass} h-full w-full text-xs cursor-pointer hover:bg-opacity-80 transition-colors`}
+        className={availabilityClass}
         onClick={() => currentBlock && handleAvailabilityBlockClick(day, currentBlock)}
       >
         {isStartOfBlock && (
-          <div className="font-medium truncate flex items-center">
+          <div className="font-medium truncate flex items-center text-xs">
             Available
             {currentBlock?.isException && (
               <span className="ml-1 text-[10px] px-1 py-0.5 bg-teal-200 text-teal-800 rounded-full">Modified</span>

@@ -7,6 +7,7 @@ import { TimeZoneService } from '@/utils/timeZoneService';
 import { Appointment } from '@/types/appointment';
 import { DateTime } from 'luxon';
 import { AvailabilityBlock } from '@/types/availability';
+import AppointmentDetailsDialog from './AppointmentDetailsDialog';
 
 interface CalendarProps {
   view: 'week' | 'month';
@@ -32,6 +33,7 @@ const CalendarView = ({
   error = null
 }: CalendarProps) => {
   const [selectedAppointmentId, setSelectedAppointmentId] = useState<string | null>(null);
+  const [isAppointmentDialogOpen, setIsAppointmentDialogOpen] = useState(false);
   
   // Ensure we have a valid IANA timezone
   const validTimeZone = TimeZoneService.ensureIANATimeZone(userTimeZone);
@@ -41,6 +43,11 @@ const CalendarView = ({
   
   // Combine both refresh triggers
   const combinedRefreshTrigger = refreshTrigger + localRefreshTrigger;
+  
+  // Find the selected appointment from the ID
+  const selectedAppointment = selectedAppointmentId 
+    ? appointments.find(a => a.id === selectedAppointmentId) 
+    : null;
   
   // Log appointments data for debugging - CRITICAL FIX: Guard the map call
   if (Array.isArray(appointments)) {
@@ -93,6 +100,7 @@ const CalendarView = ({
   // Handler for appointment clicked in calendar
   const handleAppointmentClick = (appointment: Appointment) => {
     setSelectedAppointmentId(appointment.id);
+    setIsAppointmentDialogOpen(true);
     console.log(`[CalendarView] Appointment clicked:`, {
       id: appointment.id,
       clientName: appointment.clientName,
@@ -114,6 +122,13 @@ const CalendarView = ({
   const handleAvailabilityUpdated = () => {
     console.log('[CalendarView] Availability updated, triggering calendar refresh...');
     setLocalRefreshTrigger(prev => prev + 1);
+  };
+  
+  // Handler for when appointment is updated in the dialog
+  const handleAppointmentUpdated = () => {
+    console.log('[CalendarView] Appointment updated, triggering calendar refresh...');
+    setLocalRefreshTrigger(prev => prev + 1);
+    setIsAppointmentDialogOpen(false);
   };
 
   return (
@@ -157,6 +172,16 @@ const CalendarView = ({
           />
         </div>
       )}
+      
+      {/* Appointment Details Dialog */}
+      <AppointmentDetailsDialog
+        isOpen={isAppointmentDialogOpen}
+        onClose={() => setIsAppointmentDialogOpen(false)}
+        appointment={selectedAppointment}
+        onAppointmentUpdated={handleAppointmentUpdated}
+        userTimeZone={validTimeZone}
+        clientTimeZone={validTimeZone} // For now, use the same timezone
+      />
     </div>
   );
 };

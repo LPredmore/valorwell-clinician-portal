@@ -2,7 +2,6 @@
 import React, { useEffect } from "react";
 import Layout from "../components/layout/Layout";
 import CalendarView from "../components/calendar/CalendarView";
-import { Loader2 } from "lucide-react";
 import { addWeeks, subWeeks } from "date-fns";
 import { useCalendarState } from "../hooks/useCalendarState";
 import CalendarHeader from "../components/calendar/CalendarHeader";
@@ -36,6 +35,7 @@ const CalendarPage = () => {
     appointments,
     isLoading: isLoadingAppointments,
     error: appointmentsError,
+    refetch: refetchAppointments
   } = useAppointments(
     selectedClinicianId,
     // Start date for fetch range - 1 month before current date
@@ -88,6 +88,7 @@ const CalendarPage = () => {
   // Central function to handle any data changes that should trigger a refresh
   const handleDataChanged = () => {
     console.log("[CalendarPage] Data changed, refreshing calendar...");
+    refetchAppointments();
     setAppointmentRefreshTrigger(prev => prev + 1);
   };
 

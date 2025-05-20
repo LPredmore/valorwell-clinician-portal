@@ -94,8 +94,7 @@ const DayCell: React.FC<DayCellProps> = ({
             onClick={() => onAppointmentClick && onAppointmentClick(appointment)}
           >
             <div className="font-medium">{formatAppointmentTime(appointment)}</div>
-            {/* Use the standardized clientName from the appointment */}
-            <div className="truncate">{appointment.clientName}</div>
+            <div className="truncate font-medium">{appointment.clientName || 'Unknown Client'}</div>
           </div>
         ))}
       </div>

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -9,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { toast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import EditAppointmentDialog from './EditAppointmentDialog';
 
@@ -19,7 +20,6 @@ interface AppointmentDetailsDialogProps {
   appointment: any | null;
   onAppointmentUpdated: () => void;
   userTimeZone: string;
-  clientTimeZone: string;
 }
 
 const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
@@ -27,14 +27,14 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
   onClose,
   appointment,
   onAppointmentUpdated,
-  userTimeZone,
-  clientTimeZone
+  userTimeZone
 }) => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [deleteOption, setDeleteOption] = useState<'single' | 'series'>('single');
   const [isRecurring, setIsRecurring] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     // Check if appointment is part of a recurring series
@@ -47,8 +47,15 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
 
   if (!appointment) return null;
 
-  const appointmentDate = appointment.date ? new Date(appointment.date) : new Date();
-  const formattedDate = format(appointmentDate, 'EEEE, MMMM d, yyyy');
+  // Format date for display
+  const formatDate = (dateString: string) => {
+    try {
+      return format(new Date(dateString), 'EEEE, MMMM d, yyyy');
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return dateString;
+    }
+  };
   
   const formatTime = (timeString: string) => {
     try {
@@ -71,7 +78,7 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
           .from('appointments')
           .delete()
           .eq('recurring_group_id', appointment.recurring_group_id)
-          .gte('date', appointment.date);
+          .gte('start_at', appointment.start_at);
 
         if (error) throw error;
         
@@ -94,10 +101,8 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
         });
       }
       
-      console.log("[AppointmentDetailsDialog] Appointment deleted, triggering refresh");
       setIsDeleteDialogOpen(false);
       onClose();
-      // Explicitly call onAppointmentUpdated to refresh the calendar view
       onAppointmentUpdated();
     } catch (error) {
       console.error('Error deleting appointment:', error);
@@ -112,6 +117,8 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
   };
 
   const getRecurrenceText = () => {
+    if (!appointment.recurring_group_id) return '';
+    
     switch (appointment.appointment_recurring) {
       case 'weekly':
         return 'Repeats weekly';
@@ -170,12 +177,15 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-gray-500" />
-                <span>{formattedDate}</span>
+                <span>{appointment.date ? formatDate(appointment.date) : 'No date'}</span>
               </div>
               
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4 text-gray-500" />
-                <span>{formatTime(appointment.start_time)} - {formatTime(appointment.end_time)}</span>
+                <span>
+                  {appointment.start_time ? formatTime(appointment.start_time) : 'N/A'} - 
+                  {appointment.end_time ? formatTime(appointment.end_time) : 'N/A'}
+                </span>
               </div>
               
               {isRecurring && (
@@ -234,7 +244,7 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
+      
       {appointment && (
         <EditAppointmentDialog
           isOpen={isEditDialogOpen}
