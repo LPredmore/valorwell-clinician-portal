@@ -7,6 +7,7 @@ import { ClientDetails } from '@/types/client';
 import { TimeZoneService } from '@/utils/timeZoneService';
 import { DebugUtils } from '@/utils/debugUtils';
 import { TimeBlock, AppointmentBlock, AvailabilityException } from './types';
+import { formatClientName } from '@/utils/appointmentUtils';
 
 // Debug context name for this component
 const DEBUG_CONTEXT = 'useWeekViewData';
@@ -712,7 +713,7 @@ export const useWeekViewData = (
     });
   };
   
-  // Process appointments into appointment blocks - FIXED to handle timezone boundaries
+  // Process appointments into appointment blocks - UPDATED to use formatClientName utility
   const processAppointmentBlocks = (appts: Appointment[], clientMap: Map<string, Client>) => {
     console.log('[useWeekViewData] Processing appointment blocks', {
       appointmentsCount: appts.length,
@@ -738,13 +739,13 @@ export const useWeekViewData = (
         const end = DateTime.fromISO(appointment.end_at, { zone: 'UTC' }).setZone(userTimeZone);
         const day = start.startOf('day');
         
-        // Get client name
+        // Get client name using formatClientName utility for consistent formatting
         let clientName = appointment.clientName;
         if (!clientName) {
           const client = clientMap.get(appointment.client_id);
           if (client) {
-            clientName = client.client_preferred_name || 
-                        `${client.client_first_name} ${client.client_last_name}`;
+            // Use formatClientName to ensure preferred/first name AND last name are included
+            clientName = formatClientName(client);
           } else {
             clientName = getClientName(appointment.client_id);
           }
