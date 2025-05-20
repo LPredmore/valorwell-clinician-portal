@@ -94,7 +94,7 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
     };
     
     // Base appointment styling that's consistent for all cells
-    const baseAppointmentClass = "p-1 bg-blue-100 border-l-4 border-blue-500 h-full w-full cursor-pointer transition-colors hover:bg-blue-200";
+    const baseAppointmentClass = "p-1 bg-blue-100 border-l-4 border-blue-500 h-full w-full cursor-pointer transition-colors hover:bg-blue-200 z-20 relative";
     
     // Handle drag start event
     const handleDragStart = (e: React.DragEvent) => {
@@ -182,17 +182,17 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
   } 
   
   // For availability blocks, ensure visual continuity
-  if (isAvailable && currentBlock) {
+  if (isAvailable && currentBlock && !appointment) {
     if (debugMode) {
       console.log('[TimeSlot] RENDERING AVAILABLE PATH - isAvailable && currentBlock are both true');
     }
     
-    const availabilityBaseClass = currentBlock?.isException 
-      ? 'bg-teal-100 border-teal-500' 
+    const availabilityBaseClass = currentBlock?.isException
+      ? 'bg-teal-100 border-teal-500'
       : 'bg-green-100 border-green-500';
     
     // Complete class set for availability, with consistent borders
-    let availabilityClass = `p-1 ${availabilityBaseClass} border-l-4 border-r border-l w-full h-full cursor-pointer hover:bg-opacity-80 transition-colors`;
+    let availabilityClass = `p-1 ${availabilityBaseClass} border-l-4 border-r border-l w-full h-full cursor-pointer hover:bg-opacity-80 transition-colors z-10 relative`;
     
     // Apply top/bottom borders and rounding based on position
     if (isStartOfBlock) {
@@ -267,7 +267,7 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
   // Default empty cell with faded "Unavailable" text on hover
   return (
     <div
-      className="h-full w-full opacity-0 group-hover:opacity-100 flex items-center justify-center text-[10px] text-gray-400"
+      className="h-full w-full opacity-0 group-hover:opacity-100 flex items-center justify-center text-[10px] text-gray-400 z-0 relative"
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
