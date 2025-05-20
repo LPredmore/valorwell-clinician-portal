@@ -1,113 +1,111 @@
-import React, { useState } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogClose,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { DateTime } from "luxon";
-import { Appointment } from "@/types/appointment";
+import React from 'react';
+import { TimeBlock, AppointmentBlock } from './types';
+import { Appointment } from '@/types/appointment';
 
-interface EditAppointmentDialogProps {
-  isOpen: boolean;
-  appointment: Appointment | null;
-  onClose: () => void;
-  onSave: (updatedAppointment: {
-    appointmentId: string;
-    newStartAt: string;
-    newEndAt: string;
-  }) => void;
-  onDelete: (appointmentId: string) => void;
-  userTimeZone: string;
+interface TimeSlotProps {
+  day: Date;
+  timeSlot: Date;
+  isAvailable: boolean;
+  currentBlock?: TimeBlock;
+  appointment?: AppointmentBlock;
+  isStartOfBlock: boolean;
+  isEndOfBlock: boolean;
+  isStartOfAppointment: boolean;
+  handleAvailabilityBlockClick: (day: Date, block: TimeBlock) => void;
+  onAppointmentClick?: (appointmentBlock: Appointment) => void;
+  onAppointmentDragStart?: (appointment: Appointment, event: React.DragEvent) => void;
+  onAppointmentDragOver?: (day: Date, timeSlot: Date, event: React.DragEvent) => void;
+  onAppointmentDrop?: (day: Date, timeSlot: Date, event: React.DragEvent) => void;
+  originalAppointments: Appointment[];
 }
 
-const EditAppointmentDialog: React.FC<EditAppointmentDialogProps> = ({
-  isOpen,
+const TimeSlot: React.FC<TimeSlotProps> = ({
+  day,
+  timeSlot,
+  isAvailable,
+  currentBlock,
   appointment,
-  onClose,
-  onSave,
-  onDelete,
-  userTimeZone,
+  isStartOfBlock,
+  isEndOfBlock,
+  isStartOfAppointment,
+  handleAvailabilityBlockClick,
+  onAppointmentClick,
+  onAppointmentDragStart,
+  onAppointmentDragOver,
+  onAppointmentDrop,
+  originalAppointments,
 }) => {
-  const [startTime, setStartTime] = useState("");
-  const [endTime, setEndTime] = useState("");
-
-  React.useEffect(() => {
-    if (appointment) {
-      const start = DateTime.fromISO(appointment.start_at).setZone(userTimeZone);
-      const end = DateTime.fromISO(appointment.end_at).setZone(userTimeZone);
-      setStartTime(start.toFormat("HH:mm"));
-      setEndTime(end.toFormat("HH:mm"));
-    }
-  }, [appointment, userTimeZone]);
-
-  const handleSave = () => {
-    if (!appointment || !startTime || !endTime) return;
-
-    const date = DateTime.fromISO(appointment.start_at).setZone(userTimeZone).startOf("day");
-    const newStart = date.plus({
-      hours: parseInt(startTime.split(":"[0]), 10),
-      minutes: parseInt(startTime.split(":"[1]), 10),
-    });
-    const newEnd = date.plus({
-      hours: parseInt(endTime.split(":"[0]), 10),
-      minutes: parseInt(endTime.split(":"[1]), 10),
-    });
-
-    onSave({
-      appointmentId: appointment.id,
-      newStartAt: newStart.toUTC().toISO(),
-      newEndAt: newEnd.toUTC().toISO(),
-    });
-  };
-
-  const handleDelete = () => {
-    if (appointment) {
-      onDelete(appointment.id);
+  const handleDragOver = (e: React.DragEvent) => {
+    if (onAppointmentDragOver) {
+      e.preventDefault();
+      onAppointmentDragOver(day, timeSlot, e);
     }
   };
+
+  const handleDrop = (e: React.DragEvent) => {
+    if (onAppointmentDrop) {
+      e.preventDefault();
+      onAppointmentDrop(day, timeSlot, e);
+    }
+  };
+
+  let content = null;
+  let className = '';
+  let title = '';
+  let onClick: (() => void) | undefined = undefined;
+  let draggable = false;
+  let onDragStart: ((e: React.DragEvent) => void) | undefined = undefined;
+
+  if (appointment) {
+    onClick = () => {
+      if (!onAppointmentClick) return;
+
+      const originalAppointment = originalAppointments.find(
+        (a) => a.id === appointment.id
+      );
+
+      if (originalAppointment) {
+        onAppointmentClick(originalAppointment);
+      } else {
+        console.error('[TimeSlot] Could not find original appointment for ID:', appointment.id);
+      }
+    };
+
+    className = 'bg-blue-200 border border-blue-400 text-sm p-1';
+    title = `${appointment.clientName || 'Unknown Client'} - ${appointment.start.toFormat('h:mm a')} to ${appointment.end.toFormat('h:mm a')}`;
+    content = appointment.clientName || 'Unknown Client';
+    draggable = true;
+    onDragStart = (e: React.DragEvent) => {
+      const appointmentToUse = originalAppointments.find(a => a.id === appointment.id) || appointment;
+      e.dataTransfer.setData('application/json', JSON.stringify({
+        appointmentId: appointmentToUse.id,
+        clientName: appointmentToUse.clientName
+      }));
+      if (onAppointmentDragStart) onAppointmentDragStart(appointmentToUse, e);
+    };
+  } else if (isAvailable && currentBlock) {
+    onClick = () => handleAvailabilityBlockClick(day, currentBlock);
+    className = 'bg-green-100 border border-green-400 text-xs p-1';
+    content = isStartOfBlock ? 'Available' : '\u00A0';
+  } else {
+    className = 'bg-red-100';
+  }
+
+  const shouldAcceptDrops = !appointment;
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Edit Appointment</DialogTitle>
-        </DialogHeader>
-
-        {appointment && (
-          <div className="space-y-4">
-            <div>
-              <label className="block mb-1 text-sm font-medium">Start Time</label>
-              <Input
-                type="time"
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="block mb-1 text-sm font-medium">End Time</label>
-              <Input
-                type="time"
-                value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
-              />
-            </div>
-          </div>
-        )}
-
-        <DialogFooter className="mt-4">
-          <Button variant="destructive" onClick={handleDelete}>
-            Delete
-          </Button>
-          <Button onClick={handleSave}>Save</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <div
+      className={className}
+      title={title}
+      onClick={onClick}
+      draggable={draggable}
+      onDragStart={onDragStart}
+      onDragOver={shouldAcceptDrops ? handleDragOver : undefined}
+      onDrop={shouldAcceptDrops ? handleDrop : undefined}
+    >
+      {content}
+    </div>
   );
 };
 
-export default EditAppointmentDialog;
+export default TimeSlot;
