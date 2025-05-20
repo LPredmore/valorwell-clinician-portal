@@ -76,7 +76,7 @@ const CalendarView = ({
       const sampleSize = Math.min(3, appointments.length);
       console.log(`[CalendarView] Sample of ${sampleSize} appointments:`);
       appointments.slice(0, sampleSize).forEach((app, idx) => {
-        console.log(`[CalendarView] Sample appointment ${idx+1}/${samplesToLog}:`, {
+        console.log(`[CalendarView] Sample appointment ${idx+1}/${sampleSize}:`, {
           id: app.id,
           startAt: app.start_at,
           endAt: app.end_at,

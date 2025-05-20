@@ -2,10 +2,10 @@
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Calendar, Clock, User, MapPin, AlertTriangle, MoreVertical, Trash, X, Edit } from 'lucide-react';
+import { Calendar, Clock, User, MoreVertical, Trash, Edit } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -14,6 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import EditAppointmentDialog from './EditAppointmentDialog';
 import { Appointment } from '@/types/appointment';
+import { DateTime } from 'luxon';
 
 interface AppointmentDetailsDialogProps {
   isOpen: boolean;
@@ -73,15 +74,26 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
     }
   };
   
-  const formatTime = (timeString: string | undefined) => {
-    if (!timeString) return 'N/A';
+  // Use start_at to format the date
+  const getFormattedDate = () => {
+    if (!appointment.start_at) return 'No date available';
     try {
-      const [hours, minutes] = timeString.split(':').map(Number);
-      const date = new Date();
-      date.setHours(hours, minutes, 0, 0);
+      const date = new Date(appointment.start_at);
+      return format(date, 'EEEE, MMMM d, yyyy');
+    } catch (error) {
+      console.error('Error formatting start_at date:', error);
+      return 'Invalid date format';
+    }
+  };
+  
+  // Parse time from ISO string
+  const getFormattedTime = (isoString: string | undefined) => {
+    if (!isoString) return 'N/A';
+    try {
+      const date = new Date(isoString);
       return format(date, 'h:mm a');
     } catch (error) {
-      console.error('Error formatting time:', error);
+      console.error('Error formatting time from ISO:', error);
       return 'Invalid time format';
     }
   };
@@ -194,14 +206,14 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-gray-500" />
-                <span>{formatDate(appointment.date)}</span>
+                <span>{getFormattedDate()}</span>
               </div>
               
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4 text-gray-500" />
                 <span>
-                  {formatTime(appointment.start_time)} - 
-                  {formatTime(appointment.end_time)}
+                  {getFormattedTime(appointment.start_at)} - 
+                  {getFormattedTime(appointment.end_at)}
                 </span>
               </div>
               
