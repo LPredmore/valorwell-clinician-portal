@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { TimeBlock, AppointmentBlock } from './types';
 import { Appointment } from '@/types/appointment';
@@ -138,26 +139,21 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
     // Handle drag start event
     onDragStart = (e: React.DragEvent) => {
       if (onAppointmentDragStart && appointment) {
-        // Find the original appointment in the originalAppointments array
-        const originalAppointment = originalAppointments.find(a => a.id === appointment.id);
+        // UPDATED: Less strict approach - use appointment from originalAppointments if found, otherwise use the provided appointment
+        const appointmentToUse = originalAppointments.find(a => a.id === appointment.id) || appointment;
         
-        if (originalAppointment) {
-          // Set the appointment ID as the drag data
-          e.dataTransfer.setData('application/json', JSON.stringify({
-            appointmentId: originalAppointment.id,
-            clientName: originalAppointment.clientName
-          }));
-          
-          // Call the drag start handler
-          onAppointmentDragStart(originalAppointment, e); // This is now typesafe with 'any'
-          
-          if (debugMode) {
-            console.log('[TimeSlot] Appointment drag started:', {
-              id: appointment.id,
-              clientName: appointment.clientName
-            });
-          }
+        // Set the appointment ID as the drag data
+        e.dataTransfer.setData('application/json', JSON.stringify({
+          appointmentId: appointmentToUse.id,
+          clientName: appointmentToUse.clientName
+        }));
+        
+        // Call the drag start handler
+        if (onAppointmentDragStart) {
+          onAppointmentDragStart(appointmentToUse, e);
         }
+        
+        console.log('[TimeSlot] Drag started:', appointmentToUse.id);
       }
     };
     
