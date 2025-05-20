@@ -32,6 +32,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { supabase } from '@/integrations/supabase/client';
+import { formatClientName } from '@/utils/appointmentUtils';
 
 interface AppointmentDetailsDialogProps {
   isOpen: boolean;
@@ -165,30 +166,18 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
   };
 
   const getClientName = () => {
-    if (appointment.clientName && appointment.clientName.includes(' ')) {
+    // If we have a complete client object with the fields we need
+    if (appointment.client) {
+      // Use the formatClientName utility for consistent formatting
+      return formatClientName(appointment.client);
+    }
+    
+    // Otherwise use the clientName field if available
+    if (appointment.clientName) {
       return appointment.clientName;
     }
     
-    if (appointment.client) {
-      const { client_preferred_name, client_first_name, client_last_name } = appointment.client;
-      
-      if (client_preferred_name && client_last_name) {
-        return `${client_preferred_name} ${client_last_name}`;
-      }
-      else if (client_first_name && client_last_name) {
-        return `${client_first_name} ${client_last_name}`;
-      }
-      else {
-        const firstName = client_preferred_name || client_first_name || '';
-        const lastName = client_last_name || '';
-        return [firstName, lastName].filter(Boolean).join(' ') || 'Unknown Client';
-      }
-    }
-    
-    if (appointment.clientName) {
-      return `${appointment.clientName} (ID: ${appointment.client_id || 'unknown'})`;
-    }
-    
+    // Fallback
     return 'Unknown Client';
   };
 

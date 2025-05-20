@@ -1,4 +1,3 @@
-
 import { TimeZoneService } from './timeZoneService';
 import { DateTime } from 'luxon';
 import { Appointment } from '@/types/appointment';
@@ -176,6 +175,46 @@ export const formatAppointmentDate = (utcTimestamp: string, userTimeZone: string
 };
 
 /**
+ * Parse a client name string into first name, preferred name, and last name parts
+ * 
+ * @param clientName The full client name string to parse
+ * @returns Object containing parsed name components
+ */
+export const parseClientName = (clientName: string | undefined): { 
+  firstName: string; 
+  lastName: string; 
+  preferredName: string;
+} => {
+  if (!clientName) {
+    return { firstName: '', lastName: '', preferredName: '' };
+  }
+  
+  // Split the name into parts
+  const nameParts = clientName.trim().split(' ');
+  
+  // If there's only one part, assume it's just a first name
+  if (nameParts.length === 1) {
+    return { 
+      firstName: nameParts[0], 
+      lastName: '', 
+      preferredName: nameParts[0] 
+    };
+  }
+  
+  // If there are multiple parts, assume the last part is the last name
+  // and everything before that is the first name
+  const lastName = nameParts.pop() || '';
+  const firstName = nameParts.join(' ');
+  
+  // Use first name as preferred name as a default
+  return { 
+    firstName, 
+    lastName, 
+    preferredName: firstName 
+  };
+};
+
+/**
  * Convert an AppointmentBlock to a full Appointment object
  * This is used when we need to ensure we have a complete Appointment object
  * with all the necessary fields, especially when passing data to AppointmentDetailsDialog
@@ -201,30 +240,23 @@ export const convertAppointmentBlockToAppointment = (
   const start_at = appointmentBlock.start?.toUTC?.()?.toISO?.() || '';
   const end_at = appointmentBlock.end?.toUTC?.()?.toISO?.() || '';
   
-  // Extract client name parts if available
-  let firstName = '';
-  let lastName = '';
-  let preferredName = '';
-  
-  if (appointmentBlock.clientName) {
-    const nameParts = appointmentBlock.clientName.split(' ');
-    if (nameParts.length > 1) {
-      // If there are multiple parts, assume last part is last name
-      lastName = nameParts.pop() || '';
-      firstName = nameParts.join(' ');
-      preferredName = firstName; // Default preferred name to first name
-    } else {
-      // If only one part, assume it's first name
-      firstName = appointmentBlock.clientName;
-      preferredName = firstName;
-    }
-  }
+  // Parse client name into components using our helper function
+  const parsedName = parseClientName(appointmentBlock.clientName);
   
   // Create a more complete client object with all the expected fields
   const client = {
-    client_first_name: firstName,
-    client_last_name: lastName,
-    client_preferred_name: preferredName
+    client_first_name: parsedName.firstName,
+    client_last_name: parsedName.lastName,
+    client_preferred_name: parsedName.preferredName,
+    client_email: '',
+    client_phone: '',
+    client_status: null,
+    client_date_of_birth: null,
+    client_gender: null,
+    client_address: null,
+    client_city: null,
+    client_state: null,
+    client_zipcode: null
   };
   
   // Log the conversion for debugging
@@ -236,9 +268,7 @@ export const convertAppointmentBlockToAppointment = (
     end: appointmentBlock.end?.toString(),
     convertedStart: start_at,
     convertedEnd: end_at,
-    extractedFirstName: firstName,
-    extractedLastName: lastName,
-    extractedPreferredName: preferredName
+    parsedName
   });
   
   // Return a new Appointment object with the data from the AppointmentBlock
