@@ -2,6 +2,7 @@
 import React from 'react';
 import { TimeBlock, AppointmentBlock } from './types';
 import { Appointment } from '@/types/appointment';
+import { DateTime } from 'luxon';
 
 interface TimeSlotProps {
   day: Date;
@@ -14,6 +15,9 @@ interface TimeSlotProps {
   isStartOfAppointment: boolean;
   handleAvailabilityBlockClick: (day: Date, block: TimeBlock) => void;
   onAppointmentClick?: (appointmentBlock: AppointmentBlock) => void;
+  onAppointmentDragStart?: (appointment: Appointment, event: React.DragEvent) => void;
+  onAppointmentDragOver?: (day: Date, timeSlot: Date, event: React.DragEvent) => void;
+  onAppointmentDrop?: (day: Date, timeSlot: Date, event: React.DragEvent) => void;
   originalAppointments: Appointment[];
 }
 
@@ -28,6 +32,9 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
   isStartOfAppointment,
   handleAvailabilityBlockClick,
   onAppointmentClick,
+  onAppointmentDragStart,
+  onAppointmentDragOver,
+  onAppointmentDrop,
   originalAppointments
 }) => {
   // Debug logging for specific date/time we're looking for
@@ -62,22 +69,58 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
     // Handle appointment click event
     const handleAppointmentClick = () => {
       if (onAppointmentClick && appointment) {
-        // Fixed: Directly call onAppointmentClick with the appointment
-        onAppointmentClick(appointment);
+        // Find the original appointment in the originalAppointments array
+        const originalAppointment = originalAppointments.find(a => a.id === appointment.id);
         
-        if (debugMode) {
-          console.log('[TimeSlot] Appointment clicked:', {
-            id: appointment.id,
-            clientName: appointment.clientName,
-            start: appointment.start.toFormat('HH:mm'),
-            end: appointment.end.toFormat('HH:mm')
-          });
+        if (originalAppointment) {
+          // Call onAppointmentClick with the original appointment object
+          onAppointmentClick(originalAppointment);
+          
+          if (debugMode) {
+            console.log('[TimeSlot] Appointment clicked:', {
+              id: appointment.id,
+              clientName: appointment.clientName,
+              start: appointment.start.toFormat('HH:mm'),
+              end: appointment.end.toFormat('HH:mm'),
+              originalAppointment
+            });
+          }
+        } else {
+          // Fallback to using the appointment block if original not found
+          onAppointmentClick(appointment);
+          console.warn('[TimeSlot] Original appointment not found, using appointment block');
         }
       }
     };
     
     // Base appointment styling that's consistent for all cells
     const baseAppointmentClass = "p-1 bg-blue-100 border-l-4 border-blue-500 h-full w-full cursor-pointer transition-colors hover:bg-blue-200";
+    
+    // Handle drag start event
+    const handleDragStart = (e: React.DragEvent) => {
+      if (onAppointmentDragStart && appointment) {
+        // Find the original appointment in the originalAppointments array
+        const originalAppointment = originalAppointments.find(a => a.id === appointment.id);
+        
+        if (originalAppointment) {
+          // Set the appointment ID as the drag data
+          e.dataTransfer.setData('application/json', JSON.stringify({
+            appointmentId: originalAppointment.id,
+            clientName: originalAppointment.clientName
+          }));
+          
+          // Call the drag start handler
+          onAppointmentDragStart(originalAppointment, e);
+          
+          if (debugMode) {
+            console.log('[TimeSlot] Appointment drag started:', {
+              id: appointment.id,
+              clientName: appointment.clientName
+            });
+          }
+        }
+      }
+    };
     
     // Position-specific styling
     let positionClass = "";
@@ -108,9 +151,11 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
       }
       
       return (
-        <div 
+        <div
           className={`${baseAppointmentClass} ${positionClass} text-xs font-medium truncate`}
           onClick={handleAppointmentClick}
+          draggable={true}
+          onDragStart={handleDragStart}
           title={`${appointment.clientName || 'Unknown Client'} - ${appointment.start.toFormat('h:mm a')} to ${appointment.end.toFormat('h:mm a')}`}
         >
           {appointment.clientName || 'Unknown Client'}
@@ -124,9 +169,11 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
     }
     
     return (
-      <div 
+      <div
         className={`${baseAppointmentClass} ${positionClass} text-xs opacity-75`}
         onClick={handleAppointmentClick}
+        draggable={true}
+        onDragStart={handleDragStart}
         title={`${appointment.clientName || 'Unknown Client'} - ${appointment.start.toFormat('h:mm a')} to ${appointment.end.toFormat('h:mm a')}`}
       >
         &nbsp;
@@ -194,9 +241,36 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
     });
   }
   
+  // Handle drag over event for empty time slots
+  const handleDragOver = (e: React.DragEvent) => {
+    if (onAppointmentDragOver) {
+      e.preventDefault(); // Allow drop
+      onAppointmentDragOver(day, timeSlot, e);
+    }
+  };
+  
+  // Handle drop event for empty time slots
+  const handleDrop = (e: React.DragEvent) => {
+    if (onAppointmentDrop) {
+      e.preventDefault();
+      onAppointmentDrop(day, timeSlot, e);
+      
+      if (debugMode) {
+        console.log('[TimeSlot] Appointment dropped on:', {
+          day: new Date(day).toISOString().split('T')[0],
+          time: `${timeSlot.getHours()}:${timeSlot.getMinutes().toString().padStart(2, '0')}`
+        });
+      }
+    }
+  };
+  
   // Default empty cell with faded "Unavailable" text on hover
   return (
-    <div className="h-full w-full opacity-0 group-hover:opacity-100 flex items-center justify-center text-[10px] text-gray-400">
+    <div
+      className="h-full w-full opacity-0 group-hover:opacity-100 flex items-center justify-center text-[10px] text-gray-400"
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
       Unavailable
     </div>
   );

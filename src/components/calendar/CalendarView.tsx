@@ -132,6 +132,12 @@ const CalendarView = ({
     setLocalRefreshTrigger(prev => prev + 1);
     setIsAppointmentDialogOpen(false);
   };
+  
+  // Handler for when an appointment is updated via drag-and-drop
+  const handleAppointmentDragUpdate = () => {
+    console.log('[CalendarView] Appointment updated via drag-and-drop, triggering calendar refresh...');
+    setLocalRefreshTrigger(prev => prev + 1);
+  };
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -144,6 +150,7 @@ const CalendarView = ({
             appointments={appointments}
             onAppointmentClick={handleAppointmentClick}
             onAvailabilityClick={handleAvailabilityClick}
+            onAppointmentUpdated={handleAppointmentDragUpdate}
             userTimeZone={validTimeZone}
             isLoading={isLoading}
             error={error}

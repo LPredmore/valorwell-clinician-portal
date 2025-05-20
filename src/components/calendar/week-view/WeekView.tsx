@@ -18,6 +18,7 @@ interface WeekViewProps {
   appointments?: any[];
   onAppointmentClick?: (appointment: any) => void;
   onAvailabilityClick?: (date: DateTime | Date, availabilityBlock: AvailabilityBlock) => void;
+  onAppointmentUpdate?: (appointmentId: string, newStartAt: string, newEndAt: string) => void;
   currentDate?: Date; // Added currentDate property
 }
 
@@ -49,8 +50,10 @@ const WeekView: React.FC<WeekViewProps> = ({
   onAppointmentClick,
   onAvailabilityClick,
   currentDate, // Add currentDate to the props destructuring
+  onAppointmentUpdate,
 }) => {
   const [selectedBlock, setSelectedBlock] = useState<TimeBlock | null>(null);
+  const [draggedAppointmentId, setDraggedAppointmentId] = useState<string | null>(null);
   
   const {
     loading,
@@ -94,11 +97,68 @@ const WeekView: React.FC<WeekViewProps> = ({
   };
 
   // Handle click on an appointment block
-  const handleAppointmentClick = (appointmentBlock: AppointmentBlock) => {
+  const handleAppointmentClick = (appointment: any) => {
     if (onAppointmentClick) {
-      console.log('Appointment clicked:', appointmentBlock);
-      onAppointmentClick(appointmentBlock);
+      console.log('Appointment clicked:', appointment);
+      onAppointmentClick(appointment);
     }
+  };
+  
+  // Handle appointment drag start
+  const handleAppointmentDragStart = (appointment: any, event: React.DragEvent) => {
+    console.log('Appointment drag started:', appointment);
+    setDraggedAppointmentId(appointment.id);
+  };
+  
+  // Handle drag over a time slot
+  const handleAppointmentDragOver = (day: Date, timeSlot: Date, event: React.DragEvent) => {
+    event.preventDefault(); // Allow drop
+  };
+  
+  // Handle drop on a time slot
+  const handleAppointmentDrop = (day: Date, timeSlot: Date, event: React.DragEvent) => {
+    if (!draggedAppointmentId || !onAppointmentUpdate) return;
+    
+    try {
+      // Get the dragged appointment data
+      const dragDataJson = event.dataTransfer.getData('application/json');
+      const dragData = JSON.parse(dragDataJson);
+      const appointmentId = dragData.appointmentId;
+      
+      // Find the original appointment
+      const appointment = appointments?.find(a => a.id === appointmentId);
+      
+      if (appointment) {
+        // Calculate the duration of the appointment
+        const startDateTime = DateTime.fromISO(appointment.start_at);
+        const endDateTime = DateTime.fromISO(appointment.end_at);
+        const durationMinutes = endDateTime.diff(startDateTime).as('minutes');
+        
+        // Create new start and end times based on the drop target
+        const newStartDateTime = TimeZoneService.fromJSDate(timeSlot, userTimeZone);
+        const newEndDateTime = newStartDateTime.plus({ minutes: durationMinutes });
+        
+        // Convert to UTC ISO strings for the database
+        const newStartAt = newStartDateTime.toUTC().toISO();
+        const newEndAt = newEndDateTime.toUTC().toISO();
+        
+        console.log('Updating appointment:', {
+          appointmentId,
+          oldStart: appointment.start_at,
+          oldEnd: appointment.end_at,
+          newStart: newStartAt,
+          newEnd: newEndAt
+        });
+        
+        // Call the update handler
+        onAppointmentUpdate(appointmentId, newStartAt, newEndAt);
+      }
+    } catch (error) {
+      console.error('Error handling appointment drop:', error);
+    }
+    
+    // Reset the dragged appointment ID
+    setDraggedAppointmentId(null);
   };
 
   // Find which blocks correspond to which time slots to determine visual continuity
@@ -263,6 +323,9 @@ const WeekView: React.FC<WeekViewProps> = ({
                     isStartOfAppointment={isStartOfAppointment}
                     handleAvailabilityBlockClick={handleAvailabilityBlockClick}
                     onAppointmentClick={handleAppointmentClick}
+                    onAppointmentDragStart={handleAppointmentDragStart}
+                    onAppointmentDragOver={handleAppointmentDragOver}
+                    onAppointmentDrop={handleAppointmentDrop}
                     originalAppointments={appointments}
                   />
                 </div>
