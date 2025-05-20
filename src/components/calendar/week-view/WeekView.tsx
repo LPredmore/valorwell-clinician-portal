@@ -131,6 +131,11 @@ const WeekView: React.FC<WeekViewProps> = ({
       // Find the original appointment
       const appointment = appointments?.find(a => a.id === appointmentId);
       
+      console.log('[DROP] Found appointment from ID:', appointment);
+      if (!appointment) {
+        console.warn('[DROP] No appointment found for ID:', appointmentId);
+      }
+      
       if (appointment) {
         // Calculate the duration of the appointment
         const startDateTime = DateTime.fromISO(appointment.start_at);
