@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -11,9 +12,9 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import EditAppointmentDialog from './EditAppointmentDialog';
 import { Appointment } from '@/types/appointment';
 import { DateTime } from 'luxon';
+import EditAppointmentDialog from './week-view/EditAppointmentDialog';
 
 interface AppointmentDetailsDialogProps {
   isOpen: boolean;
@@ -270,11 +271,19 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
         </AlertDialogContent>
       </AlertDialog>
       
-      {appointment && (
+      {appointment && isEditDialogOpen && (
         <EditAppointmentDialog
-          isOpen={isEditDialogOpen}
-          onClose={() => setIsEditDialogOpen(false)}
+          isOpen={isEditDialogOpen} 
           appointment={appointment}
+          onClose={() => setIsEditDialogOpen(false)}
+          onUpdate={(updatedAppt) => {
+            setIsEditDialogOpen(false);
+            onAppointmentUpdated();
+          }}
+          onDelete={(id) => {
+            setIsEditDialogOpen(false);
+            onAppointmentUpdated();
+          }}
           onAppointmentUpdated={onAppointmentUpdated}
         />
       )}

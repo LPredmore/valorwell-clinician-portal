@@ -29,4 +29,46 @@ export interface Appointment {
   // CONSISTENT FORMAT: Always uses "client_preferred_name client_last_name" when both exist
   // Falls back to "client_first_name client_last_name"
   clientName?: string;
+  
+  // Billing and coding fields
+  cpt_code?: string | null;
+  diagnosis_code_pointers?: string | null;
+  modifiers?: string[] | null;
+  place_of_service_code?: string | null;
+  billed_amount?: number | null;
+  
+  // Claims-related fields
+  claim_status?: string | null;
+  claim_claimmd_id?: string | null;
+  claim_claimmd_batch_id?: string | null;
+  claim_last_submission_date?: string | null;
+  claim_status_last_checked?: string | null;
+  claim_response_json?: any | null;
+  
+  // ERA (Electronic Remittance Advice) fields
+  era_claimmd_id?: string | null;
+  era_check_eft_number?: string | null;
+  era_payment_date?: string | null;
+  
+  // Insurance payment fields
+  insurance_paid_amount?: number | null;
+  insurance_adjustment_amount?: number | null;
+  insurance_adjustment_details_json?: any | null;
+  
+  // Patient payment fields
+  patient_responsibility_amount?: number | null;
+  denial_details_json?: any | null;
+  patient_payment_status?: string | null;
+  patient_paid_amount?: number | null;
+  patient_payment_date?: string | null;
+  stripe_charge_ids?: string[] | null;
+  
+  // Additional billing fields
+  billing_notes?: string | null;
+  requires_billing_review?: boolean;
+  last_statement_to_patient_date?: string | null;
+  
+  // Standard audit fields
+  created_at?: string;
+  updated_at?: string;
 }

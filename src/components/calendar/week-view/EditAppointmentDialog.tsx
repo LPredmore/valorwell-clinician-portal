@@ -29,13 +29,17 @@ interface EditAppointmentDialogProps {
   onClose: () => void;
   onUpdate: (updatedAppointment: Appointment) => void;
   onDelete: (id: string) => void;
+  isOpen?: boolean;
+  onAppointmentUpdated?: () => void;
 }
 
 const EditAppointmentDialog: React.FC<EditAppointmentDialogProps> = ({ 
   appointment, 
   onClose, 
   onUpdate,
-  onDelete 
+  onDelete,
+  isOpen = true, 
+  onAppointmentUpdated
 }) => {
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
 
@@ -62,18 +66,30 @@ const EditAppointmentDialog: React.FC<EditAppointmentDialogProps> = ({
     };
     
     onUpdate(updatedAppointment);
+    if (onAppointmentUpdated) {
+      onAppointmentUpdated();
+    }
   };
 
   const handleDelete = () => {
     if (isConfirmingDelete) {
       onDelete(appointment.id);
+      if (onAppointmentUpdated) {
+        onAppointmentUpdated();
+      }
     } else {
       setIsConfirmingDelete(true);
     }
   };
 
+  const handleOpenChange = (open: boolean) => {
+    if (!open) {
+      onClose();
+    }
+  };
+
   return (
-    <Dialog open onOpenChange={() => onClose()}>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Edit Appointment</DialogTitle>
@@ -82,7 +98,7 @@ const EditAppointmentDialog: React.FC<EditAppointmentDialogProps> = ({
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
             <div>
-              <h3 className="text-sm font-medium mb-2">Client: {appointment?.client_name || 'Unknown'}</h3>
+              <h3 className="text-sm font-medium mb-2">Client: {appointment?.clientName || 'Unknown'}</h3>
             </div>
             
             <FormField
