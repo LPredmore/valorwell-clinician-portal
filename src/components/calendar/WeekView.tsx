@@ -132,10 +132,13 @@ const WeekView: React.FC<WeekViewProps> = ({
       
       const appointmentId = dragData.appointmentId;
       
-      // Find the original appointment
-      const appointment = appointments?.find(a => a.id === appointmentId);
+      // Find the original appointment with more flexible matching
+      const appointment = appointments?.find(a => 
+        a.id === appointmentId || a.appointmentId === appointmentId
+      );
       
-      console.log('[DROP] Found appointment from ID:', appointment);
+      console.log('[DROP] Matched appointment object:', appointment);
+      
       if (!appointment) {
         console.warn('[DROP] No appointment found for ID:', appointmentId);
       }
@@ -154,26 +157,35 @@ const WeekView: React.FC<WeekViewProps> = ({
         const newStartAt = newStartDateTime.toUTC().toISO();
         const newEndAt = newEndDateTime.toUTC().toISO();
         
-        console.log('Updating appointment:', {
-          appointmentId,
-          oldStart: appointment.start_at,
-          oldEnd: appointment.end_at,
-          newStart: newStartAt,
-          newEnd: newEndAt
-        });
-        
-        // Log before calling Supabase update
         console.log('[DROP] About to update appointment in database:', {
           appointmentId,
           newStartAt,
           newEndAt
         });
         
-        // Call the update handler - wrapped in try/catch instead of using .catch()
+        // Call the update handler - without using .catch()
         try {
           onAppointmentUpdate(appointmentId, newStartAt, newEndAt);
         } catch (error) {
           console.error('[DROP] Error updating appointment in database:', error);
+        }
+      } else {
+        // FALLBACK: Even if we couldn't find the appointment, try to update using the dragData
+        console.log('[DROP] Using fallback values from dragData to update appointment');
+        
+        // Create new start and end times based on the drop target
+        const newStartDateTime = TimeZoneService.fromJSDate(timeSlot, userTimeZone);
+        // Assume a default duration of 60 minutes if we can't determine it from the appointment
+        const newEndDateTime = newStartDateTime.plus({ minutes: 60 });
+        
+        // Convert to UTC ISO strings for the database
+        const newStartAt = newStartDateTime.toUTC().toISO();
+        const newEndAt = newEndDateTime.toUTC().toISO();
+        
+        try {
+          onAppointmentUpdate(appointmentId, newStartAt, newEndAt);
+        } catch (error) {
+          console.error('[DROP] Error updating appointment with fallback values:', error);
         }
       }
     } catch (error) {
