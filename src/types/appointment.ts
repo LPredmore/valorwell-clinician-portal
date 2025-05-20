@@ -23,6 +23,15 @@ export interface Appointment {
     client_first_name: string; // Should not be null after processing in useAppointments (uses || '')
     client_last_name: string;  // Should not be null after processing
     client_preferred_name: string; // Should not be null after processing
+    client_email: string;
+    client_phone: string;
+    client_status: string | null;
+    client_date_of_birth: string | null;
+    client_gender: string | null;
+    client_address: string | null;
+    client_city: string | null;
+    client_state: string | null;
+    client_zipcode: string | null;
   };
   
   // Convenience field, populated by useAppointments.tsx

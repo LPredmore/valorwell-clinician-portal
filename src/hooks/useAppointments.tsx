@@ -20,8 +20,20 @@ interface RawSupabaseAppointment {
   recurring_group_id: string | null;
   video_room_url: string | null;
   notes: string | null;
-  // Modified to account for both object and array formats from Supabase joins
-  clients: any; // Using any temporarily to resolve the type error
+  clients: {
+    client_first_name: string | null;
+    client_last_name: string | null;
+    client_preferred_name: string | null;
+    client_email: string | null;
+    client_phone: string | null;
+    client_status: string | null;
+    client_date_of_birth: string | null;
+    client_gender: string | null;
+    client_address: string | null;
+    client_city: string | null;
+    client_state: string | null;
+    client_zipcode: string | null;
+  } | null;
 }
 
 // Type guard to check if an object is a valid client data object from Supabase
@@ -29,13 +41,31 @@ function isValidClientData(obj: any): obj is {
   client_first_name: string | null;
   client_last_name: string | null;
   client_preferred_name: string | null;
+  client_email: string | null;
+  client_phone: string | null;
+  client_status: string | null;
+  client_date_of_birth: string | null;
+  client_gender: string | null;
+  client_address: string | null;
+  client_city: string | null;
+  client_state: string | null;
+  client_zipcode: string | null;
 } {
   return (
     obj &&
     typeof obj === "object" &&
     ("client_first_name" in obj ||
       "client_last_name" in obj ||
-      "client_preferred_name" in obj)
+      "client_preferred_name" in obj ||
+      "client_email" in obj ||
+      "client_phone" in obj ||
+      "client_status" in obj ||
+      "client_date_of_birth" in obj ||
+      "client_gender" in obj ||
+      "client_address" in obj ||
+      "client_city" in obj ||
+      "client_state" in obj ||
+      "client_zipcode" in obj)
   );
 }
 
@@ -151,7 +181,7 @@ export const useAppointments = (
       let query = supabase
         .from("appointments")
         .select(
-          `id, client_id, clinician_id, start_at, end_at, type, status, appointment_recurring, recurring_group_id, video_room_url, notes, clients (client_first_name, client_last_name, client_preferred_name)`
+          `id, client_id, clinician_id, start_at, end_at, type, status, appointment_recurring, recurring_group_id, video_room_url, notes, clients (client_first_name, client_last_name, client_preferred_name, client_email, client_phone, client_status, client_date_of_birth, client_gender, client_address, client_city, client_state, client_zipcode)`
         )
         .eq("clinician_id", formattedClinicianId)
         .eq("status", "scheduled");
@@ -226,6 +256,15 @@ export const useAppointments = (
               client_first_name: clientInfo.client_first_name || "",
               client_last_name: clientInfo.client_last_name || "",
               client_preferred_name: clientInfo.client_preferred_name || "",
+              client_email: clientInfo.client_email || "",
+              client_phone: clientInfo.client_phone || "",
+              client_status: clientInfo.client_status || null,
+              client_date_of_birth: clientInfo.client_date_of_birth || null,
+              client_gender: clientInfo.client_gender || null,
+              client_address: clientInfo.client_address || null,
+              client_city: clientInfo.client_city || null,
+              client_state: clientInfo.client_state || null,
+              client_zipcode: clientInfo.client_zipcode || null
             };
           }
         }

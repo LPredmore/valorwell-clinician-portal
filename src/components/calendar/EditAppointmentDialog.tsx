@@ -1,5 +1,5 @@
 import React from 'react';
-import { TimeBlock, AppointmentBlock } from './types';
+import { TimeBlock, AppointmentBlock } from './week-view/types';
 import { Appointment } from '@/types/appointment';
 
 interface TimeSlotProps {
