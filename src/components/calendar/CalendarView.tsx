@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import WeekView from './WeekView';
 import MonthView from './MonthView';
@@ -173,14 +172,13 @@ const CalendarView = ({
         </div>
       )}
       
-      {/* Appointment Details Dialog */}
+      {/* Appointment Details Dialog - fixed by removing clientTimeZone prop */}
       <AppointmentDetailsDialog
         isOpen={isAppointmentDialogOpen}
         onClose={() => setIsAppointmentDialogOpen(false)}
         appointment={selectedAppointment}
         onAppointmentUpdated={handleAppointmentUpdated}
         userTimeZone={validTimeZone}
-        clientTimeZone={validTimeZone} // For now, use the same timezone
       />
     </div>
   );

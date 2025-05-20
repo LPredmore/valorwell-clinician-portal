@@ -20,6 +20,7 @@ interface AppointmentDetailsDialogProps {
   appointment: any | null;
   onAppointmentUpdated: () => void;
   userTimeZone: string;
+  clientTimeZone?: string; // Add clientTimeZone prop as optional
 }
 
 const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
@@ -27,7 +28,8 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
   onClose,
   appointment,
   onAppointmentUpdated,
-  userTimeZone
+  userTimeZone,
+  clientTimeZone // Include in destructuring
 }) => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
