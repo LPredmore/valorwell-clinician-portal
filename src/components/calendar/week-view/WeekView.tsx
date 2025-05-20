@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { format } from 'date-fns';
 import { useWeekViewData } from './useWeekViewData';
@@ -122,6 +121,8 @@ const WeekView: React.FC<WeekViewProps> = ({
     try {
       // Get the dragged appointment data
       const dragDataJson = event.dataTransfer.getData('application/json');
+      console.log('[DROP] dragDataJson:', dragDataJson);
+      
       const dragData = JSON.parse(dragDataJson);
       const appointmentId = dragData.appointmentId;
       
