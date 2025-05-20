@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import WeekView from './WeekView';
 import MonthView from './MonthView';
@@ -42,6 +43,16 @@ const CalendarView = ({
   
   // Combine both refresh triggers
   const combinedRefreshTrigger = refreshTrigger + localRefreshTrigger;
+  
+  // Calculate the week days for the WeekView component
+  const startOfWeek = new Date(currentDate);
+  startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const day = new Date(startOfWeek);
+    day.setDate(startOfWeek.getDate() + i);
+    return day;
+  });
   
   // Find the selected appointment from the ID
   const selectedAppointment = selectedAppointmentId 
@@ -143,9 +154,10 @@ const CalendarView = ({
       <div className="md:col-span-3">
         {view === 'week' ? (
           <WeekView 
+            days={days}
             currentDate={currentDate}
             selectedClinicianId={clinicianId}
-            refreshTrigger={combinedRefreshTrigger} // Use combined refresh trigger
+            refreshTrigger={combinedRefreshTrigger}
             appointments={appointments}
             onAppointmentClick={handleAppointmentClick}
             onAvailabilityClick={handleAvailabilityClick}
