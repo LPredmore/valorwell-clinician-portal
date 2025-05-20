@@ -1,3 +1,4 @@
+
 // WeekView.tsx
 import React, { useState } from 'react';
 import { format } from 'date-fns';
@@ -7,7 +8,7 @@ import { DateTime } from 'luxon';
 import TimeSlot from './TimeSlot';
 import { AvailabilityBlock } from '@/types/availability';
 import { Appointment } from '@/types/appointment';
-import EditAppointmentDialog from './EditAppointmentDialog';
+import AppointmentDetailsDialog from '@/components/calendar/AppointmentDetailsDialog';
 import { convertAppointmentBlockToAppointment } from '@/utils/appointmentUtils';
 
 interface WeekViewProps {
@@ -46,6 +47,7 @@ const WeekView: React.FC<WeekViewProps> = ({
   onAppointmentDelete,
 }) => {
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [isAppointmentDetailsOpen, setIsAppointmentDetailsOpen] = useState(false);
 
   const {
     loading,
@@ -93,26 +95,34 @@ const WeekView: React.FC<WeekViewProps> = ({
       });
       setSelectedAppointment(fullAppointment);
     }
+    setIsAppointmentDetailsOpen(true);
+  };
+
+  const handleAppointmentUpdated = () => {
+    // This will trigger a refresh of the calendar data
+    if (onAppointmentUpdate) {
+      // We don't have the new values here, but we can signal to the parent
+      // that an update occurred so it can refresh the data
+      console.log("[WeekView] Appointment updated, triggering refresh");
+      onAppointmentUpdate("refresh-trigger", "", "");
+    }
   };
 
   if (loading) return <div className="p-4 text-center">Loading...</div>;
 
   return (
     <div className="flex flex-col">
-      {selectedAppointment && (
-        <EditAppointmentDialog
-          appointment={selectedAppointment}
-          onClose={() => setSelectedAppointment(null)}
-          onUpdate={(updated) => {
-            onAppointmentUpdate?.(updated.id, updated.start_at, updated.end_at);
-            setSelectedAppointment(null);
-          }}
-          onDelete={(id) => {
-            onAppointmentDelete?.(id);
-            setSelectedAppointment(null);
-          }}
-        />
-      )}
+      {/* Appointment Details Dialog - appears when an appointment is clicked */}
+      <AppointmentDetailsDialog
+        isOpen={isAppointmentDetailsOpen}
+        onClose={() => {
+          setIsAppointmentDetailsOpen(false);
+          setSelectedAppointment(null);
+        }}
+        appointment={selectedAppointment}
+        onAppointmentUpdated={handleAppointmentUpdated}
+        userTimeZone={userTimeZone}
+      />
 
       <div className="flex">
         <div className="w-16" />

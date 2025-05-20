@@ -204,23 +204,27 @@ export const convertAppointmentBlockToAppointment = (
   // Extract client name parts if available
   let firstName = '';
   let lastName = '';
+  let preferredName = '';
+  
   if (appointmentBlock.clientName) {
     const nameParts = appointmentBlock.clientName.split(' ');
     if (nameParts.length > 1) {
       // If there are multiple parts, assume last part is last name
       lastName = nameParts.pop() || '';
       firstName = nameParts.join(' ');
+      preferredName = firstName; // Default preferred name to first name
     } else {
       // If only one part, assume it's first name
       firstName = appointmentBlock.clientName;
+      preferredName = firstName;
     }
   }
   
-  // Create a more complete client object
+  // Create a more complete client object with all the expected fields
   const client = {
     client_first_name: firstName,
     client_last_name: lastName,
-    client_preferred_name: firstName
+    client_preferred_name: preferredName
   };
   
   // Log the conversion for debugging
@@ -233,7 +237,8 @@ export const convertAppointmentBlockToAppointment = (
     convertedStart: start_at,
     convertedEnd: end_at,
     extractedFirstName: firstName,
-    extractedLastName: lastName
+    extractedLastName: lastName,
+    extractedPreferredName: preferredName
   });
   
   // Return a new Appointment object with the data from the AppointmentBlock
@@ -246,6 +251,10 @@ export const convertAppointmentBlockToAppointment = (
     type: appointmentBlock.type || 'appointment',
     status: 'scheduled',
     client,
-    clientName: appointmentBlock.clientName || 'Unknown Client'
+    clientName: appointmentBlock.clientName || 'Unknown Client',
+    // Add additional fields with reasonable defaults
+    appointment_recurring: null,
+    recurring_group_id: null,
+    notes: null
   };
 };

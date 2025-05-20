@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { TimeBlock, AppointmentBlock } from './types';
 import { Appointment } from '@/types/appointment';
@@ -121,7 +122,7 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
       }
     };
 
-    const baseAppointmentClass = 'p-1 bg-blue-100 border-l-4 border-blue-500 h-full w-full cursor-pointer transition-colors hover:bg-blue-200 z-20 relative bg-green-300/50';
+    const baseAppointmentClass = 'p-1 bg-blue-100 border-l-4 border-blue-500 h-full w-full cursor-pointer transition-colors hover:bg-blue-200 z-20 relative';
 
     onDragStart = (e: React.DragEvent) => {
       const original = originalAppointments.find(a => a.id === appointment.id) || appointment;
@@ -159,7 +160,7 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
     }
   } else if (isAvailable && currentBlock && !appointment) {
     const availabilityBaseClass = currentBlock.isException ? 'bg-teal-100 border-teal-500' : 'bg-green-100 border-green-500';
-    className = `p-1 ${availabilityBaseClass} border-l-4 border-r border-l w-full h-full cursor-pointer hover:bg-opacity-80 transition-colors z-10 relative availability-block bg-blue-300/50`;
+    className = `p-1 ${availabilityBaseClass} border-l-4 border-r border-l w-full h-full cursor-pointer hover:bg-opacity-80 transition-colors z-10 relative availability-block`;
 
     if (isStartOfBlock) {
       className += ' border-t rounded-t';
@@ -185,7 +186,7 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
       );
     }
   } else {
-    className = 'h-full w-full z-0 relative empty-slot bg-red-300/50 cursor-pointer';
+    className = 'h-full w-full z-0 relative empty-slot cursor-pointer';
   }
 
   const debugClass = appointment

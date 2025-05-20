@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { format } from 'date-fns';
 import { useWeekViewData } from './week-view/useWeekViewData';
@@ -8,6 +9,8 @@ import TimeSlot from './week-view/TimeSlot';
 import { Button } from '@/components/ui/button';
 import { AvailabilityBlock } from '@/types/availability';
 import { convertAppointmentBlockToAppointment } from '@/utils/appointmentUtils';
+import AppointmentDetailsDialog from './AppointmentDetailsDialog';
+import { Appointment } from '@/types/appointment';
 
 interface WeekViewProps {
   days: Date[];
@@ -22,6 +25,7 @@ interface WeekViewProps {
   currentDate?: Date;
   isLoading?: boolean;
   error?: any;
+  onAppointmentDelete?: (appointmentId: string) => void;
 }
 
 // Generate time slots for the day (30-minute intervals)
@@ -53,11 +57,14 @@ const WeekView: React.FC<WeekViewProps> = ({
   onAvailabilityClick,
   currentDate,
   onAppointmentUpdate,
+  onAppointmentDelete,
   isLoading,
   error,
 }) => {
   const [selectedBlock, setSelectedBlock] = useState<TimeBlock | null>(null);
   const [draggedAppointmentId, setDraggedAppointmentId] = useState<string | null>(null);
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [isAppointmentDetailsOpen, setIsAppointmentDetailsOpen] = useState(false);
   
   const {
     loading,
@@ -102,37 +109,52 @@ const WeekView: React.FC<WeekViewProps> = ({
 
   // Handle click on an appointment block
   const handleAppointmentClick = (appointment: any) => {
-    if (onAppointmentClick) {
-      // Enhanced logging to debug appointment data
-      console.log('[WeekView] Appointment clicked:', {
-        id: appointment.id,
-        clientName: appointment.clientName,
-        clientId: appointment.client_id,
-        hasClient: !!appointment.client,
-        start_at: appointment.start_at,
-        end_at: appointment.end_at
+    // Enhanced logging to debug appointment data
+    console.log('[WeekView] Appointment clicked:', {
+      id: appointment.id,
+      clientName: appointment.clientName,
+      clientId: appointment.client_id,
+      hasClient: !!appointment.client,
+      start_at: appointment.start_at,
+      end_at: appointment.end_at
+    });
+    
+    // Ensure we're passing the complete original appointment
+    const originalAppointment = appointments?.find(a => a.id === appointment.id);
+    
+    if (originalAppointment) {
+      console.log(`[WeekView] Found original appointment with complete data`);
+      setSelectedAppointment(originalAppointment);
+    } else {
+      console.warn(`[WeekView] Original appointment not found, converting to full appointment`);
+      // Convert to a full appointment object if it's not already
+      const fullAppointment = convertAppointmentBlockToAppointment(appointment, appointments || []);
+      console.log(`[WeekView] Using converted appointment:`, {
+        id: fullAppointment.id,
+        clientName: fullAppointment.clientName,
+        clientId: fullAppointment.client_id,
+        hasClient: !!fullAppointment.client,
+        start_at: fullAppointment.start_at,
+        end_at: fullAppointment.end_at
       });
-      
-      // Ensure we're passing the complete original appointment
-      const originalAppointment = appointments?.find(a => a.id === appointment.id);
-      
-      if (originalAppointment) {
-        console.log(`[WeekView] Found original appointment with complete data`);
-        onAppointmentClick(originalAppointment);
-      } else {
-        console.warn(`[WeekView] Original appointment not found, converting to full appointment`);
-        // Convert to a full appointment object if it's not already
-        const fullAppointment = convertAppointmentBlockToAppointment(appointment, appointments || []);
-        console.log(`[WeekView] Using converted appointment:`, {
-          id: fullAppointment.id,
-          clientName: fullAppointment.clientName,
-          clientId: fullAppointment.client_id,
-          hasClient: !!fullAppointment.client,
-          start_at: fullAppointment.start_at,
-          end_at: fullAppointment.end_at
-        });
-        onAppointmentClick(fullAppointment);
-      }
+      setSelectedAppointment(fullAppointment);
+    }
+    setIsAppointmentDetailsOpen(true);
+    
+    // Also call the parent's onAppointmentClick if provided
+    if (onAppointmentClick) {
+      onAppointmentClick(originalAppointment || appointment);
+    }
+  };
+
+  // Handle appointment updated
+  const handleAppointmentUpdated = () => {
+    // This will trigger a refresh of the calendar data
+    if (onAppointmentUpdate) {
+      // We don't have the new values here, but we can signal to the parent
+      // that an update occurred so it can refresh the data
+      console.log("[WeekView] Appointment updated, triggering refresh");
+      onAppointmentUpdate("refresh-trigger", "", "");
     }
   };
   
@@ -283,6 +305,18 @@ const WeekView: React.FC<WeekViewProps> = ({
 
   return (
     <div className="flex flex-col">
+      {/* AppointmentDetailsDialog */}
+      <AppointmentDetailsDialog 
+        isOpen={isAppointmentDetailsOpen}
+        onClose={() => {
+          setIsAppointmentDetailsOpen(false);
+          setSelectedAppointment(null);
+        }}
+        appointment={selectedAppointment}
+        onAppointmentUpdated={handleAppointmentUpdated}
+        userTimeZone={userTimeZone}
+      />
+
       {/* Time column headers */}
       <div className="flex">
         {/* Time label column header - add matching width to align with time labels */}
@@ -370,6 +404,10 @@ const WeekView: React.FC<WeekViewProps> = ({
                 TimeZoneService.fromJSDate(timeSlot, userTimeZone).toFormat('HH:mm') === 
                 appointment.start.toFormat('HH:mm');
               
+              const isEndOfAppointment = appointment && 
+                TimeZoneService.fromJSDate(timeSlot, userTimeZone).plus({ minutes: 30 }).toFormat('HH:mm') === 
+                appointment.end.toFormat('HH:mm');
+
               return (
                 <div
                   key={i}
@@ -385,6 +423,7 @@ const WeekView: React.FC<WeekViewProps> = ({
                     isStartOfBlock={isStartOfBlock}
                     isEndOfBlock={isEndOfBlock}
                     isStartOfAppointment={isStartOfAppointment}
+                    isEndOfAppointment={isEndOfAppointment}
                     handleAvailabilityBlockClick={handleAvailabilityBlockClick}
                     onAppointmentClick={handleAppointmentClick}
                     onAppointmentDragStart={handleAppointmentDragStart}
