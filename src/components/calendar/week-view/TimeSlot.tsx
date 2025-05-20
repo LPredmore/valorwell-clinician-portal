@@ -68,7 +68,7 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
       if (debugMode) {
         console.log('[TimeSlot] Drag over:', {
           day: new Date(day).toISOString().split('T')[0],
-          time: ${timeSlot.getHours()}:${timeSlot.getMinutes().toString().padStart(2, '0')},
+          time: `${timeSlot.getHours()}:${timeSlot.getMinutes().toString().padStart(2, '0')}`,
           type: appointment ? 'appointment' : (isAvailable && currentBlock) ? 'availability' : 'empty'
         });
       }
