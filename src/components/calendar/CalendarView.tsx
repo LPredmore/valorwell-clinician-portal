@@ -8,6 +8,7 @@ import { Appointment } from '@/types/appointment';
 import { DateTime } from 'luxon';
 import { AvailabilityBlock } from '@/types/availability';
 import AppointmentDetailsDialog from './AppointmentDetailsDialog';
+import { convertAppointmentBlockToAppointment } from '@/utils/appointmentUtils';
 
 interface CalendarProps {
   view: 'week' | 'month';
@@ -104,15 +105,51 @@ const CalendarView = ({
 
   // Handle click on an appointment clicked in calendar
   const handleAppointmentClick = (appointment: Appointment) => {
+    // Enhanced logging to debug appointment data
     console.log(`[CalendarView] Appointment clicked:`, {
       id: appointment.id,
       clientName: appointment.clientName,
       clientId: appointment.client_id,
-      startAt: appointment.start_at
+      hasClient: !!appointment.client,
+      clientDetails: appointment.client ? {
+        firstName: appointment.client.client_first_name,
+        lastName: appointment.client.client_last_name,
+        preferredName: appointment.client.client_preferred_name
+      } : 'No client data',
+      startAt: appointment.start_at,
+      endAt: appointment.end_at
     });
     
-    // Store the full appointment object and open the dialog
-    setSelectedAppointment(appointment);
+    // Verify we have a complete appointment object before storing it
+    if (!appointment.client && appointment.client_id) {
+      console.warn(`[CalendarView] Appointment is missing client data. Attempting to find complete appointment.`);
+      
+      // Try to find the complete appointment in the appointments array
+      const completeAppointment = appointments.find(a => a.id === appointment.id);
+      
+      if (completeAppointment && completeAppointment.client) {
+        console.log(`[CalendarView] Found complete appointment with client data.`);
+        setSelectedAppointment(completeAppointment);
+      } else {
+        console.warn(`[CalendarView] Could not find complete appointment. Converting to full appointment.`);
+        // Convert to a full appointment object
+        const fullAppointment = convertAppointmentBlockToAppointment(appointment, appointments);
+        console.log(`[CalendarView] Using converted appointment:`, {
+          id: fullAppointment.id,
+          clientName: fullAppointment.clientName,
+          clientId: fullAppointment.client_id,
+          hasClient: !!fullAppointment.client,
+          start_at: fullAppointment.start_at,
+          end_at: fullAppointment.end_at
+        });
+        setSelectedAppointment(fullAppointment);
+      }
+    } else {
+      // Store the full appointment object
+      setSelectedAppointment(appointment);
+    }
+    
+    // Open the dialog
     setIsAppointmentDialogOpen(true);
   };
 

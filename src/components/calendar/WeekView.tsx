@@ -7,6 +7,7 @@ import { DateTime } from 'luxon';
 import TimeSlot from './week-view/TimeSlot';
 import { Button } from '@/components/ui/button';
 import { AvailabilityBlock } from '@/types/availability';
+import { convertAppointmentBlockToAppointment } from '@/utils/appointmentUtils';
 
 interface WeekViewProps {
   days: Date[];
@@ -102,8 +103,36 @@ const WeekView: React.FC<WeekViewProps> = ({
   // Handle click on an appointment block
   const handleAppointmentClick = (appointment: any) => {
     if (onAppointmentClick) {
-      console.log('Appointment clicked:', appointment);
-      onAppointmentClick(appointment);
+      // Enhanced logging to debug appointment data
+      console.log('[WeekView] Appointment clicked:', {
+        id: appointment.id,
+        clientName: appointment.clientName,
+        clientId: appointment.client_id,
+        hasClient: !!appointment.client,
+        start_at: appointment.start_at,
+        end_at: appointment.end_at
+      });
+      
+      // Ensure we're passing the complete original appointment
+      const originalAppointment = appointments?.find(a => a.id === appointment.id);
+      
+      if (originalAppointment) {
+        console.log(`[WeekView] Found original appointment with complete data`);
+        onAppointmentClick(originalAppointment);
+      } else {
+        console.warn(`[WeekView] Original appointment not found, converting to full appointment`);
+        // Convert to a full appointment object if it's not already
+        const fullAppointment = convertAppointmentBlockToAppointment(appointment, appointments || []);
+        console.log(`[WeekView] Using converted appointment:`, {
+          id: fullAppointment.id,
+          clientName: fullAppointment.clientName,
+          clientId: fullAppointment.client_id,
+          hasClient: !!fullAppointment.client,
+          start_at: fullAppointment.start_at,
+          end_at: fullAppointment.end_at
+        });
+        onAppointmentClick(fullAppointment);
+      }
     }
   };
   

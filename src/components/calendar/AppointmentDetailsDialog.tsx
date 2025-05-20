@@ -55,10 +55,24 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
     id: appointment.id,
     clientName: appointment.clientName,
     clientId: appointment.client_id,
-    client: appointment.client,
+    client: appointment.client ? {
+      firstName: appointment.client.client_first_name,
+      lastName: appointment.client.client_last_name,
+      preferredName: appointment.client.client_preferred_name
+    } : 'No client data',
+    hasClient: !!appointment.client,
     start_at: appointment.start_at,
     end_at: appointment.end_at
   });
+  
+  // Validate required fields are present
+  if (!appointment.id || !appointment.start_at || !appointment.end_at) {
+    console.error('[AppointmentDetailsDialog] Appointment is missing required fields:', {
+      hasId: !!appointment.id,
+      hasStartAt: !!appointment.start_at,
+      hasEndAt: !!appointment.end_at
+    });
+  }
 
   // Format date for display - with better error handling
   const formatDate = (dateString: string | undefined) => {
@@ -70,6 +84,21 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
       return 'Invalid date format';
     }
   };
+  
+  // Ensure client data is available
+  const ensureClientData = () => {
+    if (!appointment.client) {
+      console.warn('[AppointmentDetailsDialog] No client data available, creating default client object');
+      appointment.client = {
+        client_first_name: '',
+        client_last_name: '',
+        client_preferred_name: ''
+      };
+    }
+  };
+  
+  // Call the function to ensure client data is available
+  ensureClientData();
   
   // Use start_at to format the date
   const getFormattedDate = () => {
@@ -93,6 +122,28 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
       console.error('Error formatting time from ISO:', error);
       return 'Invalid time format';
     }
+  };
+  
+  // Get client name with fallbacks
+  const getClientName = () => {
+    if (appointment.clientName) {
+      return appointment.clientName;
+    }
+    
+    if (appointment.client) {
+      const { client_preferred_name, client_first_name, client_last_name } = appointment.client;
+      if (client_preferred_name && client_last_name) {
+        return `${client_preferred_name} ${client_last_name}`;
+      } else if (client_first_name && client_last_name) {
+        return `${client_first_name} ${client_last_name}`;
+      } else if (client_preferred_name || client_first_name) {
+        return client_preferred_name || client_first_name || '';
+      } else if (client_last_name) {
+        return client_last_name;
+      }
+    }
+    
+    return 'Unknown Client';
   };
 
   const handleDeleteAppointment = async () => {
@@ -173,7 +224,9 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <User className="h-4 w-4 text-gray-500" />
-                <span className="font-medium">{appointment.clientName || 'Unknown Client'}</span>
+                <span className="font-medium">
+                  {getClientName()}
+                </span>
               </div>
               
               <DropdownMenu>
@@ -209,8 +262,8 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4 text-gray-500" />
                 <span>
-                  {getFormattedTime(appointment.start_at)} - 
-                  {getFormattedTime(appointment.end_at)}
+                  {appointment.start_at ? getFormattedTime(appointment.start_at) : 'N/A'} -
+                  {appointment.end_at ? getFormattedTime(appointment.end_at) : 'N/A'}
                 </span>
               </div>
               
@@ -227,6 +280,11 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
                 <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
                   {appointment.status || 'Scheduled'}
                 </Badge>
+                {appointment.client_id && !appointment.client && (
+                  <Badge className="ml-2 bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
+                    Warning: Client data incomplete
+                  </Badge>
+                )}
               </div>
             </div>
           </div>

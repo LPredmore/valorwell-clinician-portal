@@ -2,6 +2,7 @@ import React from 'react';
 import { TimeBlock, AppointmentBlock } from './types';
 import { Appointment } from '@/types/appointment';
 import { DateTime } from 'luxon';
+import { convertAppointmentBlockToAppointment } from '@/utils/appointmentUtils';
 
 interface TimeSlotProps {
   day: Date;
@@ -69,9 +70,37 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
   if (appointment) {
     onClick = (e: React.MouseEvent) => {
       e.stopPropagation(); // Stop event propagation
+      
+      // Enhanced logging to debug appointment matching
+      console.log(`[TimeSlot] Looking for appointment with ID: ${appointment.id}`);
+      console.log(`[TimeSlot] Original appointments available: ${originalAppointments?.length || 0}`);
+      
+      // More robust lookup with additional logging
       const originalAppointment = originalAppointments?.find(a => a.id === appointment.id);
-      if (originalAppointment || appointment) {
-        onAppointmentClick?.(originalAppointment || appointment);
+      
+      if (originalAppointment) {
+        console.log(`[TimeSlot] Found original appointment:`, {
+          id: originalAppointment.id,
+          clientName: originalAppointment.clientName,
+          clientId: originalAppointment.client_id,
+          hasClient: !!originalAppointment.client,
+          start_at: originalAppointment.start_at,
+          end_at: originalAppointment.end_at
+        });
+        onAppointmentClick?.(originalAppointment);
+      } else {
+        console.warn(`[TimeSlot] Original appointment not found for ID: ${appointment.id}. Converting AppointmentBlock to full Appointment.`);
+        // Convert the AppointmentBlock to a full Appointment object
+        const fullAppointment = convertAppointmentBlockToAppointment(appointment, originalAppointments || []);
+        console.log(`[TimeSlot] Converted appointment:`, {
+          id: fullAppointment.id,
+          clientName: fullAppointment.clientName,
+          clientId: fullAppointment.client_id,
+          hasClient: !!fullAppointment.client,
+          start_at: fullAppointment.start_at,
+          end_at: fullAppointment.end_at
+        });
+        onAppointmentClick?.(fullAppointment);
       }
     };
 

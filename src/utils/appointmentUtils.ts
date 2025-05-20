@@ -174,3 +174,50 @@ export const formatAppointmentDate = (utcTimestamp: string, userTimeZone: string
     return 'Invalid date';
   }
 };
+
+/**
+ * Convert an AppointmentBlock to a full Appointment object
+ * This is used when we need to ensure we have a complete Appointment object
+ * with all the necessary fields, especially when passing data to AppointmentDetailsDialog
+ *
+ * @param appointmentBlock AppointmentBlock from the calendar view
+ * @param originalAppointments Array of original Appointment objects to find matching data
+ * @returns A complete Appointment object
+ */
+export const convertAppointmentBlockToAppointment = (
+  appointmentBlock: any,
+  originalAppointments: any[]
+): Appointment => {
+  // First try to find the original appointment by ID
+  const originalAppointment = originalAppointments.find(a => a.id === appointmentBlock.id);
+  
+  // If we found the original appointment, return it
+  if (originalAppointment) {
+    return originalAppointment;
+  }
+  
+  // Otherwise, create a new Appointment object from the AppointmentBlock
+  // Convert DateTime objects to ISO strings
+  const start_at = appointmentBlock.start?.toUTC?.()?.toISO?.() || '';
+  const end_at = appointmentBlock.end?.toUTC?.()?.toISO?.() || '';
+  
+  // Create a minimal client object
+  const client = {
+    client_first_name: '',
+    client_last_name: '',
+    client_preferred_name: ''
+  };
+  
+  // Return a new Appointment object with the data from the AppointmentBlock
+  return {
+    id: appointmentBlock.id,
+    client_id: appointmentBlock.clientId || '',
+    clinician_id: '',  // We don't have this in AppointmentBlock
+    start_at,
+    end_at,
+    type: appointmentBlock.type || 'appointment',
+    status: 'scheduled',
+    client,
+    clientName: appointmentBlock.clientName || 'Unknown Client'
+  };
+};

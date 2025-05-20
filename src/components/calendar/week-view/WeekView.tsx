@@ -8,6 +8,7 @@ import TimeSlot from './TimeSlot';
 import { AvailabilityBlock } from '@/types/availability';
 import { Appointment } from '@/types/appointment';
 import EditAppointmentDialog from './EditAppointmentDialog';
+import { convertAppointmentBlockToAppointment } from '@/utils/appointmentUtils';
 
 interface WeekViewProps {
   days: Date[];
@@ -62,7 +63,37 @@ const WeekView: React.FC<WeekViewProps> = ({
     userTimeZone
   );
 
-  const handleAppointmentClick = (appt: Appointment) => setSelectedAppointment(appt);
+  const handleAppointmentClick = (appt: Appointment) => {
+    console.log(`[WeekView] Appointment clicked:`, {
+      id: appt.id,
+      clientName: appt.clientName,
+      clientId: appt.client_id,
+      hasClient: !!appt.client,
+      start_at: appt.start_at,
+      end_at: appt.end_at
+    });
+    
+    // Ensure we're passing the complete original appointment
+    const originalAppointment = appointments.find(a => a.id === appt.id);
+    
+    if (originalAppointment) {
+      console.log(`[WeekView] Found original appointment with complete data`);
+      setSelectedAppointment(originalAppointment);
+    } else {
+      console.warn(`[WeekView] Original appointment not found, converting to full appointment`);
+      // Convert to a full appointment object if it's not already
+      const fullAppointment = convertAppointmentBlockToAppointment(appt, appointments);
+      console.log(`[WeekView] Using converted appointment:`, {
+        id: fullAppointment.id,
+        clientName: fullAppointment.clientName,
+        clientId: fullAppointment.client_id,
+        hasClient: !!fullAppointment.client,
+        start_at: fullAppointment.start_at,
+        end_at: fullAppointment.end_at
+      });
+      setSelectedAppointment(fullAppointment);
+    }
+  };
 
   if (loading) return <div className="p-4 text-center">Loading...</div>;
 
