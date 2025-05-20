@@ -150,16 +150,18 @@ const WeekView: React.FC<WeekViewProps> = ({
         const newStartAt = newStartDateTime.toUTC().toISO();
         const newEndAt = newEndDateTime.toUTC().toISO();
         
-        console.log('Updating appointment:', {
+        console.log('[DROP] About to update appointment in database:', {
           appointmentId,
-          oldStart: appointment.start_at,
-          oldEnd: appointment.end_at,
-          newStart: newStartAt,
-          newEnd: newEndAt
+          newStartAt,
+          newEndAt
         });
         
-        // Call the update handler
-        onAppointmentUpdate(appointmentId, newStartAt, newEndAt);
+        // Call the update handler - without using .catch()
+        try {
+          onAppointmentUpdate(appointmentId, newStartAt, newEndAt);
+        } catch (error) {
+          console.error('[DROP] Error updating appointment in database:', error);
+        }
       }
     } catch (error) {
       console.error('Error handling appointment drop:', error);

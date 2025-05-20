@@ -145,7 +145,7 @@ const CalendarView = ({
         {view === 'week' ? (
           <WeekView 
             currentDate={currentDate}
-            clinicianId={clinicianId}
+            selectedClinicianId={clinicianId}
             refreshTrigger={combinedRefreshTrigger} // Use combined refresh trigger
             appointments={appointments}
             onAppointmentClick={handleAppointmentClick}

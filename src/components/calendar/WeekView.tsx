@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { format } from 'date-fns';
-import { useWeekViewData } from './useWeekViewData';
-import { TimeBlock, AppointmentBlock } from './types';
+import { useWeekViewData } from './week-view/useWeekViewData';
+import { TimeBlock, AppointmentBlock } from './week-view/types';
 import { TimeZoneService } from '@/utils/timeZoneService';
 import { DateTime } from 'luxon';
-import TimeSlot from './TimeSlot';
+import TimeSlot from './week-view/TimeSlot';
 import { Button } from '@/components/ui/button';
 import { AvailabilityBlock } from '@/types/availability';
 
@@ -165,10 +165,12 @@ const WeekView: React.FC<WeekViewProps> = ({
           newEndAt
         });
         
-        // Call the update handler
-        onAppointmentUpdate(appointmentId, newStartAt, newEndAt).catch(error => {
+        // Call the update handler - wrapped in try/catch instead of using .catch()
+        try {
+          onAppointmentUpdate(appointmentId, newStartAt, newEndAt);
+        } catch (error) {
           console.error('[DROP] Error updating appointment in database:', error);
-        });
+        }
       }
     } catch (error) {
       console.error('Error handling appointment drop:', error);
