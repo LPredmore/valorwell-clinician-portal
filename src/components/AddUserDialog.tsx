@@ -43,6 +43,7 @@ const userFormSchema = z.object({
   lastName: z.string().min(2, { message: "Last name is required" }),
   email: z.string().email({ message: "Invalid email address" }),
   phone: z.string().optional(),
+  professionalName: z.string().optional(),
   role: z.enum(["admin", "client", "clinician"], {
     required_error: "Please select a role",
   }),
@@ -60,6 +61,7 @@ export function AddUserDialog({ open, onOpenChange, onUserAdded }: AddUserDialog
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [creationError, setCreationError] = useState<string | null>(null);
   const [createdUserId, setCreatedUserId] = useState<string | null>(null);
+  const [showProfessionalName, setShowProfessionalName] = useState(false);
 
   const form = useForm<UserFormValues>({
     resolver: zodResolver(userFormSchema),
@@ -68,9 +70,18 @@ export function AddUserDialog({ open, onOpenChange, onUserAdded }: AddUserDialog
       lastName: "",
       email: "",
       phone: "",
+      professionalName: "",
       role: "client",
     },
   });
+  
+  // Show/hide professional name field based on role selection
+  const watchRole = form.watch("role");
+  if (watchRole === "clinician" && !showProfessionalName) {
+    setShowProfessionalName(true);
+  } else if (watchRole !== "clinician" && showProfessionalName) {
+    setShowProfessionalName(false);
+  }
 
   const checkUserCreationLogs = async (userId: string) => {
     try {
@@ -109,6 +120,10 @@ export function AddUserDialog({ open, onOpenChange, onUserAdded }: AddUserDialog
         }
       }
       
+      if (data.appRoleStatus && !data.appRoleStatus.exists) {
+        detailedErrorMessage = `Database schema issue: app_role enum type is missing. ${detailedErrorMessage || ''}`;
+      }
+      
       return { 
         success: !detailedErrorMessage, 
         error: detailedErrorMessage,
@@ -133,8 +148,13 @@ export function AddUserDialog({ open, onOpenChange, onUserAdded }: AddUserDialog
         last_name: data.lastName,
         phone: data.phone || "",
         role: data.role,
-        temp_password: "temppass1234" // Default temp password
+        temp_password: "temppass1234", // Default temp password
       };
+      
+      // Add professional name for clinicians
+      if (data.role === "clinician") {
+        userData.professional_name = data.professionalName || `${data.firstName} ${data.lastName}`;
+      }
       
       console.log("User metadata to be saved:", userData);
       
@@ -165,6 +185,15 @@ export function AddUserDialog({ open, onOpenChange, onUserAdded }: AddUserDialog
           });
           return;
         }
+        
+        // Check for warnings from the edge function
+        if (createUserResponse.warnings && createUserResponse.warnings.length > 0) {
+          toast({
+            title: "User created with warnings",
+            description: createUserResponse.warnings[0],
+            variant: "warning",
+          });
+        }
       }
       
       toast({
@@ -184,6 +213,8 @@ export function AddUserDialog({ open, onOpenChange, onUserAdded }: AddUserDialog
         errorMessage += `: ${error.message}`;
       } else if (error.error_description) {
         errorMessage += `: ${error.error_description}`;
+      } else if (error.details) {
+        errorMessage += `: ${error.details}`;
       } else {
         errorMessage += ". Please try again.";
       }
@@ -342,6 +373,24 @@ export function AddUserDialog({ open, onOpenChange, onUserAdded }: AddUserDialog
                 </FormItem>
               )}
             />
+            {showProfessionalName && (
+              <FormField
+                control={form.control}
+                name="professionalName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Professional Name (Optional)</FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Dr. Jane Smith" 
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
             <DialogFooter>
               <Button
                 type="button" 

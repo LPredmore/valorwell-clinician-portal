@@ -19,6 +19,7 @@ DECLARE
   v_phone text;
   v_state text;
   v_temp_password text;
+  v_professional_name text;
   v_error_details jsonb;
 BEGIN
   -- Extract the role from user metadata with fallback to 'client' if missing
@@ -30,6 +31,13 @@ BEGIN
   v_phone := NEW.raw_user_meta_data->>'phone';
   v_state := NEW.raw_user_meta_data->>'state';
   v_temp_password := NEW.raw_user_meta_data->>'temp_password';
+  v_professional_name := COALESCE(
+    NEW.raw_user_meta_data->>'professional_name',
+    CASE WHEN v_first_name IS NOT NULL OR v_last_name IS NOT NULL
+      THEN TRIM(COALESCE(v_first_name, '') || ' ' || COALESCE(v_last_name, ''))
+      ELSE 'Dr. ' || COALESCE(v_first_name, NEW.email)
+    END
+  );
   
   -- If role is missing or invalid, set it to 'client' and update user metadata
   IF v_role IS NULL OR v_role NOT IN ('admin', 'clinician', 'client') THEN
@@ -134,14 +142,16 @@ BEGIN
         clinician_first_name,
         clinician_last_name,
         clinician_phone,
+        clinician_professional_name,
         clinician_status
       )
       VALUES (
         NEW.id,
         NEW.email,
-        NEW.raw_user_meta_data->>'first_name',
-        NEW.raw_user_meta_data->>'last_name',
-        NEW.raw_user_meta_data->>'phone',
+        v_first_name,
+        v_last_name,
+        v_phone,
+        v_professional_name,
         'New'
       );
     EXCEPTION WHEN OTHERS THEN
@@ -273,6 +283,6 @@ CREATE TRIGGER on_auth_user_created
 INSERT INTO public.migration_logs (migration_name, description, details)
 VALUES (
   '20250522_fix_handle_new_user_clinician',
-  'Updated handle_new_user function with improved error handling for all user roles',
+  'Updated handle_new_user function with improved error handling and clinician professional name',
   jsonb_build_object('action', 'update_trigger')
 );

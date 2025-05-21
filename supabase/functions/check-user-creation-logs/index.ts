@@ -97,6 +97,48 @@ serve(async (req) => {
       } else {
         userMetadataError = userError?.message || "User not found";
       }
+      
+      // Check if user exists in role-specific tables
+      if (userData?.userMetadata?.role) {
+        const role = userData.userMetadata.role;
+        let tableExistsCheck = null;
+        
+        // Check appropriate table based on role
+        if (role === 'admin') {
+          const { data, error } = await supabaseAdmin
+            .from('admins')
+            .select('id')
+            .eq('id', userId)
+            .single();
+            
+          tableExistsCheck = { exists: !!data, error: error?.message };
+        } else if (role === 'clinician') {
+          const { data, error } = await supabaseAdmin
+            .from('clinicians')
+            .select('id, clinician_professional_name')
+            .eq('id', userId)
+            .single();
+            
+          tableExistsCheck = { 
+            exists: !!data, 
+            error: error?.message,
+            details: data
+          };
+        } else if (role === 'client') {
+          const { data, error } = await supabaseAdmin
+            .from('clients')
+            .select('id')
+            .eq('id', userId)
+            .single();
+            
+          tableExistsCheck = { exists: !!data, error: error?.message };
+        }
+        
+        userData.roleTableCheck = {
+          role,
+          ...tableExistsCheck
+        };
+      }
     }
 
     // Check for app_role enum
@@ -108,6 +150,30 @@ serve(async (req) => {
     const appRoleStatus = enumError ? 
       { exists: false, error: enumError.message } : 
       { exists: enumData, values: enumData ? ["admin", "clinician", "client"] : [] };
+      
+    // Check all tables that should exist
+    const tableChecks = {};
+    const requiredTables = ['admins', 'clients', 'clinicians', 'migration_logs'];
+    
+    for (const table of requiredTables) {
+      try {
+        // Simple query to check if table exists and is accessible
+        const { data, error } = await supabaseAdmin
+          .from(table)
+          .select('count(*)')
+          .limit(1);
+          
+        tableChecks[table] = {
+          exists: !error,
+          error: error?.message
+        };
+      } catch (e) {
+        tableChecks[table] = {
+          exists: false,
+          error: e.message
+        };
+      }
+    }
 
     // Return the logs and user metadata
     return new Response(
@@ -116,6 +182,7 @@ serve(async (req) => {
         user: userData,
         userMetadataError,
         appRoleStatus,
+        tableChecks,
         message: logs.length > 0 ? 
           "Found logs related to user creation" : 
           "No relevant logs found for this user"
