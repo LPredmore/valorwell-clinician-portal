@@ -15,6 +15,7 @@ import { ClientDetails } from '@/types/client';
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar';
 import { Button } from '@/components/ui/button';
 import { CalendarPlus } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 const ClinicianDashboard = () => {
   const { userRole, userId } = useUser();
@@ -25,6 +26,7 @@ const ClinicianDashboard = () => {
   const [showSessionDidNotOccurDialog, setShowSessionDidNotOccurDialog] = useState(false);
   const [selectedAppointmentForNoShow, setSelectedAppointmentForNoShow] = useState<Appointment | null>(null);
   const [showGoogleSyncDialog, setShowGoogleSyncDialog] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     const fetchUserId = async () => {
