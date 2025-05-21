@@ -31,7 +31,11 @@ interface Clinician {
   created_at: string;
 }
 
-const CliniciansTab = () => {
+interface ClinicianTabProps {
+  onAddUser?: () => void;
+}
+
+const CliniciansTab = ({ onAddUser }: ClinicianTabProps) => {
   const [clinicians, setClinicians] = useState<Clinician[]>([]);
   const [isClinicianLoading, setIsClinicianLoading] = useState(true);
   const [currentClinicianPage, setCurrentClinicianPage] = useState(1);
@@ -109,6 +113,18 @@ const CliniciansTab = () => {
     navigate(`/clinicians/${clinicianId}`);
   };
 
+  const handleAddClinicianClick = () => {
+    if (onAddUser) {
+      onAddUser();
+    } else {
+      toast({
+        title: 'Feature not available',
+        description: 'The add clinician feature is currently not available.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const formatName = (firstName: string | null, lastName: string | null) => {
     if (!firstName && !lastName) return "—";
     return `${firstName || ''} ${lastName || ''}`.trim();
@@ -120,6 +136,7 @@ const CliniciansTab = () => {
         <h2 className="text-xl font-semibold">Clinician Management</h2>
         <button 
           className="flex items-center gap-1 px-3 py-1.5 text-sm bg-valorwell-700 text-white rounded hover:bg-valorwell-800"
+          onClick={handleAddClinicianClick}
         >
           <Plus size={16} />
           <span>Add Clinician</span>
