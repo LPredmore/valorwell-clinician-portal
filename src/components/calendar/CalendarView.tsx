@@ -1,6 +1,5 @@
-
 import React, { useEffect, useState } from 'react';
-import WeekView from './WeekView';
+import WeekView from './week-view/WeekView';
 import MonthView from './MonthView';
 import ClinicianAvailabilityPanel from './ClinicianAvailabilityPanel';
 import { TimeZoneService } from '@/utils/timeZoneService';
@@ -173,12 +172,50 @@ const CalendarView = ({
     console.log('[CalendarView] Appointment updated, triggering calendar refresh...');
     setLocalRefreshTrigger(prev => prev + 1);
     setIsAppointmentDialogOpen(false);
+    setSelectedAppointment(null); // Clear the selected appointment
   };
   
   // Handler for when an appointment is updated via drag-and-drop
-  const handleAppointmentDragUpdate = () => {
+  const handleAppointmentDragUpdate = (appointmentId: string, newStartAt: string, newEndAt: string) => {
     console.log('[CalendarView] Appointment updated via drag-and-drop, triggering calendar refresh...');
-    setLocalRefreshTrigger(prev => prev + 1);
+    
+    // If it's just a refresh trigger with no actual update (used for signaling)
+    if (appointmentId === "refresh-trigger" && !newStartAt && !newEndAt) {
+      setLocalRefreshTrigger(prev => prev + 1);
+      return;
+    }
+    
+    // Otherwise attempt to update the appointment in the database
+    if (appointmentId && newStartAt && newEndAt) {
+      console.log('[CalendarView] Updating appointment:', {
+        appointmentId,
+        newStartAt,
+        newEndAt
+      });
+      
+      // Update the appointment in the database via Supabase
+      (async () => {
+        try {
+          const { supabase } = await import('@/integrations/supabase/client');
+          const { error } = await supabase
+            .from('appointments')
+            .update({
+              start_at: newStartAt,
+              end_at: newEndAt
+            })
+            .eq('id', appointmentId);
+            
+          if (error) {
+            throw error;
+          }
+          
+          console.log('[CalendarView] Successfully updated appointment in database');
+          setLocalRefreshTrigger(prev => prev + 1);
+        } catch (error) {
+          console.error('[CalendarView] Error updating appointment:', error);
+        }
+      })();
+    }
   };
 
   return (
@@ -225,10 +262,14 @@ const CalendarView = ({
         </div>
       )}
       
-      {/* Appointment Details Dialog - using only userTimeZone now */}
+      {/* Central AppointmentDetailsDialog - the ONLY instance in the application */}
       <AppointmentDetailsDialog
         isOpen={isAppointmentDialogOpen}
-        onClose={() => setIsAppointmentDialogOpen(false)}
+        onClose={() => {
+          console.log('[CalendarView] Closing appointment dialog');
+          setIsAppointmentDialogOpen(false);
+          setSelectedAppointment(null); // Clear selection when dialog is closed
+        }}
         appointment={selectedAppointment}
         onAppointmentUpdated={handleAppointmentUpdated}
         userTimeZone={validTimeZone}
