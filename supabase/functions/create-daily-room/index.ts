@@ -87,7 +87,7 @@ serve(async (req) => {
       name: roomName,
       properties: {
         exp: null, // No expiration
-        enable_screenshare: false, // No screen sharing
+        enable_screenshare: true,  // Enable screen sharing
         enable_chat: true, // Enable text chat
         start_video_off: true, // Start with video off
         start_audio_off: false, // Start with audio on

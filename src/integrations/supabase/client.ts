@@ -1,3 +1,4 @@
+
 import { createClient } from '@supabase/supabase-js';
 import { parseDateString, formatDateForDB } from '@/utils/dateUtils';
 
@@ -22,33 +23,35 @@ export const supabase = createClient(
 // Use our centralized date parsing utility
 export { parseDateString, formatDateForDB };
 
-// New function to get or create a video room for an appointment
-export const getOrCreateVideoRoom = async (appointmentId: string) => {
+// Updated function to get or create a video room for an appointment, with option to force new room creation
+export const getOrCreateVideoRoom = async (appointmentId: string, forceNew: boolean = false) => {
   try {
-    console.log('Getting or creating video room for appointment:', appointmentId);
+    console.log('Getting or creating video room for appointment:', appointmentId, forceNew ? '(forcing new room)' : '');
     
-    // First check if the appointment already has a video room URL
-    const { data: appointment, error: fetchError } = await supabase
-      .from('appointments')
-      .select('video_room_url')
-      .eq('id', appointmentId)
-      .single();
+    if (!forceNew) {
+      // First check if the appointment already has a video room URL
+      const { data: appointment, error: fetchError } = await supabase
+        .from('appointments')
+        .select('video_room_url')
+        .eq('id', appointmentId)
+        .single();
+        
+      if (fetchError) {
+        console.error('Error fetching appointment:', fetchError);
+        throw fetchError;
+      }
       
-    if (fetchError) {
-      console.error('Error fetching appointment:', fetchError);
-      throw fetchError;
-    }
-    
-    // If a video room URL already exists, return it
-    if (appointment && appointment.video_room_url) {
-      console.log('Appointment already has video room URL:', appointment.video_room_url);
-      return { url: appointment.video_room_url, success: true };
+      // If a video room URL already exists, return it
+      if (appointment && appointment.video_room_url) {
+        console.log('Appointment already has video room URL:', appointment.video_room_url);
+        return { url: appointment.video_room_url, success: true };
+      }
     }
     
     console.log('Creating new video room via Edge Function');
-    // Otherwise, create a new room via the Edge Function
+    // Create a new room via the Edge Function
     const { data, error } = await supabase.functions.invoke('create-daily-room', {
-      body: { appointmentId }
+      body: { appointmentId, forceNew }
     });
     
     if (error) {

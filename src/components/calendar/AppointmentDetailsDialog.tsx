@@ -261,21 +261,11 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
     
     setIsRegeneratingLink(true);
     try {
-      // Get a new video room URL
-      const { url, error } = await getOrCreateVideoRoom(appointment.id, true); // true to force regeneration
+      // Get a new video room URL, passing true to force regeneration
+      const result = await getOrCreateVideoRoom(appointment.id, true);
       
-      if (error) {
-        throw new Error(error.message);
-      }
-      
-      // Update appointment with new URL
-      const { error: updateError } = await supabase
-        .from('appointments')
-        .update({ video_room_url: url })
-        .eq('id', appointment.id);
-        
-      if (updateError) {
-        throw updateError;
+      if (!result.success || result.error) {
+        throw new Error(result.error?.message || 'Failed to regenerate video link');
       }
       
       toast({
