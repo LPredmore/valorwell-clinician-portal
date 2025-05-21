@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Calendar, Clock, AlertCircle, Check } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { supabase } from '@/integrations/supabase/client';
 import Layout from '@/components/layout/Layout';
@@ -12,6 +12,9 @@ import { getClinicianTimeZone } from '@/hooks/useClinicianData';
 import { SessionDidNotOccurDialog } from '@/components/dashboard/SessionDidNotOccurDialog';
 import { Appointment } from '@/types/appointment';
 import { ClientDetails } from '@/types/client';
+import { useGoogleCalendar } from '@/hooks/useGoogleCalendar';
+import { Button } from '@/components/ui/button';
+import { CalendarPlus } from 'lucide-react';
 
 const ClinicianDashboard = () => {
   const { userRole, userId } = useUser();
@@ -21,6 +24,7 @@ const ClinicianDashboard = () => {
   const timeZoneDisplay = TimeZoneService.getTimeZoneDisplayName(clinicianTimeZone);
   const [showSessionDidNotOccurDialog, setShowSessionDidNotOccurDialog] = useState(false);
   const [selectedAppointmentForNoShow, setSelectedAppointmentForNoShow] = useState<Appointment | null>(null);
+  const [showGoogleSyncDialog, setShowGoogleSyncDialog] = useState(false);
 
   useEffect(() => {
     const fetchUserId = async () => {
@@ -55,6 +59,15 @@ const ClinicianDashboard = () => {
     fetchClinicianTimeZone();
   }, [currentUserId]);
 
+  // Integrate Google Calendar hook
+  const { 
+    isConnected: isGoogleConnected, 
+    isLoading: isGoogleLoading, 
+    isSyncing,
+    connectGoogleCalendar, 
+    syncMultipleAppointments 
+  } = useGoogleCalendar();
+
   const {
     appointments,
     todayAppointments,
@@ -83,6 +96,27 @@ const ClinicianDashboard = () => {
   const closeSessionDidNotOccurDialog = () => {
     setShowSessionDidNotOccurDialog(false);
     setSelectedAppointmentForNoShow(null);
+  };
+
+  // Function to sync all upcoming appointments with Google Calendar
+  const syncAppointmentsWithGoogle = async () => {
+    const appointmentsToSync = [...todayAppointments, ...upcomingAppointments];
+    if (appointmentsToSync.length === 0) {
+      toast({
+        title: "No appointments to sync",
+        description: "You don't have any upcoming appointments to synchronize.",
+        variant: "default",
+      });
+      return;
+    }
+
+    try {
+      const results = await syncMultipleAppointments(appointmentsToSync);
+      console.log("Google Calendar sync results:", results);
+      // Could store the Google event IDs in the database for future reference
+    } catch (error) {
+      console.error("Failed to sync with Google Calendar:", error);
+    }
   };
 
   // Create a type adapter function to ensure clientData is handled properly by SessionNoteTemplate
@@ -220,7 +254,34 @@ const ClinicianDashboard = () => {
   return (
     <Layout>
       <div className="container mx-auto">
-        <h1 className="text-2xl font-bold mb-6">Clinician Dashboard</h1>
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold">Clinician Dashboard</h1>
+          
+          <Button
+            variant={isGoogleConnected ? "outline" : "default"}
+            size="sm"
+            disabled={isGoogleLoading || isSyncing}
+            onClick={isGoogleConnected ? syncAppointmentsWithGoogle : connectGoogleCalendar}
+            className="flex items-center gap-2"
+          >
+            {isGoogleLoading || isSyncing ? (
+              <div className="flex items-center">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900 mr-2"></div>
+                {isSyncing ? "Syncing..." : "Connecting..."}
+              </div>
+            ) : isGoogleConnected ? (
+              <>
+                <Check className="w-4 h-4 text-green-500" />
+                <span>Sync with Google Calendar</span>
+              </>
+            ) : (
+              <>
+                <CalendarPlus className="w-4 h-4" />
+                <span>Connect Google Calendar</span>
+              </>
+            )}
+          </Button>
+        </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {/* Today's Appointments */}

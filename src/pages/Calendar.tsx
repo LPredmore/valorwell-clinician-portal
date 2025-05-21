@@ -90,7 +90,8 @@ const CalendarPage = () => {
     isLoading,
     error,
     connectGoogleCalendar,
-    disconnectGoogleCalendar
+    disconnectGoogleCalendar,
+    syncMultipleAppointments
   } = useGoogleCalendar();
 
   useEffect(() => {
@@ -101,6 +102,33 @@ const CalendarPage = () => {
 
   const toggleAvailability = () => {
     setShowAvailability(!showAvailability);
+  };
+  
+  const handleGoogleCalendarToggle = () => {
+    if (isConnected) {
+      // If already connected, sync appointments
+      syncCalendarEvents();
+    } else {
+      // If not connected, start the OAuth flow
+      connectGoogleCalendar()
+        .then(() => toast.success("Google Calendar connected successfully!"))
+        .catch(err => toast.error("Failed to connect Google Calendar."));
+    }
+  };
+  
+  const syncCalendarEvents = async () => {
+    if (!isConnected) {
+      toast.error("Please connect your Google Calendar first");
+      return;
+    }
+    
+    try {
+      const results = await syncMultipleAppointments(appointments);
+      toast.success(`Synced ${results.size} appointments to Google Calendar`);
+    } catch (error) {
+      console.error("Failed to sync with Google Calendar:", error);
+      toast.error("Failed to sync appointments with Google Calendar");
+    }
   };
 
   // Central function to handle any data changes that should trigger a refresh
@@ -119,14 +147,14 @@ const CalendarPage = () => {
             <div className="flex items-center gap-4">
               <Button
                 variant="outline"
-                onClick={() => connectGoogleCalendar()}
+                onClick={handleGoogleCalendarToggle}
                 disabled={isLoading}
                 className="flex items-center gap-2"
               >
                 {isConnected ? (
                   <>
                     <CheckCircle2 className="w-4 h-4 text-green-500" />
-                    <span>Connected to Google</span>
+                    <span>Sync with Google Calendar</span>
                   </>
                 ) : (
                   <>
@@ -140,6 +168,9 @@ const CalendarPage = () => {
                 onToggleAvailability={toggleAvailability}
                 onNewAppointment={() => setIsDialogOpen(true)}
                 selectedClinicianId={selectedClinicianId}
+                isGoogleCalendarConnected={isConnected}
+                isConnectingGoogleCalendar={isLoading}
+                onToggleGoogleCalendar={handleGoogleCalendarToggle}
               />
             </div>
           </div>

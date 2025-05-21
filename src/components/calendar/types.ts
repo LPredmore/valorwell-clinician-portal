@@ -21,3 +21,12 @@ export interface TimeSlotProps {
   originalAppointments: any[];
 }
 
+export interface CalendarViewControlsProps {
+  showAvailability: boolean;
+  onToggleAvailability: () => void;
+  onNewAppointment: () => void;
+  selectedClinicianId: string | null;
+  onToggleGoogleCalendar?: () => void;
+  isGoogleCalendarConnected?: boolean;
+  isConnectingGoogleCalendar?: boolean;
+}
