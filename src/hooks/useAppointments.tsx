@@ -95,7 +95,27 @@ export const useAppointments = (
   const [isLoadingSessionClientData, setIsLoadingSessionClientData] =
     useState(false);
 
+  // Validate clinician ID for debugging
   const formattedClinicianId = clinicianId ? clinicianId : null;
+  // Log clinician ID format validation
+  const isValidUUID = formattedClinicianId ? 
+    /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(formattedClinicianId) : 
+    false;
+    
+  // Enhanced logging for clinician ID handling
+  console.log("[useAppointments] Clinician ID validation:", {
+    rawClinicianId: clinicianId,
+    formattedClinicianId,
+    isValidUUID: isValidUUID,
+    isUUIDFormat: formattedClinicianId ? /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(formattedClinicianId) : false,
+    fromTimeZone: safeUserTimeZone
+  });
+
+  // If clinician ID doesn't look like a UUID, log a warning
+  if (formattedClinicianId && !isValidUUID) {
+    console.warn("[useAppointments] Warning: clinicianId doesn't appear to be a valid UUID:", formattedClinicianId);
+  }
+
   const safeUserTimeZone = TimeZoneService.ensureIANATimeZone(
     timeZone || TimeZoneService.DEFAULT_TIMEZONE
   );
@@ -171,11 +191,21 @@ export const useAppointments = (
     // Include refreshTrigger in the queryKey to force refresh when it changes
     queryKey: ["appointments", formattedClinicianId, fromUTCISO, toUTCISO, refreshTrigger],
     queryFn: async (): Promise<Appointment[]> => {
-      if (!formattedClinicianId) return [];
+      if (!formattedClinicianId) {
+        console.warn("[useAppointments] No clinician ID provided, skipping fetch");
+        return [];
+      }
+      
+      // Log complete query parameters for debugging
       console.log(
-        "[useAppointments] Fetching for clinician:",
-        formattedClinicianId,
-        { from: fromUTCISO, to: toUTCISO, refreshTrigger }
+        "[useAppointments] Fetching appointments with params:",
+        { 
+          clinicianId: formattedClinicianId,
+          from: fromUTCISO, 
+          to: toUTCISO, 
+          refreshTrigger,
+          isValidUUID
+        }
       );
 
       let query = supabase
@@ -187,7 +217,7 @@ export const useAppointments = (
         .eq("status", "scheduled");
 
       // Use more robust timezone-aware filtering
-      console.log("[useAppointments] Applying robust UTC filter:", {
+      console.log("[useAppointments] Applying UTC filter:", {
         fromUTCISO,
         toUTCISO,
         clinicianTZ: safeUserTimeZone
@@ -208,6 +238,16 @@ export const useAppointments = (
       });
       
       const { data: rawDataAny, error: queryError } = await query;
+
+      // Log query results for debugging
+      if (queryError) {
+        console.error("[useAppointments] Query error:", queryError);
+      } else {
+        console.log("[useAppointments] Query results:", {
+          success: !queryError,
+          count: rawDataAny?.length || 0
+        });
+      }
 
       // Debugging: Log raw Supabase response structure with more context
       console.log('[useAppointments] Raw Supabase response structure:', {
@@ -289,7 +329,7 @@ export const useAppointments = (
         };
       });
     },
-    enabled: !!formattedClinicianId,
+    enabled: !!formattedClinicianId, // Only run if we have a valid clinician ID
   });
 
   // Helper function to add display formatting
@@ -469,5 +509,10 @@ export const useAppointments = (
     clientData: sessionClientData,
     isLoadingClientData: isLoadingSessionClientData,
     addDisplayFormattingToAppointment,
+    debug: { // Add debug info
+      clinicianId: formattedClinicianId,
+      isValidUUID,
+      timeZone: safeUserTimeZone
+    }
   };
 };

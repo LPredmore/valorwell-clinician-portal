@@ -67,6 +67,7 @@ const ClinicianAvailabilityPanel: React.FC<ClinicianAvailabilityPanelProps> = ({
   const [minDaysAhead, setMinDaysAhead] = useState<number>(1);
   const [maxDaysAhead, setMaxDaysAhead] = useState<number>(30);
   const [clinicianData, setClinicianData] = useState<any>(null);
+  const [resolvedClinicianId, setResolvedClinicianId] = useState<string | null>(null); // Added for debugging
   const { toast } = useToast();
 
   const defaultTimeZone = userTimeZone || 'America/Chicago';
@@ -90,33 +91,81 @@ const ClinicianAvailabilityPanel: React.FC<ClinicianAvailabilityPanelProps> = ({
         // If clinicianId is not provided, try to get it from the current user
         let clinicianIdToUse = clinicianId;
         
+        console.log('[ClinicianAvailabilityPanel] Initial clinicianId prop:', clinicianId);
+        
         if (!clinicianIdToUse) {
           const { data: sessionData } = await supabase.auth.getSession();
 
           if (!sessionData?.session?.user) {
-            console.log('User not logged in');
+            console.log('[ClinicianAvailabilityPanel] User not logged in');
             setLoading(false);
             return;
           }
+          
+          console.log('[ClinicianAvailabilityPanel] Auth user ID:', sessionData.session.user.id);
 
-          const { data: profileData } = await supabase
+          const { data: profileData, error: profileError } = await supabase
             .from('profiles')
-            .select('email')
+            .select('email, user_role')
             .eq('id', sessionData.session.user.id)
             .single();
+            
+          if (profileError) {
+            console.error('[ClinicianAvailabilityPanel] Error fetching profile:', profileError);
+          }
 
           if (profileData) {
-            const { data: clinicianData } = await supabase
+            console.log('[ClinicianAvailabilityPanel] Profile data:', {
+              email: profileData.email,
+              role: profileData.user_role
+            });
+            
+            // Check if user role is clinician
+            if (profileData.user_role !== 'clinician') {
+              console.log('[ClinicianAvailabilityPanel] User is not a clinician, role:', profileData.user_role);
+            }
+
+            const { data: clinicianData, error: clinicianError } = await supabase
               .from('clinicians')
-              .select('id')
+              .select('id, clinician_email')
               .eq('clinician_email', profileData.email)
               .single();
+              
+            if (clinicianError) {
+              console.error('[ClinicianAvailabilityPanel] Error fetching clinician by email:', clinicianError);
+            }
 
             if (clinicianData) {
+              console.log('[ClinicianAvailabilityPanel] Found clinician:', {
+                id: clinicianData.id,
+                email: clinicianData.clinician_email
+              });
               clinicianIdToUse = clinicianData.id;
+            } else {
+              // Try alternative lookup if the email approach didn't work
+              const { data: altClinicianData, error: altError } = await supabase
+                .from('clinicians')
+                .select('id')
+                .eq('profile_id', sessionData.session.user.id)
+                .single();
+                
+              if (altError) {
+                console.error('[ClinicianAvailabilityPanel] Error fetching clinician by profile_id:', altError);
+              }
+              
+              if (altClinicianData) {
+                console.log('[ClinicianAvailabilityPanel] Found clinician via profile_id:', altClinicianData.id);
+                clinicianIdToUse = altClinicianData.id;
+              } else {
+                console.error('[ClinicianAvailabilityPanel] Could not resolve clinician ID');
+              }
             }
           }
         }
+        
+        // Store the resolved clinician ID for debugging
+        setResolvedClinicianId(clinicianIdToUse);
+        console.log('[ClinicianAvailabilityPanel] Final resolved clinicianId:', clinicianIdToUse);
 
         if (clinicianIdToUse) {
           const { data, error } = await supabase
@@ -126,12 +175,17 @@ const ClinicianAvailabilityPanel: React.FC<ClinicianAvailabilityPanelProps> = ({
             .single();
 
           if (error) {
-            console.error('Error fetching clinician data:', error);
+            console.error('[ClinicianAvailabilityPanel] Error fetching clinician data:', error);
             return;
           }
 
           if (data) {
-            console.log('Fetched clinician data:', data);
+            console.log('[ClinicianAvailabilityPanel] Fetched clinician data:', {
+              id: data.id,
+              email: data.clinician_email,
+              timeZone: data.clinician_time_zone,
+              timeZoneArray: data.clinician_timezone
+            });
             setClinicianData(data);
             
             // Set the availability settings from clinician data
@@ -174,7 +228,7 @@ const ClinicianAvailabilityPanel: React.FC<ClinicianAvailabilityPanelProps> = ({
           }
         }
       } catch (error) {
-        console.error('Error:', error);
+        console.error('[ClinicianAvailabilityPanel] Error:', error);
       } finally {
         setLoading(false);
       }
@@ -270,15 +324,17 @@ const ClinicianAvailabilityPanel: React.FC<ClinicianAvailabilityPanelProps> = ({
 
   const saveAvailability = async () => {
     setIsSaving(true);
-    console.log('Saving availability to clinician record...');
+    console.log('[ClinicianAvailabilityPanel] Saving availability to clinician record...');
 
     try {
-      // If clinicianId is not provided, try to get it from the current user
-      let clinicianIdToUse = clinicianId;
+      // Use the resolved clinician ID if available
+      let clinicianIdToUse = resolvedClinicianId || clinicianId;
       
       if (!clinicianIdToUse && clinicianData) {
         clinicianIdToUse = clinicianData.id;
       }
+      
+      console.log('[ClinicianAvailabilityPanel] Using clinician ID for save:', clinicianIdToUse);
       
       if (!clinicianIdToUse) {
         const { data: sessionData } = await supabase.auth.getSession();
@@ -292,10 +348,12 @@ const ClinicianAvailabilityPanel: React.FC<ClinicianAvailabilityPanelProps> = ({
           setIsSaving(false);
           return;
         }
+        
+        console.log('[ClinicianAvailabilityPanel] Auth user ID for save:', sessionData.session.user.id);
 
         const { data: profileData } = await supabase
           .from('profiles')
-          .select('email')
+          .select('email, user_role')
           .eq('id', sessionData.session.user.id)
           .single();
 
@@ -308,24 +366,46 @@ const ClinicianAvailabilityPanel: React.FC<ClinicianAvailabilityPanelProps> = ({
           setIsSaving(false);
           return;
         }
+        
+        console.log('[ClinicianAvailabilityPanel] Profile for save:', {
+          email: profileData.email,
+          role: profileData.user_role
+        });
 
-        const { data: clinicianData } = await supabase
+        const { data: clinicianData, error: clinicianError } = await supabase
           .from('clinicians')
           .select('id')
           .eq('clinician_email', profileData.email)
           .single();
-
-        if (!clinicianData) {
-          toast({
-            title: "Clinician Error",
-            description: "Could not find your clinician record",
-            variant: "destructive"
-          });
-          setIsSaving(false);
-          return;
+          
+        if (clinicianError) {
+          console.error('[ClinicianAvailabilityPanel] Error finding clinician for save:', clinicianError);
         }
 
-        clinicianIdToUse = clinicianData.id;
+        if (!clinicianData) {
+          // Try alternative lookup
+          const { data: altClinicianData } = await supabase
+            .from('clinicians')
+            .select('id')
+            .eq('profile_id', sessionData.session.user.id)
+            .single();
+            
+          if (altClinicianData) {
+            console.log('[ClinicianAvailabilityPanel] Found clinician via profile_id for save:', altClinicianData.id);
+            clinicianIdToUse = altClinicianData.id;
+          } else {
+            toast({
+              title: "Clinician Error",
+              description: "Could not find your clinician record",
+              variant: "destructive"
+            });
+            setIsSaving(false);
+            return;
+          }
+        } else {
+          clinicianIdToUse = clinicianData.id;
+          console.log('[ClinicianAvailabilityPanel] Found clinician for save:', clinicianIdToUse);
+        }
       }
 
       if (!clinicianIdToUse) {
@@ -343,7 +423,10 @@ const ClinicianAvailabilityPanel: React.FC<ClinicianAvailabilityPanelProps> = ({
         // Add the settings directly to the clinicians table
         clinician_time_granularity: timeGranularity,
         clinician_min_notice_days: minDaysAhead,
-        clinician_max_advance_days: maxDaysAhead
+        clinician_max_advance_days: maxDaysAhead,
+        // Set the timezone fields to ensure both are populated
+        clinician_time_zone: defaultTimeZone,
+        clinician_timezone: [defaultTimeZone] // Ensure this array field is populated too
       };
       
       // For each day of the week, set all possible slots
@@ -371,15 +454,16 @@ const ClinicianAvailabilityPanel: React.FC<ClinicianAvailabilityPanelProps> = ({
         }
       });
       
-      console.log('Updating clinician record with data:', updateData);
+      console.log('[ClinicianAvailabilityPanel] Updating clinician record with data:', updateData);
       
-      const { error } = await supabase
+      const { data: updateResult, error } = await supabase
         .from('clinicians')
         .update(updateData)
-        .eq('id', clinicianIdToUse);
+        .eq('id', clinicianIdToUse)
+        .select();
         
       if (error) {
-        console.error('Error updating availability:', error);
+        console.error('[ClinicianAvailabilityPanel] Error updating availability:', error);
         toast({
           title: "Error Saving Availability",
           description: error.message,
@@ -388,6 +472,8 @@ const ClinicianAvailabilityPanel: React.FC<ClinicianAvailabilityPanelProps> = ({
         setIsSaving(false);
         return;
       }
+      
+      console.log('[ClinicianAvailabilityPanel] Update result:', updateResult);
       
       toast({
         title: "Availability Saved",
@@ -400,7 +486,7 @@ const ClinicianAvailabilityPanel: React.FC<ClinicianAvailabilityPanelProps> = ({
         onAvailabilityUpdated();
       }
     } catch (error) {
-      console.error('Error saving availability:', error);
+      console.error('[ClinicianAvailabilityPanel] Error saving availability:', error);
       toast({
         title: "Error",
         description: "An unexpected error occurred while saving your availability",
@@ -678,6 +764,22 @@ const ClinicianAvailabilityPanel: React.FC<ClinicianAvailabilityPanelProps> = ({
             {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {isSaving ? 'Saving...' : 'Save Availability'}
           </Button>
+          
+          {process.env.NODE_ENV !== 'production' && (
+            <div className="mt-4 p-2 border rounded-md bg-gray-50">
+              <h4 className="text-xs font-semibold">Debug Info</h4>
+              <p className="text-xs">Clinician ID: {resolvedClinicianId || 'Not resolved'}</p>
+              <p className="text-xs">Prop Clinician ID: {clinicianId || 'None'}</p>
+              {clinicianData && (
+                <>
+                  <p className="text-xs">Email: {clinicianData.clinician_email || 'N/A'}</p>
+                  <p className="text-xs">Time Zone: {clinicianData.clinician_time_zone || 'Not set'}</p>
+                  <p className="text-xs">Timezone Array: {clinicianData.clinician_timezone ? 
+                    JSON.stringify(clinicianData.clinician_timezone) : 'Not set'}</p>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

@@ -20,6 +20,7 @@ import { useToast } from '@/hooks/use-toast';
 const ClinicianDashboard = () => {
   const { userRole, userId } = useUser();
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [clinicianId, setClinicianId] = useState<string | null>(null); // Add explicit clinicianId state
   const [clinicianTimeZone, setClinicianTimeZone] = useState<string>(TimeZoneService.DEFAULT_TIMEZONE);
   const [isLoadingTimeZone, setIsLoadingTimeZone] = useState(true);
   const timeZoneDisplay = TimeZoneService.getTimeZoneDisplayName(clinicianTimeZone);
@@ -28,10 +29,12 @@ const ClinicianDashboard = () => {
   const [showGoogleSyncDialog, setShowGoogleSyncDialog] = useState(false);
   const { toast } = useToast();
 
+  // First fetch the auth user ID
   useEffect(() => {
     const fetchUserId = async () => {
       const { data } = await supabase.auth.getUser();
       if (data?.user) {
+        console.log("[ClinicianDashboard] Auth user ID:", data.user.id);
         setCurrentUserId(data.user.id);
       }
     };
@@ -39,17 +42,118 @@ const ClinicianDashboard = () => {
     fetchUserId();
   }, []);
 
+  // Then resolve the clinician ID from the user ID
+  useEffect(() => {
+    const resolveClinicianId = async () => {
+      if (!currentUserId) return;
+      
+      try {
+        // First try to get profile to find email
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('email, user_role')
+          .eq('id', currentUserId)
+          .single();
+          
+        if (profileError) {
+          console.error("[ClinicianDashboard] Error fetching profile:", profileError);
+          return;
+        }
+        
+        console.log("[ClinicianDashboard] Profile data:", profileData);
+        
+        if (profileData && profileData.email) {
+          // Look up clinician by email
+          const { data: clinicianData, error: clinicianError } = await supabase
+            .from('clinicians')
+            .select('id, clinician_email, clinician_time_zone, clinician_timezone')
+            .eq('clinician_email', profileData.email)
+            .single();
+            
+          if (clinicianError) {
+            console.error("[ClinicianDashboard] Error looking up clinician by email:", clinicianError);
+          }
+          
+          if (clinicianData) {
+            console.log("[ClinicianDashboard] Found clinician by email:", {
+              id: clinicianData.id, 
+              email: clinicianData.clinician_email,
+              timeZone: clinicianData.clinician_time_zone,
+              timeZoneArray: clinicianData.clinician_timezone
+            });
+            setClinicianId(clinicianData.id);
+            
+            // Check and update timezone arrays if missing
+            if (!clinicianData.clinician_timezone && clinicianData.clinician_time_zone) {
+              console.log("[ClinicianDashboard] Fixing missing timezone array with:", clinicianData.clinician_time_zone);
+              
+              const { error: updateError } = await supabase
+                .from('clinicians')
+                .update({ clinician_timezone: [clinicianData.clinician_time_zone] })
+                .eq('id', clinicianData.id);
+                
+              if (updateError) {
+                console.error("[ClinicianDashboard] Error fixing timezone array:", updateError);
+              }
+            }
+            
+            return;
+          }
+          
+          // If not found by email, try by profile_id
+          const { data: altClinicianData, error: altError } = await supabase
+            .from('clinicians')
+            .select('id, clinician_email, clinician_time_zone, clinician_timezone')
+            .eq('profile_id', currentUserId)
+            .single();
+            
+          if (altError) {
+            console.error("[ClinicianDashboard] Error looking up clinician by profile_id:", altError);
+          }
+          
+          if (altClinicianData) {
+            console.log("[ClinicianDashboard] Found clinician by profile_id:", {
+              id: altClinicianData.id, 
+              email: altClinicianData.clinician_email,
+              timeZone: altClinicianData.clinician_time_zone,
+              timeZoneArray: altClinicianData.clinician_timezone
+            });
+            setClinicianId(altClinicianData.id);
+            
+            // Check and update timezone arrays if missing
+            if (!altClinicianData.clinician_timezone && altClinicianData.clinician_time_zone) {
+              console.log("[ClinicianDashboard] Fixing missing timezone array with:", altClinicianData.clinician_time_zone);
+              
+              const { error: updateError } = await supabase
+                .from('clinicians')
+                .update({ clinician_timezone: [altClinicianData.clinician_time_zone] })
+                .eq('id', altClinicianData.id);
+                
+              if (updateError) {
+                console.error("[ClinicianDashboard] Error fixing timezone array:", updateError);
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error("[ClinicianDashboard] Error resolving clinician ID:", error);
+      }
+    };
+    
+    resolveClinicianId();
+  }, [currentUserId]);
+
   // Fetch clinician's timezone
   useEffect(() => {
     const fetchClinicianTimeZone = async () => {
-      if (currentUserId) {
+      if (clinicianId) {
         setIsLoadingTimeZone(true);
         try {
-          const timeZone = await getClinicianTimeZone(currentUserId);
-          console.log("Fetched clinician timezone:", timeZone);
+          const timeZone = await getClinicianTimeZone(clinicianId);
+          console.log("[ClinicianDashboard] Fetched clinician timezone:", timeZone);
           setClinicianTimeZone(timeZone);
         } catch (error) {
-          console.error("Error fetching clinician timezone:", error);
+          console.error("[ClinicianDashboard] Error fetching clinician timezone:", error);
           // Fallback to system timezone
           setClinicianTimeZone(TimeZoneService.DEFAULT_TIMEZONE);
         } finally {
@@ -59,7 +163,7 @@ const ClinicianDashboard = () => {
     };
     
     fetchClinicianTimeZone();
-  }, [currentUserId]);
+  }, [clinicianId]);
 
   // Integrate Google Calendar hook
   const { 
@@ -70,6 +174,7 @@ const ClinicianDashboard = () => {
     syncMultipleAppointments 
   } = useGoogleCalendar();
 
+  // Use the explicit clinicianId instead of the raw userId
   const {
     appointments,
     todayAppointments,
@@ -87,8 +192,14 @@ const ClinicianDashboard = () => {
     startVideoSession,
     openSessionTemplate,
     closeSessionTemplate,
-    closeVideoSession
-  } = useAppointments(currentUserId);
+    closeVideoSession,
+    debug
+  } = useAppointments(clinicianId);
+  
+  // Log debug info from hook
+  useEffect(() => {
+    console.log("[ClinicianDashboard] useAppointments debug info:", debug);
+  }, [debug]);
 
   const handleSessionDidNotOccur = (appointment: Appointment) => {
     setSelectedAppointmentForNoShow(appointment);
@@ -284,6 +395,19 @@ const ClinicianDashboard = () => {
             )}
           </Button>
         </div>
+        
+        {/* Debug info in dev mode */}
+        {process.env.NODE_ENV !== 'production' && (
+          <div className="mb-4 p-2 border rounded-md bg-gray-50">
+            <h4 className="text-xs font-semibold">Debug Info</h4>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <p>Auth User ID: {currentUserId || 'Not set'}</p>
+              <p>Clinician ID: {clinicianId || 'Not resolved'}</p>
+              <p>Timezone: {clinicianTimeZone}</p>
+              <p>Appointments: {appointments?.length || 0}</p>
+            </div>
+          </div>
+        )}
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {/* Today's Appointments */}
