@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -10,7 +9,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Calendar, Clock, User, MoreVertical, Trash, Edit } from 'lucide-react';
+import { Calendar, Clock, User, MoreVertical, Trash, Edit, Video, Copy, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -32,7 +31,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, getOrCreateVideoRoom } from '@/integrations/supabase/client';
 import { formatClientName } from '@/utils/appointmentUtils';
 import { TimeZoneService } from '@/utils/timeZoneService';
 
@@ -53,6 +52,7 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
 }) => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isRegeneratingLink, setIsRegeneratingLink] = useState(false);
   const [deleteOption, setDeleteOption] = useState<'single' | 'series'>('single');
   const [isEditing, setIsEditing] = useState(false);
   const isRecurring = !!appointment?.recurring_group_id;
@@ -82,7 +82,6 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
       client: appointment?.client || undefined
     },
   });
-
 
   useEffect(() => {
     if (appointment) {
@@ -237,6 +236,66 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
     }
   };
 
+  const copyVideoUrlToClipboard = () => {
+    if (!appointment.video_room_url) return;
+    
+    navigator.clipboard.writeText(appointment.video_room_url)
+      .then(() => {
+        toast({
+          title: "Link Copied",
+          description: "Video call link copied to clipboard",
+        });
+      })
+      .catch((err) => {
+        console.error('Could not copy text: ', err);
+        toast({
+          title: "Copy Failed",
+          description: "Could not copy link to clipboard",
+          variant: "destructive"
+        });
+      });
+  };
+
+  const regenerateVideoLink = async () => {
+    if (!appointment) return;
+    
+    setIsRegeneratingLink(true);
+    try {
+      // Get a new video room URL
+      const { url, error } = await getOrCreateVideoRoom(appointment.id, true); // true to force regeneration
+      
+      if (error) {
+        throw new Error(error.message);
+      }
+      
+      // Update appointment with new URL
+      const { error: updateError } = await supabase
+        .from('appointments')
+        .update({ video_room_url: url })
+        .eq('id', appointment.id);
+        
+      if (updateError) {
+        throw updateError;
+      }
+      
+      toast({
+        title: "Success",
+        description: "Video call link has been regenerated",
+      });
+      
+      onAppointmentUpdated(); // Refresh appointment data
+    } catch (error) {
+      console.error('Error regenerating video link:', error);
+      toast({
+        title: "Error",
+        description: "Failed to regenerate video link",
+        variant: "destructive"
+      });
+    } finally {
+      setIsRegeneratingLink(false);
+    }
+  };
+
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
@@ -388,6 +447,67 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
                   <div className="inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold bg-green-100 text-green-800 hover:bg-green-100">
                     {appointment.status || 'Scheduled'}
                   </div>
+                </div>
+
+                {/* Video Call Link Section */}
+                <div className="pt-2">
+                  <Label className="text-sm font-medium">Video Call Link</Label>
+                  <div className="mt-2 flex items-center space-x-2">
+                    {appointment.video_room_url ? (
+                      <>
+                        <div className="flex-1 bg-gray-50 border rounded p-2 text-xs overflow-hidden text-ellipsis">
+                          {appointment.video_room_url}
+                        </div>
+                        <Button
+                          size="icon"
+                          variant="outline"
+                          onClick={copyVideoUrlToClipboard}
+                          title="Copy link"
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="outline"
+                          onClick={regenerateVideoLink}
+                          disabled={isRegeneratingLink}
+                          title="Regenerate link"
+                        >
+                          {isRegeneratingLink ? (
+                            <div className="animate-spin">
+                              <RefreshCw className="h-4 w-4" />
+                            </div>
+                          ) : (
+                            <RefreshCw className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex-1 bg-gray-50 border rounded p-2 text-xs italic text-gray-500">
+                          No video link available
+                        </div>
+                        <Button
+                          size="icon"
+                          variant="outline"
+                          onClick={regenerateVideoLink}
+                          disabled={isRegeneratingLink}
+                          title="Generate link"
+                        >
+                          {isRegeneratingLink ? (
+                            <div className="animate-spin">
+                              <RefreshCw className="h-4 w-4" />
+                            </div>
+                          ) : (
+                            <Video className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Share this link with your client. They can use it to join the video session.
+                  </p>
                 </div>
               </div>
               

@@ -26,7 +26,7 @@ serve(async (req) => {
 
   try {
     // Parse the request body
-    const { appointmentId } = await req.json();
+    const { appointmentId, forceNew } = await req.json();
     
     if (!appointmentId) {
       return new Response(
@@ -41,26 +41,44 @@ serve(async (req) => {
     // Create a new room in Daily.co
     const roomName = `appointment-${appointmentId}`;
     
-    // First check if room already exists
-    console.log('Checking if Daily.co room exists:', roomName);
-    const checkResponse = await fetch(`https://api.daily.co/v1/rooms/${roomName}`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${DAILY_API_KEY}`
-      }
-    });
-    
-    if (checkResponse.ok) {
-      // Room exists, return its URL
-      const roomData = await checkResponse.json();
-      console.log('Room already exists, returning URL:', roomData.url);
-      return new Response(
-        JSON.stringify({ url: roomData.url }),
-        { 
-          status: 200, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+    // Only check if room exists if not forcing new room creation
+    if (!forceNew) {
+      // First check if room already exists
+      console.log('Checking if Daily.co room exists:', roomName);
+      const checkResponse = await fetch(`https://api.daily.co/v1/rooms/${roomName}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${DAILY_API_KEY}`
         }
-      );
+      });
+      
+      if (checkResponse.ok) {
+        // Room exists, return its URL
+        const roomData = await checkResponse.json();
+        console.log('Room already exists, returning URL:', roomData.url);
+        return new Response(
+          JSON.stringify({ url: roomData.url }),
+          { 
+            status: 200, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
+      }
+    } else {
+      console.log('Force creating new room, deleting old room if it exists');
+      // Try to delete the existing room if forcing new room creation
+      try {
+        await fetch(`https://api.daily.co/v1/rooms/${roomName}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${DAILY_API_KEY}`
+          }
+        });
+        console.log('Successfully deleted existing room');
+      } catch (deleteError) {
+        // Ignore delete errors, as the room might not exist
+        console.log('Error or room did not exist when trying to delete:', deleteError);
+      }
     }
     
     // Room doesn't exist, create it

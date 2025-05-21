@@ -1,9 +1,8 @@
-
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, getOrCreateVideoRoom } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { getClinicianById } from '@/hooks/useClinicianData';
 import { 
@@ -251,6 +250,20 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
           lastDate: format(recurringDates[recurringDates.length - 1], 'yyyy-MM-dd')
         });
         
+        // Create a single video room URL for all recurring appointments
+        let videoRoomUrl = null;
+        try {
+          const { url, error } = await getOrCreateVideoRoom(recurringGroupId);
+          if (error) {
+            console.error('Error creating video room:', error);
+          } else {
+            videoRoomUrl = url;
+            logAppointmentDebug('Created video room for recurring appointments', { videoRoomUrl });
+          }
+        } catch (error) {
+          console.error('Failed to create video room:', error);
+        }
+        
         const appointmentsToInsert = recurringDates.map(date => {
           // For each recurring date, create local date+time strings
           const localDateStr = format(date, 'yyyy-MM-dd');
@@ -293,7 +306,8 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
             type: "Therapy Session",
             status: 'scheduled',
             appointment_recurring: recurrenceType,
-            recurring_group_id: recurringGroupId
+            recurring_group_id: recurringGroupId,
+            video_room_url: videoRoomUrl // Add the video room URL to each appointment
           };
         });
 
@@ -369,13 +383,31 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
           utcEndAtISO
         });
         
+        // Create a video room for this individual appointment
+        let videoRoomUrl = null;
+        const appointmentId = uuidv4(); // Pre-generate ID to use for both appointment and video room
+        
+        try {
+          const { url, error } = await getOrCreateVideoRoom(appointmentId);
+          if (error) {
+            console.error('Error creating video room:', error);
+          } else {
+            videoRoomUrl = url;
+            logAppointmentDebug('Created video room for appointment', { videoRoomUrl });
+          }
+        } catch (error) {
+          console.error('Failed to create video room:', error);
+        }
+        
         const appointmentData = {
+          id: appointmentId, // Use pre-generated ID
           client_id: selectedClientId,
           clinician_id: clinicianIdToUse,
           start_at: utcStartAtISO,
           end_at: utcEndAtISO,
           type: "Therapy Session",
-          status: 'scheduled'
+          status: 'scheduled',
+          video_room_url: videoRoomUrl // Add the video room URL
         };
 
         logAppointmentDebug('Creating single appointment', {
