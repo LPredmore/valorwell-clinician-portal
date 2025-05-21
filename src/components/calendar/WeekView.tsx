@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { format } from 'date-fns';
 import { useWeekViewData } from './week-view/useWeekViewData';
@@ -156,6 +155,10 @@ const WeekView: React.FC<WeekViewProps> = ({
       console.log("[WeekView] Appointment updated, triggering refresh");
       onAppointmentUpdate("refresh-trigger", "", "");
     }
+    
+    // Close the appointment details dialog and clear selection
+    setIsAppointmentDetailsOpen(false);
+    setSelectedAppointment(null);
   };
   
   // Handle appointment drag start

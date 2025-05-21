@@ -106,6 +106,10 @@ const WeekView: React.FC<WeekViewProps> = ({
       console.log("[WeekView] Appointment updated, triggering refresh");
       onAppointmentUpdate("refresh-trigger", "", "");
     }
+    
+    // Close the appointment details dialog and clear selection
+    setIsAppointmentDetailsOpen(false);
+    setSelectedAppointment(null);
   };
 
   if (loading) return <div className="p-4 text-center">Loading...</div>;
