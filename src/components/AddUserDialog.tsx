@@ -151,54 +151,100 @@ export function AddUserDialog({ open, onOpenChange, onUserAdded }: AddUserDialog
         temp_password: "temppass1234", // Default temp password
       };
       
-      // Add professional name for clinicians
+      // Add professional name for clinicians as a separate assignment
       if (data.role === "clinician") {
-        userData.professional_name = data.professionalName || `${data.firstName} ${data.lastName}`;
-      }
-      
-      console.log("User metadata to be saved:", userData);
-      
-      // Create user using our helper function that now uses the edge function
-      const { data: createUserResponse, error: createUserError } = await createUser(data.email, userData);
-
-      if (createUserError) {
-        console.error("Error creating user:", createUserError);
-        throw createUserError;
-      }
-
-      console.log("User created successfully:", createUserResponse);
-      
-      // Save the created user ID for potential diagnostics
-      if (createUserResponse?.user?.id) {
-        setCreatedUserId(createUserResponse.user.id);
+        // Create a new object that includes professional_name
+        const clinicianData = {
+          ...userData,
+          professional_name: data.professionalName || `${data.firstName} ${data.lastName}`
+        };
         
-        // Check for any issues in the database logs
-        const logsCheck = await checkUserCreationLogs(createUserResponse.user.id);
+        console.log("User metadata to be saved:", clinicianData);
         
-        if (!logsCheck.success && logsCheck.error) {
-          // We have an issue reported in logs
-          setCreationError(logsCheck.error);
-          toast({
-            title: "Warning",
-            description: `User was created but there might be an issue: ${logsCheck.error}`,
-            variant: "destructive",
-          });
-          return;
+        // Create user using our helper function that now uses the edge function
+        const { data: createUserResponse, error: createUserError } = await createUser(data.email, clinicianData);
+
+        if (createUserError) {
+          console.error("Error creating user:", createUserError);
+          throw createUserError;
         }
+
+        console.log("User created successfully:", createUserResponse);
         
-        // Check for warnings from the edge function
-        if (createUserResponse.warnings && createUserResponse.warnings.length > 0) {
-          toast({
-            title: "User created with warnings",
-            description: createUserResponse.warnings[0],
-            variant: "warning",
-          });
+        // Save the created user ID for potential diagnostics
+        if (createUserResponse?.user?.id) {
+          setCreatedUserId(createUserResponse.user.id);
+          
+          // Check for any issues in the database logs
+          const logsCheck = await checkUserCreationLogs(createUserResponse.user.id);
+          
+          if (!logsCheck.success && logsCheck.error) {
+            // We have an issue reported in logs
+            setCreationError(logsCheck.error);
+            toast({
+              title: "Warning",
+              description: `User was created but there might be an issue: ${logsCheck.error}`,
+              variant: "destructive",
+            });
+            return;
+          }
+          
+          // Check for warnings from the edge function
+          if (createUserResponse.warnings && createUserResponse.warnings.length > 0) {
+            toast({
+              title: "User created with warnings",
+              description: createUserResponse.warnings[0],
+              variant: "default", // Changed from "warning" to "default"
+            });
+          }
+        }
+      } else {
+        // For non-clinician roles, just use the standard userData
+        console.log("User metadata to be saved:", userData);
+        
+        // Create user using our helper function that now uses the edge function
+        const { data: createUserResponse, error: createUserError } = await createUser(data.email, userData);
+
+        if (createUserError) {
+          console.error("Error creating user:", createUserError);
+          throw createUserError;
+        }
+
+        console.log("User created successfully:", createUserResponse);
+        
+        // Save the created user ID for potential diagnostics
+        if (createUserResponse?.user?.id) {
+          setCreatedUserId(createUserResponse.user.id);
+          
+          // Check for any issues in the database logs
+          const logsCheck = await checkUserCreationLogs(createUserResponse.user.id);
+          
+          if (!logsCheck.success && logsCheck.error) {
+            // We have an issue reported in logs
+            setCreationError(logsCheck.error);
+            toast({
+              title: "Warning",
+              description: `User was created but there might be an issue: ${logsCheck.error}`,
+              variant: "destructive",
+            });
+            return;
+          }
+          
+          // Check for warnings from the edge function
+          if (createUserResponse.warnings && createUserResponse.warnings.length > 0) {
+            toast({
+              title: "User created with warnings",
+              description: createUserResponse.warnings[0],
+              variant: "default", // Changed from "warning" to "default"
+            });
+          }
         }
       }
       
       toast({
         title: "Success",
         description: "User added successfully with default password: temppass1234. Please note they will need to confirm their email before logging in.",
+        variant: "default",
       });
 
       form.reset();
