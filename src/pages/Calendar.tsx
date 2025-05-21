@@ -1,6 +1,8 @@
 
 import React, { useEffect } from "react";
 import Layout from "../components/layout/Layout";
+import { Button } from "@/components/ui/button";
+import { CheckCircle2, CalendarPlus } from "lucide-react";
 import CalendarView from "../components/calendar/CalendarView";
 import { addWeeks, subWeeks } from "date-fns";
 import { useCalendarState } from "../hooks/useCalendarState";
@@ -9,6 +11,8 @@ import CalendarViewControls from "../components/calendar/CalendarViewControls";
 import AppointmentDialog from "../components/calendar/AppointmentDialog";
 import { useUser } from "@/context/UserContext";
 import { useAppointments } from "@/hooks/useAppointments";
+import { useGoogleCalendar } from "@/hooks/useGoogleCalendar";
+import { toast } from "sonner";
 
 const CalendarPage = () => {
   // Get the logged-in user's ID
@@ -81,6 +85,20 @@ const CalendarPage = () => {
     setCurrentDate(new Date());
   };
 
+  const {
+    isConnected,
+    isLoading,
+    error,
+    connectGoogleCalendar,
+    disconnectGoogleCalendar
+  } = useGoogleCalendar();
+
+  useEffect(() => {
+    if (error) {
+      toast.error(error);
+    }
+  }, [error]);
+
   const toggleAvailability = () => {
     setShowAvailability(!showAvailability);
   };
@@ -99,6 +117,24 @@ const CalendarPage = () => {
           <div className="flex justify-between items-center">
             <h1 className="text-2xl font-bold text-gray-800">Calendar</h1>
             <div className="flex items-center gap-4">
+              <Button
+                variant="outline"
+                onClick={() => connectGoogleCalendar()}
+                disabled={isLoading}
+                className="flex items-center gap-2"
+              >
+                {isConnected ? (
+                  <>
+                    <CheckCircle2 className="w-4 h-4 text-green-500" />
+                    <span>Connected to Google</span>
+                  </>
+                ) : (
+                  <>
+                    <CalendarPlus className="w-4 h-4" />
+                    <span>Connect Google Calendar</span>
+                  </>
+                )}
+              </Button>
               <CalendarViewControls
                 showAvailability={showAvailability}
                 onToggleAvailability={toggleAvailability}
