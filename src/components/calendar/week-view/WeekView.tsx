@@ -20,6 +20,7 @@ interface WeekViewProps {
   onAppointmentClick?: (appointment: Appointment) => void;
   onAppointmentUpdate?: (appointmentId: string, newStartAt: string, newEndAt: string) => void;
   onAppointmentDelete?: (appointmentId: string) => void;
+  currentDate?: Date; // Added missing property
 }
 
 const START_HOUR = 7;
@@ -46,6 +47,7 @@ const WeekView: React.FC<WeekViewProps> = ({
   onAppointmentClick,
   onAppointmentUpdate,
   onAppointmentDelete,
+  currentDate, // Include the prop in component parameters
 }) => {
   const [draggedAppointmentId, setDraggedAppointmentId] = useState<string | null>(null);
 
@@ -124,12 +126,11 @@ const WeekView: React.FC<WeekViewProps> = ({
       const dragData = JSON.parse(dragDataJson);
       console.log('[DROP] Parsed drag data:', dragData);
       
-      const appointmentId = dragData.appointmentId;
+      // Fixed: Use the id property consistently, with fallback for legacy code
+      const appointmentId = dragData.id || draggedAppointmentId;
       
       // Find the original appointment with more flexible matching
-      const appointment = appointments?.find(a => 
-        a.id === appointmentId || a.appointmentId === appointmentId
-      );
+      const appointment = appointments?.find(a => a.id === appointmentId);
       
       console.log('[DROP] Matched appointment object:', appointment);
       

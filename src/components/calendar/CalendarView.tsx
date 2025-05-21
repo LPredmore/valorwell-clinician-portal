@@ -188,7 +188,7 @@ const CalendarView = ({
         {view === 'week' ? (
           <WeekView 
             days={days}
-            currentDate={currentDate}
+            currentDate={currentDate} // Pass the currentDate prop
             selectedClinicianId={clinicianId}
             refreshTrigger={combinedRefreshTrigger}
             appointments={appointments}
