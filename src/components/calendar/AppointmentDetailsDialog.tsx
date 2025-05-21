@@ -1,12 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogFooter,
-  DialogClose
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -20,7 +19,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Appointment } from '@/types/appointment';
 import { DateTime } from 'luxon';
 import { format } from 'date-fns';
-import { 
+import {
   FormField,
   FormItem,
   FormLabel,
@@ -29,6 +28,7 @@ import {
   Form
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -54,29 +54,35 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [deleteOption, setDeleteOption] = useState<'single' | 'series'>('single');
-  const [isRecurring, setIsRecurring] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const isRecurring = !!appointment?.recurring_group_id;
   const { toast } = useToast();
 
-  // Modified schema to only require start_at
+  // Enhanced schema to handle all appointment fields
   const formSchema = z.object({
     start_at: z.string().min(1, 'Start time is required'),
+    type: z.string().min(1, 'Type is required'),
+    status: z.string().min(1, 'Status is required'),
+    notes: z.string().optional(),
+    client: z.object({
+      client_first_name: z.string().min(1, 'First name is required'),
+      client_last_name: z.string().min(1, 'Last name is required'),
+      client_email: z.string().email('Invalid email').optional(),
+      client_phone: z.string().optional()
+    }).partial().optional()
   });
 
   const form = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
       start_at: appointment ? DateTime.fromISO(appointment.start_at).toFormat('yyyy-MM-dd\'T\'HH:mm') : '',
+      type: appointment?.type || '',
+      status: appointment?.status || '',
+      notes: appointment?.notes || '',
+      client: appointment?.client || undefined
     },
   });
 
-  useEffect(() => {
-    if (appointment?.recurring_group_id) {
-      setIsRecurring(true);
-    } else {
-      setIsRecurring(false);
-    }
-  }, [appointment]);
 
   useEffect(() => {
     if (appointment) {
@@ -105,7 +111,10 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
         .from('appointments')
         .update({
           start_at: startUtc,
-          end_at: endUtc
+          end_at: endUtc,
+          type: values.type,
+          status: values.status,
+          notes: values.notes
         })
         .eq('id', appointment.id);
 
@@ -262,10 +271,52 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
                   )}
                 />
                 
+                <FormField
+                  control={form.control}
+                  name="type"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Appointment Type</FormLabel>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="status"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Status</FormLabel>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="notes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Notes</FormLabel>
+                      <FormControl>
+                        <Textarea {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
                 <DialogFooter className="flex gap-2">
-                  <Button 
-                    type="button" 
-                    variant="outline" 
+                  <Button
+                    type="button"
+                    variant="outline"
                     onClick={() => setIsEditing(false)}
                   >
                     Cancel
@@ -326,24 +377,24 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
                 
                 {isRecurring && (
                   <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="bg-blue-50">
+                    <div className="inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold text-blue-600 bg-blue-50">
                       <Calendar className="h-3 w-3 mr-1" />
                       {getRecurrenceText()}
-                    </Badge>
+                    </div>
                   </div>
                 )}
                 
                 <div>
-                  <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
+                  <div className="inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold bg-green-100 text-green-800 hover:bg-green-100">
                     {appointment.status || 'Scheduled'}
-                  </Badge>
+                  </div>
                 </div>
               </div>
               
               <DialogFooter>
-                <DialogClose asChild>
-                  <Button variant="outline">Close</Button>
-                </DialogClose>
+                <Button variant="outline" onClick={onClose}>
+                  Close
+                </Button>
               </DialogFooter>
             </div>
           )}
