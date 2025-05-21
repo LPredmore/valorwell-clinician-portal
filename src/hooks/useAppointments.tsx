@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase, getOrCreateVideoRoom } from "@/integrations/supabase/client";
@@ -95,6 +96,11 @@ export const useAppointments = (
   const [isLoadingSessionClientData, setIsLoadingSessionClientData] =
     useState(false);
 
+  // First, define safeUserTimeZone before it's used
+  const safeUserTimeZone = TimeZoneService.ensureIANATimeZone(
+    timeZone || TimeZoneService.DEFAULT_TIMEZONE
+  );
+
   // Validate clinician ID for debugging
   const formattedClinicianId = clinicianId ? clinicianId : null;
   // Log clinician ID format validation
@@ -115,10 +121,6 @@ export const useAppointments = (
   if (formattedClinicianId && !isValidUUID) {
     console.warn("[useAppointments] Warning: clinicianId doesn't appear to be a valid UUID:", formattedClinicianId);
   }
-
-  const safeUserTimeZone = TimeZoneService.ensureIANATimeZone(
-    timeZone || TimeZoneService.DEFAULT_TIMEZONE
-  );
   
   // Log clinician ID handling for debugging
   console.log("[useAppointments] Clinician ID handling:", {
