@@ -1,8 +1,6 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.21.0";
 
-// Create a Supabase client with the service role key (has admin privileges)
 const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_URL") ?? "",
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
@@ -15,41 +13,28 @@ const supabaseAdmin = createClient(
 );
 
 serve(async (req) => {
+  // CORS headers
+  const corsHeaders = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers":
+      "authorization, x-client-info, apikey, content-type",
+  };
+
+  // Handle OPTIONS request for CORS preflight
+  if (req.method === "OPTIONS") {
+    return new Response(null, {
+      headers: corsHeaders,
+      status: 204,
+    });
+  }
+
   try {
-    // CORS headers
-    const corsHeaders = {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-    };
+    const { userId } = await req.json();
 
-    // Handle OPTIONS request for CORS preflight
-    if (req.method === "OPTIONS") {
-      return new Response(null, {
-        headers: corsHeaders,
-        status: 204,
-      });
-    }
-
-    // Parse the request body
-    const { userId, email } = await req.json();
-    let whereClause = {};
-    
-    if (userId) {
-      whereClause = { 
-        details: `details->>'user_id' = '${userId}'`
-      };
-      console.log(`Checking logs for user ID: ${userId}`);
-    } else if (email) {
-      whereClause = { 
-        details: `details->>'email' = '${email}'`
-      };
-      console.log(`Checking logs for email: ${email}`);
-    } else {
+    if (!userId) {
       return new Response(
-        JSON.stringify({ 
-          error: "Either userId or email is required" 
-        }),
+        JSON.stringify({ error: "User ID is required" }),
         {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -57,22 +42,17 @@ serve(async (req) => {
       );
     }
 
-    // Query migration_logs for entries related to this user
-    const { data: logs, error: logsError } = await supabaseAdmin
-      .from('migration_logs')
-      .select('*')
-      .or(`description.ilike.%Error inserting%,description.ilike.%created successfully%`)
-      .filter(whereClause.details)
-      .order('created_at', { ascending: false })
-      .limit(20);
+    // Fetch user creation logs for the specified user ID
+    const { data, error } = await supabaseAdmin
+      .from("user_creation_logs")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
 
-    if (logsError) {
-      console.error("Error fetching logs:", logsError);
+    if (error) {
+      console.error("Error fetching user creation logs:", error);
       return new Response(
-        JSON.stringify({ 
-          error: "Error fetching logs",
-          details: logsError.message
-        }),
+        JSON.stringify({ error: "Error fetching logs", details: error }),
         {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -80,113 +60,9 @@ serve(async (req) => {
       );
     }
 
-    // If we have a userId, also get the user's metadata
-    let userData = null;
-    let userMetadataError = null;
-    
-    if (userId) {
-      const { data: user, error: userError } = await supabaseAdmin.auth.admin.getUserById(userId);
-      if (!userError && user) {
-        userData = {
-          id: user.user.id,
-          email: user.user.email,
-          userMetadata: user.user.user_metadata,
-          appMetadata: user.user.app_metadata,
-          creationError: user.user.app_metadata?.creation_error || null,
-        };
-      } else {
-        userMetadataError = userError?.message || "User not found";
-      }
-      
-      // Check if user exists in role-specific tables
-      if (userData?.userMetadata?.role) {
-        const role = userData.userMetadata.role;
-        let tableExistsCheck = null;
-        
-        // Check appropriate table based on role
-        if (role === 'admin') {
-          const { data, error } = await supabaseAdmin
-            .from('admins')
-            .select('id')
-            .eq('id', userId)
-            .single();
-            
-          tableExistsCheck = { exists: !!data, error: error?.message };
-        } else if (role === 'clinician') {
-          const { data, error } = await supabaseAdmin
-            .from('clinicians')
-            .select('id, clinician_professional_name')
-            .eq('id', userId)
-            .single();
-            
-          tableExistsCheck = { 
-            exists: !!data, 
-            error: error?.message,
-            details: data
-          };
-        } else if (role === 'client') {
-          const { data, error } = await supabaseAdmin
-            .from('clients')
-            .select('id')
-            .eq('id', userId)
-            .single();
-            
-          tableExistsCheck = { exists: !!data, error: error?.message };
-        }
-        
-        userData.roleTableCheck = {
-          role,
-          ...tableExistsCheck
-        };
-      }
-    }
-
-    // Check for app_role enum
-    const { data: enumData, error: enumError } = await supabaseAdmin.rpc(
-      'check_enum_exists',
-      { enum_name: 'app_role' }
-    );
-
-    const appRoleStatus = enumError ? 
-      { exists: false, error: enumError.message } : 
-      { exists: enumData, values: enumData ? ["admin", "clinician", "client"] : [] };
-      
-    // Check all tables that should exist
-    const tableChecks = {};
-    const requiredTables = ['admins', 'clients', 'clinicians', 'migration_logs'];
-    
-    for (const table of requiredTables) {
-      try {
-        // Simple query to check if table exists and is accessible
-        const { data, error } = await supabaseAdmin
-          .from(table)
-          .select('count(*)')
-          .limit(1);
-          
-        tableChecks[table] = {
-          exists: !error,
-          error: error?.message
-        };
-      } catch (e) {
-        tableChecks[table] = {
-          exists: false,
-          error: e.message
-        };
-      }
-    }
-
-    // Return the logs and user metadata
+    // Return the logs
     return new Response(
-      JSON.stringify({ 
-        logs,
-        user: userData,
-        userMetadataError,
-        appRoleStatus,
-        tableChecks,
-        message: logs.length > 0 ? 
-          "Found logs related to user creation" : 
-          "No relevant logs found for this user"
-      }),
+      JSON.stringify({ data }),
       {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -195,13 +71,10 @@ serve(async (req) => {
   } catch (error) {
     console.error("Unexpected error:", error);
     return new Response(
-      JSON.stringify({ 
-        error: "Internal server error",
-        details: error.message 
-      }),
+      JSON.stringify({ error: "Internal server error", details: error }),
       {
         status: 500,
-        headers: { "Content-Type": "application/json" },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );
   }
