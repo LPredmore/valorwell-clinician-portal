@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import WeekView from './WeekView';
+import WeekView from './week-view/WeekView';
 import MonthView from './MonthView';
 import ClinicianAvailabilityPanel from './ClinicianAvailabilityPanel';
 import { TimeZoneService } from '@/utils/timeZoneService';
@@ -103,7 +103,7 @@ const CalendarView = ({
     }
   }, [appointments, clinicianId, error, view, validTimeZone, combinedRefreshTrigger]);
 
-  // Handle click on an appointment clicked in calendar
+  // Centralized handler for appointment clicks from any child component
   const handleAppointmentClick = (appointment: Appointment) => {
     // Enhanced logging to debug appointment data
     console.log(`[CalendarView] Appointment clicked:`, {
@@ -173,10 +173,11 @@ const CalendarView = ({
     console.log('[CalendarView] Appointment updated, triggering calendar refresh...');
     setLocalRefreshTrigger(prev => prev + 1);
     setIsAppointmentDialogOpen(false);
+    setSelectedAppointment(null);
   };
   
   // Handler for when an appointment is updated via drag-and-drop
-  const handleAppointmentDragUpdate = () => {
+  const handleAppointmentDragUpdate = (appointmentId: string, newStartAt: string, newEndAt: string) => {
     console.log('[CalendarView] Appointment updated via drag-and-drop, triggering calendar refresh...');
     setLocalRefreshTrigger(prev => prev + 1);
   };
@@ -192,17 +193,15 @@ const CalendarView = ({
             refreshTrigger={combinedRefreshTrigger}
             appointments={appointments}
             onAppointmentClick={handleAppointmentClick}
-            onAvailabilityClick={handleAvailabilityClick}
             onAppointmentUpdate={handleAppointmentDragUpdate}
             userTimeZone={validTimeZone}
-            isLoading={isLoading}
-            error={error}
+            showAvailability={showAvailability}
           />
         ) : (
           <MonthView 
             currentDate={currentDate}
             clinicianId={clinicianId}
-            refreshTrigger={combinedRefreshTrigger} // Use combined refresh trigger
+            refreshTrigger={combinedRefreshTrigger}
             appointments={appointments}
             getClientName={(clientId: string): string => {
               const appointment = appointments.find(app => app.client_id === clientId);
@@ -219,16 +218,19 @@ const CalendarView = ({
         <div className="md:col-span-1">
           <ClinicianAvailabilityPanel 
             clinicianId={clinicianId} 
-            onAvailabilityUpdated={handleAvailabilityUpdated} // Pass the refresh handler
+            onAvailabilityUpdated={handleAvailabilityUpdated}
             userTimeZone={validTimeZone}
           />
         </div>
       )}
       
-      {/* Appointment Details Dialog - using only userTimeZone now */}
+      {/* Centralized Appointment Details Dialog */}
       <AppointmentDetailsDialog
         isOpen={isAppointmentDialogOpen}
-        onClose={() => setIsAppointmentDialogOpen(false)}
+        onClose={() => {
+          setIsAppointmentDialogOpen(false);
+          setSelectedAppointment(null);
+        }}
         appointment={selectedAppointment}
         onAppointmentUpdated={handleAppointmentUpdated}
         userTimeZone={validTimeZone}

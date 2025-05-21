@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { format } from 'date-fns';
 import { useWeekViewData } from './week-view/useWeekViewData';
@@ -8,14 +9,14 @@ import TimeSlot from './week-view/TimeSlot';
 import { Button } from '@/components/ui/button';
 import { AvailabilityBlock } from '@/types/availability';
 import { convertAppointmentBlockToAppointment } from '@/utils/appointmentUtils';
-import AppointmentDetailsDialog from './AppointmentDetailsDialog';
 import { Appointment } from '@/types/appointment';
 
 interface WeekViewProps {
-  days: Date[];
-  selectedClinicianId: string | null;
+  view?: 'week' | 'month';
+  showAvailability: boolean;
+  clinicianId: string | null;
+  selectedClinicianId?: string | null;
   userTimeZone: string;
-  showAvailability?: boolean;
   refreshTrigger?: number;
   appointments?: any[];
   onAppointmentClick?: (appointment: any) => void;
@@ -25,6 +26,7 @@ interface WeekViewProps {
   isLoading?: boolean;
   error?: any;
   onAppointmentDelete?: (appointmentId: string) => void;
+  days: Date[];
 }
 
 // Generate time slots for the day (30-minute intervals)
@@ -60,10 +62,7 @@ const WeekView: React.FC<WeekViewProps> = ({
   isLoading,
   error,
 }) => {
-  const [selectedBlock, setSelectedBlock] = useState<TimeBlock | null>(null);
   const [draggedAppointmentId, setDraggedAppointmentId] = useState<string | null>(null);
-  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
-  const [isAppointmentDetailsOpen, setIsAppointmentDetailsOpen] = useState(false);
   
   const {
     loading,
@@ -82,31 +81,7 @@ const WeekView: React.FC<WeekViewProps> = ({
     userTimeZone
   );
 
-  // Handle click on an availability block
-  const handleAvailabilityBlockClick = (day: Date, block: TimeBlock) => {
-    console.log('Availability block clicked:', {
-      day: format(day, 'yyyy-MM-dd'),
-      start: block.start.toFormat('HH:mm'),
-      end: block.end.toFormat('HH:mm'),
-    });
-    setSelectedBlock(block);
-    
-    // Call the parent's onAvailabilityClick if provided
-    if (onAvailabilityClick) {
-      // Convert the TimeBlock to AvailabilityBlock format before passing to the parent handler
-      const availabilityBlock: AvailabilityBlock = {
-        id: block.availabilityIds[0] || 'unknown',
-        clinician_id: selectedClinicianId || '',
-        start_at: block.start.toUTC().toISO(),
-        end_at: block.end.toUTC().toISO(),
-        is_active: true
-      };
-      
-      onAvailabilityClick(day, availabilityBlock);
-    }
-  };
-
-  // Handle click on an appointment block
+  // Handle click on an appointment 
   const handleAppointmentClick = (appointment: any) => {
     // Enhanced logging to debug appointment data
     console.log('[WeekView] Appointment clicked:', {
@@ -123,7 +98,9 @@ const WeekView: React.FC<WeekViewProps> = ({
     
     if (originalAppointment) {
       console.log(`[WeekView] Found original appointment with complete data`);
-      setSelectedAppointment(originalAppointment);
+      if (onAppointmentClick) {
+        onAppointmentClick(originalAppointment);
+      }
     } else {
       console.warn(`[WeekView] Original appointment not found, converting to full appointment`);
       // Convert to a full appointment object if it's not already
@@ -136,29 +113,35 @@ const WeekView: React.FC<WeekViewProps> = ({
         start_at: fullAppointment.start_at,
         end_at: fullAppointment.end_at
       });
-      setSelectedAppointment(fullAppointment);
-    }
-    setIsAppointmentDetailsOpen(true);
-    
-    // Also call the parent's onAppointmentClick if provided
-    if (onAppointmentClick) {
-      onAppointmentClick(originalAppointment || appointment);
+      
+      // Pass the appointment to the parent component
+      if (onAppointmentClick) {
+        onAppointmentClick(fullAppointment);
+      }
     }
   };
 
-  // Handle appointment updated
-  const handleAppointmentUpdated = () => {
-    // This will trigger a refresh of the calendar data
-    if (onAppointmentUpdate) {
-      // We don't have the new values here, but we can signal to the parent
-      // that an update occurred so it can refresh the data
-      console.log("[WeekView] Appointment updated, triggering refresh");
-      onAppointmentUpdate("refresh-trigger", "", "");
-    }
+  // Handle availability block click
+  const handleAvailabilityBlockClick = (day: Date, block: TimeBlock) => {
+    console.log('Availability block clicked:', {
+      day: format(day, 'yyyy-MM-dd'),
+      start: block.start.toFormat('HH:mm'),
+      end: block.end.toFormat('HH:mm'),
+    });
     
-    // Close the appointment details dialog and clear selection
-    setIsAppointmentDetailsOpen(false);
-    setSelectedAppointment(null);
+    // Call the parent's onAvailabilityClick if provided
+    if (onAvailabilityClick) {
+      // Convert the TimeBlock to AvailabilityBlock format before passing to the parent handler
+      const availabilityBlock: AvailabilityBlock = {
+        id: block.availabilityIds[0] || 'unknown',
+        clinician_id: selectedClinicianId || '',
+        start_at: block.start.toUTC().toISO(),
+        end_at: block.end.toUTC().toISO(),
+        is_active: true
+      };
+      
+      onAvailabilityClick(day, availabilityBlock);
+    }
   };
   
   // Handle appointment drag start
@@ -250,51 +233,6 @@ const WeekView: React.FC<WeekViewProps> = ({
     setDraggedAppointmentId(null);
   };
 
-  // Find which blocks correspond to which time slots to determine visual continuity
-  const findBlocksForTimeSlots = (day: DateTime, currentHour: number, currentMinute: number) => {
-    const currentBlock = timeBlocks.find(block => {
-      if (!block.day || !block.start || !block.end) return false;
-      
-      // Check if the block is for the current day
-      const isCurrentDay = block.day.hasSame(day, 'day');
-      if (!isCurrentDay) return false;
-      
-      // Check if the current time slot falls within the block's time range
-      const slotDateTime = day.set({
-        hour: currentHour,
-        minute: currentMinute,
-        second: 0,
-        millisecond: 0
-      });
-      
-      return slotDateTime >= block.start && slotDateTime < block.end;
-    });
-    
-    return currentBlock;
-  };
-  
-  // Debug function to log all blocks for a specific day
-  const debugBlocksForDay = (day: DateTime) => {
-    const dayBlocks = timeBlocks.filter(block => 
-      block.day && block.day.hasSame(day, 'day')
-    );
-    
-    console.log(`[WeekView DEBUG] Blocks for ${day.toFormat('yyyy-MM-dd')}: ${dayBlocks.length}`, 
-      dayBlocks.map(block => ({
-        start: block.start.toFormat('HH:mm'),
-        end: block.end.toFormat('HH:mm'),
-        isException: block.isException
-      }))
-    );
-    
-    return dayBlocks;
-  };
-  
-  // Get a formatted time string for display
-  const formatTime = (date: Date) => {
-    return format(date, 'h:mm a');
-  };
-
   if (loading) {
     return <div className="flex justify-center items-center h-32">Loading calendar...</div>;
   }
@@ -303,23 +241,10 @@ const WeekView: React.FC<WeekViewProps> = ({
   const debugDay = weekDays.find(day => day.toFormat('yyyy-MM-dd') === '2025-05-15');
   if (debugDay) {
     console.log('[WeekView] Found debug day 2025-05-15, showing blocks:');
-    debugBlocksForDay(debugDay);
   }
 
   return (
     <div className="flex flex-col">
-      {/* AppointmentDetailsDialog */}
-      <AppointmentDetailsDialog 
-        isOpen={isAppointmentDetailsOpen}
-        onClose={() => {
-          setIsAppointmentDetailsOpen(false);
-          setSelectedAppointment(null);
-        }}
-        appointment={selectedAppointment}
-        onAppointmentUpdated={handleAppointmentUpdated}
-        userTimeZone={userTimeZone}
-      />
-
       {/* Time column headers */}
       <div className="flex">
         {/* Time label column header - add matching width to align with time labels */}
@@ -342,7 +267,7 @@ const WeekView: React.FC<WeekViewProps> = ({
         <div className="w-16 flex-shrink-0">
           {TIME_SLOTS.map((timeSlot, i) => (
             <div key={i} className="h-10 flex items-center justify-end pr-2 text-xs text-gray-500">
-              {formatTime(timeSlot)}
+              {format(timeSlot, 'h:mm a')}
             </div>
           ))}
         </div>
@@ -354,11 +279,6 @@ const WeekView: React.FC<WeekViewProps> = ({
               // Convert JS Date to DateTime objects for consistent checking
               const dayDt = TimeZoneService.fromJSDate(day.toJSDate(), userTimeZone);
               const timeSlotDt = TimeZoneService.fromJSDate(timeSlot, userTimeZone);
-              
-              // Get formatted day and hour for debugging logs
-              const formattedDay = dayDt.toFormat('yyyy-MM-dd');
-              const formattedTime = timeSlotDt.toFormat('HH:mm');
-              const debugMode = formattedDay === '2025-05-15' && (timeSlotDt.hour >= 8 && timeSlotDt.hour <= 18);
               
               // Perform availability checks and get relevant blocks
               const isAvailable = showAvailability && isTimeSlotAvailable(
@@ -377,22 +297,6 @@ const WeekView: React.FC<WeekViewProps> = ({
                 dayDt.toJSDate(), 
                 timeSlotDt.toJSDate()
               );
-              
-              // Debug comparison logging
-              if (debugMode) {
-                // Direct comparison between isTimeSlotAvailable and getBlockForTimeSlot results
-                console.log(`[WeekView DEBUG COMPARISON] For ${formattedDay} ${formattedTime}:`);
-                console.log(`  isTimeSlotAvailable result: ${isAvailable}`);
-                console.log(`  getBlockForTimeSlot result (currentBlock defined): ${!!currentBlock}`);
-                if (currentBlock) {
-                  console.log(`  getBlockForTimeSlot block details:`, JSON.stringify({
-                    start: currentBlock.start.toFormat('HH:mm'),
-                    end: currentBlock.end.toFormat('HH:mm'),
-                    day: currentBlock.day?.toFormat('yyyy-MM-dd'),
-                    isException: currentBlock.isException
-                  }));
-                }
-              }
               
               // Determine if this is the start or end of a block
               const isStartOfBlock = currentBlock && 
