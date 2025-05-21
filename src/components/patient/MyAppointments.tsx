@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Calendar, Clock, UserCircle } from 'lucide-react';
@@ -33,6 +32,32 @@ const ErrorBoundaryFallback = ({ error }: { error: Error }) => (
     </details>
   </div>
 );
+
+/**
+ * Ensures consistent timezone handling across the application
+ * @param timezoneFromDB The timezone from the database (could be array or string)
+ * @returns A valid IANA timezone string
+ */
+const resolveTimezone = (timezoneFromDB: string | string[] | null): string => {
+  try {
+    // Check if it's an array and has values
+    if (Array.isArray(timezoneFromDB) && timezoneFromDB.length > 0) {
+      return TimeZoneService.ensureIANATimeZone(timezoneFromDB[0]);
+    }
+    
+    // Check if it's a string
+    if (typeof timezoneFromDB === 'string' && timezoneFromDB) {
+      return TimeZoneService.ensureIANATimeZone(timezoneFromDB);
+    }
+    
+    // Default to browser timezone if neither are valid
+    console.log('[resolveTimezone] No valid timezone found, using browser timezone');
+    return TimeZoneService.ensureIANATimeZone(getUserTimeZone());
+  } catch (error) {
+    console.error('[resolveTimezone] Error resolving timezone:', error);
+    return TimeZoneService.DEFAULT_TIMEZONE;
+  }
+};
 
 /**
  * MyAppointments component displays a list of past appointments for a client
@@ -133,9 +158,9 @@ const MyAppointments: React.FC<MyAppointmentsProps> = ({ pastAppointments: initi
         
         // Get timezone from client data or default to browser
         if (client?.client_time_zone) {
-          const safeTimezone = TimeZoneService.ensureIANATimeZone(client.client_time_zone);
-          console.log(`Setting client timezone from database: ${client.client_time_zone} → ${safeTimezone}`);
-          safeSetState(setClientTimeZone, safeTimezone);
+          const resolvedTimezone = resolveTimezone(client.client_time_zone);
+          console.log(`Setting client timezone from database: ${client.client_time_zone} → ${resolvedTimezone}`);
+          safeSetState(setClientTimeZone, resolvedTimezone);
         } else {
           const browserTimezone = getUserTimeZone();
           console.log(`No client timezone found, using browser timezone: ${browserTimezone}`);
