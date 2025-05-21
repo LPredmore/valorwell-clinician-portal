@@ -26,18 +26,38 @@ export const useGoogleCalendar = () => {
   const [error, setError] = useState<string | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
 
-  // Check connection status on mount
+  // Check connection status and token validity on mount
   useEffect(() => {
     const checkConnection = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         const hasToken = !!session?.provider_token;
-        setIsConnected(hasToken);
+        
+        // Debug: Log token details
         if (hasToken && session?.provider_token) {
-          setAccessToken(session.provider_token);
+          console.group('Google Calendar Token Validation');
+          console.log('Token exists, checking validity...');
+          
+          // Simple token validation by checking expiration
+          if (session.expires_at && session.expires_at * 1000 < Date.now()) {
+            console.warn('Token expired at:', new Date(session.expires_at * 1000));
+            setIsConnected(false);
+            setAccessToken(null);
+          } else {
+            console.log('Token is valid');
+            setIsConnected(true);
+            setAccessToken(session.provider_token);
+          }
+          
+          console.groupEnd();
+        } else {
+          setIsConnected(false);
+          setAccessToken(null);
         }
       } catch (err) {
         console.error('Error checking Google Calendar connection:', err);
+        setIsConnected(false);
+        setAccessToken(null);
       }
     };
     checkConnection();
@@ -111,6 +131,16 @@ export const useGoogleCalendar = () => {
         },
       };
 
+      // Debug: Log the request payload
+      console.groupCollapsed('Google Calendar API Request');
+      console.log('Endpoint:', 'https://www.googleapis.com/calendar/v3/calendars/primary/events');
+      console.log('Headers:', {
+        'Authorization': `Bearer ${accessToken?.substring(0, 10)}...`,
+        'Content-Type': 'application/json'
+      });
+      console.log('Payload:', event);
+      console.groupEnd();
+
       // Call the Google Calendar API
       const response = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
         method: 'POST',
@@ -121,12 +151,19 @@ export const useGoogleCalendar = () => {
         body: JSON.stringify(event),
       });
 
+      // Debug: Log the response
+      console.groupCollapsed('Google Calendar API Response');
+      console.log('Status:', response.status, response.statusText);
+      
+      const data = await response.json();
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error?.message || 'Failed to create Google Calendar event');
+        console.error('Error:', data);
+        console.groupEnd();
+        throw new Error(data.error?.message || 'Failed to create Google Calendar event');
       }
 
-      const data = await response.json();
+      console.log('Success:', data);
+      console.groupEnd();
       toast.success("Appointment synced to Google Calendar");
       return data.id; // Return the Google Calendar event ID
     } catch (err) {
