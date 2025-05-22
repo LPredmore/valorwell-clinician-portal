@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase, getOrCreateVideoRoom } from "@/integrations/supabase/client";
@@ -283,13 +282,16 @@ export const useAppointments = (
       
       const { data: rawDataAny, error: queryError } = await query;
 
-      // Enhanced query results logging
+      // FIX: Updated this logging code to avoid the type error
+      // The issue was comparing query.filter (a function) with a string
       console.log("[useAppointments] Query execution details:", {
         success: !queryError,
         error: queryError,
         count: rawDataAny?.length || 0,
         firstRecord: rawDataAny?.[0] || null,
-        statusFilterApplied: query.filter === "status=eq.scheduled",
+        // FIX: Removed incorrect comparison with string
+        // statusFilterApplied: query.filter === "status=eq.scheduled",
+        statusFilterApplied: true, // We know we applied it above with .eq()
         dateRangeFilterApplied: fromUTCISO && toUTCISO,
         queryParameters: {
           clinician_id: formattedClinicianId,

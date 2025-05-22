@@ -179,9 +179,9 @@ export const useGoogleCalendar = () => {
         console.groupCollapsed('Google Calendar API Response');
         console.log('Status:', response.status, response.statusText);
         
-        const data = await response.json();
+        const responseData = await response.json();
         if (!response.ok) {
-          console.error('Error:', data);
+          console.error('Error:', responseData);
           console.groupEnd();
           
           // Handle specific Google API errors
@@ -190,18 +190,20 @@ export const useGoogleCalendar = () => {
           } else if (response.status === 403) {
             throw new Error('Insufficient permissions for Google Calendar');
           } else {
-            throw new Error(data.error?.message || 'Failed to create Google Calendar event');
+            throw new Error(responseData.error?.message || 'Failed to create Google Calendar event');
           }
         }
 
-        console.log('Success:', data);
+        console.log('Success:', responseData);
         console.groupEnd();
+        
+        // Fix: Use the locally scoped responseData instead of undefined 'data'
+        toast.success("Appointment synced to Google Calendar");
+        return responseData.id; // Return the Google Calendar event ID
       } catch (err) {
         console.error('Network error during Google Calendar API call:', err);
         throw new Error('Network error while connecting to Google Calendar');
       }
-      toast.success("Appointment synced to Google Calendar");
-      return data.id; // Return the Google Calendar event ID
     } catch (err) {
       console.error('Error creating Google Calendar event:', err);
       setError(err instanceof Error ? err.message : 'Failed to create Google Calendar event');
