@@ -1,24 +1,16 @@
 
-import React from 'react';
-import { Button } from './button';
-import { DialogClose } from './dialog';
+import * as React from "react"
+import { Button } from "@/components/ui/button"
 
 interface CustomDialogCloseProps {
-  children: React.ReactNode;
-  variant?: string;
-  onClick?: () => void;
+  children: React.ReactNode
+  variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link"
 }
 
-export const CustomDialogClose: React.FC<CustomDialogCloseProps> = ({ 
-  children, 
-  variant = "outline",
-  onClick
-}) => {
+export function CustomDialogClose({ children, variant = "default" }: CustomDialogCloseProps) {
   return (
-    <DialogClose asChild>
-      <Button variant={variant as any} onClick={onClick}>
-        {children}
-      </Button>
-    </DialogClose>
-  );
-};
+    <Button variant={variant} onClick={() => document.querySelector('[data-state="open"]')?.dispatchEvent(new Event('close', { bubbles: true }))}>
+      {children}
+    </Button>
+  )
+}
