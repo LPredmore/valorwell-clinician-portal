@@ -318,37 +318,24 @@ export const useGoogleCalendar = () => {
         console.log(`Processing appointment ${appointment.id} for ${appointment.clientName} at ${DateTime.fromISO(appointment.start_at).toFormat('yyyy-MM-dd HH:mm')}`);
         
         let eventId: string | null = null;
-        
-        // Check if the appointment already has a Google Calendar event ID
         if (appointment.google_calendar_event_id) {
-          console.log(`Appointment ${appointment.id} already has Google Calendar event ID: ${appointment.google_calendar_event_id}, updating...`);
           eventId = await updateGoogleCalendarEvent(appointment.google_calendar_event_id, appointment);
           if (eventId) updatedCount++;
         } else {
-          console.log(`Appointment ${appointment.id} has no Google Calendar event ID, creating new event...`);
           eventId = await createGoogleCalendarEvent(appointment);
           if (eventId) createdCount++;
         }
-        
+        results.set(appointment.id, eventId);
+
         if (eventId) {
-          // Update the appointment in Supabase with the Google Calendar event ID and sync timestamp
-          const { error: updateError } = await supabase
+          await supabase
             .from('appointments')
             .update({
               google_calendar_event_id: eventId,
-              last_synced_at: new Date().toISOString()
+              last_synced_at: new Date().toISOString(),
             })
             .eq('id', appointment.id);
-            
-          if (updateError) {
-            console.error(`Error updating appointment ${appointment.id} with Google Calendar event ID:`, updateError);
-          } else {
-            console.log(`Updated appointment ${appointment.id} with Google Calendar event ID: ${eventId}`);
-          }
         }
-        
-        results.set(appointment.id, eventId);
-        console.log(`Result for appointment ${appointment.id}: ${eventId ? 'Success' : 'Failed'}`);
       }
       
       // Update clinician's last_google_sync timestamp
