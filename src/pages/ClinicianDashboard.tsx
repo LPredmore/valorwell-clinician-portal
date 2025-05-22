@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { Calendar, Clock, AlertCircle, Check } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
@@ -16,6 +17,7 @@ import { useGoogleCalendar } from '@/hooks/useGoogleCalendar';
 import { Button } from '@/components/ui/button';
 import { CalendarPlus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { toast as sonnerToast } from 'sonner';
 import { DateTime } from 'luxon';
 import { formatClientName } from '@/utils/appointmentUtils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -46,7 +48,7 @@ const ClinicianDashboard = () => {
     updated: 0,
     lastSyncTime: null
   });
-  const toast = useToast();
+  const { toast } = useToast();
 
   // First fetch the auth user ID
   useEffect(() => {
@@ -268,20 +270,16 @@ const ClinicianDashboard = () => {
         
       if (fetchError) {
         console.error("[ClinicianDashboard] Error fetching appointments for sync:", fetchError);
-        toast({
-          title: "Error syncing appointments",
-          description: "Failed to fetch your appointments for synchronization.",
-          variant: "destructive",
+        sonnerToast.error("Error syncing appointments", {
+          description: "Failed to fetch your appointments for synchronization."
         });
         return;
       }
       
       if (!rawAppointments || rawAppointments.length === 0) {
         console.log("[ClinicianDashboard] No appointments found for sync");
-        toast({
-          title: "No appointments to sync",
-          description: "You don't have any appointments that need synchronization.",
-          variant: "default",
+        sonnerToast.success("No appointments to sync", {
+          description: "You don't have any appointments that need synchronization."
         });
         return;
       }
@@ -293,6 +291,15 @@ const ClinicianDashboard = () => {
           client_first_name: rawAppt.clients.client_first_name || "",
           client_last_name: rawAppt.clients.client_last_name || "",
           client_preferred_name: rawAppt.clients.client_preferred_name || "",
+          client_email: "",
+          client_phone: "",
+          client_status: null,
+          client_date_of_birth: null,
+          client_gender: null,
+          client_address: null,
+          client_city: null,
+          client_state: null,
+          client_zipcode: null
         } : undefined;
 
         // Format client name using our utility
@@ -357,10 +364,8 @@ const ClinicianDashboard = () => {
       
     } catch (error) {
       console.error("[ClinicianDashboard] Failed to sync with Google Calendar:", error);
-      toast({
-        title: "Sync failed",
-        description: "Failed to synchronize appointments with Google Calendar.",
-        variant: "destructive",
+      sonnerToast.error("Sync failed", {
+        description: "Failed to synchronize appointments with Google Calendar."
       });
     }
   };
