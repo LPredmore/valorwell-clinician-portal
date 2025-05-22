@@ -218,20 +218,12 @@ const ClinicianDashboard = () => {
     try {
       console.log("[ClinicianDashboard] Starting Google Calendar sync...");
       
-      // Use today's date + 1 month for future appointments
-      const today = DateTime.now();
-      const futureDate = today.plus({ months: 1 });
-      
-      // Fetch all scheduled appointments for this clinician directly
+      // Hardcoded query as requested by user
       const { data: allScheduledAppointments, error: fetchError } = await supabase
         .from("appointments")
-        .select(
-          `id, client_id, clinician_id, start_at, end_at, type, status, appointment_recurring, recurring_group_id, video_room_url, notes, clients (client_first_name, client_last_name, client_preferred_name, client_email, client_phone, client_status, client_date_of_birth, client_gender, client_address, client_city, client_state, client_zipcode)`
-        )
+        .select("*")
         .eq("clinician_id", clinicianId)
-        .eq("status", "scheduled")
-        .gte("start_at", today.toISO())
-        .lte("start_at", futureDate.toISO());
+        .eq("status", "scheduled");
         
       if (fetchError) {
         console.error("[ClinicianDashboard] Error fetching appointments for sync:", fetchError);
@@ -253,38 +245,15 @@ const ClinicianDashboard = () => {
         return;
       }
       
+      console.log("Fetched for sync:", allScheduledAppointments);
+      
       // Process appointments into the right format
       const appointmentsToSync = allScheduledAppointments.map((rawAppt: any): Appointment => {
-        // Process client data from the join
-        const rawClientData = rawAppt.clients;
-        let clientData: Appointment["client"] | undefined;
+        // Use a default empty object for client data since we're not fetching it in the select
+        const clientData = undefined;
 
-        if (rawClientData) {
-          // Handle both object and array structures
-          const clientInfo = Array.isArray(rawClientData)
-            ? rawClientData[0]
-            : rawClientData;
-
-          if (clientInfo && typeof clientInfo === "object") {
-            clientData = {
-              client_first_name: clientInfo.client_first_name || "",
-              client_last_name: clientInfo.client_last_name || "",
-              client_preferred_name: clientInfo.client_preferred_name || "",
-              client_email: clientInfo.client_email || "",
-              client_phone: clientInfo.client_phone || "",
-              client_status: clientInfo.client_status || null,
-              client_date_of_birth: clientInfo.client_date_of_birth || null,
-              client_gender: clientInfo.client_gender || null,
-              client_address: clientInfo.client_address || null,
-              client_city: clientInfo.client_city || null,
-              client_state: clientInfo.client_state || null,
-              client_zipcode: clientInfo.client_zipcode || null
-            };
-          }
-        }
-
-        // Format client name using the shared utility
-        const clientName = formatClientName(clientData);
+        // Format client name - may be blank since we're not fetching client data
+        const clientName = "";
 
         return {
           id: rawAppt.id,
@@ -303,12 +272,9 @@ const ClinicianDashboard = () => {
         };
       });
       
-      console.log(`[ClinicianDashboard] Found ${appointmentsToSync.length} appointments to sync with date range:`, {
-        from: today.toISO(),
-        to: futureDate.toISO()
-      });
+      console.log(`[ClinicianDashboard] Found ${appointmentsToSync.length} appointments to sync`);
 
-      // Log the first few appointments for debugging
+      // Log appointments before sync
       if (appointmentsToSync.length > 0) {
         console.log("[ClinicianDashboard] Sample appointments to sync:", 
           appointmentsToSync.slice(0, 3).map(a => ({
