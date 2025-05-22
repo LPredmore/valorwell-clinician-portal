@@ -149,6 +149,7 @@ import { Separator } from "@/components/ui/separator"
 import { useSearchParams } from 'react-router-dom';
 import { TimeZoneService } from '@/utils/timeZoneService';
 import { useDebounce } from '@/hooks/useDebounce';
+import { CustomDialogClose } from '@/components/ui/custom-dialog-close';
 
 const ClientFormSchema = z.object({
   client_preferred_name: z.string().optional(),
@@ -653,7 +654,7 @@ const ClinicianDashboard: React.FC<ClinicianDashboardProps> = () => {
                     <DrawerBody clientForm={clientForm} createNewClient={createNewClient} />
                     <DrawerFooter>
                       <Button type="submit" onClick={clientForm.handleSubmit(createNewClient)}>Create Client</Button>
-                      <DrawerClose variant="outline">Cancel</DrawerClose>
+                      <CustomDialogClose variant="outline">Cancel</CustomDialogClose>
                     </DrawerFooter>
                   </DrawerContent>
                 </Drawer>
@@ -775,7 +776,7 @@ const ClinicianDashboard: React.FC<ClinicianDashboardProps> = () => {
           </div>
           <DialogFooter>
             <Button type="submit" onClick={createNewAppointment}>Create Appointment</Button>
-            <DialogClose variant="outline">Cancel</DialogClose>
+            <CustomDialogClose variant="outline">Cancel</CustomDialogClose>
           </DialogFooter>
         </DialogContent>
       </Dialog>
