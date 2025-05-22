@@ -197,19 +197,47 @@ export const useAppointments = (
         console.warn("[useAppointments] No clinician ID provided, skipping fetch");
         return [];
       }
-      
+       
       // Log complete query parameters for debugging
       console.log(
         "[useAppointments] Fetching appointments with params:",
-        { 
+        {
           clinicianId: formattedClinicianId,
-          from: fromUTCISO, 
-          to: toUTCISO, 
+          from: fromUTCISO,
+          to: toUTCISO,
           refreshTrigger,
           isValidUUID
         }
       );
 
+      // Log full clinician ID details
+      console.log("[useAppointments] Clinician ID details:", {
+        raw: clinicianId,
+        formatted: formattedClinicianId,
+        isValidUUID,
+        isNull: formattedClinicianId === null,
+        isEmpty: formattedClinicianId === ""
+      });
+
+      // Create base query without filters for debugging
+      let baseQuery = supabase
+        .from("appointments")
+        .select(
+          `id, client_id, clinician_id, start_at, end_at, type, status, appointment_recurring, recurring_group_id, video_room_url, notes, clients (client_first_name, client_last_name, client_preferred_name, client_email, client_phone, client_status, client_date_of_birth, client_gender, client_address, client_city, client_state, client_zipcode)`
+        )
+        .eq("clinician_id", formattedClinicianId);
+
+      console.log("[useAppointments] Base query (no filters):", baseQuery);
+
+      // First try query without any filters to confirm we can get results
+      const { data: baseData, error: baseError } = await baseQuery;
+      console.log("[useAppointments] Base query results:", {
+        count: baseData?.length || 0,
+        error: baseError,
+        sample: baseData?.[0] || null
+      });
+
+      // Now build the full query with filters
       let query = supabase
         .from("appointments")
         .select(
@@ -218,7 +246,21 @@ export const useAppointments = (
         .eq("clinician_id", formattedClinicianId)
         .eq("status", "scheduled");
 
+      console.log("[useAppointments] Full query with filters:", {
+        clinician_id: formattedClinicianId,
+        status: "scheduled",
+        from: fromUTCISO,
+        to: toUTCISO,
+        query: query.toString()
+      });
+
       // Use more robust timezone-aware filtering
+      console.log("[useAppointments] Date range filters:", {
+        fromUTCISO,
+        toUTCISO,
+        isValidFrom: fromUTCISO && DateTime.fromISO(fromUTCISO).isValid,
+        isValidTo: toUTCISO && DateTime.fromISO(toUTCISO).isValid
+      });
       console.log("[useAppointments] Applying UTC filter:", {
         fromUTCISO,
         toUTCISO,
@@ -240,6 +282,22 @@ export const useAppointments = (
       });
       
       const { data: rawDataAny, error: queryError } = await query;
+
+      // Enhanced query results logging
+      console.log("[useAppointments] Query execution details:", {
+        success: !queryError,
+        error: queryError,
+        count: rawDataAny?.length || 0,
+        firstRecord: rawDataAny?.[0] || null,
+        statusFilterApplied: query.filter === "status=eq.scheduled",
+        dateRangeFilterApplied: fromUTCISO && toUTCISO,
+        queryParameters: {
+          clinician_id: formattedClinicianId,
+          status: "scheduled",
+          start_at: fromUTCISO ? `gte.${fromUTCISO}` : undefined,
+          end_at: toUTCISO ? `lte.${toUTCISO}` : undefined
+        }
+      });
 
       // Log query results for debugging
       if (queryError) {

@@ -44,9 +44,31 @@ export const useGoogleCalendar = () => {
             setIsConnected(false);
             setAccessToken(null);
           } else {
-            console.log('Token is valid');
-            setIsConnected(true);
-            setAccessToken(session.provider_token);
+            // Validate token with Google's token info endpoint
+            console.log('Validating token with Google...');
+            const tokenInfoResponse = await fetch(
+              `https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=${session.provider_token}`
+            );
+            
+            if (!tokenInfoResponse.ok) {
+              console.error('Token validation failed:', await tokenInfoResponse.json());
+              setIsConnected(false);
+              setAccessToken(null);
+            } else {
+              const tokenInfo = await tokenInfoResponse.json();
+              console.log('Token info:', tokenInfo);
+              
+              // Verify required scopes
+              if (!tokenInfo.scope?.includes('https://www.googleapis.com/auth/calendar')) {
+                console.error('Missing required calendar scope');
+                setIsConnected(false);
+                setAccessToken(null);
+              } else {
+                console.log('Token is valid with required scopes');
+                setIsConnected(true);
+                setAccessToken(session.provider_token);
+              }
+            }
           }
           
           console.groupEnd();
@@ -142,28 +164,42 @@ export const useGoogleCalendar = () => {
       console.groupEnd();
 
       // Call the Google Calendar API
-      const response = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(event),
-      });
+      let response;
+      try {
+        response = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(event),
+        });
 
-      // Debug: Log the response
-      console.groupCollapsed('Google Calendar API Response');
-      console.log('Status:', response.status, response.statusText);
-      
-      const data = await response.json();
-      if (!response.ok) {
-        console.error('Error:', data);
+        // Debug: Log the response
+        console.groupCollapsed('Google Calendar API Response');
+        console.log('Status:', response.status, response.statusText);
+        
+        const data = await response.json();
+        if (!response.ok) {
+          console.error('Error:', data);
+          console.groupEnd();
+          
+          // Handle specific Google API errors
+          if (response.status === 401) {
+            throw new Error('Google Calendar access token expired or revoked');
+          } else if (response.status === 403) {
+            throw new Error('Insufficient permissions for Google Calendar');
+          } else {
+            throw new Error(data.error?.message || 'Failed to create Google Calendar event');
+          }
+        }
+
+        console.log('Success:', data);
         console.groupEnd();
-        throw new Error(data.error?.message || 'Failed to create Google Calendar event');
+      } catch (err) {
+        console.error('Network error during Google Calendar API call:', err);
+        throw new Error('Network error while connecting to Google Calendar');
       }
-
-      console.log('Success:', data);
-      console.groupEnd();
       toast.success("Appointment synced to Google Calendar");
       return data.id; // Return the Google Calendar event ID
     } catch (err) {
