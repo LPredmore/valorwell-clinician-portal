@@ -243,11 +243,11 @@ export const useAppointments = (
           `id, client_id, clinician_id, start_at, end_at, type, status, appointment_recurring, recurring_group_id, video_room_url, notes, clients (client_first_name, client_last_name, client_preferred_name, client_email, client_phone, client_status, client_date_of_birth, client_gender, client_address, client_city, client_state, client_zipcode)`
         )
         .eq("clinician_id", formattedClinicianId)
-        .eq("status", "scheduled");
+        .in("status", ["scheduled", "confirmed", "completed", "rescheduled"]);
 
       console.log("[useAppointments] Full query with filters:", {
         clinician_id: formattedClinicianId,
-        status: "scheduled",
+        status: ["scheduled", "confirmed", "completed", "rescheduled"],
         from: fromUTCISO,
         to: toUTCISO,
         query: query.toString()
@@ -295,7 +295,7 @@ export const useAppointments = (
         dateRangeFilterApplied: fromUTCISO && toUTCISO,
         queryParameters: {
           clinician_id: formattedClinicianId,
-          status: "scheduled",
+          status: ["scheduled", "confirmed", "completed", "rescheduled"],
           start_at: fromUTCISO ? `gte.${fromUTCISO}` : undefined,
           end_at: toUTCISO ? `lte.${toUTCISO}` : undefined
         }
