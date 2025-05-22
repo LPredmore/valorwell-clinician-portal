@@ -6,11 +6,9 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { AlertCircle, Calendar, CheckCircle2, Link as LinkIcon, RefreshCw, Settings2 } from 'lucide-react';
+import { AlertCircle, Calendar, CheckCircle2, Link as LinkIcon, RefreshCw } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { Separator } from '@/components/ui/separator';
 
 interface GoogleIntegrationSetupProps {
   userId?: string;
@@ -18,20 +16,7 @@ interface GoogleIntegrationSetupProps {
 }
 
 const GoogleIntegrationSetup = ({ userId, userEmail }: GoogleIntegrationSetupProps) => {
-  const { 
-    isConnected, 
-    isLoading, 
-    isSyncing, 
-    connectGoogleCalendar, 
-    disconnectGoogleCalendar, 
-    syncDirection, 
-    setSyncDirection,
-    personalEventsLabel,
-    setPersonalEventsLabel,
-    showPersonalEvents,
-    setShowPersonalEvents
-  } = useGoogleCalendar();
-  
+  const { isConnected, isLoading, isSyncing, connectGoogleCalendar, disconnectGoogleCalendar, syncDirection, setSyncDirection } = useGoogleCalendar();
   const [hasEmailAccount, setHasEmailAccount] = useState(false);
   const [hasGoogleAccount, setHasGoogleAccount] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
@@ -94,18 +79,6 @@ const GoogleIntegrationSetup = ({ userId, userEmail }: GoogleIntegrationSetupPro
       description: `Calendar will now sync ${direction === 'both' ? 'bidirectionally' : 
         direction === 'toGoogle' ? 'from app to Google only' : 
         'from Google to app only'}`,
-    });
-  };
-
-  const handlePersonalEventsLabelChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setPersonalEventsLabel(e.target.value || "Personal Block");
-  };
-
-  const handleShowPersonalEventsChange = (checked: boolean) => {
-    setShowPersonalEvents(checked);
-    toast({
-      title: "Personal Events Setting Updated",
-      description: checked ? "Personal events will be shown on the calendar" : "Personal events will be hidden",
     });
   };
 
@@ -173,97 +146,54 @@ const GoogleIntegrationSetup = ({ userId, userEmail }: GoogleIntegrationSetupPro
             )}
 
             {hasGoogleAccount && (
-              <>
-                <div className="mt-6 space-y-4 border rounded-md p-4">
-                  <h3 className="font-medium text-lg">Calendar Synchronization Settings</h3>
-                  
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="sync-both" className="flex items-center space-x-2">
-                        <RefreshCw className="h-4 w-4" />
-                        <span>Bidirectional sync (both ways)</span>
-                      </Label>
-                      <Switch 
-                        id="sync-both" 
-                        checked={syncDirection === 'both'} 
-                        onCheckedChange={() => handleSyncDirectionChange('both')}
-                      />
-                    </div>
-                    
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="sync-to-google" className="ml-6">
-                        App → Google only
-                      </Label>
-                      <Switch 
-                        id="sync-to-google" 
-                        checked={syncDirection === 'toGoogle'} 
-                        onCheckedChange={() => handleSyncDirectionChange('toGoogle')}
-                      />
-                    </div>
-                    
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="sync-from-google" className="ml-6">
-                        Google → App only
-                      </Label>
-                      <Switch 
-                        id="sync-from-google" 
-                        checked={syncDirection === 'fromGoogle'} 
-                        onCheckedChange={() => handleSyncDirectionChange('fromGoogle')}
-                      />
-                    </div>
+              <div className="mt-6 space-y-4 border rounded-md p-4">
+                <h3 className="font-medium text-lg">Calendar Synchronization Settings</h3>
+                
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="sync-both" className="flex items-center space-x-2">
+                      <RefreshCw className="h-4 w-4" />
+                      <span>Bidirectional sync (both ways)</span>
+                    </Label>
+                    <Switch 
+                      id="sync-both" 
+                      checked={syncDirection === 'both'} 
+                      onCheckedChange={() => handleSyncDirectionChange('both')}
+                    />
                   </div>
                   
-                  <div className="text-sm text-gray-500 mt-2">
-                    <p>These settings control how your appointments sync with Google Calendar:</p>
-                    <ul className="list-disc list-inside mt-1 space-y-1 ml-2">
-                      <li>Bidirectional: Changes in either calendar will update the other</li>
-                      <li>App → Google: Only push appointments from this app to Google</li>
-                      <li>Google → App: Only import events from Google to this app</li>
-                    </ul>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="sync-to-google" className="ml-6">
+                      App → Google only
+                    </Label>
+                    <Switch 
+                      id="sync-to-google" 
+                      checked={syncDirection === 'toGoogle'} 
+                      onCheckedChange={() => handleSyncDirectionChange('toGoogle')}
+                    />
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="sync-from-google" className="ml-6">
+                      Google → App only
+                    </Label>
+                    <Switch 
+                      id="sync-from-google" 
+                      checked={syncDirection === 'fromGoogle'} 
+                      onCheckedChange={() => handleSyncDirectionChange('fromGoogle')}
+                    />
                   </div>
                 </div>
                 
-                <div className="mt-4 border rounded-md p-4">
-                  <h3 className="font-medium text-lg flex items-center">
-                    <Settings2 className="h-4 w-4 mr-2" />
-                    Personal Events Settings
-                  </h3>
-                  <p className="text-sm text-gray-500 mb-4">
-                    Control how your personal Google Calendar events appear in the app
-                  </p>
-                  
-                  <Separator className="my-4" />
-                  
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="show-personal-events">
-                        Show personal events on calendar
-                      </Label>
-                      <Switch 
-                        id="show-personal-events" 
-                        checked={showPersonalEvents} 
-                        onCheckedChange={handleShowPersonalEventsChange}
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="personal-events-label">
-                        Label for personal events
-                      </Label>
-                      <Input 
-                        id="personal-events-label"
-                        value={personalEventsLabel}
-                        onChange={handlePersonalEventsLabelChange}
-                        placeholder="Personal Block"
-                        disabled={!showPersonalEvents}
-                      />
-                      <p className="text-xs text-gray-500 italic">
-                        This label will replace the actual event names from Google Calendar for privacy
-                      </p>
-                    </div>
-                  </div>
+                <div className="text-sm text-gray-500 mt-2">
+                  <p>These settings control how your appointments sync with Google Calendar:</p>
+                  <ul className="list-disc list-inside mt-1 space-y-1 ml-2">
+                    <li>Bidirectional: Changes in either calendar will update the other</li>
+                    <li>App → Google: Only push appointments from this app to Google</li>
+                    <li>Google → App: Only import events from Google to this app</li>
+                  </ul>
                 </div>
-              </>
+              </div>
             )}
           </>
         )}

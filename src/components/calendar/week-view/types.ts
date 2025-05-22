@@ -22,7 +22,6 @@ export interface AppointmentBlock {
   clientId: string;
   clientName: string;
   type?: string;
-  isPersonalEvent?: boolean;
 }
 
 export interface AvailabilityException {
@@ -47,11 +46,7 @@ export interface TimeSlotProps {
   isStartOfBlock: boolean;
   isEndOfBlock: boolean;
   isStartOfAppointment: boolean;
-  isEndOfAppointment?: boolean;
   handleAvailabilityBlockClick: (day: Date, block: TimeBlock) => void;
   onAppointmentClick?: (appointment: any) => void;
-  onAppointmentDragStart?: (appointment: any, event: React.DragEvent) => void;
-  onAppointmentDragOver?: (day: Date, timeSlot: Date, event: React.DragEvent) => void;
-  onAppointmentDrop?: (day: Date, timeSlot: Date, event: React.DragEvent) => void;
   originalAppointments: any[];
 }
