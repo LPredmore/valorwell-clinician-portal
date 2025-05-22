@@ -39,6 +39,33 @@ interface SyncResult {
   conflicts?: SyncConflict[];
 }
 
+// Interface for a synced event from Google Calendar
+export interface SyncedEvent {
+  id: string;
+  clinician_id: string;
+  start_at: string;
+  end_at: string;
+  google_calendar_event_id: string;
+  original_title: string;
+  original_description?: string;
+  display_title: string;
+  is_visible: boolean;
+  last_synced_at: string;
+}
+
+// Keywords that might indicate a work appointment vs. personal event
+const WORK_APPOINTMENT_KEYWORDS = [
+  'session with',
+  'client',
+  'patient',
+  'therapy',
+  'appointment',
+  'consultation',
+  'meeting with',
+  'clinical',
+  'treatment'
+];
+
 export const useGoogleCalendar = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -46,6 +73,39 @@ export const useGoogleCalendar = () => {
   const [error, setError] = useState<string | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [syncDirection, setSyncDirection] = useState<'both' | 'toGoogle' | 'fromGoogle'>('both');
+  
+  // New state for personal events settings
+  const [personalEventsLabel, setPersonalEventsLabel] = useState<string>('Personal Block');
+  const [showPersonalEvents, setShowPersonalEvents] = useState<boolean>(true);
+
+  // Load user preferences from local storage on mount
+  useEffect(() => {
+    try {
+      const savedLabel = localStorage.getItem('personalEventsLabel');
+      if (savedLabel) setPersonalEventsLabel(savedLabel);
+      
+      const savedShowEvents = localStorage.getItem('showPersonalEvents');
+      if (savedShowEvents !== null) {
+        setShowPersonalEvents(savedShowEvents === 'true');
+      }
+      
+      const savedSyncDirection = localStorage.getItem('syncDirection') as 'both' | 'toGoogle' | 'fromGoogle';
+      if (savedSyncDirection) setSyncDirection(savedSyncDirection);
+    } catch (err) {
+      console.error('Error loading Google Calendar preferences:', err);
+    }
+  }, []);
+
+  // Save preferences to local storage when they change
+  useEffect(() => {
+    try {
+      localStorage.setItem('personalEventsLabel', personalEventsLabel);
+      localStorage.setItem('showPersonalEvents', String(showPersonalEvents));
+      localStorage.setItem('syncDirection', syncDirection);
+    } catch (err) {
+      console.error('Error saving Google Calendar preferences:', err);
+    }
+  }, [personalEventsLabel, showPersonalEvents, syncDirection]);
 
   // Check connection status and token validity on mount
   useEffect(() => {
@@ -337,6 +397,18 @@ export const useGoogleCalendar = () => {
     }
   };
 
+  // Helper function to determine if an event is likely a work appointment
+  const isLikelyWorkAppointment = (event: GoogleCalendarEvent): boolean => {
+    const eventTitle = event.summary?.toLowerCase() || '';
+    const eventDescription = event.description?.toLowerCase() || '';
+    
+    // Check if any work-related keywords are in the title or description
+    return WORK_APPOINTMENT_KEYWORDS.some(keyword => 
+      eventTitle.includes(keyword.toLowerCase()) || 
+      eventDescription.includes(keyword.toLowerCase())
+    );
+  };
+
   // NEW: Fetch events from Google Calendar
   const fetchEventsFromGoogleCalendar = async (
     startTime: Date | string,
@@ -426,13 +498,31 @@ export const useGoogleCalendar = () => {
     
     return {
       clinician_id: clinicianId,
+      client_id: null, // We'll try to find a matching client separately
       start_at: googleEvent.start.dateTime,
       end_at: googleEvent.end.dateTime,
       type: 'session', // Default type
       status: 'scheduled',
       notes: googleEvent.description || '',
-      clientName,
       google_calendar_event_id: googleEvent.id,
+      last_synced_at: new Date().toISOString()
+    };
+  };
+
+  // NEW: Convert Google Calendar event to synced_event record
+  const convertGoogleEventToSyncedEvent = (
+    googleEvent: GoogleCalendarEvent,
+    clinicianId: string
+  ): Partial<SyncedEvent> => {
+    return {
+      clinician_id: clinicianId,
+      start_at: googleEvent.start.dateTime,
+      end_at: googleEvent.end.dateTime,
+      google_calendar_event_id: googleEvent.id,
+      original_title: googleEvent.summary || '',
+      original_description: googleEvent.description,
+      display_title: personalEventsLabel || 'Personal Block',
+      is_visible: showPersonalEvents,
       last_synced_at: new Date().toISOString()
     };
   };
@@ -474,7 +564,22 @@ export const useGoogleCalendar = () => {
         }
       });
       
-      console.log(`Found ${appointmentsByGoogleId.size} existing appointments with Google Calendar IDs`);
+      // Get existing synced events as well
+      const { data: existingSyncedEvents } = await supabase
+        .from('synced_events')
+        .select('*')
+        .eq('clinician_id', clinicianId);
+        
+      const syncedEventsByGoogleId = new Map<string, SyncedEvent>();
+      if (existingSyncedEvents) {
+        existingSyncedEvents.forEach((event: SyncedEvent) => {
+          if (event.google_calendar_event_id) {
+            syncedEventsByGoogleId.set(event.google_calendar_event_id, event);
+          }
+        });
+      }
+      
+      console.log(`Found ${appointmentsByGoogleId.size} existing appointments and ${syncedEventsByGoogleId.size} synced events with Google Calendar IDs`);
       
       // Process each Google Calendar event
       for (const googleEvent of googleEvents) {
@@ -485,83 +590,183 @@ export const useGoogleCalendar = () => {
         
         try {
           const existingAppointment = appointmentsByGoogleId.get(googleEvent.id);
+          const existingSyncedEvent = syncedEventsByGoogleId.get(googleEvent.id);
           
-          if (existingAppointment) {
-            // Update existing appointment if it's changed
-            console.log(`Found existing appointment for Google event ${googleEvent.id}`);
-            
-            // Check if Google event is newer than our last sync
-            const lastSyncTime = existingAppointment.last_synced_at 
-              ? new Date(existingAppointment.last_synced_at).getTime()
-              : 0;
+          // Determine if this is likely a work appointment or personal event
+          const isWorkAppointment = isLikelyWorkAppointment(googleEvent);
+          console.log(`Event "${googleEvent.summary}" classified as: ${isWorkAppointment ? 'Work Appointment' : 'Personal Event'}`);
+          
+          // WORK APPOINTMENT CASE - store in appointments table
+          if (isWorkAppointment) {
+            if (existingAppointment) {
+              // Update existing appointment if Google event is newer
+              const lastSyncTime = existingAppointment.last_synced_at 
+                ? new Date(existingAppointment.last_synced_at).getTime()
+                : 0;
+                
+              const googleUpdateTime = googleEvent.updated 
+                ? new Date(googleEvent.updated).getTime() 
+                : Infinity; // If no update time, assume it's newer
               
-            const googleUpdateTime = googleEvent.updated 
-              ? new Date(googleEvent.updated).getTime() 
-              : Infinity; // If no update time, assume it's newer
-            
-            if (googleUpdateTime > lastSyncTime) {
-              console.log(`Google event ${googleEvent.id} was updated after last sync, updating local appointment`);
+              if (googleUpdateTime > lastSyncTime) {
+                console.log(`Updating existing appointment for work event: ${googleEvent.summary}`);
+                
+                // Update appointment with Google data
+                const { data, error } = await supabase
+                  .from('appointments')
+                  .update({
+                    start_at: googleEvent.start.dateTime,
+                    end_at: googleEvent.end.dateTime,
+                    notes: googleEvent.description || existingAppointment.notes,
+                    last_synced_at: new Date().toISOString()
+                  })
+                  .eq('id', existingAppointment.id)
+                  .select();
+                  
+                if (error) {
+                  console.error(`Error updating appointment ${existingAppointment.id}:`, error);
+                  errors++;
+                } else {
+                  console.log(`Updated appointment ${existingAppointment.id} with Google data`);
+                  updated++;
+                  
+                  // If there's also a synced_event entry for this, remove it
+                  if (existingSyncedEvent) {
+                    await supabase
+                      .from('synced_events')
+                      .delete()
+                      .eq('id', existingSyncedEvent.id);
+                    console.log(`Removed duplicate synced_event ${existingSyncedEvent.id}`);
+                  }
+                }
+              } else {
+                console.log(`Work event ${googleEvent.id} has not changed since last sync, skipping`);
+              }
+            } else {
+              // Create new appointment from Google event
+              console.log(`Creating new appointment for work event: ${googleEvent.summary}`);
               
-              // Update appointment with Google data
+              // Convert Google event to appointment
+              const newAppointmentData = convertGoogleEventToAppointment(googleEvent, clinicianId);
+              
+              // Attempt to find a client ID based on the name
+              if (googleEvent.summary) {
+                const { data: clientData } = await supabase
+                  .from('clients')
+                  .select('id')
+                  .ilike('client_preferred_name', `%${googleEvent.summary.replace('Session with ', '')}%`)
+                  .limit(1);
+                  
+                if (clientData && clientData.length > 0) {
+                  console.log(`Found matching client for "${googleEvent.summary}"`);
+                  newAppointmentData.client_id = clientData[0].id;
+                } else {
+                  console.log(`No client found for "${googleEvent.summary}"`);
+                }
+              }
+              
+              // Insert new appointment
               const { data, error } = await supabase
                 .from('appointments')
-                .update({
-                  start_at: googleEvent.start.dateTime,
-                  end_at: googleEvent.end.dateTime,
-                  notes: googleEvent.description || existingAppointment.notes,
-                  last_synced_at: new Date().toISOString()
-                })
-                .eq('id', existingAppointment.id)
+                .insert([newAppointmentData])
                 .select();
                 
               if (error) {
-                console.error(`Error updating appointment ${existingAppointment.id}:`, error);
+                console.error(`Error creating new appointment for work event ${googleEvent.id}:`, error);
                 errors++;
               } else {
-                console.log(`Updated appointment ${existingAppointment.id} with Google data`);
-                updated++;
-              }
-            } else {
-              console.log(`Google event ${googleEvent.id} has not changed since last sync, skipping`);
-            }
-          } else {
-            // Create new appointment from Google event
-            console.log(`No existing appointment for Google event ${googleEvent.id}, creating new appointment`);
-            
-            // Convert Google event to appointment
-            const newAppointmentData = convertGoogleEventToAppointment(googleEvent, clinicianId);
-            
-            // Attempt to find a client ID based on the name
-            if (newAppointmentData.clientName) {
-              const { data: clientData } = await supabase
-                .from('clients')
-                .select('id')
-                .ilike('client_preferred_name', `%${newAppointmentData.clientName}%`)
-                .limit(1);
+                console.log(`Created new appointment for work event ${googleEvent.id}`);
+                created++;
                 
-              if (clientData && clientData.length > 0) {
-                console.log(`Found matching client for "${newAppointmentData.clientName}"`);
-                newAppointmentData.client_id = clientData[0].id;
-              } else {
-                console.log(`No client found for "${newAppointmentData.clientName}"`);
+                // If there's also a synced_event entry for this, remove it
+                if (existingSyncedEvent) {
+                  await supabase
+                    .from('synced_events')
+                    .delete()
+                    .eq('id', existingSyncedEvent.id);
+                  console.log(`Removed duplicate appointment ${existingAppointment.id}`);
+                }
               }
             }
-            
-            // Insert new appointment
-            const { data, error } = await supabase
-              .from('appointments')
-              .insert([{
-                ...newAppointmentData,
-                // Use the client_id if we found one, otherwise the field will be null
-              }])
-              .select();
+          }
+          // PERSONAL EVENT CASE - store in synced_events table
+          else {
+            if (existingSyncedEvent) {
+              // Update existing synced event if Google event is newer
+              const lastSyncTime = existingSyncedEvent.last_synced_at 
+                ? new Date(existingSyncedEvent.last_synced_at).getTime()
+                : 0;
+                
+              const googleUpdateTime = googleEvent.updated 
+                ? new Date(googleEvent.updated).getTime() 
+                : Infinity;
               
-            if (error) {
-              console.error(`Error creating new appointment for Google event ${googleEvent.id}:`, error);
-              errors++;
+              if (googleUpdateTime > lastSyncTime) {
+                console.log(`Updating existing synced event for personal event: ${googleEvent.summary}`);
+                
+                // Update synced event with Google data
+                const { data, error } = await supabase
+                  .from('synced_events')
+                  .update({
+                    start_at: googleEvent.start.dateTime,
+                    end_at: googleEvent.end.dateTime,
+                    original_title: googleEvent.summary || '',
+                    original_description: googleEvent.description || '',
+                    display_title: personalEventsLabel,
+                    is_visible: showPersonalEvents,
+                    last_synced_at: new Date().toISOString()
+                  })
+                  .eq('id', existingSyncedEvent.id)
+                  .select();
+                  
+                if (error) {
+                  console.error(`Error updating synced event ${existingSyncedEvent.id}:`, error);
+                  errors++;
+                } else {
+                  console.log(`Updated synced event ${existingSyncedEvent.id} with Google data`);
+                  updated++;
+                  
+                  // If there's also an appointment entry for this, remove it
+                  if (existingAppointment) {
+                    await supabase
+                      .from('appointments')
+                      .delete()
+                      .eq('id', existingAppointment.id);
+                    console.log(`Removed duplicate appointment ${existingAppointment.id}`);
+                  }
+                }
+              } else {
+                console.log(`Personal event ${googleEvent.id} has not changed since last sync, skipping`);
+              }
             } else {
-              console.log(`Created new appointment for Google event ${googleEvent.id}`);
-              created++;
+              // Create new synced event from Google event
+              console.log(`Creating new synced event for personal event: ${googleEvent.summary}`);
+              
+              // Convert Google event to synced event
+              const newSyncedEventData = convertGoogleEventToSyncedEvent(googleEvent, clinicianId);
+              
+              // Insert new synced event
+              const { data, error } = await supabase
+                .from('synced_events')
+                .insert([newSyncedEventData])
+                .select();
+                
+              if (error) {
+                console.error(`Error creating new synced event for personal event ${googleEvent.id}:`, error);
+                errors++;
+              } else {
+                console.log(`Created new synced event for personal event ${googleEvent.id}`);
+                created++;
+                
+                // If there's also an appointment entry for this, remove it
+                if (existingAppointment) {
+                  await supabase
+                    .from('appointments')
+                    .delete()
+                    .eq('id', existingAppointment.id);
+                  console.log(`Removed duplicate appointment ${existingAppointment.id}`);
+                }
+              }
             }
           }
         } catch (err) {
@@ -802,6 +1007,10 @@ export const useGoogleCalendar = () => {
     accessToken,
     syncDirection,
     setSyncDirection,
+    personalEventsLabel,
+    setPersonalEventsLabel,
+    showPersonalEvents,
+    setShowPersonalEvents,
     connectGoogleCalendar,
     disconnectGoogleCalendar,
     createGoogleCalendarEvent,
