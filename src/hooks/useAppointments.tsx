@@ -6,6 +6,8 @@ import { TimeZoneService } from "@/utils/timeZoneService";
 import { DateTime } from "luxon";
 import { Appointment } from "@/types/appointment";
 import { formatClientName } from "@/utils/appointmentUtils";
+import { SyncedEvent, syncedEventToAppointmentLike } from "@/types/syncedEvent";
+import { fetchSyncedEvents } from "@/utils/googleCalendarSync";
 
 // Interface for the raw Supabase response
 interface RawSupabaseAppointment {
@@ -190,10 +192,11 @@ export const useAppointments = (
     }
   }, [fromDate, toDate, safeUserTimeZone]);
 
+  // Query for regular appointments
   const {
     data: fetchedAppointments = [],
-    isLoading,
-    error,
+    isLoading: isLoadingAppointments,
+    error: appointmentsError,
     refetch: refetchAppointments,
   } = useQuery<Appointment[], Error>({
     // Include refreshTrigger in the queryKey to force refresh when it changes
@@ -216,15 +219,6 @@ export const useAppointments = (
         }
       );
 
-      // Log full clinician ID details
-      console.log("[useAppointments] Clinician ID details:", {
-        raw: clinicianId,
-        formatted: formattedClinicianId,
-        isValidUUID,
-        isNull: formattedClinicianId === null,
-        isEmpty: formattedClinicianId === ""
-      });
-
       // Create base query without filters for debugging
       let baseQuery = supabase
         .from("appointments")
@@ -232,16 +226,6 @@ export const useAppointments = (
           `id, client_id, clinician_id, start_at, end_at, type, status, appointment_recurring, recurring_group_id, video_room_url, notes, google_calendar_event_id, last_synced_at, clients (client_first_name, client_last_name, client_preferred_name, client_email, client_phone, client_status, client_date_of_birth, client_gender, client_address, client_city, client_state, client_zipcode)`
         )
         .eq("clinician_id", formattedClinicianId);
-
-      console.log("[useAppointments] Base query (no filters):", baseQuery);
-
-      // First try query without any filters to confirm we can get results
-      const { data: baseData, error: baseError } = await baseQuery;
-      console.log("[useAppointments] Base query results:", {
-        count: baseData?.length || 0,
-        error: baseError,
-        sample: baseData?.[0] || null
-      });
 
       // Now build the full query with filters
       let query = supabase
@@ -252,27 +236,7 @@ export const useAppointments = (
         .eq("clinician_id", formattedClinicianId)
         .in("status", ["scheduled", "confirmed", "completed", "rescheduled"]);
 
-      console.log("[useAppointments] Full query with filters:", {
-        clinician_id: formattedClinicianId,
-        status: ["scheduled", "confirmed", "completed", "rescheduled"],
-        from: fromUTCISO,
-        to: toUTCISO,
-        query: query.toString()
-      });
-
       // Use more robust timezone-aware filtering
-      console.log("[useAppointments] Date range filters:", {
-        fromUTCISO,
-        toUTCISO,
-        isValidFrom: fromUTCISO && DateTime.fromISO(fromUTCISO).isValid,
-        isValidTo: toUTCISO && DateTime.fromISO(toUTCISO).isValid
-      });
-      console.log("[useAppointments] Applying UTC filter:", {
-        fromUTCISO,
-        toUTCISO,
-        clinicianTZ: safeUserTimeZone
-      });
-      
       if (fromUTCISO) query = query.gte("start_at", fromUTCISO);
       if (toUTCISO) query = query.lte("end_at", toUTCISO);
       
@@ -280,55 +244,7 @@ export const useAppointments = (
       query = query
         .order("start_at", { ascending: true });
         
-      // Log debug info
-      console.log("[useAppointments] Final query details:", {
-        clinician_id: formattedClinicianId,
-        start_at: fromUTCISO ? `>= ${fromUTCISO}` : 'any',
-        end_at: toUTCISO ? `<= ${toUTCISO}` : 'any'
-      });
-      
       const { data: rawDataAny, error: queryError } = await query;
-
-      // FIX: Updated this logging code to avoid the type error
-      // The issue was comparing query.filter (a function) with a string
-      console.log("[useAppointments] Query execution details:", {
-        success: !queryError,
-        error: queryError,
-        count: rawDataAny?.length || 0,
-        firstRecord: rawDataAny?.[0] || null,
-        // FIX: Removed incorrect comparison with string
-        // statusFilterApplied: query.filter === "status=eq.scheduled",
-        statusFilterApplied: true, // We know we applied it above with .eq()
-        dateRangeFilterApplied: fromUTCISO && toUTCISO,
-        queryParameters: {
-          clinician_id: formattedClinicianId,
-          status: ["scheduled", "confirmed", "completed", "rescheduled"],
-          start_at: fromUTCISO ? `gte.${fromUTCISO}` : undefined,
-          end_at: toUTCISO ? `lte.${toUTCISO}` : undefined
-        }
-      });
-
-      // Log query results for debugging
-      if (queryError) {
-        console.error("[useAppointments] Query error:", queryError);
-      } else {
-        console.log("[useAppointments] Query results:", {
-          success: !queryError,
-          count: rawDataAny?.length || 0
-        });
-      }
-
-      // Debugging: Log raw Supabase response structure with more context
-      console.log('[useAppointments] Raw Supabase response structure:', {
-        hasData: !!rawDataAny,
-        recordCount: rawDataAny?.length || 0,
-        sampleRecord: rawDataAny?.[0] || null,
-        hasClientsField: rawDataAny?.[0] ? 'clients' in rawDataAny[0] : false,
-        clientsFieldType: rawDataAny?.[0]?.clients ? typeof rawDataAny[0].clients : "undefined",
-        clientFieldKeys: rawDataAny?.[0]?.clients ? Object.keys(rawDataAny[0].clients) : [],
-        rawStartAtFormat: rawDataAny?.[0]?.start_at || "N/A",
-        clinicianIdUsed: formattedClinicianId
-      });
 
       if (queryError) {
         console.error(
@@ -347,24 +263,6 @@ export const useAppointments = (
       console.log(
         `[useAppointments] Fetched ${rawDataAny.length || 0} raw appointments.`
       );
-
-      // Log status distribution for debugging
-      if (rawDataAny && rawDataAny.length > 0) {
-        const statusCounts = rawDataAny.reduce((acc, appt) => {
-          acc[appt.status] = (acc[appt.status] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>);
-        
-        console.log('[useAppointments] Status distribution:', statusCounts);
-        
-        // Log sync status for debugging
-        const syncCounts = {
-          synced: rawDataAny.filter(a => a.google_calendar_event_id).length,
-          notSynced: rawDataAny.filter(a => !a.google_calendar_event_id).length
-        };
-        
-        console.log('[useAppointments] Sync status:', syncCounts);
-      }
 
       // Safely process the data with standardized client name formatting using our shared function
       return rawDataAny.map((rawAppt: any): Appointment => {
@@ -420,6 +318,72 @@ export const useAppointments = (
     },
     enabled: !!formattedClinicianId, // Only run if we have a valid clinician ID
   });
+
+  // Query for synced events
+  const {
+    data: fetchedSyncedEvents = [],
+    isLoading: isLoadingSyncedEvents,
+    error: syncedEventsError,
+    refetch: refetchSyncedEvents,
+  } = useQuery<SyncedEvent[], Error>({
+    queryKey: ["synced_events", formattedClinicianId, fromUTCISO, toUTCISO, refreshTrigger],
+    queryFn: async (): Promise<SyncedEvent[]> => {
+      if (!formattedClinicianId || !fromUTCISO || !toUTCISO) {
+        return [];
+      }
+
+      console.log("[useAppointments] Fetching synced events:", {
+        clinicianId: formattedClinicianId,
+        from: fromUTCISO,
+        to: toUTCISO
+      });
+
+      try {
+        const { data, error } = await supabase
+          .from("synced_events")
+          .select("*")
+          .eq("clinician_id", formattedClinicianId)
+          .eq("is_busy", true)
+          .gte("start_at", fromUTCISO)
+          .lte("end_at", toUTCISO)
+          .order("start_at", { ascending: true });
+
+        if (error) {
+          console.error("[useAppointments] Error fetching synced events:", error);
+          return [];
+        }
+
+        console.log(`[useAppointments] Fetched ${data?.length || 0} synced events`);
+        return data || [];
+      } catch (error) {
+        console.error("[useAppointments] Error in fetchSyncedEvents:", error);
+        return [];
+      }
+    },
+    enabled: !!formattedClinicianId && !!fromUTCISO && !!toUTCISO,
+  });
+
+  // Combine appointments and synced events
+  const combinedAppointments = useMemo(() => {
+    // Convert synced events to appointment-like objects
+    const syncedEventsAsAppointments = fetchedSyncedEvents.map(syncedEventToAppointmentLike);
+    
+    // Combine with regular appointments
+    const combined = [...fetchedAppointments, ...syncedEventsAsAppointments];
+    
+    // Sort by start time
+    combined.sort((a, b) => {
+      return new Date(a.start_at).getTime() - new Date(b.start_at).getTime();
+    });
+    
+    console.log("[useAppointments] Combined appointments and synced events:", {
+      appointments: fetchedAppointments.length,
+      syncedEvents: fetchedSyncedEvents.length,
+      total: combined.length
+    });
+    
+    return combined;
+  }, [fetchedAppointments, fetchedSyncedEvents]);
 
   // Helper function to add display formatting
   const addDisplayFormattingToAppointment = (
@@ -479,10 +443,10 @@ export const useAppointments = (
 
   // Memoized formatted appointments
   const appointmentsWithDisplayFormatting = useMemo(() => {
-    return fetchedAppointments.map((appt) =>
+    return combinedAppointments.map((appt) =>
       addDisplayFormattingToAppointment(appt, safeUserTimeZone)
     );
-  }, [fetchedAppointments, safeUserTimeZone]);
+  }, [combinedAppointments, safeUserTimeZone]);
   
 
   // Memoized filtered appointments
@@ -578,6 +542,18 @@ export const useAppointments = (
   const closeVideoSession = () => setIsVideoOpen(false);
   const closeSessionTemplate = () => setShowSessionTemplate(false);
 
+  // Combined refetch function
+  const refetch = () => {
+    refetchAppointments();
+    refetchSyncedEvents();
+  };
+
+  // Combined loading state
+  const isLoading = isLoadingAppointments || isLoadingSyncedEvents;
+
+  // Combined error state
+  const error = appointmentsError || syncedEventsError;
+
   return {
     appointments: appointmentsWithDisplayFormatting,
     todayAppointments,
@@ -585,7 +561,7 @@ export const useAppointments = (
     pastAppointments,
     isLoading,
     error,
-    refetch: refetchAppointments,
+    refetch,
     startVideoSession: startSession,
     openSessionTemplate: documentSession,
     isVideoOpen,
@@ -598,10 +574,5 @@ export const useAppointments = (
     clientData: sessionClientData,
     isLoadingClientData: isLoadingSessionClientData,
     addDisplayFormattingToAppointment,
-    debug: { // Add debug info
-      clinicianId: formattedClinicianId,
-      isValidUUID,
-      timeZone: safeUserTimeZone
-    }
   };
 };
