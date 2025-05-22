@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { AuthError } from '@supabase/supabase-js';
@@ -60,7 +59,7 @@ export const useGoogleCalendar = () => {
               console.log('Token info:', tokenInfo);
               
               // Verify required scopes
-              if (!tokenInfo.scope?.includes('https://www.googleapis.com/auth/calendar')) {
+              if (!tokenInfo.scope?.includes('https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events')) {
                 console.error('Missing required calendar scope');
                 setIsConnected(false);
                 setAccessToken(null);
@@ -96,7 +95,7 @@ export const useGoogleCalendar = () => {
         provider: 'google',
         options: {
           redirectTo: window.location.origin + window.location.pathname,
-          scopes: 'https://www.googleapis.com/auth/calendar',
+          scopes: 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events',
           queryParams: {
             access_type: 'offline',
             prompt: 'consent'
