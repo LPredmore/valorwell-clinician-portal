@@ -33,9 +33,9 @@ const GoogleIntegrationSetup = ({ userId, userEmail }: GoogleIntegrationSetupPro
         // to properly check auth methods, but we'll make an educated guess
         const { data: session } = await supabase.auth.getSession();
         const hasGoogleToken = !!session?.session?.provider_token;
-        const isCurrentlyGoogle = !!session?.session?.user?.app_metadata?.provider === 'google';
+        const isCurrentlyGoogle = session?.session?.user?.app_metadata?.provider === 'google';
         
-        setHasGoogleAccount(hasGoogleToken || isCurrentlyGoogle);
+        setHasGoogleAccount(hasGoogleToken || !!isCurrentlyGoogle);
         setHasEmailAccount(!!session?.session?.user && !isCurrentlyGoogle);
         
         console.log("[GoogleIntegrationSetup] Auth methods check:", {
