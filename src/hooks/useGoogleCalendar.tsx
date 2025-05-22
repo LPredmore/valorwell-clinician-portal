@@ -230,6 +230,9 @@ export const useGoogleCalendar = () => {
       console.group('Google Calendar Sync Operation');
       console.log(`Attempting to sync ${appointments.length} appointments`);
       
+      // Add the requested debug log
+      console.log(`Syncing ${appointments.length} appointments to Google...`, appointments);
+      
       if (appointments.length > 0) {
         // Log details about appointment date ranges for debugging
         const appointmentDates = appointments.map(a => ({
