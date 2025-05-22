@@ -1,878 +1,900 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Calendar, Clock, AlertCircle, Check, RefreshCw } from 'lucide-react';
-import { useUser } from '@/context/UserContext';
-import { supabase } from '@/integrations/supabase/client';
-import Layout from '@/components/layout/Layout';
-import VideoChat from '@/components/video/VideoChat';
-import { TimeZoneService } from '@/utils/timeZoneService';
-import { AppointmentsList } from '@/components/dashboard/AppointmentsList';
-import SessionNoteTemplate from '@/components/templates/SessionNoteTemplate';
-import { useAppointments } from '@/hooks/useAppointments';
-import { getClinicianTimeZone } from '@/hooks/useClinicianData';
-import { SessionDidNotOccurDialog } from '@/components/dashboard/SessionDidNotOccurDialog';
-import { Appointment } from '@/types/appointment';
-import { ClientDetails } from '@/types/client';
-import { useGoogleCalendar } from '@/hooks/useGoogleCalendar';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CalendarPlus } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { toast as sonnerToast } from 'sonner';
-import { DateTime } from 'luxon';
-import { formatClientName } from '@/utils/appointmentUtils';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { useToast } from '@/components/ui/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { useUserContext } from '@/context/UserContext';
+import AppointmentsList from '@/components/dashboard/AppointmentsList';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { v4 as uuidv4 } from 'uuid';
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from "@/components/ui/drawer"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Calendar } from "@/components/ui/calendar"
+import { cn } from "@/lib/utils"
+import { format } from "date-fns"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { CalendarView } from '@/components/calendar';
+import { Appointment } from '@/types/appointment';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Checkbox } from "@/components/ui/checkbox"
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
+import { z } from "zod"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useForm } from "react-hook-form"
+import { Textarea } from "@/components/ui/textarea"
+import { DatePicker } from "@/components/ui/date-picker"
+import { TimePicker } from "@/components/ui/time-picker"
+import { Separator } from "@/components/ui/separator"
+import { Badge } from "@/components/ui/badge"
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+  CommandShortcut,
+} from "@/components/ui/command"
+import { PlusCircle, RefreshCw } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Progress } from "@/components/ui/progress"
+import { Slider } from "@/components/ui/slider"
+import { Switch } from "@/components/ui/switch"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
+import { AspectRatio } from "@/components/ui/aspect-ratio"
+import { CalendarDateRangePicker } from "@/components/ui/calendar-date-range-picker"
+import { MultiSelect } from "@/components/ui/multi-select"
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card"
+import { NavigationMenu, NavigationMenuItem, NavigationMenuList } from "@/components/ui/navigation-menu"
+import { Skeleton } from "@/components/ui/skeleton"
+import { useTheme } from "@/components/theme-provider"
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable"
+import {
+  ContextMenu,
+  ContextMenuCheckboxItem,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuLabel,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
+import { Separator } from "@/components/ui/separator"
+import { useSearchParams } from 'react-router-dom';
+import { TimeZoneService } from '@/utils/timeZoneService';
+import { useDebounce } from '@/hooks/useDebounce';
 
-const ClinicianDashboard = () => {
-  const { userRole, userId } = useUser();
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [clinicianId, setClinicianId] = useState<string | null>(null); // Add explicit clinicianId state
-  const [clinicianTimeZone, setClinicianTimeZone] = useState<string>(TimeZoneService.DEFAULT_TIMEZONE);
-  const [isLoadingTimeZone, setIsLoadingTimeZone] = useState(true);
-  const timeZoneDisplay = TimeZoneService.getTimeZoneDisplayName(clinicianTimeZone);
-  const [showSessionDidNotOccurDialog, setShowSessionDidNotOccurDialog] = useState(false);
-  const [selectedAppointmentForNoShow, setSelectedAppointmentForNoShow] = useState<Appointment | null>(null);
-  const [showGoogleSyncDialog, setShowGoogleSyncDialog] = useState(false);
-  const [showSyncDetails, setShowSyncDetails] = useState(false);
-  const [isForceSync, setIsForceSync] = useState(false);
-  const [syncStats, setSyncStats] = useState<{
-    total: number;
-    synced: number;
-    skipped: number;
-    created: number;
-    updated: number;
-    lastSyncTime: string | null;
-  }>({
-    total: 0,
-    synced: 0,
-    skipped: 0,
-    created: 0,
-    updated: 0,
-    lastSyncTime: null
-  });
+const ClientFormSchema = z.object({
+  client_preferred_name: z.string().optional(),
+  client_first_name: z.string().min(2, {
+    message: "Client first name must be at least 2 characters.",
+  }),
+  client_last_name: z.string().min(2, {
+    message: "Client last name must be at least 2 characters.",
+  }),
+  client_email: z.string().email({
+    message: "Please enter a valid email.",
+  }),
+  client_phone: z.string().min(10, {
+    message: "Please enter a valid phone number.",
+  }),
+  client_date_of_birth: z.date(),
+  client_age: z.number().min(0, {
+    message: "Please enter a valid age.",
+  }),
+  client_gender: z.string(),
+  client_gender_identity: z.string().optional(),
+  client_address: z.string().optional(),
+  client_city: z.string().optional(),
+  client_state: z.string().optional(),
+  client_zip_code: z.string().optional(),
+  client_insurance_provider: z.string().optional(),
+  client_insurance_policy_number: z.string().optional(),
+  client_emergency_contact_name: z.string().optional(),
+  client_emergency_contact_phone: z.string().optional(),
+  client_emergency_contact_relationship: z.string().optional(),
+  client_notes: z.string().optional(),
+})
+
+interface ClinicianDashboardProps { }
+
+const ClinicianDashboard: React.FC<ClinicianDashboardProps> = () => {
+  const navigate = useNavigate();
   const { toast } = useToast();
+  const { user, userProfile, isLoading: isUserContextLoading } = useUserContext();
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+  const [isClientDrawerOpen, setIsClientDrawerOpen] = useState(false);
+  const [isAppointmentDialogOpen, setIsAppointmentDialogOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [selectedTime, setSelectedTime] = useState<Date | undefined>(new Date());
+  const [selectedClient, setSelectedClient] = useState<any | null>(null);
+  const [clients, setClients] = useState<any[]>([]);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [calendarView, setCalendarView] = useState<'week' | 'month'>('week');
+  const [showAvailability, setShowAvailability] = useState(true);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [userTimeZone, setUserTimeZone] = useState('America/Chicago');
+  const [timeZoneLoading, setTimeZoneLoading] = useState(true);
+  const [timeZoneError, setTimeZoneError] = useState<Error | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearchTerm = useDebounce(searchTerm, 500);
 
-  // First fetch the auth user ID
-  useEffect(() => {
-    const fetchUserId = async () => {
-      const { data } = await supabase.auth.getUser();
-      if (data?.user) {
-        console.log("[ClinicianDashboard] Auth user ID:", data.user.id);
-        setCurrentUserId(data.user.id);
-      }
-    };
-    
-    fetchUserId();
-  }, []);
+  const clientForm = useForm<z.infer<typeof ClientFormSchema>>({
+    resolver: zodResolver(ClientFormSchema),
+    defaultValues: {
+      client_preferred_name: "",
+      client_first_name: "",
+      client_last_name: "",
+      client_email: "",
+      client_phone: "",
+      client_date_of_birth: new Date(),
+      client_age: 0,
+      client_gender: "",
+      client_gender_identity: "",
+      client_address: "",
+      client_city: "",
+      client_state: "",
+      client_zip_code: "",
+      client_insurance_provider: "",
+      client_insurance_policy_number: "",
+      client_emergency_contact_name: "",
+      client_emergency_contact_phone: "",
+      client_emergency_contact_relationship: "",
+      client_notes: "",
+    },
+  })
 
-  // Then resolve the clinician ID from the user ID
+  const { theme } = useTheme()
+
+  const handleAvailabilityToggle = (checked: boolean) => {
+    setShowAvailability(checked);
+  };
+
+  const handleCalendarViewChange = (view: 'week' | 'month') => {
+    setCalendarView(view);
+  };
+
+  const handleDateChange = (date: Date | undefined) => {
+    setSelectedDate(date);
+  };
+
+  const handleTimeChange = (time: Date | undefined) => {
+    setSelectedTime(time);
+  };
+
+  const handleClientSelect = (client: any) => {
+    setSelectedClient(client);
+  };
+
+  const refreshData = () => {
+    setRefreshTrigger(prev => prev + 1);
+  };
+
   useEffect(() => {
-    const resolveClinicianId = async () => {
-      if (!currentUserId) return;
-      
+    const fetchTimeZone = async () => {
+      setTimeZoneLoading(true);
       try {
-        console.log("[ClinicianDashboard] Resolving clinician ID for user:", currentUserId);
-        
-        // First check if user_profiles table exists
-        const { data: hasProfileTable, error: checkError } = await supabase
-          .from('user_profiles')
-          .select('count', { count: 'exact', head: true });
-          
-        let userEmail: string | null = null;
-        
-        // If user_profiles table exists, get email from there
-        if (!checkError) {
-          console.log("[ClinicianDashboard] Found user_profiles table, querying it");
-          
-          const { data: profileData, error: profileError } = await supabase
-            .from('user_profiles')
-            .select('email')
-            .eq('user_id', currentUserId)
-            .single();
-            
-          if (profileError) {
-            console.error("[ClinicianDashboard] Error fetching from user_profiles:", profileError);
-          } else if (profileData) {
-            console.log("[ClinicianDashboard] Found user profile:", profileData);
-            userEmail = profileData.email;
-          }
-        } else {
-          console.log("[ClinicianDashboard] user_profiles table not found, trying direct auth method");
-        }
-        
-        // If email not found in profiles or profiles doesn't exist, get from auth user directly
-        if (!userEmail) {
-          const { data: userData } = await supabase.auth.getUser();
-          userEmail = userData?.user?.email || null;
-          console.log("[ClinicianDashboard] Using email from auth user:", userEmail);
-        }
-        
-        if (!userEmail) {
-          console.error("[ClinicianDashboard] Failed to resolve user email");
+        if (!user?.id) {
+          console.warn('User ID is missing, cannot fetch timezone.');
           return;
         }
-        
-        // Try to find clinician by email
-        const { data: clinicianData, error: clinicianError } = await supabase
-          .from('clinicians')
-          .select('id, clinician_email, clinician_time_zone, clinician_timezone')
-          .eq('clinician_email', userEmail)
+
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('timezone')
+          .eq('id', user.id)
           .single();
-          
-        if (clinicianError) {
-          console.error("[ClinicianDashboard] Error looking up clinician by email:", clinicianError);
-          
-          // Try fallback to profile_id if email lookup fails
-          const { data: altClinicianData, error: altError } = await supabase
-            .from('clinicians')
-            .select('id, clinician_email, clinician_time_zone, clinician_timezone')
-            .eq('profile_id', currentUserId)
-            .single();
-            
-          if (altError) {
-            console.error("[ClinicianDashboard] Error looking up clinician by profile_id:", altError);
-            return;
-          }
-          
-          if (altClinicianData) {
-            console.log("[ClinicianDashboard] Found clinician by profile_id:", {
-              id: altClinicianData.id, 
-              email: altClinicianData.clinician_email
-            });
-            setClinicianId(altClinicianData.id);
-            
-            // Set up timezone if needed
-            handleClinicianTimezone(altClinicianData);
-            return;
-          }
-          
+
+        if (error) {
+          console.error('Error fetching timezone:', error);
+          setTimeZoneError(error);
           return;
         }
-        
-        if (clinicianData) {
-          console.log("[ClinicianDashboard] Found clinician by email:", {
-            id: clinicianData.id, 
-            email: clinicianData.clinician_email
-          });
-          setClinicianId(clinicianData.id);
-          
-          // Set up timezone if needed
-          handleClinicianTimezone(clinicianData);
-          
-          // If profile_id is not set, update it
-          if (hasProfileTable && !checkError) {
-            const { error: updateError } = await supabase
-              .from('clinicians')
-              .update({ profile_id: currentUserId })
-              .eq('id', clinicianData.id);
-              
-            if (updateError) {
-              console.error("[ClinicianDashboard] Error updating clinician profile_id:", updateError);
-            } else {
-              console.log("[ClinicianDashboard] Updated clinician profile_id to:", currentUserId);
-            }
-          }
+
+        if (data && data.timezone) {
+          setUserTimeZone(data.timezone);
+          console.log(`[ClinicianDashboard] User timezone loaded: ${data.timezone}`);
+        } else {
+          console.warn('No timezone found for user, defaulting to America/Chicago.');
         }
-      } catch (error) {
-        console.error("[ClinicianDashboard] Error resolving clinician ID:", error);
+      } catch (err) {
+        console.error('Unexpected error fetching timezone:', err);
+        setTimeZoneError(new Error('Failed to fetch timezone.'));
+      } finally {
+        setTimeZoneLoading(false);
       }
     };
-    
-    // Helper function for handling timezone data
-    const handleClinicianTimezone = (clinicianData: any) => {
-      // Check and update timezone arrays if missing
-      if (!clinicianData.clinician_timezone && clinicianData.clinician_time_zone) {
-        console.log("[ClinicianDashboard] Fixing missing timezone array with:", clinicianData.clinician_time_zone);
-        
-        supabase
-          .from('clinicians')
-          .update({ clinician_timezone: [clinicianData.clinician_time_zone] })
-          .eq('id', clinicianData.id)
-          .then(({ error }) => {
-            if (error) {
-              console.error("[ClinicianDashboard] Error fixing timezone array:", error);
-            }
-          });
-      }
-    };
-    
-    resolveClinicianId();
-  }, [currentUserId]);
 
-  // Fetch clinician's timezone
+    fetchTimeZone();
+  }, [user?.id]);
+
   useEffect(() => {
-    const fetchClinicianTimeZone = async () => {
-      if (clinicianId) {
-        setIsLoadingTimeZone(true);
-        try {
-          const timeZone = await getClinicianTimeZone(clinicianId);
-          console.log("[ClinicianDashboard] Fetched clinician timezone:", timeZone);
-          setClinicianTimeZone(timeZone);
-        } catch (error) {
-          console.error("[ClinicianDashboard] Error fetching clinician timezone:", error);
-          // Fallback to system timezone
-          setClinicianTimeZone(TimeZoneService.DEFAULT_TIMEZONE);
-        } finally {
-          setIsLoadingTimeZone(false);
+    const fetchAppointments = async () => {
+      setIsLoading(true);
+      try {
+        if (!userProfile?.id) {
+          console.warn('UserProfile ID is missing, cannot fetch appointments.');
+          return;
         }
+
+        // Calculate date range for fetching appointments
+        const startDate = new Date(selectedDate || new Date());
+        startDate.setDate(startDate.getDate() - 30); // 1 month before
+
+        const endDate = new Date(selectedDate || new Date());
+        endDate.setDate(endDate.getDate() + 60); // 2 months ahead
+
+        const { data, error } = await supabase
+          .from('appointments')
+          .select('*')
+          .eq('clinician_id', userProfile.id)
+          .gte('start_at', startDate.toISOString())
+          .lte('end_at', endDate.toISOString());
+
+        if (error) {
+          console.error('Error fetching appointments:', error);
+          setError(error);
+        } else {
+          setAppointments(data || []);
+          console.log(`[ClinicianDashboard] Fetched ${data?.length || 0} appointments`);
+        }
+      } catch (err) {
+        console.error('Error fetching appointments:', err);
+        setError(new Error('Failed to fetch appointments.'));
+      } finally {
+        setIsLoading(false);
       }
     };
-    
-    fetchClinicianTimeZone();
-  }, [clinicianId]);
 
-  // Integrate Google Calendar hook
-  const { 
-    isConnected: isGoogleConnected, 
-    isLoading: isGoogleLoading, 
-    isSyncing,
-    connectGoogleCalendar, 
-    syncMultipleAppointments 
-  } = useGoogleCalendar();
+    fetchAppointments();
+  }, [userProfile?.id, selectedDate, refreshTrigger]);
 
-  // Use the explicit clinicianId instead of the raw userId
-  const {
-    appointments,
-    todayAppointments,
-    upcomingAppointments,
-    pastAppointments,
-    isLoading,
-    error,
-    refetch,
-    currentAppointment,
-    isVideoOpen,
-    currentVideoUrl,
-    showSessionTemplate,
-    clientData,
-    isLoadingClientData,
-    startVideoSession,
-    openSessionTemplate,
-    closeSessionTemplate,
-    closeVideoSession,
-    debug
-  } = useAppointments(clinicianId);
-  
-  // Log debug info from hook
   useEffect(() => {
-    console.log("[ClinicianDashboard] useAppointments debug info:", debug);
-  }, [debug]);
+    const fetchClients = async () => {
+      try {
+        if (!userProfile?.id) {
+          console.warn('UserProfile ID is missing, cannot fetch clients.');
+          return;
+        }
 
-  const handleSessionDidNotOccur = (appointment: Appointment) => {
-    setSelectedAppointmentForNoShow(appointment);
-    setShowSessionDidNotOccurDialog(true);
-  };
+        let query = supabase
+          .from('clients')
+          .select('*')
+          .eq('clinician_id', userProfile.id);
 
-  const closeSessionDidNotOccurDialog = () => {
-    setShowSessionDidNotOccurDialog(false);
-    setSelectedAppointmentForNoShow(null);
-  };
+        if (debouncedSearchTerm) {
+          query = query.ilike('client_first_name', `%${debouncedSearchTerm}%`);
+        }
 
-  // Function to sync all upcoming appointments with Google Calendar
-  const syncAppointmentsWithGoogle = async () => {
+        const { data, error } = await query;
+
+        if (error) {
+          console.error('Error fetching clients:', error);
+          toast({
+            title: "Error",
+            description: "Failed to fetch clients. Please try again.",
+            variant: "destructive",
+          });
+        } else {
+          setClients(data || []);
+          console.log(`[ClinicianDashboard] Fetched ${data?.length || 0} clients`);
+        }
+      } catch (err) {
+        console.error('Error fetching clients:', err);
+        toast({
+          title: "Error",
+          description: "Failed to fetch clients. Please try again.",
+          variant: "destructive",
+        });
+      }
+    };
+
+    fetchClients();
+  }, [userProfile?.id, debouncedSearchTerm]);
+
+  const createNewClient = async (formData: any) => {
     try {
-      console.log("[ClinicianDashboard] Starting Google Calendar sync...");
-      setShowSyncDetails(true);
-      
-      // Get clinician's last sync time
-      const { data: clinicianData, error: clinicianError } = await supabase
-        .from("clinicians")
-        .select('last_google_sync')
-        .eq('id', clinicianId)
-        .single();
-        
-      if (clinicianError) {
-        console.error("[ClinicianDashboard] Error fetching clinician sync data:", clinicianError);
-      }
-      
-      const lastSyncTime = clinicianData?.last_google_sync || null;
-      console.log("[ClinicianDashboard] Last sync time:", lastSyncTime);
-      
-      // Query appointments that need syncing
-      const query = supabase
-        .from("appointments")
-        .select('*, clients(client_first_name, client_last_name, client_preferred_name)')
-        .eq('clinician_id', clinicianId);
-        
-      // Use an array of statuses instead of just 'scheduled'
-      query.in('status', ['scheduled', 'confirmed', 'rescheduled']);
-      
-      // Apply date filters - get appointments from past 30 days through next 60 days
-      const now = new Date();
-      const pastDate = new Date(now);
-      pastDate.setDate(now.getDate() - 30);
-      const futureDate = new Date(now);
-      futureDate.setDate(now.getDate() + 60);
-      
-      query.gte('start_at', pastDate.toISOString());
-      query.lte('start_at', futureDate.toISOString());
-      
-      // If we're doing an incremental sync (not force sync) and have a last sync time,
-      // only fetch appointments that were updated since then or don't have a google_calendar_event_id
-      if (!isForceSync && lastSyncTime) {
-        console.log("[ClinicianDashboard] Using incremental sync with last sync time:", lastSyncTime);
-        query.or(`updated_at.gt.${lastSyncTime},google_calendar_event_id.is.null,last_synced_at.is.null`);
-      } else {
-        console.log("[ClinicianDashboard] Using force sync - fetching all appointments in date range");
-      }
-        
-      // Log query details  
-      console.log("[ClinicianDashboard] Sync query parameters:", {
-        clinicianId,
-        dateRange: {from: pastDate.toISOString(), to: futureDate.toISOString()},
-        statuses: ['scheduled', 'confirmed', 'rescheduled'],
-        forceSync: isForceSync,
-        lastSyncTime
-      });
-        
-      const { data: rawAppointments, error: fetchError } = await query;
-        
-      console.log("[ClinicianDashboard] Fetched for sync:", {
-        count: rawAppointments?.length || 0,
-        sample: rawAppointments?.[0] || "No appointments found"
-      });
-        
-      if (fetchError) {
-        console.error("[ClinicianDashboard] Error fetching appointments for sync:", fetchError);
-        sonnerToast.error("Error syncing appointments", {
-          description: "Failed to fetch your appointments for synchronization."
-        });
-        return;
-      }
-      
-      if (!rawAppointments || rawAppointments.length === 0) {
-        console.log("[ClinicianDashboard] No appointments found for sync");
-        sonnerToast.success("No appointments to sync", {
-          description: "No appointments match your sync criteria. Try using Force Sync to sync all appointments."
-        });
-        return;
-      }
-      
-      // Process appointments into the right format
-      const appointmentsToSync = rawAppointments.map((rawAppt: any): Appointment => {
-        // Format the client name if client data is available
-        const clientData = rawAppt.clients ? {
-          client_first_name: rawAppt.clients.client_first_name || "",
-          client_last_name: rawAppt.clients.client_last_name || "",
-          client_preferred_name: rawAppt.clients.client_preferred_name || "",
-          client_email: "",
-          client_phone: "",
-          client_date_of_birth: null,
-          client_age: null,
-          client_gender: null,
-          client_gender_identity: null,
-          client_state: null,
-          client_time_zone: null,
-          client_minor: null,
-          client_status: null,
-          client_assigned_therapist: null,
-          client_referral_source: null,
-          client_self_goal: null,
-          client_diagnosis: null,
-          client_insurance_company_primary: null,
-          client_policy_number_primary: null,
-          client_group_number_primary: null,
-          client_subscriber_name_primary: null,
-          client_insurance_type_primary: null,
-          client_subscriber_dob_primary: null,
-          client_subscriber_relationship_primary: null,
-          client_insurance_company_secondary: null,
-          client_policy_number_secondary: null,
-          client_group_number_secondary: null,
-          client_subscriber_name_secondary: null,
-          client_insurance_type_secondary: null,
-          client_subscriber_dob_secondary: null,
-          client_subscriber_relationship_secondary: null,
-          client_insurance_company_tertiary: null,
-          client_policy_number_tertiary: null,
-          client_group_number_tertiary: null,
-          client_subscriber_name_tertiary: null,
-          client_insurance_type_tertiary: null,
-          client_subscriber_dob_tertiary: null,
-          client_subscriber_relationship_tertiary: null,
-          client_planlength: null,
-          client_treatmentfrequency: null,
-          client_problem: null,
-          client_treatmentgoal: null,
-          client_primaryobjective: null,
-          client_secondaryobjective: null,
-          client_tertiaryobjective: null,
-          client_intervention1: null,
-          client_intervention2: null,
-          client_intervention3: null,
-          client_intervention4: null,
-          client_intervention5: null,
-          client_intervention6: null,
-          client_nexttreatmentplanupdate: null,
-          client_privatenote: null,
-          client_appearance: null,
-          client_attitude: null,
-          client_behavior: null,
-          client_speech: null,
-          client_affect: null,
-          client_thoughtprocess: null,
-          client_perception: null,
-          client_orientation: null,
-          client_memoryconcentration: null,
-          client_insightjudgement: null,
-          client_mood: null,
-          client_substanceabuserisk: null,
-          client_suicidalideation: null,
-          client_homicidalideation: null,
-          client_functioning: null,
-          client_prognosis: null,
-          client_progress: null,
-          client_sessionnarrative: null,
-          client_medications: null,
-          client_personsinattendance: null,
-          client_currentsymptoms: null,
-          client_vacoverage: null,
-          client_champva: null,
-          client_tricare_beneficiary_category: null,
-          client_tricare_sponsor_name: null,
-          client_tricare_sponsor_branch: null,
-          client_tricare_sponsor_id: null,
-          client_tricare_plan: null,
-          client_tricare_region: null,
-          client_tricare_policy_id: null,
-          client_tricare_has_referral: null,
-          client_tricare_referral_number: null,
-          client_recentdischarge: null,
-          client_branchOS: null,
-          client_disabilityrating: null,
-          client_relationship: null,
-          client_is_profile_complete: null,
-          client_treatmentplan_startdate: null,
-          client_temppassword: null,
-          client_primary_payer_id: null,
-          client_secondary_payer_id: null,
-          client_tertiary_payer_id: null,
-          eligibility_status_primary: null,
-          eligibility_last_checked_primary: null,
-          eligibility_claimmd_id_primary: null,
-          eligibility_response_details_primary_json: null,
-          eligibility_copay_primary: null,
-          eligibility_deductible_primary: null,
-          eligibility_coinsurance_primary_percent: null,
-          stripe_customer_id: null,
-          client_city: null,
-          client_zipcode: null,
-          client_address: null,
-          client_zip_code: null
-        } : undefined;
-
-        // Format client name using our utility
-        const clientName = clientData ? formatClientName(clientData) : "";
-
-        return {
-          id: rawAppt.id,
-          client_id: rawAppt.client_id,
-          clinician_id: rawAppt.clinician_id,
-          start_at: rawAppt.start_at,
-          end_at: rawAppt.end_at,
-          type: rawAppt.type,
-          status: rawAppt.status,
-          appointment_recurring: rawAppt.appointment_recurring,
-          recurring_group_id: rawAppt.recurring_group_id,
-          video_room_url: rawAppt.video_room_url,
-          notes: rawAppt.notes,
-          client: clientData,
-          clientName: clientName,
-          google_calendar_event_id: rawAppt.google_calendar_event_id,
-          last_synced_at: rawAppt.last_synced_at,
-          updated_at: rawAppt.updated_at,
-        };
-      });
-      
-      console.log(`[ClinicianDashboard] Found ${appointmentsToSync.length} appointments to sync`);
-      
-      // Set initial stats
-      const initialStats = {
-        total: appointmentsToSync.length,
-        synced: 0,
-        skipped: 0,
-        created: 0,
-        updated: 0,
-        lastSyncTime: new Date().toISOString()
+      const payload = {
+        // Generate a temporary ID to fix the TypeScript error
+        id: uuidv4(), // Add UUID import at the top of the file if not already there
+        client_preferred_name: formData.client_preferred_name || formData.client_first_name,
+        client_first_name: formData.client_first_name,
+        client_last_name: formData.client_last_name,
+        client_email: formData.client_email,
+        client_phone: formData.client_phone,
+        client_date_of_birth: formData.client_date_of_birth,
+        client_age: formData.client_age,
+        client_gender: formData.client_gender,
+        client_gender_identity: formData.client_gender_identity,
+        client_address: formData.client_address,
+        client_city: formData.client_city,
+        client_state: formData.client_state,
+        client_zip_code: formData.client_zip_code,
+        client_insurance_provider: formData.client_insurance_provider,
+        client_insurance_policy_number: formData.client_insurance_policy_number,
+        client_emergency_contact_name: formData.client_emergency_contact_name,
+        client_emergency_contact_phone: formData.client_emergency_contact_phone,
+        client_emergency_contact_relationship: formData.client_emergency_contact_relationship,
+        client_notes: formData.client_notes,
+        clinician_id: userProfile?.id,
       };
-      setSyncStats(initialStats);
-      
-      // Start sync
-      const results = await syncMultipleAppointments(appointmentsToSync);
-      
-      // Calculate final stats
-      const synced = Array.from(results.values()).filter(Boolean).length;
-      const created = appointmentsToSync.filter(a => !a.google_calendar_event_id && results.get(a.id)).length;
-      const updated = synced - created;
-      const skipped = appointmentsToSync.length - synced;
-      
-      // Update stats
-      setSyncStats({
-        total: appointmentsToSync.length,
-        synced,
-        skipped,
-        created,
-        updated,
-        lastSyncTime: new Date().toISOString()
-      });
-      
-      // Reset force sync after completion
-      setIsForceSync(false);
-      
-      console.log("[ClinicianDashboard] Google Calendar sync complete, results:", results);
-      
+
+      const { data, error } = await supabase
+        .from('clients')
+        .insert([payload])
+        .select();
+
+      if (error) {
+        console.error('Error creating client:', error);
+        toast({
+          title: "Error",
+          description: "Failed to create client. Please try again.",
+          variant: "destructive",
+        });
+      } else {
+        console.log('Client created successfully:', data);
+        toast({
+          title: "Success",
+          description: "Client created successfully.",
+        });
+        clientForm.reset();
+        setIsClientDrawerOpen(false);
+        refreshData();
+      }
     } catch (error) {
-      console.error("[ClinicianDashboard] Failed to sync with Google Calendar:", error);
-      sonnerToast.error("Sync failed", {
-        description: "Failed to synchronize appointments with Google Calendar."
+      console.error('Error creating client:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create client. Please try again.",
+        variant: "destructive",
       });
-      setIsForceSync(false);
     }
   };
 
-  // Force sync handler
-  const handleForceSyncClick = () => {
-    setIsForceSync(true);
-    syncAppointmentsWithGoogle();
+  const createNewAppointment = async () => {
+    try {
+      if (!selectedDate || !selectedTime || !selectedClient?.id) {
+        console.warn('Missing appointment details, cannot create appointment.');
+        toast({
+          title: "Error",
+          description: "Please select a date, time, and client.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const startDateTime = new Date(selectedDate);
+      startDateTime.setHours(selectedTime.getHours(), selectedTime.getMinutes(), 0, 0);
+
+      const endDateTime = new Date(startDateTime);
+      endDateTime.setHours(startDateTime.getHours() + 1);
+
+      const payload = {
+        clinician_id: userProfile?.id,
+        client_id: selectedClient.id,
+        start_at: startDateTime.toISOString(),
+        end_at: endDateTime.toISOString(),
+        type: 'therapy',
+        status: 'scheduled',
+      };
+
+      const { data, error } = await supabase
+        .from('appointments')
+        .insert([payload])
+        .select();
+
+      if (error) {
+        console.error('Error creating appointment:', error);
+        toast({
+          title: "Error",
+          description: "Failed to create appointment. Please try again.",
+          variant: "destructive",
+        });
+      } else {
+        console.log('Appointment created successfully:', data);
+        toast({
+          title: "Success",
+          description: "Appointment created successfully.",
+        });
+        setIsAppointmentDialogOpen(false);
+        refreshData();
+      }
+    } catch (error) {
+      console.error('Error creating appointment:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create appointment. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
-  // Create a type adapter function to ensure clientData is handled properly by SessionNoteTemplate
-  const prepareClientDataForTemplate = (): ClientDetails | null => {
-    if (!clientData) return null;
-    
-    // Create a ClientDetails object with the available data
-    // Only include fields that we can safely access from clientData
-    // Add null defaults for all properties required by ClientDetails
-    return {
-      id: currentAppointment?.client_id || '',
-      client_first_name: clientData.client_first_name || null,
-      client_last_name: clientData.client_last_name || null,
-      client_preferred_name: clientData.client_preferred_name || null,
-      client_email: null,
-      client_phone: null,
-      client_date_of_birth: null,
-      client_age: null,
-      client_gender: null,
-      client_gender_identity: null,
-      client_state: null,
-      client_time_zone: null,
-      client_minor: null,
-      client_status: null,
-      client_assigned_therapist: null,
-      client_referral_source: null,
-      client_self_goal: null,
-      client_diagnosis: null,
-      client_insurance_company_primary: null,
-      client_policy_number_primary: null,
-      client_group_number_primary: null,
-      client_subscriber_name_primary: null,
-      client_insurance_type_primary: null,
-      client_subscriber_dob_primary: null,
-      client_subscriber_relationship_primary: null,
-      client_insurance_company_secondary: null,
-      client_policy_number_secondary: null,
-      client_group_number_secondary: null,
-      client_subscriber_name_secondary: null,
-      client_insurance_type_secondary: null,
-      client_subscriber_dob_secondary: null,
-      client_subscriber_relationship_secondary: null,
-      client_insurance_company_tertiary: null,
-      client_policy_number_tertiary: null,
-      client_group_number_tertiary: null,
-      client_subscriber_name_tertiary: null,
-      client_insurance_type_tertiary: null,
-      client_subscriber_dob_tertiary: null,
-      client_subscriber_relationship_tertiary: null,
-      client_planlength: null,
-      client_treatmentfrequency: null,
-      client_problem: null,
-      client_treatmentgoal: null,
-      client_primaryobjective: null,
-      client_secondaryobjective: null,
-      client_tertiaryobjective: null,
-      client_intervention1: null,
-      client_intervention2: null,
-      client_intervention3: null,
-      client_intervention4: null,
-      client_intervention5: null,
-      client_intervention6: null,
-      client_nexttreatmentplanupdate: null,
-      client_privatenote: null,
-      client_appearance: null,
-      client_attitude: null,
-      client_behavior: null,
-      client_speech: null,
-      client_affect: null,
-      client_thoughtprocess: null,
-      client_perception: null,
-      client_orientation: null,
-      client_memoryconcentration: null,
-      client_insightjudgement: null,
-      client_mood: null,
-      client_substanceabuserisk: null,
-      client_suicidalideation: null,
-      client_homicidalideation: null,
-      client_functioning: null,
-      client_prognosis: null,
-      client_progress: null,
-      client_sessionnarrative: null,
-      client_medications: null,
-      client_personsinattendance: null,
-      client_currentsymptoms: null,
-      client_vacoverage: null,
-      client_champva: null,
-      client_tricare_beneficiary_category: null,
-      client_tricare_sponsor_name: null,
-      client_tricare_sponsor_branch: null,
-      client_tricare_sponsor_id: null,
-      client_tricare_plan: null,
-      client_tricare_region: null,
-      client_tricare_policy_id: null,
-      client_tricare_has_referral: null,
-      client_tricare_referral_number: null,
-      client_recentdischarge: null,
-      client_branchOS: null,
-      client_disabilityrating: null,
-      client_relationship: null,
-      client_is_profile_complete: null,
-      client_treatmentplan_startdate: null,
-      client_temppassword: null,
-      client_primary_payer_id: null,
-      client_secondary_payer_id: null,
-      client_tertiary_payer_id: null,
-      eligibility_status_primary: null,
-      eligibility_last_checked_primary: null,
-      eligibility_claimmd_id_primary: null,
-      eligibility_response_details_primary_json: null,
-      eligibility_copay_primary: null,
-      eligibility_deductible_primary: null,
-      eligibility_coinsurance_primary_percent: null,
-      stripe_customer_id: null,
-      client_city: null,
-      client_zipcode: null,
-      client_address: null,
-      client_zip_code: null
-    };
+  const updateAppointment = async (appointmentId: string, newStartAt: string, newEndAt: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('appointments')
+        .update({ start_at: newStartAt, end_at: newEndAt })
+        .eq('id', appointmentId)
+        .select();
+
+      if (error) {
+        console.error('Error updating appointment:', error);
+        toast({
+          title: "Error",
+          description: "Failed to update appointment. Please try again.",
+          variant: "destructive",
+        });
+      } else {
+        console.log('Appointment updated successfully:', data);
+        toast({
+          title: "Success",
+          description: "Appointment updated successfully.",
+        });
+        refreshData();
+      }
+    } catch (error) {
+      console.error('Error updating appointment:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update appointment. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
-  if (showSessionTemplate && currentAppointment) {
-    return (
-      <Layout>
-        <SessionNoteTemplate 
-          onClose={closeSessionTemplate}
-          appointment={currentAppointment}
-          clinicianName={userId}
-          clientData={prepareClientDataForTemplate()}
-        />
-      </Layout>
-    );
+  const deleteAppointment = async (appointmentId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('appointments')
+        .delete()
+        .eq('id', appointmentId);
+
+      if (error) {
+        console.error('Error deleting appointment:', error);
+        toast({
+          title: "Error",
+          description: "Failed to delete appointment. Please try again.",
+          variant: "destructive",
+        });
+      } else {
+        console.log('Appointment deleted successfully:', data);
+        toast({
+          title: "Success",
+          description: "Appointment deleted successfully.",
+        });
+        refreshData();
+      }
+    } catch (error) {
+      console.error('Error deleting appointment:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete appointment. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  if (isUserContextLoading || timeZoneLoading) {
+    return <div>Loading...</div>;
+  }
+
+  if (!userProfile) {
+    return <div>No user profile found.</div>;
   }
 
   return (
-    <Layout>
-      <div className="container mx-auto">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold">Clinician Dashboard</h1>
-          
-          <div className="flex items-center gap-2">
-            {showSyncDetails && (
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => setShowSyncDetails(false)}
-                className="text-xs"
-              >
-                Hide details
-              </Button>
-            )}
-            
-            {isGoogleConnected && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={isGoogleLoading || isSyncing}
-                      onClick={handleForceSyncClick}
-                      className="flex items-center gap-1"
-                    >
-                      <RefreshCw className="h-3 w-3" />
-                      <span>Force</span>
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Force full sync of all appointments</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-            
-            <Button
-              variant={isGoogleConnected ? "outline" : "default"}
-              size="sm"
-              disabled={isGoogleLoading || isSyncing}
-              onClick={isGoogleConnected ? syncAppointmentsWithGoogle : connectGoogleCalendar}
-              className="flex items-center gap-2"
-            >
-              {isGoogleLoading || isSyncing ? (
-                <div className="flex items-center">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900 mr-2"></div>
-                  {isSyncing ? "Syncing..." : "Connecting..."}
+    <div className="container py-10">
+      <Card>
+        <CardHeader>
+          <CardTitle>Clinician Dashboard</CardTitle>
+        </CardHeader>
+        <CardContent className="pl-6">
+          <Tabs defaultValue="calendar" className="space-y-4">
+            <TabsList>
+              <TabsTrigger value="calendar">Calendar</TabsTrigger>
+              <TabsTrigger value="appointments">Appointments</TabsTrigger>
+              <TabsTrigger value="clients">Clients</TabsTrigger>
+              <TabsTrigger value="billing">Billing</TabsTrigger>
+            </TabsList>
+            <TabsContent value="calendar" className="space-y-4">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center space-x-2">
+                  <Button variant="outline" size="sm" onClick={refreshData}>
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Refresh
+                  </Button>
+                  <Select value={calendarView} onValueChange={handleCalendarViewChange}>
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Select view" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="week">Week View</SelectItem>
+                      <SelectItem value="month">Month View</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Label htmlFor="showAvailability" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed">
+                    Show Availability
+                  </Label>
+                  <Switch
+                    id="showAvailability"
+                    checked={showAvailability}
+                    onCheckedChange={handleAvailabilityToggle}
+                  />
                 </div>
-              ) : isGoogleConnected ? (
-                <>
-                  <Check className="w-4 h-4 text-green-500" />
-                  <span>Sync with Google Calendar</span>
-                </>
-              ) : (
-                <>
-                  <CalendarPlus className="w-4 h-4" />
-                  <span>Connect Google Calendar</span>
-                </>
-              )}
-            </Button>
-          </div>
-        </div>
-        
-        {/* Sync Details Panel */}
-        {showSyncDetails && (
-          <div className="mb-6 p-3 border rounded-md bg-gray-50">
-            <h3 className="text-sm font-semibold mb-2">
-              Google Calendar Sync Details
-              <span className="text-xs font-normal ml-2 text-gray-500">
-                {syncStats.lastSyncTime && `Last sync: ${DateTime.fromISO(syncStats.lastSyncTime).toRelative()}`}
-              </span>
-            </h3>
-            
-            {syncStats.total > 0 ? (
-              <>
-                <div className="grid grid-cols-4 gap-4 mb-2">
-                  <div className="bg-white p-2 rounded border">
-                    <div className="text-xs text-gray-500">Total</div>
-                    <div className="text-lg font-semibold">{syncStats.total}</div>
-                  </div>
-                  <div className="bg-white p-2 rounded border">
-                    <div className="text-xs text-gray-500">Synced</div>
-                    <div className="text-lg font-semibold text-green-600">{syncStats.synced}</div>
-                  </div>
-                  <div className="bg-white p-2 rounded border">
-                    <div className="text-xs text-gray-500">Created</div>
-                    <div className="text-lg font-semibold text-blue-600">{syncStats.created}</div>
-                  </div>
-                  <div className="bg-white p-2 rounded border">
-                    <div className="text-xs text-gray-500">Updated</div>
-                    <div className="text-lg font-semibold text-orange-600">{syncStats.updated}</div>
-                  </div>
-                </div>
-                
-                <div className="text-xs text-gray-500">
-                  {syncStats.skipped > 0 ? (
-                    <span>{syncStats.skipped} appointments were skipped (already up to date)</span>
-                  ) : (
-                    <span>All appointments were successfully synchronized</span>
-                  )}
-                </div>
-              </>
-            ) : (
-              <div className="text-sm text-gray-600">
-                <p>No appointments found matching the sync criteria. Try these options:</p>
-                <ul className="list-disc ml-5 mt-1 text-xs">
-                  <li>Use the "Force" button to sync all appointments regardless of their update status</li>
-                  <li>Check if you have any upcoming appointments in the system</li>
-                  <li>Verify that the appointments have the status "scheduled", "confirmed", or "rescheduled"</li>
-                </ul>
+                <Button size="sm" onClick={() => navigate('/calendar-settings')}>
+                  Calendar Settings
+                </Button>
               </div>
-            )}
-          </div>
-        )}
-        
-        {/* Debug info in dev mode */}
-        {process.env.NODE_ENV !== 'production' && (
-          <div className="mb-4 p-2 border rounded-md bg-gray-50">
-            <h4 className="text-xs font-semibold">Debug Info</h4>
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <p>Auth User ID: {currentUserId || 'Not set'}</p>
-              <p>Clinician ID: {clinicianId || 'Not resolved'}</p>
-              <p>Timezone: {clinicianTimeZone}</p>
-              <p>Appointments: {appointments?.length || 0}</p>
-              <p>Force Sync: {isForceSync ? 'Yes' : 'No'}</p>
+              <CalendarView
+                view={calendarView}
+                showAvailability={showAvailability}
+                clinicianId={userProfile.id}
+                currentDate={selectedDate || new Date()}
+                refreshTrigger={refreshTrigger}
+                appointments={appointments}
+                isLoading={isLoading}
+                error={error}
+                userTimeZone={userTimeZone}
+              />
+            </TabsContent>
+            <TabsContent value="appointments" className="space-y-4">
+              <AppointmentsList appointments={appointments} />
+            </TabsContent>
+            <TabsContent value="clients" className="space-y-4">
+              <div className="flex justify-between items-center">
+                <Input
+                  type="search"
+                  placeholder="Search clients..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+                <Drawer>
+                  <DrawerTrigger asChild>
+                    <Button variant="outline">
+                      <PlusCircle className="mr-2 h-4 w-4" />
+                      Add Client
+                    </Button>
+                  </DrawerTrigger>
+                  <DrawerContent>
+                    <DrawerHeader>
+                      <DrawerTitle>Create New Client</DrawerTitle>
+                      <DrawerDescription>
+                        Create a new client to add to your list.
+                      </DrawerDescription>
+                    </DrawerHeader>
+                    <DrawerBody clientForm={clientForm} createNewClient={createNewClient} />
+                    <DrawerFooter>
+                      <Button type="submit" onClick={clientForm.handleSubmit(createNewClient)}>Create Client</Button>
+                      <DrawerClose variant="outline">Cancel</DrawerClose>
+                    </DrawerFooter>
+                  </DrawerContent>
+                </Drawer>
+              </div>
+              <ClientTable clients={clients} />
+            </TabsContent>
+            <TabsContent value="billing">
+              Billing content goes here.
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
+      <Dialog open={isAppointmentDialogOpen} onOpenChange={setIsAppointmentDialogOpen}>
+        <DialogTrigger asChild>
+          <Button variant="outline">Create Appointment</Button>
+        </DialogTrigger>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Create New Appointment</DialogTitle>
+            <DialogDescription>
+              Make a new appointment for a client.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="date" className="text-right">
+                Date
+              </Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant={"outline"}
+                    className={cn(
+                      "w-[240px] justify-start text-left font-normal",
+                      !selectedDate && "text-muted-foreground"
+                    )}
+                  >
+                    {selectedDate ? (
+                      format(selectedDate, "PPP")
+                    ) : (
+                      <span>Pick a date</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={handleDateChange}
+                    disabled={(date) =>
+                      date > new Date()
+                    }
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+              <FormDescription>
+                Select a date for the appointment.
+              </FormDescription>
+              <FormMessage />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="time" className="text-right">
+                Time
+              </Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant={"outline"}
+                    className={cn(
+                      "w-[240px] justify-start text-left font-normal",
+                      !selectedTime && "text-muted-foreground"
+                    )}
+                  >
+                    {selectedTime ? (
+                      format(selectedTime, "p")
+                    ) : (
+                      <span>Pick a time</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <TimePicker
+                    selected={selectedTime}
+                    onSelect={handleTimeChange}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+              <FormDescription>
+                Select a time for the appointment.
+              </FormDescription>
+              <FormMessage />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="client" className="text-right">
+                Client
+              </Label>
+              <Select onValueChange={(value) => {
+                const client = clients.find((client) => client.id === value);
+                handleClientSelect(client);
+              }}>
+                <SelectTrigger className="w-[240px]">
+                  <SelectValue placeholder="Select a client" />
+                </SelectTrigger>
+                <SelectContent>
+                  {clients.map((client) => (
+                    <SelectItem key={client.id} value={client.id}>
+                      {client.client_first_name} {client.client_last_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormDescription>
+                Select a client for the appointment.
+              </FormDescription>
+              <FormMessage />
             </div>
           </div>
-        )}
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* Today's Appointments */}
-          <div>
-            <AppointmentsList
-              title="Today's Appointments"
-              icon={<Calendar className="h-5 w-5 mr-2" />}
-              appointments={todayAppointments}
-              isLoading={isLoading || isLoadingTimeZone}
-              error={error}
-              emptyMessage="No appointments scheduled for today."
-              timeZoneDisplay={timeZoneDisplay}
-              userTimeZone={clinicianTimeZone}
-              showStartButton={true}
-              onStartSession={startVideoSession}
-            />
-          </div>
-          
-          {/* Outstanding Documentation */}
-          <div>
-            <AppointmentsList
-              title="Outstanding Documentation"
-              icon={<AlertCircle className="h-5 w-5 mr-2" />}
-              appointments={pastAppointments}
-              isLoading={isLoading || isLoadingTimeZone || isLoadingClientData}
-              error={error}
-              emptyMessage="No outstanding documentation."
-              timeZoneDisplay={timeZoneDisplay}
-              userTimeZone={clinicianTimeZone}
-              onDocumentSession={openSessionTemplate}
-              onSessionDidNotOccur={handleSessionDidNotOccur}
-            />
-          </div>
-          
-          {/* Upcoming Appointments */}
-          <div>
-            <AppointmentsList
-              title="Upcoming Appointments"
-              icon={<Calendar className="h-5 w-5 mr-2" />}
-              appointments={upcomingAppointments}
-              isLoading={isLoading || isLoadingTimeZone}
-              error={error}
-              emptyMessage="No upcoming appointments scheduled."
-              timeZoneDisplay={timeZoneDisplay}
-              userTimeZone={clinicianTimeZone}
-              showViewAllButton={true}
-            />
-          </div>
-        </div>
-      </div>
-      
-      {/* Video Chat Component */}
-      {isVideoOpen && (
-        <VideoChat
-          roomUrl={currentVideoUrl}
-          isOpen={isVideoOpen}
-          onClose={closeVideoSession}
-        />
-      )}
+          <DialogFooter>
+            <Button type="submit" onClick={createNewAppointment}>Create Appointment</Button>
+            <DialogClose variant="outline">Cancel</DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
 
-      {/* Session Did Not Occur Dialog */}
-      {showSessionDidNotOccurDialog && selectedAppointmentForNoShow && (
-        <SessionDidNotOccurDialog
-          isOpen={showSessionDidNotOccurDialog}
-          onClose={closeSessionDidNotOccurDialog}
-          appointmentId={selectedAppointmentForNoShow.id}
-          onStatusUpdate={refetch}
+interface ClientTableProps {
+  clients: any[];
+}
+
+const ClientTable: React.FC<ClientTableProps> = ({ clients }) => {
+  return (
+    <div className="rounded-md border">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-[100px]">ID</TableHead>
+            <TableHead>Name</TableHead>
+            <TableHead>Email</TableHead>
+            <TableHead>Phone</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {clients.map((client) => (
+            <TableRow key={client.id}>
+              <TableCell className="font-medium">{client.id}</TableCell>
+              <TableCell>{client.client_first_name} {client.client_last_name}</TableCell>
+              <TableCell>{client.client_email}</TableCell>
+              <TableCell>{client.client_phone}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+};
+
+interface DrawerBodyProps {
+  clientForm: any;
+  createNewClient: any;
+}
+
+const DrawerBody: React.FC<DrawerBodyProps> = ({ clientForm, createNewClient }) => {
+  return (
+    <DrawerContent>
+      <DrawerHeader>
+        <DrawerTitle>Create New Client</DrawerTitle>
+        <DrawerDescription>
+          Create a new client to add to your list.
+        </DrawerDescription>
+      </DrawerHeader>
+      <div className="grid gap-4 py-4">
+        <FormField
+          control={clientForm.control}
+          name="client_first_name"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>First Name</FormLabel>
+              <FormControl>
+                <Input placeholder="John" {...field} />
+              </FormControl>
+              <FormDescription>
+                This is the client's first name.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
         />
-      )}
-    </Layout>
+        <FormField
+          control={clientForm.control}
+          name="client_last_name"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Last Name</FormLabel>
+              <FormControl>
+                <Input placeholder="Doe" {...field} />
+              </FormControl>
+              <FormDescription>
+                This is the client's last name.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={clientForm.control}
+          name="client_email"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Email</FormLabel>
+              <FormControl>
+                <Input placeholder="johndoe@example.com" {...field} />
+              </FormControl>
+              <FormDescription>
+                This is the client's email address.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={clientForm.control}
+          name="client_phone"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Phone</FormLabel>
+              <FormControl>
+                <Input placeholder="555-555-5555" {...field} />
+              </FormControl>
+              <FormDescription>
+                This is the client's phone number.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+      </div>
+    </DrawerContent>
   );
 };
 
