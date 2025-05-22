@@ -4,34 +4,151 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { useUser } from '@/context/UserContext';
-import { AppointmentsList } from '@/components/dashboard/AppointmentsList';
+import { useUserContext } from '@/context/UserContext';
+import AppointmentsList from '@/components/dashboard/AppointmentsList';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { v4 as uuidv4 } from 'uuid';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Drawer, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Calendar } from "@/components/ui/calendar";
-import { cn } from "@/lib/utils";
-import { format } from "date-fns";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { DatePicker } from "@/components/ui/date-picker";
-import { TimePicker } from "@/components/ui/time-picker";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { z } from "zod";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import { Separator } from "@/components/ui/separator";
-import { PlusCircle, RefreshCw, Calendar as CalendarIcon } from 'lucide-react';
-import { Switch } from "@/components/ui/switch";
-import { useTheme } from "@/components/theme-provider";
-import { useSearchParams } from 'react-router-dom';
-import { useDebounce } from '@/hooks/useDebounce';
-import { CustomDialogClose } from '@/components/ui/custom-dialog-close';
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from "@/components/ui/drawer"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Calendar } from "@/components/ui/calendar"
+import { cn } from "@/lib/utils"
+import { format } from "date-fns"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { CalendarView } from '@/components/calendar';
 import { Appointment } from '@/types/appointment';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Checkbox } from "@/components/ui/checkbox"
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
+import { z } from "zod"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useForm } from "react-hook-form"
+import { Textarea } from "@/components/ui/textarea"
+import { DatePicker } from "@/components/ui/date-picker"
+import { TimePicker } from "@/components/ui/time-picker"
+import { Separator } from "@/components/ui/separator"
+import { Badge } from "@/components/ui/badge"
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+  CommandShortcut,
+} from "@/components/ui/command"
+import { PlusCircle, RefreshCw } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Progress } from "@/components/ui/progress"
+import { Slider } from "@/components/ui/slider"
+import { Switch } from "@/components/ui/switch"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
+import { AspectRatio } from "@/components/ui/aspect-ratio"
+import { CalendarDateRangePicker } from "@/components/ui/calendar-date-range-picker"
+import { MultiSelect } from "@/components/ui/multi-select"
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card"
+import { NavigationMenu, NavigationMenuItem, NavigationMenuList } from "@/components/ui/navigation-menu"
+import { Skeleton } from "@/components/ui/skeleton"
+import { useTheme } from "@/components/theme-provider"
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable"
+import {
+  ContextMenu,
+  ContextMenuCheckboxItem,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuLabel,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
+import { Separator } from "@/components/ui/separator"
+import { useSearchParams } from 'react-router-dom';
+import { TimeZoneService } from '@/utils/timeZoneService';
+import { useDebounce } from '@/hooks/useDebounce';
 
 const ClientFormSchema = z.object({
   client_preferred_name: z.string().optional(),
@@ -70,7 +187,7 @@ interface ClinicianDashboardProps { }
 const ClinicianDashboard: React.FC<ClinicianDashboardProps> = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { user, isLoading: isUserContextLoading } = useUser();
+  const { user, userProfile, isLoading: isUserContextLoading } = useUserContext();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -115,7 +232,7 @@ const ClinicianDashboard: React.FC<ClinicianDashboardProps> = () => {
     },
   })
 
-  const { theme } = useTheme();
+  const { theme } = useTheme()
 
   const handleAvailabilityToggle = (checked: boolean) => {
     setShowAvailability(checked);
@@ -183,8 +300,8 @@ const ClinicianDashboard: React.FC<ClinicianDashboardProps> = () => {
     const fetchAppointments = async () => {
       setIsLoading(true);
       try {
-        if (!user?.id) {
-          console.warn('User ID is missing, cannot fetch appointments.');
+        if (!userProfile?.id) {
+          console.warn('UserProfile ID is missing, cannot fetch appointments.');
           return;
         }
 
@@ -198,7 +315,7 @@ const ClinicianDashboard: React.FC<ClinicianDashboardProps> = () => {
         const { data, error } = await supabase
           .from('appointments')
           .select('*')
-          .eq('clinician_id', user.id)
+          .eq('clinician_id', userProfile.id)
           .gte('start_at', startDate.toISOString())
           .lte('end_at', endDate.toISOString());
 
@@ -218,20 +335,20 @@ const ClinicianDashboard: React.FC<ClinicianDashboardProps> = () => {
     };
 
     fetchAppointments();
-  }, [user?.id, selectedDate, refreshTrigger]);
+  }, [userProfile?.id, selectedDate, refreshTrigger]);
 
   useEffect(() => {
     const fetchClients = async () => {
       try {
-        if (!user?.id) {
-          console.warn('User ID is missing, cannot fetch clients.');
+        if (!userProfile?.id) {
+          console.warn('UserProfile ID is missing, cannot fetch clients.');
           return;
         }
 
         let query = supabase
           .from('clients')
           .select('*')
-          .eq('clinician_id', user.id);
+          .eq('clinician_id', userProfile.id);
 
         if (debouncedSearchTerm) {
           query = query.ilike('client_first_name', `%${debouncedSearchTerm}%`);
@@ -261,12 +378,13 @@ const ClinicianDashboard: React.FC<ClinicianDashboardProps> = () => {
     };
 
     fetchClients();
-  }, [user?.id, debouncedSearchTerm]);
+  }, [userProfile?.id, debouncedSearchTerm]);
 
   const createNewClient = async (formData: any) => {
     try {
       const payload = {
-        id: uuidv4(),
+        // Generate a temporary ID to fix the TypeScript error
+        id: uuidv4(), // Add UUID import at the top of the file if not already there
         client_preferred_name: formData.client_preferred_name || formData.client_first_name,
         client_first_name: formData.client_first_name,
         client_last_name: formData.client_last_name,
@@ -286,7 +404,7 @@ const ClinicianDashboard: React.FC<ClinicianDashboardProps> = () => {
         client_emergency_contact_phone: formData.client_emergency_contact_phone,
         client_emergency_contact_relationship: formData.client_emergency_contact_relationship,
         client_notes: formData.client_notes,
-        clinician_id: user?.id,
+        clinician_id: userProfile?.id,
       };
 
       const { data, error } = await supabase
@@ -308,6 +426,7 @@ const ClinicianDashboard: React.FC<ClinicianDashboardProps> = () => {
           description: "Client created successfully.",
         });
         clientForm.reset();
+        setIsClientDrawerOpen(false);
         refreshData();
       }
     } catch (error) {
@@ -339,7 +458,7 @@ const ClinicianDashboard: React.FC<ClinicianDashboardProps> = () => {
       endDateTime.setHours(startDateTime.getHours() + 1);
 
       const payload = {
-        clinician_id: user?.id,
+        clinician_id: userProfile?.id,
         client_id: selectedClient.id,
         start_at: startDateTime.toISOString(),
         end_at: endDateTime.toISOString(),
@@ -447,7 +566,7 @@ const ClinicianDashboard: React.FC<ClinicianDashboardProps> = () => {
     return <div>Loading...</div>;
   }
 
-  if (!user) {
+  if (!userProfile) {
     return <div>No user profile found.</div>;
   }
 
@@ -494,23 +613,20 @@ const ClinicianDashboard: React.FC<ClinicianDashboardProps> = () => {
                   Calendar Settings
                 </Button>
               </div>
-              <div className="bg-gray-100 p-4 rounded-md">
-                <h3>Calendar would display here</h3>
-                <p>Calendar view: {calendarView}</p>
-                <p>Show availability: {showAvailability ? 'Yes' : 'No'}</p>
-              </div>
-            </TabsContent>
-            <TabsContent value="appointments" className="space-y-4">
-              <AppointmentsList 
-                title="Upcoming Appointments"
-                icon={<CalendarIcon className="mr-2 h-5 w-5" />}
+              <CalendarView
+                view={calendarView}
+                showAvailability={showAvailability}
+                clinicianId={userProfile.id}
+                currentDate={selectedDate || new Date()}
+                refreshTrigger={refreshTrigger}
                 appointments={appointments}
                 isLoading={isLoading}
                 error={error}
-                emptyMessage="No upcoming appointments"
-                timeZoneDisplay="local"
                 userTimeZone={userTimeZone}
               />
+            </TabsContent>
+            <TabsContent value="appointments" className="space-y-4">
+              <AppointmentsList appointments={appointments} />
             </TabsContent>
             <TabsContent value="clients" className="space-y-4">
               <div className="flex justify-between items-center">
@@ -534,77 +650,10 @@ const ClinicianDashboard: React.FC<ClinicianDashboardProps> = () => {
                         Create a new client to add to your list.
                       </DrawerDescription>
                     </DrawerHeader>
-                    <div className="px-4">
-                      <div className="grid gap-4 py-4">
-                        <FormField
-                          control={clientForm.control}
-                          name="client_first_name"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>First Name</FormLabel>
-                              <FormControl>
-                                <Input placeholder="John" {...field} />
-                              </FormControl>
-                              <FormDescription>
-                                This is the client's first name.
-                              </FormDescription>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={clientForm.control}
-                          name="client_last_name"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Last Name</FormLabel>
-                              <FormControl>
-                                <Input placeholder="Doe" {...field} />
-                              </FormControl>
-                              <FormDescription>
-                                This is the client's last name.
-                              </FormDescription>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={clientForm.control}
-                          name="client_email"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Email</FormLabel>
-                              <FormControl>
-                                <Input placeholder="johndoe@example.com" {...field} />
-                              </FormControl>
-                              <FormDescription>
-                                This is the client's email address.
-                              </FormDescription>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={clientForm.control}
-                          name="client_phone"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Phone</FormLabel>
-                              <FormControl>
-                                <Input placeholder="555-555-5555" {...field} />
-                              </FormControl>
-                              <FormDescription>
-                                This is the client's phone number.
-                              </FormDescription>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-                    </div>
+                    <DrawerBody clientForm={clientForm} createNewClient={createNewClient} />
                     <DrawerFooter>
                       <Button type="submit" onClick={clientForm.handleSubmit(createNewClient)}>Create Client</Button>
-                      <CustomDialogClose variant="outline">Cancel</CustomDialogClose>
+                      <DrawerClose variant="outline">Cancel</DrawerClose>
                     </DrawerFooter>
                   </DrawerContent>
                 </Drawer>
@@ -633,7 +682,34 @@ const ClinicianDashboard: React.FC<ClinicianDashboardProps> = () => {
               <Label htmlFor="date" className="text-right">
                 Date
               </Label>
-              <DatePicker date={selectedDate} setDate={handleDateChange} />
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant={"outline"}
+                    className={cn(
+                      "w-[240px] justify-start text-left font-normal",
+                      !selectedDate && "text-muted-foreground"
+                    )}
+                  >
+                    {selectedDate ? (
+                      format(selectedDate, "PPP")
+                    ) : (
+                      <span>Pick a date</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={handleDateChange}
+                    disabled={(date) =>
+                      date > new Date()
+                    }
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
               <FormDescription>
                 Select a date for the appointment.
               </FormDescription>
@@ -643,7 +719,30 @@ const ClinicianDashboard: React.FC<ClinicianDashboardProps> = () => {
               <Label htmlFor="time" className="text-right">
                 Time
               </Label>
-              <TimePicker selected={selectedTime} onSelect={handleTimeChange} initialFocus />
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant={"outline"}
+                    className={cn(
+                      "w-[240px] justify-start text-left font-normal",
+                      !selectedTime && "text-muted-foreground"
+                    )}
+                  >
+                    {selectedTime ? (
+                      format(selectedTime, "p")
+                    ) : (
+                      <span>Pick a time</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <TimePicker
+                    selected={selectedTime}
+                    onSelect={handleTimeChange}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
               <FormDescription>
                 Select a time for the appointment.
               </FormDescription>
@@ -676,7 +775,7 @@ const ClinicianDashboard: React.FC<ClinicianDashboardProps> = () => {
           </div>
           <DialogFooter>
             <Button type="submit" onClick={createNewAppointment}>Create Appointment</Button>
-            <CustomDialogClose variant="outline">Cancel</CustomDialogClose>
+            <DialogClose variant="outline">Cancel</DialogClose>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -712,6 +811,90 @@ const ClientTable: React.FC<ClientTableProps> = ({ clients }) => {
         </TableBody>
       </Table>
     </div>
+  );
+};
+
+interface DrawerBodyProps {
+  clientForm: any;
+  createNewClient: any;
+}
+
+const DrawerBody: React.FC<DrawerBodyProps> = ({ clientForm, createNewClient }) => {
+  return (
+    <DrawerContent>
+      <DrawerHeader>
+        <DrawerTitle>Create New Client</DrawerTitle>
+        <DrawerDescription>
+          Create a new client to add to your list.
+        </DrawerDescription>
+      </DrawerHeader>
+      <div className="grid gap-4 py-4">
+        <FormField
+          control={clientForm.control}
+          name="client_first_name"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>First Name</FormLabel>
+              <FormControl>
+                <Input placeholder="John" {...field} />
+              </FormControl>
+              <FormDescription>
+                This is the client's first name.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={clientForm.control}
+          name="client_last_name"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Last Name</FormLabel>
+              <FormControl>
+                <Input placeholder="Doe" {...field} />
+              </FormControl>
+              <FormDescription>
+                This is the client's last name.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={clientForm.control}
+          name="client_email"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Email</FormLabel>
+              <FormControl>
+                <Input placeholder="johndoe@example.com" {...field} />
+              </FormControl>
+              <FormDescription>
+                This is the client's email address.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={clientForm.control}
+          name="client_phone"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Phone</FormLabel>
+              <FormControl>
+                <Input placeholder="555-555-5555" {...field} />
+              </FormControl>
+              <FormDescription>
+                This is the client's phone number.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+      </div>
+    </DrawerContent>
   );
 };
 
