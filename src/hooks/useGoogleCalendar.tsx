@@ -214,6 +214,58 @@ export const useGoogleCalendar = () => {
     }
   };
 
+  // Update a Google Calendar event
+  const updateGoogleCalendarEvent = async (eventId: string, appointment: Appointment): Promise<string | null> => {
+    if (!isConnected || !accessToken) {
+      toast.error("Not connected to Google Calendar");
+      return null;
+    }
+    setIsSyncing(true);
+    try {
+      const event: GoogleCalendarEvent = {
+        summary: `Session with ${appointment.clientName || 'Client'}`,
+        description: appointment.notes || `Appointment type: ${appointment.type}`,
+        start: {
+          dateTime: appointment.start_at,
+          timeZone: 'UTC',
+        },
+        end: {
+          dateTime: appointment.end_at,
+          timeZone: 'UTC',
+        },
+      };
+
+      // PATCH to Google API
+      const response = await fetch(
+        `https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(event),
+        }
+      );
+      const data = await response.json();
+      if (!response.ok) {
+        if (response.status === 404) {
+          // fallback to create if missing
+          return await createGoogleCalendarEvent(appointment);
+        }
+        throw new Error(data.error?.message || 'Failed to update Google Calendar event');
+      }
+      toast.success("Appointment updated in Google Calendar");
+      return data.id;
+    } catch (err) {
+      toast.error("Failed to update Google Calendar event");
+      console.error(err);
+      return null;
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   // Batch sync multiple appointments
   const syncMultipleAppointments = async (appointments: Appointment[]): Promise<Map<string, string | null>> => {
     if (!isConnected || !accessToken) {
@@ -290,6 +342,7 @@ export const useGoogleCalendar = () => {
     connectGoogleCalendar,
     disconnectGoogleCalendar,
     createGoogleCalendarEvent,
+    updateGoogleCalendarEvent,
     syncMultipleAppointments
   };
 };
