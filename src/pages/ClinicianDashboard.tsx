@@ -18,6 +18,7 @@ import { CalendarPlus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { DateTime } from 'luxon';
 import { formatClientName } from '@/utils/appointmentUtils';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 const ClinicianDashboard = () => {
   const { userRole, userId } = useUser();
@@ -29,7 +30,23 @@ const ClinicianDashboard = () => {
   const [showSessionDidNotOccurDialog, setShowSessionDidNotOccurDialog] = useState(false);
   const [selectedAppointmentForNoShow, setSelectedAppointmentForNoShow] = useState<Appointment | null>(null);
   const [showGoogleSyncDialog, setShowGoogleSyncDialog] = useState(false);
-  const { toast } = useToast();
+  const [showSyncDetails, setShowSyncDetails] = useState(false);
+  const [syncStats, setSyncStats] = useState<{
+    total: number;
+    synced: number;
+    skipped: number;
+    created: number;
+    updated: number;
+    lastSyncTime: string | null;
+  }>({
+    total: 0,
+    synced: 0,
+    skipped: 0,
+    created: 0,
+    updated: 0,
+    lastSyncTime: null
+  });
+  const toast = useToast();
 
   // First fetch the auth user ID
   useEffect(() => {
@@ -218,14 +235,36 @@ const ClinicianDashboard = () => {
     try {
       console.log("[ClinicianDashboard] Starting Google Calendar sync...");
       
-      // Query exactly as requested by user - no date filters
-      const { data: appointments, error: fetchError } = await supabase
+      // Get clinician's last sync time
+      const { data: clinicianData, error: clinicianError } = await supabase
+        .from("clinicians")
+        .select('last_google_sync')
+        .eq('id', clinicianId)
+        .single();
+        
+      if (clinicianError) {
+        console.error("[ClinicianDashboard] Error fetching clinician sync data:", clinicianError);
+      }
+      
+      const lastSyncTime = clinicianData?.last_google_sync || null;
+      console.log("[ClinicianDashboard] Last sync time:", lastSyncTime);
+      
+      // Query appointments that need syncing
+      const query = supabase
         .from("appointments")
-        .select('*')
+        .select('*, clients(client_first_name, client_last_name, client_preferred_name)')
         .eq('clinician_id', clinicianId)
         .eq('status', 'scheduled');
         
-      console.log("Fetched for sync:", appointments);
+      // If we have a last sync time, only fetch appointments that were updated since then
+      // or that don't have a google_calendar_event_id yet
+      if (lastSyncTime) {
+        query.or(`updated_at.gt.${lastSyncTime},google_calendar_event_id.is.null,last_synced_at.is.null`);
+      }
+        
+      const { data: rawAppointments, error: fetchError } = await query;
+        
+      console.log("[ClinicianDashboard] Fetched for sync:", rawAppointments);
         
       if (fetchError) {
         console.error("[ClinicianDashboard] Error fetching appointments for sync:", fetchError);
@@ -237,23 +276,27 @@ const ClinicianDashboard = () => {
         return;
       }
       
-      if (!appointments || appointments.length === 0) {
+      if (!rawAppointments || rawAppointments.length === 0) {
         console.log("[ClinicianDashboard] No appointments found for sync");
         toast({
           title: "No appointments to sync",
-          description: "You don't have any upcoming appointments to synchronize.",
+          description: "You don't have any appointments that need synchronization.",
           variant: "default",
         });
         return;
       }
       
       // Process appointments into the right format
-      const appointmentsToSync = appointments.map((rawAppt: any): Appointment => {
-        // Use a default empty object for client data since we're not fetching it in the select
-        const clientData = undefined;
+      const appointmentsToSync = rawAppointments.map((rawAppt: any): Appointment => {
+        // Format the client name if client data is available
+        const clientData = rawAppt.clients ? {
+          client_first_name: rawAppt.clients.client_first_name || "",
+          client_last_name: rawAppt.clients.client_last_name || "",
+          client_preferred_name: rawAppt.clients.client_preferred_name || "",
+        } : undefined;
 
-        // Format client name - may be blank since we're not fetching client data
-        const clientName = "";
+        // Format client name using our utility
+        const clientName = clientData ? formatClientName(clientData) : "";
 
         return {
           id: rawAppt.id,
@@ -269,24 +312,47 @@ const ClinicianDashboard = () => {
           notes: rawAppt.notes,
           client: clientData,
           clientName: clientName,
+          google_calendar_event_id: rawAppt.google_calendar_event_id,
+          last_synced_at: rawAppt.last_synced_at,
+          updated_at: rawAppt.updated_at,
         };
       });
       
       console.log(`[ClinicianDashboard] Found ${appointmentsToSync.length} appointments to sync`);
-
-      // Log appointments before sync
-      if (appointmentsToSync.length > 0) {
-        console.log("[ClinicianDashboard] Sample appointments to sync:", 
-          appointmentsToSync.slice(0, 3).map(a => ({
-            id: a.id,
-            client: a.clientName,
-            start: a.start_at,
-            end: a.end_at
-          }))
-        );
-      }
       
+      // Set initial stats
+      const initialStats = {
+        total: appointmentsToSync.length,
+        synced: 0,
+        skipped: 0,
+        created: 0,
+        updated: 0,
+        lastSyncTime: new Date().toISOString()
+      };
+      setSyncStats(initialStats);
+      
+      // Start sync
       const results = await syncMultipleAppointments(appointmentsToSync);
+      
+      // Calculate final stats
+      const synced = Array.from(results.values()).filter(Boolean).length;
+      const created = appointmentsToSync.filter(a => !a.google_calendar_event_id && results.get(a.id)).length;
+      const updated = synced - created;
+      const skipped = appointmentsToSync.length - synced;
+      
+      // Update stats
+      setSyncStats({
+        total: appointmentsToSync.length,
+        synced,
+        skipped,
+        created,
+        updated,
+        lastSyncTime: new Date().toISOString()
+      });
+      
+      // Show sync details after completion
+      setShowSyncDetails(true);
+      
       console.log("[ClinicianDashboard] Google Calendar sync complete, results:", results);
       
     } catch (error) {
@@ -437,31 +503,83 @@ const ClinicianDashboard = () => {
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold">Clinician Dashboard</h1>
           
-          <Button
-            variant={isGoogleConnected ? "outline" : "default"}
-            size="sm"
-            disabled={isGoogleLoading || isSyncing}
-            onClick={isGoogleConnected ? syncAppointmentsWithGoogle : connectGoogleCalendar}
-            className="flex items-center gap-2"
-          >
-            {isGoogleLoading || isSyncing ? (
-              <div className="flex items-center">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900 mr-2"></div>
-                {isSyncing ? "Syncing..." : "Connecting..."}
-              </div>
-            ) : isGoogleConnected ? (
-              <>
-                <Check className="w-4 h-4 text-green-500" />
-                <span>Sync with Google Calendar</span>
-              </>
-            ) : (
-              <>
-                <CalendarPlus className="w-4 h-4" />
-                <span>Connect Google Calendar</span>
-              </>
+          <div className="flex items-center gap-2">
+            {showSyncDetails && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => setShowSyncDetails(false)}
+                className="text-xs"
+              >
+                Hide details
+              </Button>
             )}
-          </Button>
+            
+            <Button
+              variant={isGoogleConnected ? "outline" : "default"}
+              size="sm"
+              disabled={isGoogleLoading || isSyncing}
+              onClick={isGoogleConnected ? syncAppointmentsWithGoogle : connectGoogleCalendar}
+              className="flex items-center gap-2"
+            >
+              {isGoogleLoading || isSyncing ? (
+                <div className="flex items-center">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900 mr-2"></div>
+                  {isSyncing ? "Syncing..." : "Connecting..."}
+                </div>
+              ) : isGoogleConnected ? (
+                <>
+                  <Check className="w-4 h-4 text-green-500" />
+                  <span>Sync with Google Calendar</span>
+                </>
+              ) : (
+                <>
+                  <CalendarPlus className="w-4 h-4" />
+                  <span>Connect Google Calendar</span>
+                </>
+              )}
+            </Button>
+          </div>
         </div>
+        
+        {/* Sync Details Panel */}
+        {showSyncDetails && syncStats.total > 0 && (
+          <div className="mb-6 p-3 border rounded-md bg-gray-50">
+            <h3 className="text-sm font-semibold mb-2">
+              Google Calendar Sync Results
+              <span className="text-xs font-normal ml-2 text-gray-500">
+                {syncStats.lastSyncTime && `Last sync: ${DateTime.fromISO(syncStats.lastSyncTime).toRelative()}`}
+              </span>
+            </h3>
+            
+            <div className="grid grid-cols-4 gap-4 mb-2">
+              <div className="bg-white p-2 rounded border">
+                <div className="text-xs text-gray-500">Total</div>
+                <div className="text-lg font-semibold">{syncStats.total}</div>
+              </div>
+              <div className="bg-white p-2 rounded border">
+                <div className="text-xs text-gray-500">Synced</div>
+                <div className="text-lg font-semibold text-green-600">{syncStats.synced}</div>
+              </div>
+              <div className="bg-white p-2 rounded border">
+                <div className="text-xs text-gray-500">Created</div>
+                <div className="text-lg font-semibold text-blue-600">{syncStats.created}</div>
+              </div>
+              <div className="bg-white p-2 rounded border">
+                <div className="text-xs text-gray-500">Updated</div>
+                <div className="text-lg font-semibold text-orange-600">{syncStats.updated}</div>
+              </div>
+            </div>
+            
+            <div className="text-xs text-gray-500">
+              {syncStats.skipped > 0 ? (
+                <span>{syncStats.skipped} appointments were skipped (already up to date)</span>
+              ) : (
+                <span>All appointments were successfully synchronized</span>
+              )}
+            </div>
+          </div>
+        )}
         
         {/* Debug info in dev mode */}
         {process.env.NODE_ENV !== 'production' && (
