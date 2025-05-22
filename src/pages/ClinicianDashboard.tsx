@@ -218,12 +218,14 @@ const ClinicianDashboard = () => {
     try {
       console.log("[ClinicianDashboard] Starting Google Calendar sync...");
       
-      // Hardcoded query as requested by user
-      const { data: allScheduledAppointments, error: fetchError } = await supabase
+      // Query exactly as requested by user - no date filters
+      const { data: appointments, error: fetchError } = await supabase
         .from("appointments")
-        .select("*")
-        .eq("clinician_id", clinicianId)
-        .eq("status", "scheduled");
+        .select('*')
+        .eq('clinician_id', clinicianId)
+        .eq('status', 'scheduled');
+        
+      console.log("Fetched for sync:", appointments);
         
       if (fetchError) {
         console.error("[ClinicianDashboard] Error fetching appointments for sync:", fetchError);
@@ -235,7 +237,7 @@ const ClinicianDashboard = () => {
         return;
       }
       
-      if (!allScheduledAppointments || allScheduledAppointments.length === 0) {
+      if (!appointments || appointments.length === 0) {
         console.log("[ClinicianDashboard] No appointments found for sync");
         toast({
           title: "No appointments to sync",
@@ -245,10 +247,8 @@ const ClinicianDashboard = () => {
         return;
       }
       
-      console.log("Fetched for sync:", allScheduledAppointments);
-      
       // Process appointments into the right format
-      const appointmentsToSync = allScheduledAppointments.map((rawAppt: any): Appointment => {
+      const appointmentsToSync = appointments.map((rawAppt: any): Appointment => {
         // Use a default empty object for client data since we're not fetching it in the select
         const clientData = undefined;
 
