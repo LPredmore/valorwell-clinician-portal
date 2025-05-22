@@ -4,8 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { useUserContext } from '@/context/UserContext';
-import AppointmentsList from '@/components/dashboard/AppointmentsList';
+import { useUser } from '@/context/UserContext';
+import { AppointmentsList } from '@/components/dashboard/AppointmentsList';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { v4 as uuidv4 } from 'uuid';
 import {
@@ -46,7 +46,6 @@ import {
 import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
-  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -67,8 +66,6 @@ import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { Textarea } from "@/components/ui/textarea"
-import { DatePicker } from "@/components/ui/date-picker"
-import { TimePicker } from "@/components/ui/time-picker"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -104,12 +101,13 @@ import { Switch } from "@/components/ui/switch"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
 import { AspectRatio } from "@/components/ui/aspect-ratio"
-import { CalendarDateRangePicker } from "@/components/ui/calendar-date-range-picker"
-import { MultiSelect } from "@/components/ui/multi-select"
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card"
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger 
+} from "@/components/ui/hover-card"
 import { NavigationMenu, NavigationMenuItem, NavigationMenuList } from "@/components/ui/navigation-menu"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useTheme } from "@/components/theme-provider"
 import {
   ResizableHandle,
   ResizablePanel,
@@ -145,7 +143,6 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
-import { Separator } from "@/components/ui/separator"
 import { useSearchParams } from 'react-router-dom';
 import { TimeZoneService } from '@/utils/timeZoneService';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -188,7 +185,7 @@ interface ClinicianDashboardProps { }
 const ClinicianDashboard: React.FC<ClinicianDashboardProps> = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { user, userProfile, isLoading: isUserContextLoading } = useUserContext();
+  const { user, userProfile, isLoading: isUserContextLoading } = useUser();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
