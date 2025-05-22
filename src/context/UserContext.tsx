@@ -118,8 +118,6 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setClientStatus(null);
         setClientProfile(null);
         logInfo('[UserContext] Skipping client data fetch for role:', role);
-      } else {
-        setClientStatus(null); setClientProfile(null);
       }
     } catch (error) {
       logError('[UserContext] Unexpected error in fetchClientSpecificData:', error);
