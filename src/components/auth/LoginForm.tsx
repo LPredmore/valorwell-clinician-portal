@@ -86,6 +86,44 @@ const LoginForm = ({ onForgotPassword }: LoginFormProps) => {
       }
 
       console.log("[LoginForm] Authentication successful, user:", data.user?.id);
+      
+      // Create or update profile entry to ensure clinician association
+      if (data.user) {
+        try {
+          // Check if profile exists first
+          const { data: existingProfile, error: profileCheckError } = await supabase
+            .from('user_profiles')
+            .select('*')
+            .eq('user_id', data.user.id)
+            .single();
+            
+          if (profileCheckError && profileCheckError.code !== 'PGRST116') {
+            console.error("[LoginForm] Error checking for existing profile:", profileCheckError);
+          }
+          
+          if (!existingProfile) {
+            // Insert new profile with email for clinician lookup
+            const { error: createError } = await supabase
+              .from('user_profiles')
+              .insert({
+                user_id: data.user.id,
+                email: data.user.email,
+                auth_provider: 'email',
+              });
+              
+            if (createError) {
+              console.error("[LoginForm] Error creating user profile:", createError);
+            } else {
+              console.log("[LoginForm] Created new user profile for ID:", data.user.id);
+            }
+          } else {
+            console.log("[LoginForm] Existing profile found for user:", data.user.id);
+          }
+        } catch (profileError) {
+          console.error("[LoginForm] Error managing user profile:", profileError);
+        }
+      }
+
       toast({
         title: "Login successful",
         description: "Welcome back!",

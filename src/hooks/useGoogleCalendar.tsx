@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { AuthError } from '@supabase/supabase-js';
@@ -31,6 +30,7 @@ export const useGoogleCalendar = () => {
   useEffect(() => {
     const checkConnection = async () => {
       try {
+        console.log("[useGoogleCalendar] Checking Google Calendar connection...");
         const { data: { session } } = await supabase.auth.getSession();
         const hasToken = !!session?.provider_token;
         
@@ -47,33 +47,40 @@ export const useGoogleCalendar = () => {
           } else {
             // Validate token with Google's token info endpoint
             console.log('Validating token with Google...');
-            const tokenInfoResponse = await fetch(
-              `https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=${session.provider_token}`
-            );
-            
-            if (!tokenInfoResponse.ok) {
-              console.error('Token validation failed:', await tokenInfoResponse.json());
-              setIsConnected(false);
-              setAccessToken(null);
-            } else {
-              const tokenInfo = await tokenInfoResponse.json();
-              console.log('Token info:', tokenInfo);
+            try {
+              const tokenInfoResponse = await fetch(
+                `https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=${session.provider_token}`
+              );
               
-              // Verify required scopes
-              if (!tokenInfo.scope?.includes('https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events')) {
-                console.error('Missing required calendar scope');
+              if (!tokenInfoResponse.ok) {
+                console.error('Token validation failed:', await tokenInfoResponse.json());
                 setIsConnected(false);
                 setAccessToken(null);
               } else {
-                console.log('Token is valid with required scopes');
-                setIsConnected(true);
-                setAccessToken(session.provider_token);
+                const tokenInfo = await tokenInfoResponse.json();
+                console.log('Token info:', tokenInfo);
+                
+                // Verify required scopes
+                if (!tokenInfo.scope?.includes("https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events")) {
+                  console.error('Missing required calendar scope');
+                  setIsConnected(false);
+                  setAccessToken(null);
+                } else {
+                  console.log('Token is valid with required scopes');
+                  setIsConnected(true);
+                  setAccessToken(session.provider_token);
+                }
               }
+            } catch (validationError) {
+              console.error('Error validating token:', validationError);
+              setIsConnected(false);
+              setAccessToken(null);
             }
           }
           
           console.groupEnd();
         } else {
+          console.log("[useGoogleCalendar] No token found in session");
           setIsConnected(false);
           setAccessToken(null);
         }
@@ -86,11 +93,52 @@ export const useGoogleCalendar = () => {
     checkConnection();
   }, []);
 
+  // Enhanced connect function that detects existing auth
   const connectGoogleCalendar = async () => {
     setIsLoading(true);
     setError(null);
     
     try {
+      // First check if we're already authenticated with email
+      const { data: authData } = await supabase.auth.getSession();
+      const currentUser = authData?.session?.user;
+      const isEmailUser = currentUser && !authData?.session?.provider_token;
+      
+      if (isEmailUser) {
+        console.log("[useGoogleCalendar] User is logged in with email, checking for profile...", currentUser.id);
+        
+        // Check if user_profiles table exists
+        try {
+          const { data: profileData, error: profileError } = await supabase
+            .from('user_profiles')
+            .select('*')
+            .eq('user_id', currentUser.id)
+            .single();
+            
+          if (!profileError && profileData) {
+            console.log("[useGoogleCalendar] Found user profile, will link with Google:", profileData);
+          } else {
+            // If no profile yet, create one
+            const { error: createError } = await supabase
+              .from('user_profiles')
+              .insert({
+                user_id: currentUser.id,
+                email: currentUser.email,
+                auth_provider: 'email'
+              });
+              
+            if (createError) {
+              console.error("[useGoogleCalendar] Error creating user profile:", createError);
+            } else {
+              console.log("[useGoogleCalendar] Created profile for email user");
+            }
+          }
+        } catch (e) {
+          console.error("[useGoogleCalendar] Error managing user profile:", e);
+          // Continue with auth flow even if profile creation fails
+        }
+      }
+      
       // Start Google OAuth flow
       const { data, error: authError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -109,7 +157,8 @@ export const useGoogleCalendar = () => {
       // The actual token will be available after redirect in the session
       return data;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to connect Google Calendar');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to connect Google Calendar';
+      setError(errorMessage);
       throw err;
     } finally {
       setIsLoading(false);

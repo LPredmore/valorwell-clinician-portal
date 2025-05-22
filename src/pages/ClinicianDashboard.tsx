@@ -75,59 +75,58 @@ const ClinicianDashboard = () => {
       if (!currentUserId) return;
       
       try {
-        // First try to get profile to find email
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('email, user_role')
-          .eq('id', currentUserId)
-          .single();
+        console.log("[ClinicianDashboard] Resolving clinician ID for user:", currentUserId);
+        
+        // First check if user_profiles table exists
+        const { data: hasProfileTable, error: checkError } = await supabase
+          .from('user_profiles')
+          .select('count', { count: 'exact', head: true });
           
-        if (profileError) {
-          console.error("[ClinicianDashboard] Error fetching profile:", profileError);
+        let userEmail: string | null = null;
+        
+        // If user_profiles table exists, get email from there
+        if (!checkError) {
+          console.log("[ClinicianDashboard] Found user_profiles table, querying it");
+          
+          const { data: profileData, error: profileError } = await supabase
+            .from('user_profiles')
+            .select('email')
+            .eq('user_id', currentUserId)
+            .single();
+            
+          if (profileError) {
+            console.error("[ClinicianDashboard] Error fetching from user_profiles:", profileError);
+          } else if (profileData) {
+            console.log("[ClinicianDashboard] Found user profile:", profileData);
+            userEmail = profileData.email;
+          }
+        } else {
+          console.log("[ClinicianDashboard] user_profiles table not found, trying direct auth method");
+        }
+        
+        // If email not found in profiles or profiles doesn't exist, get from auth user directly
+        if (!userEmail) {
+          const { data: userData } = await supabase.auth.getUser();
+          userEmail = userData?.user?.email || null;
+          console.log("[ClinicianDashboard] Using email from auth user:", userEmail);
+        }
+        
+        if (!userEmail) {
+          console.error("[ClinicianDashboard] Failed to resolve user email");
           return;
         }
         
-        console.log("[ClinicianDashboard] Profile data:", profileData);
-        
-        if (profileData && profileData.email) {
-          // Look up clinician by email
-          const { data: clinicianData, error: clinicianError } = await supabase
-            .from('clinicians')
-            .select('id, clinician_email, clinician_time_zone, clinician_timezone')
-            .eq('clinician_email', profileData.email)
-            .single();
-            
-          if (clinicianError) {
-            console.error("[ClinicianDashboard] Error looking up clinician by email:", clinicianError);
-          }
+        // Try to find clinician by email
+        const { data: clinicianData, error: clinicianError } = await supabase
+          .from('clinicians')
+          .select('id, clinician_email, clinician_time_zone, clinician_timezone')
+          .eq('clinician_email', userEmail)
+          .single();
           
-          if (clinicianData) {
-            console.log("[ClinicianDashboard] Found clinician by email:", {
-              id: clinicianData.id, 
-              email: clinicianData.clinician_email,
-              timeZone: clinicianData.clinician_time_zone,
-              timeZoneArray: clinicianData.clinician_timezone
-            });
-            setClinicianId(clinicianData.id);
-            
-            // Check and update timezone arrays if missing
-            if (!clinicianData.clinician_timezone && clinicianData.clinician_time_zone) {
-              console.log("[ClinicianDashboard] Fixing missing timezone array with:", clinicianData.clinician_time_zone);
-              
-              const { error: updateError } = await supabase
-                .from('clinicians')
-                .update({ clinician_timezone: [clinicianData.clinician_time_zone] })
-                .eq('id', clinicianData.id);
-                
-              if (updateError) {
-                console.error("[ClinicianDashboard] Error fixing timezone array:", updateError);
-              }
-            }
-            
-            return;
-          }
+        if (clinicianError) {
+          console.error("[ClinicianDashboard] Error looking up clinician by email:", clinicianError);
           
-          // If not found by email, try by profile_id
+          // Try fallback to profile_id if email lookup fails
           const { data: altClinicianData, error: altError } = await supabase
             .from('clinicians')
             .select('id, clinician_email, clinician_time_zone, clinician_timezone')
@@ -136,34 +135,68 @@ const ClinicianDashboard = () => {
             
           if (altError) {
             console.error("[ClinicianDashboard] Error looking up clinician by profile_id:", altError);
+            return;
           }
           
           if (altClinicianData) {
             console.log("[ClinicianDashboard] Found clinician by profile_id:", {
               id: altClinicianData.id, 
-              email: altClinicianData.clinician_email,
-              timeZone: altClinicianData.clinician_time_zone,
-              timeZoneArray: altClinicianData.clinician_timezone
+              email: altClinicianData.clinician_email
             });
             setClinicianId(altClinicianData.id);
             
-            // Check and update timezone arrays if missing
-            if (!altClinicianData.clinician_timezone && altClinicianData.clinician_time_zone) {
-              console.log("[ClinicianDashboard] Fixing missing timezone array with:", altClinicianData.clinician_time_zone);
+            // Set up timezone if needed
+            handleClinicianTimezone(altClinicianData);
+            return;
+          }
+          
+          return;
+        }
+        
+        if (clinicianData) {
+          console.log("[ClinicianDashboard] Found clinician by email:", {
+            id: clinicianData.id, 
+            email: clinicianData.clinician_email
+          });
+          setClinicianId(clinicianData.id);
+          
+          // Set up timezone if needed
+          handleClinicianTimezone(clinicianData);
+          
+          // If profile_id is not set, update it
+          if (hasProfileTable && !checkError) {
+            const { error: updateError } = await supabase
+              .from('clinicians')
+              .update({ profile_id: currentUserId })
+              .eq('id', clinicianData.id);
               
-              const { error: updateError } = await supabase
-                .from('clinicians')
-                .update({ clinician_timezone: [altClinicianData.clinician_time_zone] })
-                .eq('id', altClinicianData.id);
-                
-              if (updateError) {
-                console.error("[ClinicianDashboard] Error fixing timezone array:", updateError);
-              }
+            if (updateError) {
+              console.error("[ClinicianDashboard] Error updating clinician profile_id:", updateError);
+            } else {
+              console.log("[ClinicianDashboard] Updated clinician profile_id to:", currentUserId);
             }
           }
         }
       } catch (error) {
         console.error("[ClinicianDashboard] Error resolving clinician ID:", error);
+      }
+    };
+    
+    // Helper function for handling timezone data
+    const handleClinicianTimezone = (clinicianData: any) => {
+      // Check and update timezone arrays if missing
+      if (!clinicianData.clinician_timezone && clinicianData.clinician_time_zone) {
+        console.log("[ClinicianDashboard] Fixing missing timezone array with:", clinicianData.clinician_time_zone);
+        
+        supabase
+          .from('clinicians')
+          .update({ clinician_timezone: [clinicianData.clinician_time_zone] })
+          .eq('id', clinicianData.id)
+          .then(({ error }) => {
+            if (error) {
+              console.error("[ClinicianDashboard] Error fixing timezone array:", error);
+            }
+          });
       }
     };
     
@@ -327,13 +360,108 @@ const ClinicianDashboard = () => {
           client_preferred_name: rawAppt.clients.client_preferred_name || "",
           client_email: "",
           client_phone: "",
-          client_status: null,
           client_date_of_birth: null,
+          client_age: null,
           client_gender: null,
-          client_address: null,
-          client_city: null,
+          client_gender_identity: null,
           client_state: null,
-          client_zipcode: null
+          client_time_zone: null,
+          client_minor: null,
+          client_status: null,
+          client_assigned_therapist: null,
+          client_referral_source: null,
+          client_self_goal: null,
+          client_diagnosis: null,
+          client_insurance_company_primary: null,
+          client_policy_number_primary: null,
+          client_group_number_primary: null,
+          client_subscriber_name_primary: null,
+          client_insurance_type_primary: null,
+          client_subscriber_dob_primary: null,
+          client_subscriber_relationship_primary: null,
+          client_insurance_company_secondary: null,
+          client_policy_number_secondary: null,
+          client_group_number_secondary: null,
+          client_subscriber_name_secondary: null,
+          client_insurance_type_secondary: null,
+          client_subscriber_dob_secondary: null,
+          client_subscriber_relationship_secondary: null,
+          client_insurance_company_tertiary: null,
+          client_policy_number_tertiary: null,
+          client_group_number_tertiary: null,
+          client_subscriber_name_tertiary: null,
+          client_insurance_type_tertiary: null,
+          client_subscriber_dob_tertiary: null,
+          client_subscriber_relationship_tertiary: null,
+          client_planlength: null,
+          client_treatmentfrequency: null,
+          client_problem: null,
+          client_treatmentgoal: null,
+          client_primaryobjective: null,
+          client_secondaryobjective: null,
+          client_tertiaryobjective: null,
+          client_intervention1: null,
+          client_intervention2: null,
+          client_intervention3: null,
+          client_intervention4: null,
+          client_intervention5: null,
+          client_intervention6: null,
+          client_nexttreatmentplanupdate: null,
+          client_privatenote: null,
+          client_appearance: null,
+          client_attitude: null,
+          client_behavior: null,
+          client_speech: null,
+          client_affect: null,
+          client_thoughtprocess: null,
+          client_perception: null,
+          client_orientation: null,
+          client_memoryconcentration: null,
+          client_insightjudgement: null,
+          client_mood: null,
+          client_substanceabuserisk: null,
+          client_suicidalideation: null,
+          client_homicidalideation: null,
+          client_functioning: null,
+          client_prognosis: null,
+          client_progress: null,
+          client_sessionnarrative: null,
+          client_medications: null,
+          client_personsinattendance: null,
+          client_currentsymptoms: null,
+          client_vacoverage: null,
+          client_champva: null,
+          client_tricare_beneficiary_category: null,
+          client_tricare_sponsor_name: null,
+          client_tricare_sponsor_branch: null,
+          client_tricare_sponsor_id: null,
+          client_tricare_plan: null,
+          client_tricare_region: null,
+          client_tricare_policy_id: null,
+          client_tricare_has_referral: null,
+          client_tricare_referral_number: null,
+          client_recentdischarge: null,
+          client_branchOS: null,
+          client_disabilityrating: null,
+          client_relationship: null,
+          client_is_profile_complete: null,
+          client_treatmentplan_startdate: null,
+          client_temppassword: null,
+          client_primary_payer_id: null,
+          client_secondary_payer_id: null,
+          client_tertiary_payer_id: null,
+          eligibility_status_primary: null,
+          eligibility_last_checked_primary: null,
+          eligibility_claimmd_id_primary: null,
+          eligibility_response_details_primary_json: null,
+          eligibility_copay_primary: null,
+          eligibility_deductible_primary: null,
+          eligibility_coinsurance_primary_percent: null,
+          stripe_customer_id: null,
+          client_city: null,
+          client_zipcode: null,
+          client_address: null,
+          client_zip_code: null
         } : undefined;
 
         // Format client name using our utility
