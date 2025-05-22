@@ -16,6 +16,7 @@ import { useGoogleCalendar } from '@/hooks/useGoogleCalendar';
 import { Button } from '@/components/ui/button';
 import { CalendarPlus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { DateTime } from 'luxon';
 
 const ClinicianDashboard = () => {
   const { userRole, userId } = useUser();
@@ -213,22 +214,121 @@ const ClinicianDashboard = () => {
 
   // Function to sync all upcoming appointments with Google Calendar
   const syncAppointmentsWithGoogle = async () => {
-    const appointmentsToSync = [...todayAppointments, ...upcomingAppointments];
-    if (appointmentsToSync.length === 0) {
-      toast({
-        title: "No appointments to sync",
-        description: "You don't have any upcoming appointments to synchronize.",
-        variant: "default",
-      });
-      return;
-    }
-
     try {
+      console.log("[ClinicianDashboard] Starting Google Calendar sync...");
+      
+      // Use today's date + 1 month for future appointments
+      const today = DateTime.now();
+      const futureDate = today.plus({ months: 1 });
+      
+      // Fetch all scheduled appointments for this clinician directly
+      const { data: allScheduledAppointments, error: fetchError } = await supabase
+        .from("appointments")
+        .select(
+          `id, client_id, clinician_id, start_at, end_at, type, status, appointment_recurring, recurring_group_id, video_room_url, notes, clients (client_first_name, client_last_name, client_preferred_name, client_email, client_phone, client_status, client_date_of_birth, client_gender, client_address, client_city, client_state, client_zipcode)`
+        )
+        .eq("clinician_id", clinicianId)
+        .eq("status", "scheduled")
+        .gte("start_at", today.toISO())
+        .lte("start_at", futureDate.toISO());
+        
+      if (fetchError) {
+        console.error("[ClinicianDashboard] Error fetching appointments for sync:", fetchError);
+        toast({
+          title: "Error syncing appointments",
+          description: "Failed to fetch your appointments for synchronization.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      if (!allScheduledAppointments || allScheduledAppointments.length === 0) {
+        console.log("[ClinicianDashboard] No appointments found for sync");
+        toast({
+          title: "No appointments to sync",
+          description: "You don't have any upcoming appointments to synchronize.",
+          variant: "default",
+        });
+        return;
+      }
+      
+      // Process appointments into the right format
+      const appointmentsToSync = allScheduledAppointments.map((rawAppt: any): Appointment => {
+        // Process client data from the join
+        const rawClientData = rawAppt.clients;
+        let clientData: Appointment["client"] | undefined;
+
+        if (rawClientData) {
+          // Handle both object and array structures
+          const clientInfo = Array.isArray(rawClientData)
+            ? rawClientData[0]
+            : rawClientData;
+
+          if (clientInfo && typeof clientInfo === "object") {
+            clientData = {
+              client_first_name: clientInfo.client_first_name || "",
+              client_last_name: clientInfo.client_last_name || "",
+              client_preferred_name: clientInfo.client_preferred_name || "",
+              client_email: clientInfo.client_email || "",
+              client_phone: clientInfo.client_phone || "",
+              client_status: clientInfo.client_status || null,
+              client_date_of_birth: clientInfo.client_date_of_birth || null,
+              client_gender: clientInfo.client_gender || null,
+              client_address: clientInfo.client_address || null,
+              client_city: clientInfo.client_city || null,
+              client_state: clientInfo.client_state || null,
+              client_zipcode: clientInfo.client_zipcode || null
+            };
+          }
+        }
+
+        // Format client name using the shared utility
+        const clientName = formatClientName(clientData);
+
+        return {
+          id: rawAppt.id,
+          client_id: rawAppt.client_id,
+          clinician_id: rawAppt.clinician_id,
+          start_at: rawAppt.start_at,
+          end_at: rawAppt.end_at,
+          type: rawAppt.type,
+          status: rawAppt.status,
+          appointment_recurring: rawAppt.appointment_recurring,
+          recurring_group_id: rawAppt.recurring_group_id,
+          video_room_url: rawAppt.video_room_url,
+          notes: rawAppt.notes,
+          client: clientData,
+          clientName: clientName,
+        };
+      });
+      
+      console.log(`[ClinicianDashboard] Found ${appointmentsToSync.length} appointments to sync with date range:`, {
+        from: today.toISO(),
+        to: futureDate.toISO()
+      });
+
+      // Log the first few appointments for debugging
+      if (appointmentsToSync.length > 0) {
+        console.log("[ClinicianDashboard] Sample appointments to sync:", 
+          appointmentsToSync.slice(0, 3).map(a => ({
+            id: a.id,
+            client: a.clientName,
+            start: a.start_at,
+            end: a.end_at
+          }))
+        );
+      }
+      
       const results = await syncMultipleAppointments(appointmentsToSync);
-      console.log("Google Calendar sync results:", results);
-      // Could store the Google event IDs in the database for future reference
+      console.log("[ClinicianDashboard] Google Calendar sync complete, results:", results);
+      
     } catch (error) {
-      console.error("Failed to sync with Google Calendar:", error);
+      console.error("[ClinicianDashboard] Failed to sync with Google Calendar:", error);
+      toast({
+        title: "Sync failed",
+        description: "Failed to synchronize appointments with Google Calendar.",
+        variant: "destructive",
+      });
     }
   };
 

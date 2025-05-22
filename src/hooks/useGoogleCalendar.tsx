@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import type { AuthError } from '@supabase/supabase-js';
 import { toast } from 'sonner';
 import { Appointment } from '@/types/appointment';
+import { DateTime } from 'luxon';
 
 // Interface for Google Calendar event creation
 interface GoogleCalendarEvent {
@@ -225,12 +226,48 @@ export const useGoogleCalendar = () => {
     const results = new Map<string, string | null>();
     
     try {
-      for (const appointment of appointments) {
-        const eventId = await createGoogleCalendarEvent(appointment);
-        results.set(appointment.id, eventId);
+      // Enhanced logging for sync operation
+      console.group('Google Calendar Sync Operation');
+      console.log(`Attempting to sync ${appointments.length} appointments`);
+      
+      if (appointments.length > 0) {
+        // Log details about appointment date ranges for debugging
+        const appointmentDates = appointments.map(a => ({
+          id: a.id,
+          date: DateTime.fromISO(a.start_at).toFormat('yyyy-MM-dd'),
+          time: DateTime.fromISO(a.start_at).toFormat('HH:mm'),
+          clientName: a.clientName || 'Unknown client'
+        }));
+        
+        console.log('Appointments being synced:', appointmentDates);
+        
+        // Calculate the date range of appointments being synced
+        const startDates = appointments.map(a => DateTime.fromISO(a.start_at));
+        const earliestDate = startDates.length > 0 ? 
+          startDates.reduce((earliest, current) => current < earliest ? current : earliest, startDates[0])
+          : 'No appointments';
+        const latestDate = startDates.length > 0 ?
+          startDates.reduce((latest, current) => current > latest ? current : latest, startDates[0])
+          : 'No appointments';
+          
+        console.log('Date range of sync:', {
+          earliest: earliestDate instanceof DateTime ? earliestDate.toFormat('yyyy-MM-dd') : earliestDate,
+          latest: latestDate instanceof DateTime ? latestDate.toFormat('yyyy-MM-dd') : latestDate,
+        });
       }
       
-      toast.success(`Synced ${results.size} appointments to Google Calendar`);
+      for (const appointment of appointments) {
+        console.log(`Syncing appointment ${appointment.id} for ${appointment.clientName} at ${DateTime.fromISO(appointment.start_at).toFormat('yyyy-MM-dd HH:mm')}`);
+        const eventId = await createGoogleCalendarEvent(appointment);
+        results.set(appointment.id, eventId);
+        console.log(`Result for appointment ${appointment.id}: ${eventId ? 'Success' : 'Failed'}`);
+      }
+      
+      const successCount = Array.from(results.values()).filter(Boolean).length;
+      console.log(`Sync complete: ${successCount} of ${appointments.length} appointments successfully synced`);
+      console.groupEnd();
+      
+      toast.success(`Synced ${successCount} appointments to Google Calendar`);
       return results;
     } catch (err) {
       console.error('Error syncing multiple appointments:', err);
