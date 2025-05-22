@@ -82,7 +82,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUserRole(role);
       logInfo(`[UserContext] User role set: ${role}`);
 
-      if (role === 'client' || role === 'admin' || role === 'clinician') {
+      if (role === 'client') {
         try {
           const { data: clientData, error } = await supabase
             .from('clients')
@@ -93,21 +93,31 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (error) {
             logError('[UserContext] Error fetching client data:', error);
             if (error.code === 'PGRST116') {
-              setClientStatus('New'); setClientProfile(null);
+              setClientStatus('New');
+              setClientProfile(null);
             } else {
-              setClientStatus('ErrorFetchingStatus'); setClientProfile(null);
+              logError('[UserContext] Non-404 error fetching client data:', error);
+              setClientStatus('ErrorFetchingStatus');
+              setClientProfile(null);
             }
           } else if (clientData) {
             setClientProfile(clientData as ClientProfile);
             setClientStatus(clientData.client_status || 'New');
             logInfo('[UserContext] Set clientProfile with age:', clientData.client_age, 'and status:', clientData.client_status);
           } else {
-            setClientStatus('New'); setClientProfile(null);
+            setClientStatus('New');
+            setClientProfile(null);
           }
         } catch (e) {
           logError('[UserContext] Exception fetching client data:', e);
-          setClientStatus('ErrorFetchingStatus'); setClientProfile(null);
+          setClientStatus('ErrorFetchingStatus');
+          setClientProfile(null);
         }
+      } else {
+        // Skip client data fetch for non-client roles
+        setClientStatus(null);
+        setClientProfile(null);
+        logInfo('[UserContext] Skipping client data fetch for role:', role);
       } else {
         setClientStatus(null); setClientProfile(null);
       }
