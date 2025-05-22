@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
-import { Calendar, Clock, AlertCircle, Check } from 'lucide-react';
+import { Calendar, Clock, AlertCircle, Check, RefreshCw } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { supabase } from '@/integrations/supabase/client';
 import Layout from '@/components/layout/Layout';
@@ -21,6 +20,12 @@ import { toast as sonnerToast } from 'sonner';
 import { DateTime } from 'luxon';
 import { formatClientName } from '@/utils/appointmentUtils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const ClinicianDashboard = () => {
   const { userRole, userId } = useUser();
@@ -33,6 +38,7 @@ const ClinicianDashboard = () => {
   const [selectedAppointmentForNoShow, setSelectedAppointmentForNoShow] = useState<Appointment | null>(null);
   const [showGoogleSyncDialog, setShowGoogleSyncDialog] = useState(false);
   const [showSyncDetails, setShowSyncDetails] = useState(false);
+  const [isForceSync, setIsForceSync] = useState(false);
   const [syncStats, setSyncStats] = useState<{
     total: number;
     synced: number;
@@ -236,6 +242,7 @@ const ClinicianDashboard = () => {
   const syncAppointmentsWithGoogle = async () => {
     try {
       console.log("[ClinicianDashboard] Starting Google Calendar sync...");
+      setShowSyncDetails(true);
       
       // Get clinician's last sync time
       const { data: clinicianData, error: clinicianError } = await supabase
@@ -255,18 +262,45 @@ const ClinicianDashboard = () => {
       const query = supabase
         .from("appointments")
         .select('*, clients(client_first_name, client_last_name, client_preferred_name)')
-        .eq('clinician_id', clinicianId)
-        .eq('status', 'scheduled');
+        .eq('clinician_id', clinicianId);
         
-      // If we have a last sync time, only fetch appointments that were updated since then
-      // or that don't have a google_calendar_event_id yet
-      if (lastSyncTime) {
+      // Use an array of statuses instead of just 'scheduled'
+      query.in('status', ['scheduled', 'confirmed', 'rescheduled']);
+      
+      // Apply date filters - get appointments from past 30 days through next 60 days
+      const now = new Date();
+      const pastDate = new Date(now);
+      pastDate.setDate(now.getDate() - 30);
+      const futureDate = new Date(now);
+      futureDate.setDate(now.getDate() + 60);
+      
+      query.gte('start_at', pastDate.toISOString());
+      query.lte('start_at', futureDate.toISOString());
+      
+      // If we're doing an incremental sync (not force sync) and have a last sync time,
+      // only fetch appointments that were updated since then or don't have a google_calendar_event_id
+      if (!isForceSync && lastSyncTime) {
+        console.log("[ClinicianDashboard] Using incremental sync with last sync time:", lastSyncTime);
         query.or(`updated_at.gt.${lastSyncTime},google_calendar_event_id.is.null,last_synced_at.is.null`);
+      } else {
+        console.log("[ClinicianDashboard] Using force sync - fetching all appointments in date range");
       }
+        
+      // Log query details  
+      console.log("[ClinicianDashboard] Sync query parameters:", {
+        clinicianId,
+        dateRange: {from: pastDate.toISOString(), to: futureDate.toISOString()},
+        statuses: ['scheduled', 'confirmed', 'rescheduled'],
+        forceSync: isForceSync,
+        lastSyncTime
+      });
         
       const { data: rawAppointments, error: fetchError } = await query;
         
-      console.log("[ClinicianDashboard] Fetched for sync:", rawAppointments);
+      console.log("[ClinicianDashboard] Fetched for sync:", {
+        count: rawAppointments?.length || 0,
+        sample: rawAppointments?.[0] || "No appointments found"
+      });
         
       if (fetchError) {
         console.error("[ClinicianDashboard] Error fetching appointments for sync:", fetchError);
@@ -279,7 +313,7 @@ const ClinicianDashboard = () => {
       if (!rawAppointments || rawAppointments.length === 0) {
         console.log("[ClinicianDashboard] No appointments found for sync");
         sonnerToast.success("No appointments to sync", {
-          description: "You don't have any appointments that need synchronization."
+          description: "No appointments match your sync criteria. Try using Force Sync to sync all appointments."
         });
         return;
       }
@@ -357,8 +391,8 @@ const ClinicianDashboard = () => {
         lastSyncTime: new Date().toISOString()
       });
       
-      // Show sync details after completion
-      setShowSyncDetails(true);
+      // Reset force sync after completion
+      setIsForceSync(false);
       
       console.log("[ClinicianDashboard] Google Calendar sync complete, results:", results);
       
@@ -367,7 +401,14 @@ const ClinicianDashboard = () => {
       sonnerToast.error("Sync failed", {
         description: "Failed to synchronize appointments with Google Calendar."
       });
+      setIsForceSync(false);
     }
+  };
+
+  // Force sync handler
+  const handleForceSyncClick = () => {
+    setIsForceSync(true);
+    syncAppointmentsWithGoogle();
   };
 
   // Create a type adapter function to ensure clientData is handled properly by SessionNoteTemplate
@@ -520,6 +561,28 @@ const ClinicianDashboard = () => {
               </Button>
             )}
             
+            {isGoogleConnected && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={isGoogleLoading || isSyncing}
+                      onClick={handleForceSyncClick}
+                      className="flex items-center gap-1"
+                    >
+                      <RefreshCw className="h-3 w-3" />
+                      <span>Force</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Force full sync of all appointments</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+            
             <Button
               variant={isGoogleConnected ? "outline" : "default"}
               size="sm"
@@ -548,41 +611,54 @@ const ClinicianDashboard = () => {
         </div>
         
         {/* Sync Details Panel */}
-        {showSyncDetails && syncStats.total > 0 && (
+        {showSyncDetails && (
           <div className="mb-6 p-3 border rounded-md bg-gray-50">
             <h3 className="text-sm font-semibold mb-2">
-              Google Calendar Sync Results
+              Google Calendar Sync Details
               <span className="text-xs font-normal ml-2 text-gray-500">
                 {syncStats.lastSyncTime && `Last sync: ${DateTime.fromISO(syncStats.lastSyncTime).toRelative()}`}
               </span>
             </h3>
             
-            <div className="grid grid-cols-4 gap-4 mb-2">
-              <div className="bg-white p-2 rounded border">
-                <div className="text-xs text-gray-500">Total</div>
-                <div className="text-lg font-semibold">{syncStats.total}</div>
+            {syncStats.total > 0 ? (
+              <>
+                <div className="grid grid-cols-4 gap-4 mb-2">
+                  <div className="bg-white p-2 rounded border">
+                    <div className="text-xs text-gray-500">Total</div>
+                    <div className="text-lg font-semibold">{syncStats.total}</div>
+                  </div>
+                  <div className="bg-white p-2 rounded border">
+                    <div className="text-xs text-gray-500">Synced</div>
+                    <div className="text-lg font-semibold text-green-600">{syncStats.synced}</div>
+                  </div>
+                  <div className="bg-white p-2 rounded border">
+                    <div className="text-xs text-gray-500">Created</div>
+                    <div className="text-lg font-semibold text-blue-600">{syncStats.created}</div>
+                  </div>
+                  <div className="bg-white p-2 rounded border">
+                    <div className="text-xs text-gray-500">Updated</div>
+                    <div className="text-lg font-semibold text-orange-600">{syncStats.updated}</div>
+                  </div>
+                </div>
+                
+                <div className="text-xs text-gray-500">
+                  {syncStats.skipped > 0 ? (
+                    <span>{syncStats.skipped} appointments were skipped (already up to date)</span>
+                  ) : (
+                    <span>All appointments were successfully synchronized</span>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="text-sm text-gray-600">
+                <p>No appointments found matching the sync criteria. Try these options:</p>
+                <ul className="list-disc ml-5 mt-1 text-xs">
+                  <li>Use the "Force" button to sync all appointments regardless of their update status</li>
+                  <li>Check if you have any upcoming appointments in the system</li>
+                  <li>Verify that the appointments have the status "scheduled", "confirmed", or "rescheduled"</li>
+                </ul>
               </div>
-              <div className="bg-white p-2 rounded border">
-                <div className="text-xs text-gray-500">Synced</div>
-                <div className="text-lg font-semibold text-green-600">{syncStats.synced}</div>
-              </div>
-              <div className="bg-white p-2 rounded border">
-                <div className="text-xs text-gray-500">Created</div>
-                <div className="text-lg font-semibold text-blue-600">{syncStats.created}</div>
-              </div>
-              <div className="bg-white p-2 rounded border">
-                <div className="text-xs text-gray-500">Updated</div>
-                <div className="text-lg font-semibold text-orange-600">{syncStats.updated}</div>
-              </div>
-            </div>
-            
-            <div className="text-xs text-gray-500">
-              {syncStats.skipped > 0 ? (
-                <span>{syncStats.skipped} appointments were skipped (already up to date)</span>
-              ) : (
-                <span>All appointments were successfully synchronized</span>
-              )}
-            </div>
+            )}
           </div>
         )}
         
@@ -595,6 +671,7 @@ const ClinicianDashboard = () => {
               <p>Clinician ID: {clinicianId || 'Not resolved'}</p>
               <p>Timezone: {clinicianTimeZone}</p>
               <p>Appointments: {appointments?.length || 0}</p>
+              <p>Force Sync: {isForceSync ? 'Yes' : 'No'}</p>
             </div>
           </div>
         )}

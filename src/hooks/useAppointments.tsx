@@ -20,6 +20,8 @@ interface RawSupabaseAppointment {
   recurring_group_id: string | null;
   video_room_url: string | null;
   notes: string | null;
+  google_calendar_event_id: string | null;
+  last_synced_at: string | null;
   clients: {
     client_first_name: string | null;
     client_last_name: string | null;
@@ -170,10 +172,15 @@ export const useAppointments = (
           
         fromISO = weekStart;
       } else {
-        // If neither from/to dates exist, fetch current UTC week
+        // If neither from/to dates exist, fetch current UTC week and expand range to +/- 30 days
         const now = DateTime.utc();
-        fromISO = now.startOf('week').toISO();
-        toISO = now.endOf('week').toISO();
+        fromISO = now.minus({ days: 30 }).startOf('day').toISO();
+        toISO = now.plus({ days: 30 }).endOf('day').toISO();
+        
+        console.log("[useAppointments] Using expanded default date range:", { 
+          from: DateTime.fromISO(fromISO).toFormat('yyyy-MM-dd'),
+          to: DateTime.fromISO(toISO).toFormat('yyyy-MM-dd')
+        });
       }
       
       return { fromUTCISO: fromISO, toUTCISO: toISO };
@@ -222,7 +229,7 @@ export const useAppointments = (
       let baseQuery = supabase
         .from("appointments")
         .select(
-          `id, client_id, clinician_id, start_at, end_at, type, status, appointment_recurring, recurring_group_id, video_room_url, notes, clients (client_first_name, client_last_name, client_preferred_name, client_email, client_phone, client_status, client_date_of_birth, client_gender, client_address, client_city, client_state, client_zipcode)`
+          `id, client_id, clinician_id, start_at, end_at, type, status, appointment_recurring, recurring_group_id, video_room_url, notes, google_calendar_event_id, last_synced_at, clients (client_first_name, client_last_name, client_preferred_name, client_email, client_phone, client_status, client_date_of_birth, client_gender, client_address, client_city, client_state, client_zipcode)`
         )
         .eq("clinician_id", formattedClinicianId);
 
@@ -240,7 +247,7 @@ export const useAppointments = (
       let query = supabase
         .from("appointments")
         .select(
-          `id, client_id, clinician_id, start_at, end_at, type, status, appointment_recurring, recurring_group_id, video_room_url, notes, clients (client_first_name, client_last_name, client_preferred_name, client_email, client_phone, client_status, client_date_of_birth, client_gender, client_address, client_city, client_state, client_zipcode)`
+          `id, client_id, clinician_id, start_at, end_at, type, status, appointment_recurring, recurring_group_id, video_room_url, notes, google_calendar_event_id, last_synced_at, clients (client_first_name, client_last_name, client_preferred_name, client_email, client_phone, client_status, client_date_of_birth, client_gender, client_address, client_city, client_state, client_zipcode)`
         )
         .eq("clinician_id", formattedClinicianId)
         .in("status", ["scheduled", "confirmed", "completed", "rescheduled"]);
@@ -341,6 +348,24 @@ export const useAppointments = (
         `[useAppointments] Fetched ${rawDataAny.length || 0} raw appointments.`
       );
 
+      // Log status distribution for debugging
+      if (rawDataAny && rawDataAny.length > 0) {
+        const statusCounts = rawDataAny.reduce((acc, appt) => {
+          acc[appt.status] = (acc[appt.status] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>);
+        
+        console.log('[useAppointments] Status distribution:', statusCounts);
+        
+        // Log sync status for debugging
+        const syncCounts = {
+          synced: rawDataAny.filter(a => a.google_calendar_event_id).length,
+          notSynced: rawDataAny.filter(a => !a.google_calendar_event_id).length
+        };
+        
+        console.log('[useAppointments] Sync status:', syncCounts);
+      }
+
       // Safely process the data with standardized client name formatting using our shared function
       return rawDataAny.map((rawAppt: any): Appointment => {
         // Process client data, ensure we handle nested objects correctly
@@ -386,6 +411,8 @@ export const useAppointments = (
           recurring_group_id: rawAppt.recurring_group_id,
           video_room_url: rawAppt.video_room_url,
           notes: rawAppt.notes,
+          google_calendar_event_id: rawAppt.google_calendar_event_id,
+          last_synced_at: rawAppt.last_synced_at,
           client: clientData,
           clientName: clientName,
         };
