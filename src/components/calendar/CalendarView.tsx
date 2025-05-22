@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import WeekView from './week-view';
+import { WeekView } from './week-view';
 import MonthView from './MonthView';
 import { Appointment } from '@/types/appointment';
 import { SyncedEvent } from '@/hooks/useGoogleCalendar';

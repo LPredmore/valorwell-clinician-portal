@@ -20,4 +20,6 @@ export interface Appointment {
   video_room_url?: string;
   cpt_code?: string;
   isPersonalEvent?: boolean; // Flag to identify synced personal events
+  recurring_group_id?: string; // Added for appointment recurrence
+  appointment_recurring?: string; // Added for recurrence type (weekly, biweekly, monthly)
 }

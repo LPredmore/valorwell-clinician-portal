@@ -5,6 +5,7 @@ import { Loader2 } from 'lucide-react';
 import { useWeekViewData } from './useWeekViewData';
 import TimeSlot from './TimeSlot';
 import { Appointment } from '@/types/appointment';
+import { DateTime } from 'luxon';
 
 interface WeekViewProps {
   currentDate: Date;
@@ -28,12 +29,14 @@ const WeekView: React.FC<WeekViewProps> = ({
   error = null
 }) => {
   const { 
-    days, 
-    timeSlots, 
-    dayHeaders,
+    loading: dataLoading,
+    weekDays,
+    timeBlocks,
     availabilityBlocks,
     appointmentBlocks,
-    loading: dataLoading
+    isTimeSlotAvailable,
+    getBlockForTimeSlot,
+    getAppointmentForTimeSlot
   } = useWeekViewData(
     currentDate, 
     clinicianId, 
@@ -41,6 +44,29 @@ const WeekView: React.FC<WeekViewProps> = ({
     appointments,
     userTimeZone
   );
+  
+  // Generate days array from weekDays
+  const days = weekDays.map(day => day.toJSDate());
+  
+  // Generate time slots - 30 minute intervals from 7am to 7pm
+  const timeSlots = [];
+  for (let hour = 7; hour < 19; hour++) {
+    for (let minute = 0; minute < 60; minute += 30) {
+      timeSlots.push(`${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`);
+    }
+  }
+  
+  // Generate day headers with day name and date
+  const dayHeaders = weekDays.map(day => {
+    const isToday = day.hasSame(DateTime.local(), 'day');
+    const isWeekend = [6, 0].includes(day.weekday);
+    return {
+      dayName: day.toFormat('EEE'),
+      date: day.toFormat('MMM d'),
+      isToday,
+      isWeekend
+    };
+  });
 
   // Allow custom time slot styling
   const getTimeSlotStyle = useCallback((slotTime: string, dayIndex: number) => {
@@ -125,14 +151,17 @@ const WeekView: React.FC<WeekViewProps> = ({
             {timeSlots.map((time, timeIndex) => (
               <TimeSlot
                 key={`slot-${dayIndex}-${timeIndex}`}
-                dayIndex={dayIndex}
-                timeIndex={timeIndex}
-                time={time}
-                date={day}
-                availabilityBlocks={showAvailability ? availabilityBlocks : []}
-                appointmentBlocks={appointmentBlocks}
-                style={getTimeSlotStyle(time, dayIndex)} 
-                getAppointmentBlockStyle={getAppointmentBlockStyle}
+                day={day}
+                timeSlot={new Date(new Date().setHours(parseInt(time.split(':')[0]), parseInt(time.split(':')[1])))}
+                isAvailable={showAvailability && isTimeSlotAvailable(day, new Date(new Date().setHours(parseInt(time.split(':')[0]), parseInt(time.split(':')[1]))))}
+                currentBlock={getBlockForTimeSlot(day, new Date(new Date().setHours(parseInt(time.split(':')[0]), parseInt(time.split(':')[1]))))}
+                appointment={getAppointmentForTimeSlot(day, new Date(new Date().setHours(parseInt(time.split(':')[0]), parseInt(time.split(':')[1]))))}
+                isStartOfBlock={false} // This will be determined in the TimeSlot component
+                isEndOfBlock={false} // This will be determined in the TimeSlot component
+                isStartOfAppointment={false} // This will be determined in the TimeSlot component
+                isEndOfAppointment={false} // This will be determined in the TimeSlot component
+                handleAvailabilityBlockClick={() => {}}
+                originalAppointments={appointments}
               />
             ))}
           </div>

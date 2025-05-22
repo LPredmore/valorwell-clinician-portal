@@ -212,7 +212,7 @@ export const useAppointments = (
           from: fromUTCISO,
           to: toUTCISO,
           refreshTrigger,
-          isValidUUID
+          isValidUUID: isValidUUID
         }
       );
 
@@ -380,18 +380,10 @@ export const useAppointments = (
 
           if (clientInfo && typeof clientInfo === "object") {
             clientData = {
+              id: rawAppt.client_id || `temp-${new Date().getTime()}`, // Add required id field
               client_first_name: clientInfo.client_first_name || "",
               client_last_name: clientInfo.client_last_name || "",
               client_preferred_name: clientInfo.client_preferred_name || "",
-              client_email: clientInfo.client_email || "",
-              client_phone: clientInfo.client_phone || "",
-              client_status: clientInfo.client_status || null,
-              client_date_of_birth: clientInfo.client_date_of_birth || null,
-              client_gender: clientInfo.client_gender || null,
-              client_address: clientInfo.client_address || null,
-              client_city: clientInfo.client_city || null,
-              client_state: clientInfo.client_state || null,
-              client_zipcode: clientInfo.client_zipcode || null
             };
           }
         }
@@ -407,8 +399,8 @@ export const useAppointments = (
           end_at: rawAppt.end_at,
           type: rawAppt.type,
           status: rawAppt.status,
-          appointment_recurring: rawAppt.appointment_recurring,
           recurring_group_id: rawAppt.recurring_group_id,
+          appointment_recurring: rawAppt.appointment_recurring,
           video_room_url: rawAppt.video_room_url,
           notes: rawAppt.notes,
           google_calendar_event_id: rawAppt.google_calendar_event_id,

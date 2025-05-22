@@ -245,6 +245,7 @@ export const convertAppointmentBlockToAppointment = (
   
   // Create a more complete client object with all the expected fields
   const client = {
+    id: appointmentBlock.clientId || `temp-${new Date().getTime()}`, // Add required id field
     client_first_name: parsedName.firstName,
     client_last_name: parsedName.lastName,
     client_preferred_name: parsedName.preferredName,
@@ -283,8 +284,8 @@ export const convertAppointmentBlockToAppointment = (
     client,
     clientName: appointmentBlock.clientName || 'Unknown Client',
     // Add additional fields with reasonable defaults
-    appointment_recurring: null,
     recurring_group_id: null,
+    appointment_recurring: null,
     notes: null
   };
 };
