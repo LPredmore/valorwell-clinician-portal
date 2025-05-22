@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { CalendarPlus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { DateTime } from 'luxon';
+import { formatClientName } from '@/utils/appointmentUtils';
 
 const ClinicianDashboard = () => {
   const { userRole, userId } = useUser();
