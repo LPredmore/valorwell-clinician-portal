@@ -1,12 +1,11 @@
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
 import { useWeekViewData } from './useWeekViewData';
 import TimeSlot from './TimeSlot';
 import { Appointment } from '@/types/appointment';
 import { DateTime } from 'luxon';
-import { TimeZoneService } from '@/utils/timeZoneService';
 
 interface WeekViewProps {
   currentDate: Date;
@@ -29,22 +28,9 @@ const WeekView: React.FC<WeekViewProps> = ({
   isLoading = false,
   error = null
 }) => {
-  // Generate an array of dates for the current week
-  const weekDays = useMemo(() => {
-    const dt = DateTime.fromJSDate(currentDate);
-    const startOfWeek = dt.startOf('week');
-    
-    // Create an array of 7 dates starting from the start of the week
-    const days: Date[] = [];
-    for (let i = 0; i < 7; i++) {
-      days.push(startOfWeek.plus({ days: i }).toJSDate());
-    }
-    return days;
-  }, [currentDate]);
-
   const { 
     loading: dataLoading,
-    weekDays: weekDayDTs,
+    weekDays,
     timeBlocks,
     availabilityBlocks,
     appointmentBlocks,
@@ -52,38 +38,35 @@ const WeekView: React.FC<WeekViewProps> = ({
     getBlockForTimeSlot,
     getAppointmentForTimeSlot
   } = useWeekViewData(
-    weekDays, // Pass the array of dates
+    currentDate, 
     clinicianId, 
     refreshTrigger, 
     appointments,
-    (id: string) => `Client ${id}`, // Add the missing getClientName parameter
     userTimeZone
   );
   
+  // Generate days array from weekDays
+  const days = weekDays.map(day => day.toJSDate());
+  
   // Generate time slots - 30 minute intervals from 7am to 7pm
-  const timeSlots = useMemo(() => {
-    const slots = [];
-    for (let hour = 7; hour < 19; hour++) {
-      for (let minute = 0; minute < 60; minute += 30) {
-        slots.push(`${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`);
-      }
+  const timeSlots = [];
+  for (let hour = 7; hour < 19; hour++) {
+    for (let minute = 0; minute < 60; minute += 30) {
+      timeSlots.push(`${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`);
     }
-    return slots;
-  }, []);
+  }
   
   // Generate day headers with day name and date
-  const dayHeaders = useMemo(() => {
-    return weekDayDTs.map(day => {
-      const isToday = day.hasSame(DateTime.local(), 'day');
-      const isWeekend = [6, 0].includes(day.weekday);
-      return {
-        dayName: day.toFormat('EEE'),
-        date: day.toFormat('MMM d'),
-        isToday,
-        isWeekend
-      };
-    });
-  }, [weekDayDTs]);
+  const dayHeaders = weekDays.map(day => {
+    const isToday = day.hasSame(DateTime.local(), 'day');
+    const isWeekend = [6, 0].includes(day.weekday);
+    return {
+      dayName: day.toFormat('EEE'),
+      date: day.toFormat('MMM d'),
+      isToday,
+      isWeekend
+    };
+  });
 
   // Allow custom time slot styling
   const getTimeSlotStyle = useCallback((slotTime: string, dayIndex: number) => {
@@ -96,13 +79,7 @@ const WeekView: React.FC<WeekViewProps> = ({
   // Allow custom block styling based on the type
   const getAppointmentBlockStyle = useCallback((block: any) => {
     // Base styles for all appointment blocks
-    let style: {
-      backgroundColor: string;
-      color: string;
-      borderRadius: string;
-      border?: string;
-      opacity?: number;
-    } = {
+    let style = {
       backgroundColor: '#4F46E5', // Default indigo color
       color: 'white',
       borderRadius: '0.375rem',
@@ -155,7 +132,7 @@ const WeekView: React.FC<WeekViewProps> = ({
         </div>
       
         {/* Day columns with headers */}
-        {weekDays.map((day, dayIndex) => (
+        {days.map((day, dayIndex) => (
           <div key={`day-${dayIndex}`} className="flex flex-col">
             {/* Day header */}
             <div 
