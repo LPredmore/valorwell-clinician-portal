@@ -17,6 +17,26 @@ interface GoogleCalendarEvent {
     dateTime: string;
     timeZone: string;
   };
+  id?: string;
+  status?: string;
+  created?: string;
+  updated?: string;
+  htmlLink?: string;
+}
+
+// Interface for sync conflict resolution
+interface SyncConflict {
+  googleEvent: GoogleCalendarEvent;
+  localAppointment?: Appointment;
+  type: 'new' | 'updated' | 'deleted';
+}
+
+// Interface for sync results
+interface SyncResult {
+  created: number;
+  updated: number;
+  errors: number;
+  conflicts?: SyncConflict[];
 }
 
 export const useGoogleCalendar = () => {
@@ -25,6 +45,7 @@ export const useGoogleCalendar = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [syncDirection, setSyncDirection] = useState<'both' | 'toGoogle' | 'fromGoogle'>('both');
 
   // Check connection status and token validity on mount
   useEffect(() => {
@@ -316,6 +337,339 @@ export const useGoogleCalendar = () => {
     }
   };
 
+  // NEW: Fetch events from Google Calendar
+  const fetchEventsFromGoogleCalendar = async (
+    startTime: Date | string,
+    endTime: Date | string
+  ): Promise<GoogleCalendarEvent[]> => {
+    if (!isConnected || !accessToken) {
+      toast.error("Not connected to Google Calendar");
+      return [];
+    }
+    
+    try {
+      console.group('Fetching Google Calendar Events');
+      
+      // Convert dates to ISO strings if they're Date objects
+      const startTimeISO = typeof startTime === 'string' ? startTime : startTime.toISOString();
+      const endTimeISO = typeof endTime === 'string' ? endTime : endTime.toISOString();
+      
+      console.log(`Fetching events from ${new Date(startTimeISO).toLocaleString()} to ${new Date(endTimeISO).toLocaleString()}`);
+      
+      // Build the API URL with query parameters
+      const url = new URL('https://www.googleapis.com/calendar/v3/calendars/primary/events');
+      url.searchParams.append('timeMin', startTimeISO);
+      url.searchParams.append('timeMax', endTimeISO);
+      url.searchParams.append('singleEvents', 'true'); // Expand recurring events
+      url.searchParams.append('orderBy', 'startTime');
+      url.searchParams.append('maxResults', '2500'); // Google's maximum
+
+      console.log('API Request URL:', url.toString());
+      
+      // Call the Google Calendar API
+      const response = await fetch(url.toString(), {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      // Handle response
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Google API Error:', errorData);
+        console.groupEnd();
+        
+        if (response.status === 401) {
+          throw new Error('Google Calendar access token expired or revoked');
+        } else {
+          throw new Error(errorData.error?.message || 'Failed to fetch events from Google Calendar');
+        }
+      }
+      
+      const data = await response.json();
+      console.log(`Fetched ${data.items?.length || 0} events from Google Calendar`);
+      
+      // Sample of first few events for debugging
+      if (data.items && data.items.length > 0) {
+        console.log('Sample events:', data.items.slice(0, 3).map((e: any) => ({
+          id: e.id,
+          summary: e.summary,
+          start: e.start?.dateTime,
+          end: e.end?.dateTime
+        })));
+      }
+      
+      console.groupEnd();
+      return data.items || [];
+    } catch (err) {
+      console.error('Error fetching Google Calendar events:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch events from Google Calendar');
+      toast.error("Failed to fetch events from Google Calendar");
+      return [];
+    }
+  };
+
+  // NEW: Convert Google Calendar event to appointment object
+  const convertGoogleEventToAppointment = (
+    googleEvent: GoogleCalendarEvent,
+    clinicianId: string
+  ): Partial<Appointment> => {
+    // Extract client name from event summary
+    let clientName = '';
+    if (googleEvent.summary) {
+      // If summary follows our format "Session with ClientName"
+      const match = googleEvent.summary.match(/Session with (.+)/);
+      clientName = match ? match[1] : googleEvent.summary;
+    }
+    
+    return {
+      clinician_id: clinicianId,
+      start_at: googleEvent.start.dateTime,
+      end_at: googleEvent.end.dateTime,
+      type: 'session', // Default type
+      status: 'scheduled',
+      notes: googleEvent.description || '',
+      clientName,
+      google_calendar_event_id: googleEvent.id,
+      last_synced_at: new Date().toISOString()
+    };
+  };
+
+  // NEW: Import events from Google Calendar to our database
+  const importEventsFromGoogle = async (
+    clinicianId: string,
+    startTime: Date | string,
+    endTime: Date | string,
+    existingAppointments: Appointment[]
+  ): Promise<SyncResult> => {
+    setIsSyncing(true);
+    
+    try {
+      console.group('Importing Google Calendar Events');
+      console.log('Fetching events for clinician:', clinicianId);
+      
+      // Fetch events from Google Calendar
+      const googleEvents = await fetchEventsFromGoogleCalendar(startTime, endTime);
+      
+      if (googleEvents.length === 0) {
+        console.log('No events found in Google Calendar');
+        console.groupEnd();
+        return { created: 0, updated: 0, errors: 0 };
+      }
+      
+      console.log(`Processing ${googleEvents.length} Google Calendar events`);
+      
+      // Prepare result counters
+      let created = 0;
+      let updated = 0;
+      let errors = 0;
+      
+      // Create a map of existing appointments by Google Calendar event ID
+      const appointmentsByGoogleId = new Map<string, Appointment>();
+      existingAppointments.forEach(appointment => {
+        if (appointment.google_calendar_event_id) {
+          appointmentsByGoogleId.set(appointment.google_calendar_event_id, appointment);
+        }
+      });
+      
+      console.log(`Found ${appointmentsByGoogleId.size} existing appointments with Google Calendar IDs`);
+      
+      // Process each Google Calendar event
+      for (const googleEvent of googleEvents) {
+        if (!googleEvent.id) {
+          console.warn('Skipping Google event without ID:', googleEvent);
+          continue;
+        }
+        
+        try {
+          const existingAppointment = appointmentsByGoogleId.get(googleEvent.id);
+          
+          if (existingAppointment) {
+            // Update existing appointment if it's changed
+            console.log(`Found existing appointment for Google event ${googleEvent.id}`);
+            
+            // Check if Google event is newer than our last sync
+            const lastSyncTime = existingAppointment.last_synced_at 
+              ? new Date(existingAppointment.last_synced_at).getTime()
+              : 0;
+              
+            const googleUpdateTime = googleEvent.updated 
+              ? new Date(googleEvent.updated).getTime() 
+              : Infinity; // If no update time, assume it's newer
+            
+            if (googleUpdateTime > lastSyncTime) {
+              console.log(`Google event ${googleEvent.id} was updated after last sync, updating local appointment`);
+              
+              // Update appointment with Google data
+              const { data, error } = await supabase
+                .from('appointments')
+                .update({
+                  start_at: googleEvent.start.dateTime,
+                  end_at: googleEvent.end.dateTime,
+                  notes: googleEvent.description || existingAppointment.notes,
+                  last_synced_at: new Date().toISOString()
+                })
+                .eq('id', existingAppointment.id)
+                .select();
+                
+              if (error) {
+                console.error(`Error updating appointment ${existingAppointment.id}:`, error);
+                errors++;
+              } else {
+                console.log(`Updated appointment ${existingAppointment.id} with Google data`);
+                updated++;
+              }
+            } else {
+              console.log(`Google event ${googleEvent.id} has not changed since last sync, skipping`);
+            }
+          } else {
+            // Create new appointment from Google event
+            console.log(`No existing appointment for Google event ${googleEvent.id}, creating new appointment`);
+            
+            // Convert Google event to appointment
+            const newAppointmentData = convertGoogleEventToAppointment(googleEvent, clinicianId);
+            
+            // Attempt to find a client ID based on the name
+            if (newAppointmentData.clientName) {
+              const { data: clientData } = await supabase
+                .from('clients')
+                .select('id')
+                .ilike('client_preferred_name', `%${newAppointmentData.clientName}%`)
+                .limit(1);
+                
+              if (clientData && clientData.length > 0) {
+                console.log(`Found matching client for "${newAppointmentData.clientName}"`);
+                newAppointmentData.client_id = clientData[0].id;
+              } else {
+                console.log(`No client found for "${newAppointmentData.clientName}"`);
+              }
+            }
+            
+            // Insert new appointment
+            const { data, error } = await supabase
+              .from('appointments')
+              .insert([{
+                ...newAppointmentData,
+                // Use the client_id if we found one, otherwise the field will be null
+              }])
+              .select();
+              
+            if (error) {
+              console.error(`Error creating new appointment for Google event ${googleEvent.id}:`, error);
+              errors++;
+            } else {
+              console.log(`Created new appointment for Google event ${googleEvent.id}`);
+              created++;
+            }
+          }
+        } catch (err) {
+          console.error(`Error processing Google event ${googleEvent.id}:`, err);
+          errors++;
+        }
+      }
+      
+      // Update clinician's last_google_sync timestamp
+      const { error: clinicianUpdateError } = await supabase
+        .from('clinicians')
+        .update({ last_google_sync: new Date().toISOString() })
+        .eq('id', clinicianId);
+        
+      if (clinicianUpdateError) {
+        console.error('Error updating clinician last_google_sync:', clinicianUpdateError);
+      } else {
+        console.log('Updated clinician last_google_sync timestamp');
+      }
+      
+      console.log(`Import complete: ${created} created, ${updated} updated, ${errors} errors`);
+      console.groupEnd();
+      
+      // Return results
+      const result = { created, updated, errors };
+      
+      if (created > 0 || updated > 0) {
+        toast.success(`Imported ${created + updated} events from Google Calendar (${created} new, ${updated} updated)`);
+      } else if (errors > 0) {
+        toast.error(`Failed to import events from Google Calendar (${errors} errors)`);
+      } else {
+        toast.info("No new events found in Google Calendar");
+      }
+      
+      return result;
+    } catch (err) {
+      console.error('Error importing Google Calendar events:', err);
+      setError(err instanceof Error ? err.message : 'Failed to import events from Google Calendar');
+      toast.error("Failed to import events from Google Calendar");
+      return { created: 0, updated: 0, errors: 1 };
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  // NEW: Bidirectional sync function
+  const bidirectionalSync = async (
+    clinicianId: string,
+    appointments: Appointment[],
+    startTime: Date | string,
+    endTime: Date | string
+  ): Promise<{
+    toGoogle: Map<string, string | null>;
+    fromGoogle: SyncResult;
+  }> => {
+    setIsSyncing(true);
+    
+    try {
+      console.group('Bidirectional Google Calendar Sync');
+      console.log(`Starting bidirectional sync for clinician ${clinicianId}`);
+      
+      let toGoogleResult = new Map<string, string | null>();
+      let fromGoogleResult = { created: 0, updated: 0, errors: 0 };
+      
+      // Sync direction control
+      if (syncDirection === 'both' || syncDirection === 'toGoogle') {
+        console.log('Syncing appointments to Google Calendar');
+        toGoogleResult = await syncMultipleAppointments(appointments);
+      }
+      
+      if (syncDirection === 'both' || syncDirection === 'fromGoogle') {
+        console.log('Importing events from Google Calendar');
+        fromGoogleResult = await importEventsFromGoogle(
+          clinicianId,
+          startTime,
+          endTime,
+          appointments
+        );
+      }
+      
+      console.log('Bidirectional sync complete', {
+        toGoogle: {
+          total: toGoogleResult.size,
+          succeeded: Array.from(toGoogleResult.values()).filter(Boolean).length
+        },
+        fromGoogle: fromGoogleResult
+      });
+      
+      console.groupEnd();
+      
+      return {
+        toGoogle: toGoogleResult,
+        fromGoogle: fromGoogleResult
+      };
+    } catch (err) {
+      console.error('Error during bidirectional sync:', err);
+      setError(err instanceof Error ? err.message : 'Failed to sync with Google Calendar');
+      toast.error("Error during Google Calendar synchronization");
+      
+      return {
+        toGoogle: new Map(),
+        fromGoogle: { created: 0, updated: 0, errors: 1 }
+      };
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   // Batch sync multiple appointments with upsert logic
   const syncMultipleAppointments = async (appointments: Appointment[]): Promise<Map<string, string | null>> => {
     if (!isConnected || !accessToken) {
@@ -446,10 +800,15 @@ export const useGoogleCalendar = () => {
     isSyncing,
     error,
     accessToken,
+    syncDirection,
+    setSyncDirection,
     connectGoogleCalendar,
     disconnectGoogleCalendar,
     createGoogleCalendarEvent,
     updateGoogleCalendarEvent,
-    syncMultipleAppointments
+    syncMultipleAppointments,
+    fetchEventsFromGoogleCalendar,
+    importEventsFromGoogle,
+    bidirectionalSync
   };
 };

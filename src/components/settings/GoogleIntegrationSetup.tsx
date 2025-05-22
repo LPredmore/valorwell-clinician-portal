@@ -6,7 +6,9 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { AlertCircle, Calendar, CheckCircle2, Link as LinkIcon } from 'lucide-react';
+import { AlertCircle, Calendar, CheckCircle2, Link as LinkIcon, RefreshCw } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
 interface GoogleIntegrationSetupProps {
   userId?: string;
@@ -14,7 +16,7 @@ interface GoogleIntegrationSetupProps {
 }
 
 const GoogleIntegrationSetup = ({ userId, userEmail }: GoogleIntegrationSetupProps) => {
-  const { isConnected, isLoading, connectGoogleCalendar, disconnectGoogleCalendar } = useGoogleCalendar();
+  const { isConnected, isLoading, isSyncing, connectGoogleCalendar, disconnectGoogleCalendar, syncDirection, setSyncDirection } = useGoogleCalendar();
   const [hasEmailAccount, setHasEmailAccount] = useState(false);
   const [hasGoogleAccount, setHasGoogleAccount] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
@@ -68,6 +70,16 @@ const GoogleIntegrationSetup = ({ userId, userEmail }: GoogleIntegrationSetupPro
         variant: "destructive",
       });
     }
+  };
+
+  const handleSyncDirectionChange = (direction: 'both' | 'toGoogle' | 'fromGoogle') => {
+    setSyncDirection(direction);
+    toast({
+      title: "Sync Direction Updated",
+      description: `Calendar will now sync ${direction === 'both' ? 'bidirectionally' : 
+        direction === 'toGoogle' ? 'from app to Google only' : 
+        'from Google to app only'}`,
+    });
   };
 
   return (
@@ -132,6 +144,57 @@ const GoogleIntegrationSetup = ({ userId, userEmail }: GoogleIntegrationSetupPro
                 </AlertDescription>
               </Alert>
             )}
+
+            {hasGoogleAccount && (
+              <div className="mt-6 space-y-4 border rounded-md p-4">
+                <h3 className="font-medium text-lg">Calendar Synchronization Settings</h3>
+                
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="sync-both" className="flex items-center space-x-2">
+                      <RefreshCw className="h-4 w-4" />
+                      <span>Bidirectional sync (both ways)</span>
+                    </Label>
+                    <Switch 
+                      id="sync-both" 
+                      checked={syncDirection === 'both'} 
+                      onCheckedChange={() => handleSyncDirectionChange('both')}
+                    />
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="sync-to-google" className="ml-6">
+                      App → Google only
+                    </Label>
+                    <Switch 
+                      id="sync-to-google" 
+                      checked={syncDirection === 'toGoogle'} 
+                      onCheckedChange={() => handleSyncDirectionChange('toGoogle')}
+                    />
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="sync-from-google" className="ml-6">
+                      Google → App only
+                    </Label>
+                    <Switch 
+                      id="sync-from-google" 
+                      checked={syncDirection === 'fromGoogle'} 
+                      onCheckedChange={() => handleSyncDirectionChange('fromGoogle')}
+                    />
+                  </div>
+                </div>
+                
+                <div className="text-sm text-gray-500 mt-2">
+                  <p>These settings control how your appointments sync with Google Calendar:</p>
+                  <ul className="list-disc list-inside mt-1 space-y-1 ml-2">
+                    <li>Bidirectional: Changes in either calendar will update the other</li>
+                    <li>App → Google: Only push appointments from this app to Google</li>
+                    <li>Google → App: Only import events from Google to this app</li>
+                  </ul>
+                </div>
+              </div>
+            )}
           </>
         )}
       </CardContent>
@@ -151,10 +214,10 @@ const GoogleIntegrationSetup = ({ userId, userEmail }: GoogleIntegrationSetupPro
           <Button 
             variant="outline"
             onClick={disconnectGoogleCalendar}
-            disabled={isLoading}
+            disabled={isLoading || isSyncing}
             className="w-full"
           >
-            Disconnect Google Account
+            {isLoading ? "Processing..." : "Disconnect Google Account"}
           </Button>
         )}
       </CardFooter>
