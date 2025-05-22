@@ -266,7 +266,7 @@ export const useGoogleCalendar = () => {
     }
   };
 
-  // Batch sync multiple appointments
+  // Batch sync multiple appointments with upsert logic
   const syncMultipleAppointments = async (appointments: Appointment[]): Promise<Map<string, string | null>> => {
     if (!isConnected || !accessToken) {
       toast.error("Not connected to Google Calendar");
@@ -290,7 +290,8 @@ export const useGoogleCalendar = () => {
           id: a.id,
           date: DateTime.fromISO(a.start_at).toFormat('yyyy-MM-dd'),
           time: DateTime.fromISO(a.start_at).toFormat('HH:mm'),
-          clientName: a.clientName || 'Unknown client'
+          clientName: a.clientName || 'Unknown client',
+          googleEventId: a.google_calendar_event_id || 'Not synced'
         }));
         
         console.log('Appointments being synced:', appointmentDates);
@@ -310,18 +311,65 @@ export const useGoogleCalendar = () => {
         });
       }
       
+      let createdCount = 0;
+      let updatedCount = 0;
+      
       for (const appointment of appointments) {
-        console.log(`Syncing appointment ${appointment.id} for ${appointment.clientName} at ${DateTime.fromISO(appointment.start_at).toFormat('yyyy-MM-dd HH:mm')}`);
-        const eventId = await createGoogleCalendarEvent(appointment);
+        console.log(`Processing appointment ${appointment.id} for ${appointment.clientName} at ${DateTime.fromISO(appointment.start_at).toFormat('yyyy-MM-dd HH:mm')}`);
+        
+        let eventId: string | null = null;
+        
+        // Check if the appointment already has a Google Calendar event ID
+        if (appointment.google_calendar_event_id) {
+          console.log(`Appointment ${appointment.id} already has Google Calendar event ID: ${appointment.google_calendar_event_id}, updating...`);
+          eventId = await updateGoogleCalendarEvent(appointment.google_calendar_event_id, appointment);
+          if (eventId) updatedCount++;
+        } else {
+          console.log(`Appointment ${appointment.id} has no Google Calendar event ID, creating new event...`);
+          eventId = await createGoogleCalendarEvent(appointment);
+          if (eventId) createdCount++;
+        }
+        
+        if (eventId) {
+          // Update the appointment in Supabase with the Google Calendar event ID and sync timestamp
+          const { error: updateError } = await supabase
+            .from('appointments')
+            .update({
+              google_calendar_event_id: eventId,
+              last_synced_at: new Date().toISOString()
+            })
+            .eq('id', appointment.id);
+            
+          if (updateError) {
+            console.error(`Error updating appointment ${appointment.id} with Google Calendar event ID:`, updateError);
+          } else {
+            console.log(`Updated appointment ${appointment.id} with Google Calendar event ID: ${eventId}`);
+          }
+        }
+        
         results.set(appointment.id, eventId);
         console.log(`Result for appointment ${appointment.id}: ${eventId ? 'Success' : 'Failed'}`);
       }
       
+      // Update clinician's last_google_sync timestamp
+      if (appointments.length > 0 && appointments[0].clinician_id) {
+        const { error: clinicianUpdateError } = await supabase
+          .from('clinicians')
+          .update({ last_google_sync: new Date().toISOString() })
+          .eq('id', appointments[0].clinician_id);
+          
+        if (clinicianUpdateError) {
+          console.error('Error updating clinician last_google_sync:', clinicianUpdateError);
+        } else {
+          console.log('Updated clinician last_google_sync timestamp');
+        }
+      }
+      
       const successCount = Array.from(results.values()).filter(Boolean).length;
-      console.log(`Sync complete: ${successCount} of ${appointments.length} appointments successfully synced`);
+      console.log(`Sync complete: ${successCount} of ${appointments.length} appointments successfully synced (${createdCount} created, ${updatedCount} updated)`);
       console.groupEnd();
       
-      toast.success(`Synced ${successCount} appointments to Google Calendar`);
+      toast.success(`Synced ${successCount} appointments to Google Calendar (${createdCount} created, ${updatedCount} updated)`);
       return results;
     } catch (err) {
       console.error('Error syncing multiple appointments:', err);
