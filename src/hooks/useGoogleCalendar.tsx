@@ -675,7 +675,7 @@ export const useGoogleCalendar = () => {
     };
     
     handleOAuthCallback();
-  }, []);
+  }, [toast]);
 
   return {
     isConnected,
