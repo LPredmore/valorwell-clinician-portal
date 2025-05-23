@@ -3,7 +3,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { Appointment } from '@/types/appointment';
 import { SyncedEvent } from '@/types/syncedEvent';
 import { useToast } from '@/hooks/use-toast';
-import { toast as toastNotification } from '@/components/ui/use-toast';
 
 // Type for Google Calendar event
 interface GoogleCalendarEvent {
@@ -41,7 +40,7 @@ export const useGoogleCalendar = () => {
   const [error, setError] = useState<string | null>(null);
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const [syncDirection, setSyncDirection] = useState<SyncDirection>('both');
-  const toast = useToast();
+  const { toast } = useToast();
 
   // Check if Google Calendar is connected
   // Check if Google Calendar is connected and refresh token if needed
@@ -324,7 +323,7 @@ export const useGoogleCalendar = () => {
       localStorage.removeItem('googleCodeVerifier');
       
       setIsConnected(false);
-      toastNotification({
+      toast({
         title: "Success",
         description: "Disconnected from Google Calendar"
       });
@@ -723,7 +722,7 @@ export const useGoogleCalendar = () => {
       // Propagate authentication errors
       if (err instanceof Error && err.message.includes('Authentication failed')) {
         setError('Authentication failed. Please reconnect to Google Calendar.');
-        toastNotification({
+        toast({
           title: "Authentication Error",
           description: "Your Google Calendar connection has expired. Please reconnect.",
           variant: "destructive"
@@ -813,7 +812,7 @@ export const useGoogleCalendar = () => {
                   console.log(`[importEventsFromGoogle] Google event ${googleEvent.id} was updated after last sync, updating local appointment`);
                   
                   // Update appointment with Google data
-                  const { data, error } = supabase
+                  const { data, error } = await supabase
                     .from('appointments')
                     .update({
                       start_at: googleEvent.start.dateTime,
@@ -994,18 +993,18 @@ export const useGoogleCalendar = () => {
       const result = { created, updated, errors };
       
       if (created > 0 || updated > 0) {
-        toastNotification({
+        toast({
           title: "Success",
           description: `Imported ${created + updated} events from Google Calendar (${created} new, ${updated} updated)`
         });
       } else if (errors > 0) {
-        toastNotification({
+        toast({
           title: "Error",
           description: `Failed to import events from Google Calendar (${errors} errors)`,
           variant: "destructive"
         });
       } else {
-        toastNotification({
+        toast({
           title: "Info",
           description: "No new events found in Google Calendar"
         });
@@ -1015,7 +1014,7 @@ export const useGoogleCalendar = () => {
     } catch (err) {
       console.error('[importEventsFromGoogle] Error importing Google Calendar events:', err);
       setError(err instanceof Error ? err.message : 'Failed to import events from Google Calendar');
-      toastNotification({
+      toast({
         title: "Error",
         description: "Failed to import events from Google Calendar",
         variant: "destructive"
@@ -1081,7 +1080,7 @@ export const useGoogleCalendar = () => {
     } catch (err) {
       console.error('Error in bidirectional sync:', err);
       setError(err instanceof Error ? err.message : 'Failed to sync with Google Calendar');
-      toastNotification({
+      toast({
         title: "Error",
         description: "Failed to sync with Google Calendar",
         variant: "destructive"
@@ -1118,7 +1117,7 @@ export const useGoogleCalendar = () => {
           // Validate state to prevent CSRF
           if (state !== storedState) {
             console.error('[useGoogleCalendar] OAuth state mismatch');
-            toastNotification({
+            toast({
               title: "Error",
               description: "Authentication failed: Invalid state",
               variant: "destructive"
@@ -1128,7 +1127,7 @@ export const useGoogleCalendar = () => {
           
           if (!code || !codeVerifier) {
             console.error('[useGoogleCalendar] Missing code or code verifier');
-            toastNotification({
+            toast({
               title: "Error",
               description: "Authentication failed: Missing parameters",
               variant: "destructive"
@@ -1157,7 +1156,7 @@ export const useGoogleCalendar = () => {
           if (!tokenResponse.ok) {
             const errorData = await tokenResponse.json();
             console.error('[useGoogleCalendar] Token exchange error:', errorData);
-            toastNotification({
+            toast({
               title: "Error",
               description: `Authentication failed: ${errorData.error_description || 'Token exchange failed'}`,
               variant: "destructive"
@@ -1181,7 +1180,7 @@ export const useGoogleCalendar = () => {
           localStorage.removeItem('googleCodeVerifier');
           
           setIsConnected(true);
-          toastNotification({
+          toast({
             title: "Success",
             description: "Connected to Google Calendar"
           });
@@ -1190,7 +1189,7 @@ export const useGoogleCalendar = () => {
           window.location.href = '/calendar';
         } catch (err) {
           console.error('[useGoogleCalendar] Error handling OAuth callback:', err);
-          toastNotification({
+          toast({
             title: "Error",
             description: "Failed to complete authentication",
             variant: "destructive"
