@@ -21,25 +21,25 @@ const Index = () => {
     if ((isLoading || !authInitialized) && !authError) {
       console.log("[Index] Starting loading timeout check");
       timeoutId = setTimeout(() => {
-        console.log("[Index] Loading timeout reached after 10 seconds");
+        console.log("[Index] Loading timeout reached after 5 seconds");
         setLoadingTimeout(true);
         toast({
           title: "Loading Delay",
           description: "Authentication is taking longer than expected. Please wait or refresh the page.",
           variant: "default"
         });
-      }, 10000); // 10 seconds timeout
+      }, 5000); // Reduced to 5 seconds (from 10) for faster feedback
       
       // Add a second timeout for critical failure
       const criticalTimeoutId = setTimeout(() => {
-        console.log("[Index] Critical loading timeout reached after 30 seconds");
+        console.log("[Index] Critical loading timeout reached after 15 seconds");
         setAuthError("Authentication process is taking too long. Please refresh the page or try again later.");
         toast({
           title: "Authentication Error",
           description: "Failed to complete authentication. Please refresh the page.",
           variant: "destructive"
         });
-      }, 30000); // 30 seconds for critical timeout
+      }, 15000); // Reduced to 15 seconds (from 30) for better user experience
       
       return () => {
         clearTimeout(timeoutId);
@@ -52,14 +52,14 @@ const Index = () => {
     };
   }, [isLoading, authInitialized, authError, toast]);
 
-  // Reduced force redirect timer from 15 to 10 seconds for faster experience
+  // Reduced force redirect timer from 10 to 5 seconds for faster experience
   useEffect(() => {
     let forcedRedirectTimer: NodeJS.Timeout;
     
     // If we have a userId but auth isn't fully initialized, start a timer
     if (userId && (!authInitialized || isLoading)) {
       console.log("[Index] Starting forced redirect timer - we have userId but auth isn't fully initialized");
-      let secondsLeft = 10; // Reduced from 15 to 10 seconds
+      let secondsLeft = 5; // Reduced from 10 to 5 seconds for faster navigation
       
       const intervalTimer = setInterval(() => {
         secondsLeft--;
@@ -91,7 +91,7 @@ const Index = () => {
         } else {
           navigate('/login');
         }
-      }, 10000); // 10 seconds (reduced from 15)
+      }, 5000); // 5 seconds (reduced from 10)
       
       return () => {
         clearTimeout(forcedRedirectTimer);
@@ -104,7 +104,13 @@ const Index = () => {
 
   useEffect(() => {
     console.log("[Index] Checking redirect conditions - userId:", userId, "authInitialized:", authInitialized, "isLoading:", isLoading);
-    console.log("[Index] Index page mounted, isLoading:", isLoading, "userRole:", userRole, "authInitialized:", authInitialized);
+    
+    // If user is not authenticated and auth is initialized, redirect to login immediately
+    if (authInitialized && !isLoading && !userId) {
+      console.log("[Index] Redirecting to login - no authenticated user found");
+      navigate('/login');
+      return; // Early return to prevent unnecessary UI flashing
+    }
     
     // Only make redirect decisions if the UserContext is fully initialized
     if (authInitialized && !isLoading && userId) {
@@ -138,19 +144,29 @@ const Index = () => {
         console.log("[Index] No valid role found, redirecting to Login page");
         navigate('/login');
       }
-    } else if (authInitialized && !isLoading && !userId) {
-      // If auth is initialized, not loading, and no user ID - go to login
-      console.log("[Index] Auth initialized but no user, redirecting to login");
-      navigate('/login');
-    } else {
-      console.log("[Index] Waiting for user context to fully initialize before redirecting");
     }
   }, [navigate, userRole, isLoading, authInitialized, userId, toast]);
+
+  // Prevent displaying loading UI if redirecting soon to avoid flashing
+  if (!authInitialized || isLoading) {
+    if (userId && forceRedirectTimer > 0) {
+      // If we're about to force redirect, show minimal UI
+      return (
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-blue-600 text-sm">
+              Redirecting in {forceRedirectTimer} seconds...
+            </p>
+          </div>
+        </div>
+      );
+    }
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center">
       {/* Set AuthStateMonitor to be visible in development environment for debugging */}
-      <AuthStateMonitor visible={process.env.NODE_ENV === 'development'} />
+      <AuthStateMonitor visible={import.meta.env.MODE === 'development'} />
       <div className="text-center">
         {isLoading || !authInitialized ? (
           <div className="flex flex-col items-center">
