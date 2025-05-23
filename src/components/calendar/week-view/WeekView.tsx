@@ -10,7 +10,7 @@ import { Appointment } from '@/types/appointment';
 import { convertAppointmentBlockToAppointment } from '@/utils/appointmentUtils';
 
 interface WeekViewProps {
-  days: Date[];
+  days: Date[] | null;
   selectedClinicianId: string | null;
   userTimeZone: string;
   showAvailability?: boolean;
@@ -39,21 +39,26 @@ for (let hour = START_HOUR; hour < END_HOUR; hour++) {
   }
 }
 
-const WeekView: React.FC<WeekViewProps> = ({
-  days,
-  selectedClinicianId,
-  userTimeZone,
-  showAvailability = true,
-  refreshTrigger = 0,
-  appointments = [],
-  onAppointmentClick,
-  onAvailabilityClick,
-  onAppointmentUpdate,
-  onAppointmentDelete,
-  currentDate,
-  isLoading,
-  error,
-}) => {
+const WeekView: React.FC<WeekViewProps> = (props) => {
+  // Safely destructure props with defaults
+  const {
+    days: rawDays,
+    selectedClinicianId,
+    userTimeZone,
+    showAvailability = true,
+    refreshTrigger = 0,
+    appointments = [],
+    onAppointmentClick,
+    onAvailabilityClick,
+    onAppointmentUpdate,
+    onAppointmentDelete,
+    currentDate,
+    isLoading,
+    error,
+  } = props;
+
+  // Ensure days is always an array
+  const days = Array.isArray(rawDays) ? rawDays : [];
   const [selectedBlock, setSelectedBlock] = useState<any | null>(null);
   const [draggedAppointmentId, setDraggedAppointmentId] = useState<string | null>(null);
 
