@@ -80,8 +80,4 @@ export interface Appointment {
   // Standard audit fields
   created_at?: string;
   updated_at?: string;
-  
-  // Google Calendar sync fields
-  google_calendar_event_id?: string | null;
-  last_synced_at?: string | null;
 }

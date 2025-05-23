@@ -1,41 +1,23 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Clock, Plus, CalendarPlus, Check } from 'lucide-react';
-import { CalendarViewControlsProps } from './types';
+import { Clock, Plus } from 'lucide-react';
+
+interface CalendarViewControlsProps {
+  showAvailability: boolean;
+  onToggleAvailability: () => void;
+  onNewAppointment: () => void;
+  selectedClinicianId?: string | null;
+}
 
 const CalendarViewControls: React.FC<CalendarViewControlsProps> = ({
   showAvailability,
   onToggleAvailability,
   onNewAppointment,
-  selectedClinicianId,
-  onToggleGoogleCalendar,
-  isGoogleCalendarConnected,
-  isConnectingGoogleCalendar
+  selectedClinicianId
 }) => {
   return (
     <div className="flex items-center gap-4">
-      {onToggleGoogleCalendar && (
-        <Button
-          variant={isGoogleCalendarConnected ? "outline" : "default"}
-          onClick={onToggleGoogleCalendar}
-          disabled={isConnectingGoogleCalendar}
-          className="flex items-center gap-2"
-        >
-          {isGoogleCalendarConnected ? (
-            <>
-              <Check className="w-4 h-4 text-green-500" />
-              <span>Sync with Google Calendar</span>
-            </>
-          ) : (
-            <>
-              <CalendarPlus className="w-4 h-4" />
-              <span>Connect Google Calendar</span>
-            </>
-          )}
-        </Button>
-      )}
-
       <Button
         variant={showAvailability ? "default" : "outline"}
         onClick={onToggleAvailability}

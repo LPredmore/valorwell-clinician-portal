@@ -147,17 +147,13 @@ const extractWeeklyPatternFromClinicianData = (clinicianData: any): ClinicianWee
 
 // Main hook for week view data processing
 export const useWeekViewData = (
-  inputDays: Date[] | null | undefined,
+  days: Date[],
   clinicianId: string | null,
   refreshTrigger = 0,
   externalAppointments: Appointment[] = [],
   getClientName = (id: string) => `Client ${id}`,
   userTimeZone: string
 ) => {
-  // Ensure days is always an array
-  const days = Array.isArray(inputDays) ? inputDays : [];
-  // Ensure days is always an array
-  const safeDays = Array.isArray(days) ? days : [];
   const [loading, setLoading] = useState(true);
   const [availability, setAvailability] = useState<AvailabilityBlock[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);

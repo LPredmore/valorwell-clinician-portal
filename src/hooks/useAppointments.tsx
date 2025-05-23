@@ -6,8 +6,6 @@ import { TimeZoneService } from "@/utils/timeZoneService";
 import { DateTime } from "luxon";
 import { Appointment } from "@/types/appointment";
 import { formatClientName } from "@/utils/appointmentUtils";
-import { SyncedEvent, syncedEventToAppointmentLike } from "@/types/syncedEvent";
-import { fetchSyncedEvents } from "@/utils/googleCalendarSync";
 
 // Interface for the raw Supabase response
 interface RawSupabaseAppointment {
@@ -22,8 +20,6 @@ interface RawSupabaseAppointment {
   recurring_group_id: string | null;
   video_room_url: string | null;
   notes: string | null;
-  google_calendar_event_id: string | null;
-  last_synced_at: string | null;
   clients: {
     client_first_name: string | null;
     client_last_name: string | null;
@@ -99,31 +95,10 @@ export const useAppointments = (
   const [isLoadingSessionClientData, setIsLoadingSessionClientData] =
     useState(false);
 
-  // First, define safeUserTimeZone before it's used
+  const formattedClinicianId = clinicianId ? clinicianId : null;
   const safeUserTimeZone = TimeZoneService.ensureIANATimeZone(
     timeZone || TimeZoneService.DEFAULT_TIMEZONE
   );
-
-  // Validate clinician ID for debugging
-  const formattedClinicianId = clinicianId ? clinicianId : null;
-  // Log clinician ID format validation
-  const isValidUUID = formattedClinicianId ? 
-    /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(formattedClinicianId) : 
-    false;
-    
-  // Enhanced logging for clinician ID handling
-  console.log("[useAppointments] Clinician ID validation:", {
-    rawClinicianId: clinicianId,
-    formattedClinicianId,
-    isValidUUID: isValidUUID,
-    isUUIDFormat: formattedClinicianId ? /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(formattedClinicianId) : false,
-    fromTimeZone: safeUserTimeZone
-  });
-
-  // If clinician ID doesn't look like a UUID, log a warning
-  if (formattedClinicianId && !isValidUUID) {
-    console.warn("[useAppointments] Warning: clinicianId doesn't appear to be a valid UUID:", formattedClinicianId);
-  }
   
   // Log clinician ID handling for debugging
   console.log("[useAppointments] Clinician ID handling:", {
@@ -174,15 +149,10 @@ export const useAppointments = (
           
         fromISO = weekStart;
       } else {
-        // If neither from/to dates exist, fetch current UTC week and expand range to +/- 30 days
+        // If neither from/to dates exist, fetch current UTC week
         const now = DateTime.utc();
-        fromISO = now.minus({ days: 30 }).startOf('day').toISO();
-        toISO = now.plus({ days: 30 }).endOf('day').toISO();
-        
-        console.log("[useAppointments] Using expanded default date range:", { 
-          from: DateTime.fromISO(fromISO).toFormat('yyyy-MM-dd'),
-          to: DateTime.fromISO(toISO).toFormat('yyyy-MM-dd')
-        });
+        fromISO = now.startOf('week').toISO();
+        toISO = now.endOf('week').toISO();
       }
       
       return { fromUTCISO: fromISO, toUTCISO: toISO };
@@ -192,51 +162,37 @@ export const useAppointments = (
     }
   }, [fromDate, toDate, safeUserTimeZone]);
 
-  // Query for regular appointments
   const {
     data: fetchedAppointments = [],
-    isLoading: isLoadingAppointments,
-    error: appointmentsError,
+    isLoading,
+    error,
     refetch: refetchAppointments,
   } = useQuery<Appointment[], Error>({
     // Include refreshTrigger in the queryKey to force refresh when it changes
     queryKey: ["appointments", formattedClinicianId, fromUTCISO, toUTCISO, refreshTrigger],
     queryFn: async (): Promise<Appointment[]> => {
-      if (!formattedClinicianId) {
-        console.warn("[useAppointments] No clinician ID provided, skipping fetch");
-        return [];
-      }
-       
-      // Log complete query parameters for debugging
+      if (!formattedClinicianId) return [];
       console.log(
-        "[useAppointments] Fetching appointments with params:",
-        {
-          clinicianId: formattedClinicianId,
-          from: fromUTCISO,
-          to: toUTCISO,
-          refreshTrigger,
-          isValidUUID
-        }
+        "[useAppointments] Fetching for clinician:",
+        formattedClinicianId,
+        { from: fromUTCISO, to: toUTCISO, refreshTrigger }
       );
 
-      // Create base query without filters for debugging
-      let baseQuery = supabase
-        .from("appointments")
-        .select(
-          `id, client_id, clinician_id, start_at, end_at, type, status, appointment_recurring, recurring_group_id, video_room_url, notes, google_calendar_event_id, last_synced_at, clients (client_first_name, client_last_name, client_preferred_name, client_email, client_phone, client_status, client_date_of_birth, client_gender, client_address, client_city, client_state, client_zipcode)`
-        )
-        .eq("clinician_id", formattedClinicianId);
-
-      // Now build the full query with filters
       let query = supabase
         .from("appointments")
         .select(
-          `id, client_id, clinician_id, start_at, end_at, type, status, appointment_recurring, recurring_group_id, video_room_url, notes, google_calendar_event_id, last_synced_at, clients (client_first_name, client_last_name, client_preferred_name, client_email, client_phone, client_status, client_date_of_birth, client_gender, client_address, client_city, client_state, client_zipcode)`
+          `id, client_id, clinician_id, start_at, end_at, type, status, appointment_recurring, recurring_group_id, video_room_url, notes, clients (client_first_name, client_last_name, client_preferred_name, client_email, client_phone, client_status, client_date_of_birth, client_gender, client_address, client_city, client_state, client_zipcode)`
         )
         .eq("clinician_id", formattedClinicianId)
-        .in("status", ["scheduled", "confirmed", "completed", "rescheduled"]);
+        .eq("status", "scheduled");
 
       // Use more robust timezone-aware filtering
+      console.log("[useAppointments] Applying robust UTC filter:", {
+        fromUTCISO,
+        toUTCISO,
+        clinicianTZ: safeUserTimeZone
+      });
+      
       if (fromUTCISO) query = query.gte("start_at", fromUTCISO);
       if (toUTCISO) query = query.lte("end_at", toUTCISO);
       
@@ -244,7 +200,26 @@ export const useAppointments = (
       query = query
         .order("start_at", { ascending: true });
         
+      // Log debug info
+      console.log("[useAppointments] Final query details:", {
+        clinician_id: formattedClinicianId,
+        start_at: fromUTCISO ? `>= ${fromUTCISO}` : 'any',
+        end_at: toUTCISO ? `<= ${toUTCISO}` : 'any'
+      });
+      
       const { data: rawDataAny, error: queryError } = await query;
+
+      // Debugging: Log raw Supabase response structure with more context
+      console.log('[useAppointments] Raw Supabase response structure:', {
+        hasData: !!rawDataAny,
+        recordCount: rawDataAny?.length || 0,
+        sampleRecord: rawDataAny?.[0] || null,
+        hasClientsField: rawDataAny?.[0] ? 'clients' in rawDataAny[0] : false,
+        clientsFieldType: rawDataAny?.[0]?.clients ? typeof rawDataAny[0].clients : "undefined",
+        clientFieldKeys: rawDataAny?.[0]?.clients ? Object.keys(rawDataAny[0].clients) : [],
+        rawStartAtFormat: rawDataAny?.[0]?.start_at || "N/A",
+        clinicianIdUsed: formattedClinicianId
+      });
 
       if (queryError) {
         console.error(
@@ -309,81 +284,13 @@ export const useAppointments = (
           recurring_group_id: rawAppt.recurring_group_id,
           video_room_url: rawAppt.video_room_url,
           notes: rawAppt.notes,
-          google_calendar_event_id: rawAppt.google_calendar_event_id,
-          last_synced_at: rawAppt.last_synced_at,
           client: clientData,
           clientName: clientName,
         };
       });
     },
-    enabled: !!formattedClinicianId, // Only run if we have a valid clinician ID
+    enabled: !!formattedClinicianId,
   });
-
-  // Query for synced events
-  const {
-    data: fetchedSyncedEvents = [],
-    isLoading: isLoadingSyncedEvents,
-    error: syncedEventsError,
-    refetch: refetchSyncedEvents,
-  } = useQuery<SyncedEvent[], Error>({
-    queryKey: ["synced_events", formattedClinicianId, fromUTCISO, toUTCISO, refreshTrigger],
-    queryFn: async (): Promise<SyncedEvent[]> => {
-      if (!formattedClinicianId || !fromUTCISO || !toUTCISO) {
-        return [];
-      }
-
-      console.log("[useAppointments] Fetching synced events:", {
-        clinicianId: formattedClinicianId,
-        from: fromUTCISO,
-        to: toUTCISO
-      });
-
-      try {
-        const { data, error } = await supabase
-          .from("synced_events")
-          .select("*")
-          .eq("clinician_id", formattedClinicianId)
-          .eq("is_busy", true)
-          .gte("start_at", fromUTCISO)
-          .lte("end_at", toUTCISO)
-          .order("start_at", { ascending: true });
-
-        if (error) {
-          console.error("[useAppointments] Error fetching synced events:", error);
-          return [];
-        }
-
-        console.log(`[useAppointments] Fetched ${data?.length || 0} synced events`);
-        return data || [];
-      } catch (error) {
-        console.error("[useAppointments] Error in fetchSyncedEvents:", error);
-        return [];
-      }
-    },
-    enabled: !!formattedClinicianId && !!fromUTCISO && !!toUTCISO,
-  });
-
-  // Combine appointments and synced events
-  const combinedAppointments = useMemo(() => {
-    // Convert synced events to appointment-like objects
-    const syncedEventsAsAppointments = fetchedSyncedEvents.map(syncedEventToAppointmentLike);
-    
-    // Combine with regular appointments
-    const combined = [...fetchedAppointments, ...syncedEventsAsAppointments];
-    
-    // Sort by start time
-    combined.sort((a, b) => {
-      return new Date(a.start_at).getTime() - new Date(b.start_at).getTime();
-    });
-    
-    console.log("[useAppointments] Combined appointments and synced events:", {
-      appointments: fetchedAppointments.length,
-      syncedEvents: fetchedSyncedEvents.length,
-      total: combined.length
-    });
-    
-    return combined;
-  }, [fetchedAppointments, fetchedSyncedEvents]);
 
   // Helper function to add display formatting
   const addDisplayFormattingToAppointment = (
@@ -443,10 +350,10 @@ export const useAppointments = (
 
   // Memoized formatted appointments
   const appointmentsWithDisplayFormatting = useMemo(() => {
-    return combinedAppointments.map((appt) =>
+    return fetchedAppointments.map((appt) =>
       addDisplayFormattingToAppointment(appt, safeUserTimeZone)
     );
-  }, [combinedAppointments, safeUserTimeZone]);
+  }, [fetchedAppointments, safeUserTimeZone]);
   
 
   // Memoized filtered appointments
@@ -542,18 +449,6 @@ export const useAppointments = (
   const closeVideoSession = () => setIsVideoOpen(false);
   const closeSessionTemplate = () => setShowSessionTemplate(false);
 
-  // Combined refetch function
-  const refetch = () => {
-    refetchAppointments();
-    refetchSyncedEvents();
-  };
-
-  // Combined loading state
-  const isLoading = isLoadingAppointments || isLoadingSyncedEvents;
-
-  // Combined error state
-  const error = appointmentsError || syncedEventsError;
-
   return {
     appointments: appointmentsWithDisplayFormatting,
     todayAppointments,
@@ -561,7 +456,7 @@ export const useAppointments = (
     pastAppointments,
     isLoading,
     error,
-    refetch,
+    refetch: refetchAppointments,
     startVideoSession: startSession,
     openSessionTemplate: documentSession,
     isVideoOpen,
