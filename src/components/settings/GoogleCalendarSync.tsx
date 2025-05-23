@@ -1,28 +1,60 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2, Calendar, Check, AlertCircle } from 'lucide-react';
-import { syncGoogleCalendarEvents } from '@/utils/googleCalendarSync';
+import { useGoogleCalendar } from '@/hooks/useGoogleCalendar';
+import { useAppointments } from '@/hooks/useAppointments';
 import { useToast } from '@/hooks/use-toast';
 
 interface GoogleCalendarSyncProps {
   clinicianId: string;
-  googleAccessToken?: string;
 }
 
-export function GoogleCalendarSync({ clinicianId, googleAccessToken }: GoogleCalendarSyncProps) {
-  const [isSyncing, setIsSyncing] = useState(false);
+export function GoogleCalendarSync({ clinicianId }: GoogleCalendarSyncProps) {
+  const { toast } = useToast();
+  const { 
+    isConnected, 
+    isConnecting, 
+    isSyncing, 
+    connect, 
+    disconnect, 
+    bidirectionalSync,
+    lastSyncTime
+  } = useGoogleCalendar();
+  
+  const { appointments, refetch } = useAppointments(clinicianId);
+  
   const [lastSyncResult, setLastSyncResult] = useState<{
     success: boolean;
     message: string;
     syncedCount: number;
     timestamp: Date;
   } | null>(null);
-  const { toast } = useToast();
+
+  // Initialize last sync result from lastSyncTime if available
+  useEffect(() => {
+    if (lastSyncTime && !lastSyncResult) {
+      setLastSyncResult({
+        success: true,
+        message: "Last sync completed successfully",
+        syncedCount: 0,
+        timestamp: lastSyncTime
+      });
+    }
+  }, [lastSyncTime, lastSyncResult]);
+
+  const handleConnect = async () => {
+    await connect();
+  };
+
+  const handleDisconnect = () => {
+    disconnect();
+    setLastSyncResult(null);
+  };
 
   const handleSync = async () => {
-    if (!googleAccessToken) {
+    if (!isConnected) {
       toast({
         title: "Google Calendar Sync Error",
         description: "You need to connect your Google Calendar first",
@@ -31,7 +63,6 @@ export function GoogleCalendarSync({ clinicianId, googleAccessToken }: GoogleCal
       return;
     }
 
-    setIsSyncing(true);
     try {
       // Calculate date range for sync (now to 3 months in the future)
       const now = new Date();
@@ -39,34 +70,42 @@ export function GoogleCalendarSync({ clinicianId, googleAccessToken }: GoogleCal
       threeMonthsFromNow.setMonth(threeMonthsFromNow.getMonth() + 3);
 
       // Sync events from Google Calendar
-      const result = await syncGoogleCalendarEvents(
+      const result = await bidirectionalSync(
         clinicianId,
-        googleAccessToken,
-        'primary', // Use primary calendar
+        appointments,
         now,
         threeMonthsFromNow
       );
 
+      // Calculate total synced count
+      const syncedCount = result.fromGoogle.created + result.fromGoogle.updated;
+      const success = result.fromGoogle.errors === 0;
+      
       // Store the result
       setLastSyncResult({
-        ...result,
+        success,
+        message: success ? "Sync completed successfully" : "Some errors occurred during sync",
+        syncedCount,
         timestamp: new Date()
       });
 
       // Show toast notification
-      if (result.success) {
+      if (success) {
         toast({
           title: "Google Calendar Sync Complete",
-          description: `Successfully synced ${result.syncedCount} events`,
+          description: `Successfully synced ${syncedCount} events`,
           variant: "default"
         });
       } else {
         toast({
           title: "Google Calendar Sync Error",
-          description: result.message,
+          description: `Failed to sync some events (${result.fromGoogle.errors} errors)`,
           variant: "destructive"
         });
       }
+      
+      // Refresh appointments to show the newly synced events
+      refetch();
     } catch (error: any) {
       console.error('Error syncing Google Calendar:', error);
       setLastSyncResult({
@@ -80,8 +119,6 @@ export function GoogleCalendarSync({ clinicianId, googleAccessToken }: GoogleCal
         description: error.message || 'An unknown error occurred',
         variant: "destructive"
       });
-    } finally {
-      setIsSyncing(false);
     }
   };
 
@@ -127,23 +164,52 @@ export function GoogleCalendarSync({ clinicianId, googleAccessToken }: GoogleCal
         )}
       </CardContent>
       <CardFooter>
-        <Button 
-          onClick={handleSync} 
-          disabled={isSyncing || !googleAccessToken}
-          className="w-full"
-        >
-          {isSyncing ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Syncing...
-            </>
-          ) : (
-            <>
-              <Calendar className="mr-2 h-4 w-4" />
-              Sync Google Calendar
-            </>
-          )}
-        </Button>
+        {!isConnected ? (
+          <Button 
+            onClick={handleConnect} 
+            disabled={isConnecting}
+            className="w-full"
+          >
+            {isConnecting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Connecting...
+              </>
+            ) : (
+              <>
+                <Calendar className="mr-2 h-4 w-4" />
+                Connect Google Calendar
+              </>
+            )}
+          </Button>
+        ) : (
+          <div className="flex flex-col gap-2">
+            <Button 
+              onClick={handleSync} 
+              disabled={isSyncing}
+              className="w-full"
+            >
+              {isSyncing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Syncing...
+                </>
+              ) : (
+                <>
+                  <Calendar className="mr-2 h-4 w-4" />
+                  Sync Google Calendar
+                </>
+              )}
+            </Button>
+            <Button 
+              onClick={handleDisconnect} 
+              variant="outline"
+              className="w-full"
+            >
+              Disconnect Google Calendar
+            </Button>
+          </div>
+        )}
       </CardFooter>
     </Card>
   );
