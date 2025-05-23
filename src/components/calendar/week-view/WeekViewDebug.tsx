@@ -1,4 +1,3 @@
-
 import React, { useMemo, useEffect } from "react";
 import {
   format,
@@ -107,8 +106,8 @@ const WeekViewDebug: React.FC<WeekViewDebugProps> = ({
 
   // Use the custom hook to get all the data and utility functions
   const hookProps = {
-    currentDate,
-    clinicianId,
+    days,
+    selectedClinicianId: clinicianId,
     userTimeZone,
     refreshTrigger,
     appointments,
