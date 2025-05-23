@@ -80,5 +80,4 @@ export interface Appointment {
   // Standard audit fields
   created_at?: string;
   updated_at?: string;
-  
 }

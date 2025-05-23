@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Plus } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { AddUserDialog } from '@/components/AddUserDialog';
 import {
   Table,
   TableBody,
@@ -29,14 +30,11 @@ interface User {
   role: string | null;
 }
 
-interface UsersTabProps {
-  onAddUser?: () => void;
-}
-
-const UsersTab = ({ onAddUser }: UsersTabProps) => {
+const UsersTab = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
+  const [isAddUserDialogOpen, setIsAddUserDialogOpen] = useState(false);
   const itemsPerPage = 10;
   
   const totalUserPages = useMemo(() => Math.max(1, Math.ceil(users.length / itemsPerPage)), [users.length]);
@@ -142,18 +140,12 @@ const UsersTab = ({ onAddUser }: UsersTabProps) => {
     }
   };
 
-  const handleAddUserClick = () => {
-    if (onAddUser) {
-      onAddUser();
-    }
-  };
-
   return (
     <div className="p-6 animate-fade-in">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-semibold">User Management</h2>
         <button 
-          onClick={handleAddUserClick}
+          onClick={() => setIsAddUserDialogOpen(true)}
           className="flex items-center gap-1 px-3 py-1.5 text-sm bg-valorwell-700 text-white rounded hover:bg-valorwell-800"
         >
           <Plus size={16} />
@@ -239,6 +231,12 @@ const UsersTab = ({ onAddUser }: UsersTabProps) => {
           </PaginationContent>
         </Pagination>
       )}
+      
+      <AddUserDialog 
+        open={isAddUserDialogOpen} 
+        onOpenChange={setIsAddUserDialogOpen}
+        onUserAdded={handleUserAdded}
+      />
     </div>
   );
 };

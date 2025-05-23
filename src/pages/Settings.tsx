@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import Layout from '../components/layout/Layout';
 import PracticeTab from '@/components/settings/PracticeTab';
@@ -9,7 +8,6 @@ import TemplatesTab from '@/components/settings/TemplatesTab';
 import SecurityTab from '@/components/settings/SecurityTab';
 import LicensesTab from '@/components/settings/LicensesTab';
 import { AddUserDialog } from '@/components/AddUserDialog';
-import { useToast } from '@/hooks/use-toast';
 
 const SettingsTabs = {
   PRACTICE: 'practice',
@@ -24,20 +22,6 @@ const SettingsTabs = {
 const Settings = () => {
   const [activeTab, setActiveTab] = useState(SettingsTabs.PRACTICE);
   const [isAddUserDialogOpen, setIsAddUserDialogOpen] = useState(false);
-  const { toast } = useToast();
-  
-  const handleUserAdded = () => {
-    // Notify user of success
-    toast({
-      title: "User added",
-      description: "User has been added successfully"
-    });
-    
-    // Refresh the active tab's data (if needed)
-    if (activeTab === SettingsTabs.USERS || activeTab === SettingsTabs.CLINICIANS) {
-      // The refresh is handled internally in the respective component
-    }
-  };
   
   return (
     <Layout>
@@ -88,8 +72,8 @@ const Settings = () => {
         </div>
         
         {activeTab === SettingsTabs.PRACTICE && <PracticeTab />}
-        {activeTab === SettingsTabs.CLINICIANS && <CliniciansTab onAddUser={() => setIsAddUserDialogOpen(true)} />}
-        {activeTab === SettingsTabs.USERS && <UsersTab onAddUser={() => setIsAddUserDialogOpen(true)} />}
+        {activeTab === SettingsTabs.CLINICIANS && <CliniciansTab />}
+        {activeTab === SettingsTabs.USERS && <UsersTab />}
         {activeTab === SettingsTabs.BILLING && <BillingTab />}
         {activeTab === SettingsTabs.TEMPLATES && <TemplatesTab />}
         {activeTab === SettingsTabs.SECURITY && <SecurityTab />}
@@ -99,7 +83,10 @@ const Settings = () => {
       <AddUserDialog 
         open={isAddUserDialogOpen} 
         onOpenChange={setIsAddUserDialogOpen}
-        onUserAdded={handleUserAdded}
+        onUserAdded={() => {
+          // This is a callback that will be passed to the UsersTab
+          // We will handle this in the UsersTab component
+        }}
       />
     </Layout>
   );

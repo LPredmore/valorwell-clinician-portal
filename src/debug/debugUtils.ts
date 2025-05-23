@@ -1,237 +1,429 @@
-
 import { DateTime } from 'luxon';
+import { Appointment } from '@/types/appointment';
+import { AvailabilityBlock } from '@/types/availability';
+import { TimeBlock, AppointmentBlock } from '@/components/calendar/week-view/types';
 
-// Generic log function
-export const log = (context: string, message: string, data?: any) => {
-  if (process.env.NODE_ENV !== 'production') {
-    console.log(`[${context}] ${message}`, data || '');
-  }
-};
-
-// Generic warning function
-export const warn = (context: string, message: string, data?: any) => {
-    console.warn(`[${context}] ${message}`, data || '');
-};
-
-// Generic error function
-export const error = (context: string, message: string, data?: any) => {
-    console.error(`[${context}] ${message}`, data || '');
-};
-
+/**
+ * Centralized debug utility for the application
+ * Provides structured logging, data visualization, and debugging tools
+ */
 export class DebugUtils {
-  static VERBOSE = process.env.NODE_ENV !== 'production';
-
-  static log(context: string, message: string, data?: any) {
-    if (process.env.NODE_ENV !== 'production') {
-      console.log(`[${context}] ${message}`, data || '');
-    }
-  }
-
-  static warn(context: string, message: string, data?: any) {
-    if (process.env.NODE_ENV !== 'production') {
-      console.warn(`[${context}] ${message}`, data || '');
-    }
-  }
-
-  static error(context: string, message: string, data?: any) {
-    if (process.env.NODE_ENV !== 'production') {
-      console.error(`[${context}] ${message}`, data || '');
-    }
-  }
-
-  static info(context: string, message: string, data?: any) {
-    if (process.env.NODE_ENV !== 'production') {
-      console.info(`[${context}] ${message}`, data || '');
+  private static readonly PREFIX = '🔍 [DEBUG]';
+  private static readonly ERROR_PREFIX = '❌ [ERROR]';
+  private static readonly WARNING_PREFIX = '⚠️ [WARNING]';
+  private static readonly INFO_PREFIX = '📝 [INFO]';
+  
+  /**
+   * Enable or disable detailed debug logging
+   * Set to false in production environments
+   */
+  public static VERBOSE = process.env.NODE_ENV === 'development';
+  
+  /**
+   * Log with structured formatting and optional object inspection
+   */
+  public static log(context: string, message: string, data?: any): void {
+    if (!this.VERBOSE) return;
+    
+    console.log(`${this.PREFIX} [${context}] ${message}`);
+    if (data !== undefined) {
+      console.log(this.formatData(data));
     }
   }
   
-  // Add methods that might be referenced elsewhere
-  static analyzeAppointment(context: string, appointment: any, timezone: string) {
-    this.log(context, 'Analyzing appointment data', { appointment, timezone });
+  /**
+   * Log error with structured formatting
+   */
+  public static error(context: string, message: string, error?: any): void {
+    console.error(`${this.ERROR_PREFIX} [${context}] ${message}`);
+    if (error) {
+      console.error(error);
+    }
   }
   
-  static visualizeAppointment(context: string, appointment: any) {
-    this.log(context, 'Visualizing appointment', appointment);
+  /**
+   * Log warning with structured formatting
+   */
+  public static warn(context: string, message: string, data?: any): void {
+    console.warn(`${this.WARNING_PREFIX} [${context}] ${message}`);
+    if (data !== undefined) {
+      console.warn(this.formatData(data));
+    }
   }
   
-  static visualizeAppointmentBlock(context: string, block: any) {
-    this.log(context, 'Visualizing appointment block', block);
+  /**
+   * Log info with structured formatting
+   */
+  public static info(context: string, message: string, data?: any): void {
+    if (!this.VERBOSE) return;
+    
+    console.info(`${this.INFO_PREFIX} [${context}] ${message}`);
+    if (data !== undefined) {
+      console.info(this.formatData(data));
+    }
   }
   
-  static trackTimezoneConversion(context: string, timestamp: string, timezone: string) {
-    if (!timestamp) {
-      this.warn(context, 'Cannot track timezone conversion for null timestamp');
+  /**
+   * Format data for better console visualization
+   */
+  private static formatData(data: any): any {
+    if (data === null || data === undefined) {
+      return 'null/undefined';
+    }
+    
+    // Handle DateTime objects specially
+    if (data instanceof DateTime) {
+      return {
+        iso: data.toISO(),
+        formatted: data.toFormat('yyyy-MM-dd HH:mm:ss'),
+        zone: data.zoneName,
+        offset: data.offset,
+        isValid: data.isValid,
+        invalidReason: data.invalidReason || 'N/A'
+      };
+    }
+    
+    // Handle arrays of DateTime objects
+    if (Array.isArray(data) && data.length > 0 && data[0] instanceof DateTime) {
+      return data.map(dt => this.formatData(dt));
+    }
+    
+    return data;
+  }
+  
+  /**
+   * Log function entry with parameters
+   */
+  public static logFunctionEntry(context: string, functionName: string, params: Record<string, any>): void {
+    if (!this.VERBOSE) return;
+    this.log(context, `➡️ ${functionName}() called with:`, params);
+  }
+  
+  /**
+   * Log function exit with return value
+   */
+  public static logFunctionExit(context: string, functionName: string, returnValue: any): void {
+    if (!this.VERBOSE) return;
+    this.log(context, `⬅️ ${functionName}() returned:`, returnValue);
+  }
+  
+  /**
+   * Compare expected vs actual data structures
+   */
+  public static compareDataStructures(context: string, expected: any, actual: any): void {
+    if (!this.VERBOSE) return;
+    
+    const expectedKeys = Object.keys(expected || {}).sort();
+    const actualKeys = Object.keys(actual || {}).sort();
+    
+    const missingKeys = expectedKeys.filter(key => !actualKeys.includes(key));
+    const extraKeys = actualKeys.filter(key => !expectedKeys.includes(key));
+    const commonKeys = expectedKeys.filter(key => actualKeys.includes(key));
+    
+    const typeMismatches = commonKeys.filter(key => {
+      const expectedType = typeof expected[key];
+      const actualType = typeof actual[key];
+      return expectedType !== actualType;
+    });
+    
+    if (missingKeys.length > 0 || extraKeys.length > 0 || typeMismatches.length > 0) {
+      this.warn(context, `Data structure mismatch`, {
+        missingKeys,
+        extraKeys,
+        typeMismatches: typeMismatches.map(key => ({
+          key,
+          expectedType: typeof expected[key],
+          actualType: typeof actual[key]
+        }))
+      });
+      
+      console.log(`
+🔍 DATA STRUCTURE COMPARISON [${context}]
+┌─────────────────────────────────────────────────────────────────┐
+│ EXPECTED:
+${JSON.stringify(expected, null, 2).split('\n').map(line => `│   ${line}`).join('\n')}
+├─────────────────────────────────────────────────────────────────┤
+│ ACTUAL:
+${JSON.stringify(actual, null, 2).split('\n').map(line => `│   ${line}`).join('\n')}
+└─────────────────────────────────────────────────────────────────┘
+      `);
+    } else {
+      this.info(context, `Data structures match`);
+    }
+  }
+  
+  /**
+   * Visualize appointment data in the console
+   */
+  public static visualizeAppointment(appointment: Appointment, userTimeZone: string): void {
+    if (!this.VERBOSE) return;
+    
+    const startLocal = DateTime.fromISO(appointment.start_at).setZone(userTimeZone);
+    const endLocal = DateTime.fromISO(appointment.end_at).setZone(userTimeZone);
+    
+    console.log(`
+🗓️ APPOINTMENT: ${appointment.id}
+┌─────────────────────────────────────────────────────────────────┐
+│ Client: ${appointment.clientName || `${appointment.client_id} (ID only)`}
+│ Type: ${appointment.type}
+│ Status: ${appointment.status}
+├─────────────────────────────────────────────────────────────────┤
+│ UTC Start: ${appointment.start_at}
+│ UTC End: ${appointment.end_at}
+├─────────────────────────────────────────────────────────────────┤
+│ Local Start (${userTimeZone}): ${startLocal.toFormat('yyyy-MM-dd HH:mm:ss')}
+│ Local End (${userTimeZone}): ${endLocal.toFormat('yyyy-MM-dd HH:mm:ss')}
+└─────────────────────────────────────────────────────────────────┘
+    `);
+  }
+  
+  /**
+   * Visualize appointment block data in the console
+   */
+  public static visualizeAppointmentBlock(block: AppointmentBlock, userTimeZone: string): void {
+    if (!this.VERBOSE) return;
+    
+    console.log(`
+🧩 APPOINTMENT BLOCK: ${block.id}
+┌─────────────────────────────────────────────────────────────────┐
+│ Client: ${block.clientName || `${block.clientId} (ID only)`}
+│ Type: ${block.type}
+├─────────────────────────────────────────────────────────────────┤
+│ Start (${block.start.zoneName}): ${block.start.toFormat('yyyy-MM-dd HH:mm:ss')}
+│ End (${block.end.zoneName}): ${block.end.toFormat('yyyy-MM-dd HH:mm:ss')}
+│ Day: ${block.day ? block.day.toFormat('yyyy-MM-dd') : 'Not specified'}
+└─────────────────────────────────────────────────────────────────┘
+    `);
+  }
+  
+  /**
+   * Visualize availability block data in the console
+   */
+  public static visualizeAvailabilityBlock(block: AvailabilityBlock, userTimeZone: string): void {
+    if (!this.VERBOSE) return;
+    
+    const startLocal = block.start_at ? DateTime.fromISO(block.start_at).setZone(userTimeZone) : null;
+    const endLocal = block.end_at ? DateTime.fromISO(block.end_at).setZone(userTimeZone) : null;
+    
+    console.log(`
+⏰ AVAILABILITY BLOCK: ${block.id}
+┌─────────────────────────────────────────────────────────────────┐
+│ Clinician: ${block.clinician_id}
+│ Active: ${block.is_active ? 'Yes' : 'No'}
+├─────────────────────────────────────────────────────────────────┤
+│ UTC Start: ${block.start_at}
+│ UTC End: ${block.end_at}
+├─────────────────────────────────────────────────────────────────┤
+│ Local Start (${userTimeZone}): ${startLocal ? startLocal.toFormat('yyyy-MM-dd HH:mm:ss') : 'N/A'}
+│ Local End (${userTimeZone}): ${endLocal ? endLocal.toFormat('yyyy-MM-dd HH:mm:ss') : 'N/A'}
+├─────────────────────────────────────────────────────────────────┤
+│ Day of Week: ${(block as any).day_of_week || 'N/A'}
+│ Legacy Start Time: ${(block as any).start_time || 'N/A'}
+│ Legacy End Time: ${(block as any).end_time || 'N/A'}
+└─────────────────────────────────────────────────────────────────┘
+    `);
+  }
+  
+  /**
+   * Track timezone conversion
+   */
+  public static trackTimezoneConversion(context: string, fromTime: string | DateTime, fromZone: string, toZone: string, result: DateTime): void {
+    if (!this.VERBOSE) return;
+    
+    const fromTimeStr = typeof fromTime === 'string' ? fromTime : fromTime.toISO();
+    
+    console.log(`
+🌐 TIMEZONE CONVERSION [${context}]
+┌─────────────────────────────────────────────────────────────────┐
+│ From: ${fromTimeStr} (${fromZone})
+│ To: ${result.toISO()} (${toZone})
+│ 
+│ From (formatted): ${typeof fromTime === 'string' 
+                      ? DateTime.fromISO(fromTime, { zone: fromZone }).toFormat('yyyy-MM-dd HH:mm:ss')
+                      : fromTime.toFormat('yyyy-MM-dd HH:mm:ss')}
+│ To (formatted): ${result.toFormat('yyyy-MM-dd HH:mm:ss')}
+│ 
+│ Valid: ${result.isValid ? 'Yes' : 'No'}
+│ Invalid Reason: ${result.invalidReason || 'N/A'}
+└─────────────────────────────────────────────────────────────────┘
+    `);
+  }
+  
+  /**
+   * Analyze an appointment's timezone conversions and log detailed information
+   */
+  public static analyzeAppointment(appointment: Appointment, userTimeZone: string): void {
+    if (!this.VERBOSE) return;
+    
+    if (!appointment) {
+      this.error('AppointmentDebug', 'Cannot analyze null appointment');
       return;
     }
-    
+
     try {
-      const utcTime = DateTime.fromISO(timestamp, { zone: 'utc' });
-      const localTime = utcTime.setZone(timezone);
-      this.log(context, 'Timezone conversion tracking', { 
-        utc: timestamp, 
-        local: localTime.toISO(),
-        offset: localTime.offset 
+      // Parse UTC timestamps
+      const utcStart = DateTime.fromISO(appointment.start_at, { zone: 'UTC' });
+      const utcEnd = DateTime.fromISO(appointment.end_at, { zone: 'UTC' });
+
+      // Convert to user's timezone
+      const localStart = utcStart.setZone(userTimeZone);
+      const localEnd = utcEnd.setZone(userTimeZone);
+
+      // Check for DST transitions
+      const isDSTTransition = this.checkForDSTTransition(utcStart, utcEnd, userTimeZone);
+
+      // Log detailed analysis
+      console.log(`
+🔍 APPOINTMENT ANALYSIS: ${appointment.id}
+┌─────────────────────────────────────────────────────────────────┐
+│ Client: ${appointment.clientName || appointment.client_id}
+│ Type: ${appointment.type}
+│ Status: ${appointment.status}
+├─────────────────────────────────────────────────────────────────┤
+│ UTC Start: ${appointment.start_at}
+│   → Parsed: ${utcStart.toISO()} (Valid: ${utcStart.isValid})
+│   → Weekday: ${utcStart.weekdayLong}
+│
+│ UTC End: ${appointment.end_at}
+│   → Parsed: ${utcEnd.toISO()} (Valid: ${utcEnd.isValid})
+│   → Duration: ${utcEnd.diff(utcStart).as('minutes')} minutes
+├─────────────────────────────────────────────────────────────────┤
+│ Local Start (${userTimeZone}): ${localStart.toISO()}
+│   → Formatted: ${localStart.toFormat('yyyy-MM-dd HH:mm:ss')}
+│   → Weekday: ${localStart.weekdayLong}
+│   → Offset: UTC${localStart.toFormat('Z')} (${localStart.offsetNameShort})
+│
+│ Local End (${userTimeZone}): ${localEnd.toISO()}
+│   → Formatted: ${localEnd.toFormat('yyyy-MM-dd HH:mm:ss')}
+│   → Offset: UTC${localEnd.toFormat('Z')} (${localEnd.offsetNameShort})
+│   → Duration: ${localEnd.diff(localStart).as('minutes')} minutes
+├─────────────────────────────────────────────────────────────────┤
+│ DST Transition: ${isDSTTransition ? '⚠️ YES - POTENTIAL ISSUE' : 'No'}
+│ Day Boundary Cross: ${utcStart.day !== localStart.day ? '⚠️ YES - POTENTIAL ISSUE' : 'No'}
+│ Duration Mismatch: ${
+        Math.abs(utcEnd.diff(utcStart).as('minutes') - localEnd.diff(localStart).as('minutes')) > 1
+          ? '⚠️ YES - POTENTIAL ISSUE'
+          : 'No'
+      }
+└─────────────────────────────────────────────────────────────────┘
+      `);
+    } catch (error) {
+      this.error('AppointmentDebug', 'Error analyzing appointment', {
+        appointmentId: appointment.id,
+        error: error instanceof Error ? error.message : String(error)
       });
-    } catch (e) {
-      this.error(context, 'Error tracking timezone conversion', e);
     }
   }
-  
-  static compareDataStructures(context: string, expected: any, actual: any) {
-    const expectedKeys = Object.keys(expected || {});
-    const actualKeys = Object.keys(actual || {});
-    
-    const missingKeys = expectedKeys.filter(k => !actualKeys.includes(k));
-    const extraKeys = actualKeys.filter(k => !expectedKeys.includes(k));
-    
-    this.log(context, 'Data structure comparison', { 
-      missingKeys, 
-      extraKeys, 
-      matching: missingKeys.length === 0 && extraKeys.length === 0 
-    });
-  }
-  
-  static logHookParameterMismatch(hookName: string, expected: any, actual: any) {
-    this.warn(hookName, 'Hook parameter mismatch', { expected, actual });
-  }
-  
-  static validateHookParameters(context: string, params: any) {
-    const nullParams = Object.entries(params)
-      .filter(([_, v]) => v === null || v === undefined)
-      .map(([k]) => k);
+
+  /**
+   * Check if a time range crosses a DST transition
+   */
+  private static checkForDSTTransition(
+    utcStart: DateTime,
+    utcEnd: DateTime,
+    timezone: string
+  ): boolean {
+    try {
+      // Check hourly intervals between start and end for offset changes
+      const hours = Math.ceil(utcEnd.diff(utcStart).as('hours'));
+      let previousOffset = utcStart.setZone(timezone).offset;
       
-    if (nullParams.length > 0) {
-      this.warn(context, 'Some parameters are null or undefined', nullParams);
+      for (let i = 1; i <= hours; i++) {
+        const checkTime = utcStart.plus({ hours: i }).setZone(timezone);
+        if (checkTime.offset !== previousOffset) {
+          return true;
+        }
+        previousOffset = checkTime.offset;
+      }
+      
+      return false;
+    } catch (error) {
+      this.error('AppointmentDebug', 'Error checking DST transition', {
+        error: error instanceof Error ? error.message : String(error)
+      });
+      return false;
     }
   }
   
-  static visualizeAvailabilityBlock(context: string, block: any) {
-    this.log(context, 'Visualizing availability block', block);
+  /**
+   * Log hook parameter mismatch between expected and actual parameters
+   */
+  public static logHookParameterMismatch(
+    hookName: string, 
+    expectedParams: Record<string, any>, 
+    actualParams: any[]
+  ): void {
+    if (!this.VERBOSE) return;
+    
+    this.error('CalendarDebug', `Parameter mismatch in ${hookName} hook`, {
+      expected: Object.keys(expectedParams),
+      actual: actualParams.map((param, index) => `param${index+1}: ${typeof param}`)
+    });
+    
+    console.error(`
+❌ HOOK PARAMETER MISMATCH in ${hookName}
+┌─────────────────────────────────────────────────────────────────┐
+│ Expected (named parameters):
+${Object.entries(expectedParams).map(([key, value]) => 
+  `│   ${key}: ${value === undefined ? 'undefined' : typeof value} ${value === null ? '(null)' : ''}`
+).join('\n')}
+├─────────────────────────────────────────────────────────────────┤
+│ Actual (positional parameters):
+${actualParams.map((param, index) => 
+  `│   param${index+1}: ${param === undefined ? 'undefined' : typeof param} ${param === null ? '(null)' : ''}`
+).join('\n')}
+└─────────────────────────────────────────────────────────────────┘
+    `);
+  }
+  
+  /**
+   * Log hook parameter validation
+   */
+  public static validateHookParameters(
+    hookName: string,
+    params: Record<string, any>
+  ): void {
+    if (!this.VERBOSE) return;
+    
+    const issues: string[] = [];
+    
+    // Check for null or undefined parameters
+    Object.entries(params).forEach(([key, value]) => {
+      if (value === undefined) {
+        issues.push(`Parameter '${key}' is undefined`);
+      } else if (value === null) {
+        issues.push(`Parameter '${key}' is null`);
+      }
+    });
+    
+    // Check specific parameters
+    if ('userTimeZone' in params && typeof params.userTimeZone === 'string') {
+      try {
+        DateTime.now().setZone(params.userTimeZone);
+      } catch (error) {
+        issues.push(`Invalid timezone '${params.userTimeZone}'`);
+      }
+    }
+    
+    if ('currentDate' in params && params.currentDate instanceof Date) {
+      if (isNaN(params.currentDate.getTime())) {
+        issues.push(`Invalid date: ${params.currentDate}`);
+      }
+    }
+    
+    // Log results
+    if (issues.length > 0) {
+      this.warn('CalendarDebug', `Parameter validation issues in ${hookName}`, issues);
+    } else {
+      this.info('CalendarDebug', `All parameters valid for ${hookName}`, params);
+    }
   }
 }
 
-export const loadDebugModule = () => {
-  if (process.env.NODE_ENV !== 'production') {
-    console.log('Debug module loaded');
+// Export a conditional import helper to only load debug code in development
+export function loadDebugModule<T>(importFn: () => Promise<T>): Promise<T | null> {
+  if (process.env.NODE_ENV === 'development') {
+    return importFn();
   }
-};
-
-// Function to log appointment details
-export const logAppointment = (context: string, appointment: any, timezone: string) => {
-  if (!appointment) {
-    log(context, 'Appointment is null/undefined');
-    return;
-  }
-
-  log(context, 'Appointment details', {
-    id: appointment.id,
-    client_id: appointment.client_id,
-    start_at: appointment.start_at,
-    end_at: appointment.end_at,
-    clientName: appointment.clientName,
-    timezone
-  });
-};
-
-// Function to log availability block details
-export const logAvailabilityBlock = (context: string, block: any, timezone: string) => {
-  if (!block) {
-    log(context, 'Availability block is null/undefined');
-    return;
-  }
-
-  log(context, 'Availability block details', {
-    id: block.id,
-    clinician_id: block.clinician_id,
-    start_at: block.start_at,
-    end_at: block.end_at,
-    timezone
-  });
-};
-
-// Function to log client details
-export const logClient = (context: string, client: any) => {
-  if (!client) {
-    log(context, 'Client is null/undefined');
-    return;
-  }
-
-  log(context, 'Client details', {
-    id: client.id,
-    client_first_name: client.client_first_name,
-    client_last_name: client.client_last_name,
-    client_preferred_name: client.client_preferred_name
-  });
-};
-
-// Function to log timezone conversion
-export const logTimezoneConversion = (context: string, time: string, timezone: string) => {
-    if (!time) {
-        log(context, 'Time is null/undefined');
-        return;
-    }
-
-    try {
-        const utcTime = DateTime.fromISO(time, { zone: 'utc' });
-        const localTime = utcTime.setZone(timezone);
-
-        log(context, 'Timezone conversion details', {
-            utcTime: utcTime.toISO(),
-            localTime: localTime.toISO(),
-            timezone: timezone
-        });
-    } catch (e) {
-        error(context, 'Error during timezone conversion', {
-            time: time,
-            timezone: timezone,
-            error: e
-        });
-    }
-};
-
-// Function to log appointment transformation
-export const logAppointmentTransformation = (context: string, appointment: any, timezone: string) => {
-    if (!appointment) {
-        log(context, 'Appointment is null/undefined');
-        return;
-    }
-
-    try {
-        const startAt = DateTime.fromISO(appointment.start_at, { zone: 'utc' });
-        const endAt = DateTime.fromISO(appointment.end_at, { zone: 'utc' });
-
-        log(context, 'Appointment transformation details', {
-            id: appointment.id,
-            start_at_utc: appointment.start_at,
-            end_at_utc: appointment.end_at,
-            start_at_local: startAt.setZone(timezone).toISO(),
-            end_at_local: endAt.setZone(timezone).toISO(),
-            timezone: timezone
-        });
-    } catch (e) {
-        error(context, 'Error during appointment transformation', {
-            appointmentId: appointment.id,
-            error: e
-        });
-    }
-};
-
-// Update the logAppointmentBlock function to handle optional day property
-export const logAppointmentBlock = (context: string, block: any, timezone: string) => {
-  if (!block) {
-    log(context, 'Appointment block is null/undefined');
-    return;
-  }
-
-  log(context, 'Appointment block details', {
-    id: block.id,
-    clientId: block.clientId,
-    clientName: block.clientName,
-    start: block.start?.toFormat?.('yyyy-MM-dd HH:mm') || 'Invalid start',
-    end: block.end?.toFormat?.('yyyy-MM-dd HH:mm') || 'Invalid end',
-    day: block.day?.toFormat?.('yyyy-MM-dd') || 'No day property',
-    type: block.type,
-    status: block.status,
-    timezone
-  });
-};
+  return Promise.resolve(null);
+}

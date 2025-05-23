@@ -1,40 +1,40 @@
 
 import { DateTime } from 'luxon';
-import { Appointment } from '@/types/appointment';
+import { AvailabilityBlock } from '@/types/availability';
+
+// Re-export using the proper syntax for types with isolatedModules
+export type { AvailabilityBlock };
 
 export interface TimeBlock {
-  id: string;
   start: DateTime;
   end: DateTime;
   day?: DateTime;
   availabilityIds: string[];
-  isAvailable: boolean;
-  isException?: boolean;
-  isStandalone?: boolean;
+  isException: boolean;
+  isStandalone: boolean;
 }
 
 export interface AppointmentBlock {
   id: string;
-  clientId: string;
-  clientName: string;
   start: DateTime;
   end: DateTime;
-  day?: DateTime;
-  type: string;
-  status?: string;
-  notes?: string;
-  video_room_url?: string;
+  day: DateTime;
+  clientId: string;
+  clientName: string;
+  type?: string;
 }
 
 export interface AvailabilityException {
   id: string;
   clinician_id: string;
-  start_time?: string;
-  end_time?: string;
-  date?: string;
+  specific_date: string;
+  start_time: string;
+  end_time: string;
+  day_of_week?: string;
   is_active: boolean;
-  is_deleted?: boolean;
-  specific_date?: string;
+  is_deleted: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface TimeSlotProps {
@@ -46,11 +46,7 @@ export interface TimeSlotProps {
   isStartOfBlock: boolean;
   isEndOfBlock: boolean;
   isStartOfAppointment: boolean;
-  isEndOfAppointment: boolean;
-  handleAvailabilityBlockClick: (day: Date, block: any) => void;
+  handleAvailabilityBlockClick: (day: Date, block: TimeBlock) => void;
   onAppointmentClick?: (appointment: any) => void;
-  onAppointmentDragStart?: (appointment: any, event: React.DragEvent) => void;
-  onAppointmentDragOver?: (day: Date, timeSlot: Date, event: React.DragEvent) => void;
-  onAppointmentDrop?: (day: Date, timeSlot: Date, event: React.DragEvent) => void;
-  originalAppointments?: Appointment[];
+  originalAppointments: any[];
 }

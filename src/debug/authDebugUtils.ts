@@ -1,5 +1,4 @@
-
-import { DebugUtils } from '../utils/debugUtils';
+import { DebugUtils } from './debugUtils';
 
 /**
  * Debug utility for authentication operations

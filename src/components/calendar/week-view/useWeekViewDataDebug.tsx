@@ -15,10 +15,10 @@ const DEBUG_CONTEXT = 'useWeekViewDataDebug';
 // Use ClientDetails as Client for backward compatibility
 type Client = ClientDetails;
 
-// Input props interface for hook - updated to match actual usage
+// Input props interface for hook
 export interface UseWeekViewDataProps {
-  days: Date[];
-  selectedClinicianId: string | null;
+  currentDate: Date;
+  clinicianId: string | null;
   userTimeZone: string;
   refreshTrigger?: number;
   appointments?: Appointment[];
@@ -32,8 +32,8 @@ export interface UseWeekViewDataProps {
 export const useWeekViewDataDebug = (props: UseWeekViewDataProps) => {
   // Destructure props with defaults
   const {
-    days,
-    selectedClinicianId,
+    currentDate,
+    clinicianId,
     userTimeZone,
     refreshTrigger = 0,
     appointments: externalAppointments = [],
@@ -42,8 +42,8 @@ export const useWeekViewDataDebug = (props: UseWeekViewDataProps) => {
 
   // Log hook initialization with parameters
   DebugUtils.log(DEBUG_CONTEXT, 'Hook initialized with parameters', {
-    daysCount: days?.length || 0,
-    selectedClinicianId,
+    currentDate: currentDate?.toISOString(),
+    clinicianId,
     userTimeZone,
     refreshTrigger,
     externalAppointmentsCount: externalAppointments.length
@@ -51,8 +51,8 @@ export const useWeekViewDataDebug = (props: UseWeekViewDataProps) => {
 
   // Validate parameters
   CalendarDebugUtils.validateHookParameters(DEBUG_CONTEXT, {
-    currentDate: days?.[0] || new Date(),
-    clinicianId: selectedClinicianId,
+    currentDate,
+    clinicianId,
     userTimeZone
   });
 
@@ -65,27 +65,50 @@ export const useWeekViewDataDebug = (props: UseWeekViewDataProps) => {
   const [timeBlocks, setTimeBlocks] = useState<TimeBlock[]>([]);
   const [appointmentBlocks, setAppointmentBlocks] = useState<AppointmentBlock[]>([]);
 
-  // Convert the provided days array to DateTime objects
-  const weekDays = useMemo(() => {
-    DebugUtils.log(DEBUG_CONTEXT, 'Converting days to DateTime objects', {
-      daysCount: days?.length || 0
+  // Ensure current date is in clinician's time zone
+  const localDate = useMemo(() => {
+    DebugUtils.log(DEBUG_CONTEXT, 'Converting currentDate to localDate', {
+      currentDate: currentDate?.toISOString(),
+      userTimeZone
     });
     
-    if (!days || days.length === 0) {
-      DebugUtils.warn(DEBUG_CONTEXT, 'No days provided, returning empty array');
-      return [];
-    }
+    const result = TimeZoneService.fromJSDate(currentDate, userTimeZone);
     
-    const result = days.map(day => TimeZoneService.fromJSDate(day, userTimeZone));
-    
-    DebugUtils.log(DEBUG_CONTEXT, 'Converted weekDays result', {
-      count: result.length,
-      firstDay: result[0]?.toFormat('yyyy-MM-dd'),
-      lastDay: result[result.length - 1]?.toFormat('yyyy-MM-dd')
+    DebugUtils.log(DEBUG_CONTEXT, 'Converted localDate result', {
+      localDate: result.toISO(),
+      zone: result.zoneName,
+      offset: result.offset
     });
     
     return result;
-  }, [days, userTimeZone]);
+  }, [currentDate, userTimeZone]);
+
+  // Generate days for the current week
+  const weekDays = useMemo(() => {
+    DebugUtils.log(DEBUG_CONTEXT, 'Generating weekDays', {
+      localDate: localDate.toISO()
+    });
+    
+    const days: DateTime[] = [];
+    const weekStart = localDate.startOf('week');
+    
+    DebugUtils.log(DEBUG_CONTEXT, 'Week start date', {
+      weekStart: weekStart.toISO(),
+      weekDay: weekStart.weekday
+    });
+    
+    for (let i = 0; i < 7; i++) {
+      days.push(weekStart.plus({ days: i }));
+    }
+    
+    DebugUtils.log(DEBUG_CONTEXT, 'Generated weekDays', {
+      count: days.length,
+      firstDay: days[0].toFormat('yyyy-MM-dd'),
+      lastDay: days[6].toFormat('yyyy-MM-dd')
+    });
+    
+    return days;
+  }, [localDate]);
 
   // Format day strings ('yyyy-MM-dd') for mapping
   const dayKeys = useMemo(() => {
@@ -102,15 +125,15 @@ export const useWeekViewDataDebug = (props: UseWeekViewDataProps) => {
   useEffect(() => {
     const initializeData = async () => {
       DebugUtils.log(DEBUG_CONTEXT, 'Initializing data', {
-        selectedClinicianId,
+        clinicianId,
         refreshTrigger,
         userTimeZone
       });
       
       setLoading(true);
       
-      if (!selectedClinicianId || weekDays.length === 0) {
-        DebugUtils.warn(DEBUG_CONTEXT, 'No clinicianId or days provided, returning empty data');
+      if (!clinicianId) {
+        DebugUtils.warn(DEBUG_CONTEXT, 'No clinicianId provided, returning empty data');
         setAppointments([]);
         setAvailability([]);
         setClients(new Map());
@@ -123,12 +146,20 @@ export const useWeekViewDataDebug = (props: UseWeekViewDataProps) => {
 
       try {
         // UTC date bounds for current week
-        const utcStart = weekDays[0].toUTC().startOf('day').toISO();
-        const utcEnd = weekDays[weekDays.length - 1].toUTC().endOf('day').toISO();
+        const utcStart = DateTime.utc(
+          localDate.year,
+          localDate.month,
+          localDate.day
+        ).startOf('week').toISO();
+
+        const utcEnd = DateTime.utc(
+          localDate.year,
+          localDate.month,
+          localDate.day
+        ).endOf('week').toISO();
 
         DebugUtils.log(DEBUG_CONTEXT, 'Fetching data for week', {
-          localStart: weekDays[0].toISO(),
-          localEnd: weekDays[weekDays.length - 1].toISO(),
+          localStart: localDate.startOf('week').toISO(),
           utcStart,
           utcEnd,
           timezone: userTimeZone
@@ -137,34 +168,34 @@ export const useWeekViewDataDebug = (props: UseWeekViewDataProps) => {
         // Fetch all required data in parallel
         const [appointmentData, availabilityData, clientData, exceptionData] = await Promise.all([
           // Fetch appointments
-          selectedClinicianId ? supabase
+          clinicianId ? supabase
             .from('appointments')
             .select('*')
-            .eq('clinician_id', selectedClinicianId)
+            .eq('clinician_id', clinicianId)
             .gte('start_at', utcStart)
             .lt('end_at', utcEnd)
             .order('start_at', { ascending: true }) : Promise.resolve({ data: [], error: null }),
           
           // Fetch availability blocks
-          selectedClinicianId ? supabase
+          clinicianId ? supabase
             .from('availability_blocks')
             .select('*')
-            .eq('clinician_id', selectedClinicianId)
+            .eq('clinician_id', clinicianId)
             .gte('end_at', utcStart)
             .lt('start_at', utcEnd)
             .order('start_at', { ascending: true }) : Promise.resolve({ data: [], error: null }),
           
           // Fetch client data once
-          selectedClinicianId ? supabase
+          clinicianId ? supabase
             .from('clients')
             .select('id, client_first_name, client_last_name, client_preferred_name')
-            .eq('clinician_id', selectedClinicianId) : Promise.resolve({ data: [], error: null }),
+            .eq('clinician_id', clinicianId) : Promise.resolve({ data: [], error: null }),
             
           // Fetch availability exceptions
-          selectedClinicianId ? supabase
+          clinicianId ? supabase
             .from('availability_exceptions')
             .select('*')
-            .eq('clinician_id', selectedClinicianId) : Promise.resolve({ data: [], error: null })
+            .eq('clinician_id', clinicianId) : Promise.resolve({ data: [], error: null })
         ]);
 
         // Process appointments
@@ -247,7 +278,7 @@ export const useWeekViewDataDebug = (props: UseWeekViewDataProps) => {
     };
 
     initializeData();
-  }, [selectedClinicianId, refreshTrigger, userTimeZone, weekDays]);
+  }, [clinicianId, refreshTrigger, userTimeZone, localDate]);
 
   // Process availability blocks into time blocks
   const processTimeBlocks = (blocks: AvailabilityBlock[], exceptions: AvailabilityException[]) => {
@@ -275,12 +306,10 @@ export const useWeekViewDataDebug = (props: UseWeekViewDataProps) => {
         const day = start.startOf('day');
         
         timeBlocks.push({
-          id: block.id,
           start,
           end,
           day,
           availabilityIds: [block.id],
-          isAvailable: true,
           isException: false,
           isStandalone: false
         });

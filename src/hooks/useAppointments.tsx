@@ -95,31 +95,10 @@ export const useAppointments = (
   const [isLoadingSessionClientData, setIsLoadingSessionClientData] =
     useState(false);
 
-  // First, define safeUserTimeZone before it's used
+  const formattedClinicianId = clinicianId ? clinicianId : null;
   const safeUserTimeZone = TimeZoneService.ensureIANATimeZone(
     timeZone || TimeZoneService.DEFAULT_TIMEZONE
   );
-
-  // Validate clinician ID for debugging
-  const formattedClinicianId = clinicianId ? clinicianId : null;
-  // Log clinician ID format validation
-  const isValidUUID = formattedClinicianId ? 
-    /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(formattedClinicianId) : 
-    false;
-    
-  // Enhanced logging for clinician ID handling
-  console.log("[useAppointments] Clinician ID validation:", {
-    rawClinicianId: clinicianId,
-    formattedClinicianId,
-    isValidUUID: isValidUUID,
-    isUUIDFormat: formattedClinicianId ? /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(formattedClinicianId) : false,
-    fromTimeZone: safeUserTimeZone
-  });
-
-  // If clinician ID doesn't look like a UUID, log a warning
-  if (formattedClinicianId && !isValidUUID) {
-    console.warn("[useAppointments] Warning: clinicianId doesn't appear to be a valid UUID:", formattedClinicianId);
-  }
   
   // Log clinician ID handling for debugging
   console.log("[useAppointments] Clinician ID handling:", {
@@ -170,15 +149,10 @@ export const useAppointments = (
           
         fromISO = weekStart;
       } else {
-        // If neither from/to dates exist, fetch current UTC week and expand range to +/- 30 days
+        // If neither from/to dates exist, fetch current UTC week
         const now = DateTime.utc();
-        fromISO = now.minus({ days: 30 }).startOf('day').toISO();
-        toISO = now.plus({ days: 30 }).endOf('day').toISO();
-        
-        console.log("[useAppointments] Using expanded default date range:", { 
-          from: DateTime.fromISO(fromISO).toFormat('yyyy-MM-dd'),
-          to: DateTime.fromISO(toISO).toFormat('yyyy-MM-dd')
-        });
+        fromISO = now.startOf('week').toISO();
+        toISO = now.endOf('week').toISO();
       }
       
       return { fromUTCISO: fromISO, toUTCISO: toISO };
@@ -188,51 +162,37 @@ export const useAppointments = (
     }
   }, [fromDate, toDate, safeUserTimeZone]);
 
-  // Query for regular appointments
   const {
     data: fetchedAppointments = [],
-    isLoading: isLoadingAppointments,
-    error: appointmentsError,
+    isLoading,
+    error,
     refetch: refetchAppointments,
   } = useQuery<Appointment[], Error>({
     // Include refreshTrigger in the queryKey to force refresh when it changes
     queryKey: ["appointments", formattedClinicianId, fromUTCISO, toUTCISO, refreshTrigger],
     queryFn: async (): Promise<Appointment[]> => {
-      if (!formattedClinicianId) {
-        console.warn("[useAppointments] No clinician ID provided, skipping fetch");
-        return [];
-      }
-       
-      // Log complete query parameters for debugging
+      if (!formattedClinicianId) return [];
       console.log(
-        "[useAppointments] Fetching appointments with params:",
-        {
-          clinicianId: formattedClinicianId,
-          from: fromUTCISO,
-          to: toUTCISO,
-          refreshTrigger,
-          isValidUUID
-        }
+        "[useAppointments] Fetching for clinician:",
+        formattedClinicianId,
+        { from: fromUTCISO, to: toUTCISO, refreshTrigger }
       );
 
-      // Create base query without filters for debugging
-      let baseQuery = supabase
-        .from("appointments")
-        .select(
-          `id, client_id, clinician_id, start_at, end_at, type, status, appointment_recurring, recurring_group_id, video_room_url, notes, clients (client_first_name, client_last_name, client_preferred_name, client_email, client_phone, client_status, client_date_of_birth, client_gender, client_address, client_city, client_state, client_zipcode)`
-        )
-        .eq("clinician_id", formattedClinicianId);
-
-      // Now build the full query with filters
       let query = supabase
         .from("appointments")
         .select(
           `id, client_id, clinician_id, start_at, end_at, type, status, appointment_recurring, recurring_group_id, video_room_url, notes, clients (client_first_name, client_last_name, client_preferred_name, client_email, client_phone, client_status, client_date_of_birth, client_gender, client_address, client_city, client_state, client_zipcode)`
         )
         .eq("clinician_id", formattedClinicianId)
-        .in("status", ["scheduled", "confirmed", "completed", "rescheduled"]);
+        .eq("status", "scheduled");
 
       // Use more robust timezone-aware filtering
+      console.log("[useAppointments] Applying robust UTC filter:", {
+        fromUTCISO,
+        toUTCISO,
+        clinicianTZ: safeUserTimeZone
+      });
+      
       if (fromUTCISO) query = query.gte("start_at", fromUTCISO);
       if (toUTCISO) query = query.lte("end_at", toUTCISO);
       
@@ -240,7 +200,26 @@ export const useAppointments = (
       query = query
         .order("start_at", { ascending: true });
         
+      // Log debug info
+      console.log("[useAppointments] Final query details:", {
+        clinician_id: formattedClinicianId,
+        start_at: fromUTCISO ? `>= ${fromUTCISO}` : 'any',
+        end_at: toUTCISO ? `<= ${toUTCISO}` : 'any'
+      });
+      
       const { data: rawDataAny, error: queryError } = await query;
+
+      // Debugging: Log raw Supabase response structure with more context
+      console.log('[useAppointments] Raw Supabase response structure:', {
+        hasData: !!rawDataAny,
+        recordCount: rawDataAny?.length || 0,
+        sampleRecord: rawDataAny?.[0] || null,
+        hasClientsField: rawDataAny?.[0] ? 'clients' in rawDataAny[0] : false,
+        clientsFieldType: rawDataAny?.[0]?.clients ? typeof rawDataAny[0].clients : "undefined",
+        clientFieldKeys: rawDataAny?.[0]?.clients ? Object.keys(rawDataAny[0].clients) : [],
+        rawStartAtFormat: rawDataAny?.[0]?.start_at || "N/A",
+        clinicianIdUsed: formattedClinicianId
+      });
 
       if (queryError) {
         console.error(
@@ -310,25 +289,8 @@ export const useAppointments = (
         };
       });
     },
-    enabled: !!formattedClinicianId, // Only run if we have a valid clinician ID
+    enabled: !!formattedClinicianId,
   });
-
-
-  // Use appointments directly
-  const combinedAppointments = useMemo(() => {
-    // Sort by start time
-    const sorted = [...fetchedAppointments];
-    sorted.sort((a, b) => {
-      return new Date(a.start_at).getTime() - new Date(b.start_at).getTime();
-    });
-    
-    console.log("[useAppointments] Processed appointments:", {
-      appointments: fetchedAppointments.length,
-      total: sorted.length
-    });
-    
-    return sorted;
-  }, [fetchedAppointments]);
 
   // Helper function to add display formatting
   const addDisplayFormattingToAppointment = (
@@ -388,10 +350,10 @@ export const useAppointments = (
 
   // Memoized formatted appointments
   const appointmentsWithDisplayFormatting = useMemo(() => {
-    return combinedAppointments.map((appt) =>
+    return fetchedAppointments.map((appt) =>
       addDisplayFormattingToAppointment(appt, safeUserTimeZone)
     );
-  }, [combinedAppointments, safeUserTimeZone]);
+  }, [fetchedAppointments, safeUserTimeZone]);
   
 
   // Memoized filtered appointments
@@ -487,17 +449,6 @@ export const useAppointments = (
   const closeVideoSession = () => setIsVideoOpen(false);
   const closeSessionTemplate = () => setShowSessionTemplate(false);
 
-  // Refetch function
-  const refetch = () => {
-    refetchAppointments();
-  };
-
-  // Loading state
-  const isLoading = isLoadingAppointments;
-
-  // Error state
-  const error = appointmentsError;
-
   return {
     appointments: appointmentsWithDisplayFormatting,
     todayAppointments,
@@ -505,7 +456,7 @@ export const useAppointments = (
     pastAppointments,
     isLoading,
     error,
-    refetch,
+    refetch: refetchAppointments,
     startVideoSession: startSession,
     openSessionTemplate: documentSession,
     isVideoOpen,

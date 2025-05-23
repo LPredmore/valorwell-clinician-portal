@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { format } from 'date-fns';
 import { useWeekViewData } from './useWeekViewData';
@@ -9,7 +10,7 @@ import { Appointment } from '@/types/appointment';
 import { convertAppointmentBlockToAppointment } from '@/utils/appointmentUtils';
 
 interface WeekViewProps {
-  days: Date[] | null;
+  days: Date[];
   selectedClinicianId: string | null;
   userTimeZone: string;
   showAvailability?: boolean;
@@ -38,26 +39,21 @@ for (let hour = START_HOUR; hour < END_HOUR; hour++) {
   }
 }
 
-const WeekView: React.FC<WeekViewProps> = (props) => {
-  // Safely destructure props with defaults
-  const {
-    days: rawDays,
-    selectedClinicianId,
-    userTimeZone,
-    showAvailability = true,
-    refreshTrigger = 0,
-    appointments = [],
-    onAppointmentClick,
-    onAvailabilityClick,
-    onAppointmentUpdate,
-    onAppointmentDelete,
-    currentDate,
-    isLoading,
-    error,
-  } = props;
-
-  // Ensure days is always an array
-  const days = Array.isArray(rawDays) ? rawDays : [];
+const WeekView: React.FC<WeekViewProps> = ({
+  days,
+  selectedClinicianId,
+  userTimeZone,
+  showAvailability = true,
+  refreshTrigger = 0,
+  appointments = [],
+  onAppointmentClick,
+  onAvailabilityClick,
+  onAppointmentUpdate,
+  onAppointmentDelete,
+  currentDate,
+  isLoading,
+  error,
+}) => {
   const [selectedBlock, setSelectedBlock] = useState<any | null>(null);
   const [draggedAppointmentId, setDraggedAppointmentId] = useState<string | null>(null);
 
@@ -69,14 +65,14 @@ const WeekView: React.FC<WeekViewProps> = (props) => {
     isTimeSlotAvailable,
     getBlockForTimeSlot,
     getAppointmentForTimeSlot,
-  } = useWeekViewData({
+  } = useWeekViewData(
     days,
     selectedClinicianId,
     refreshTrigger,
     appointments,
-    getClientName: (id: string) => `Client ${id}`,
+    (id: string) => `Client ${id}`,
     userTimeZone
-  });
+  );
 
   // Handle click on an availability block
   const handleAvailabilityBlockClick = (day: Date, block: any) => {

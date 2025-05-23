@@ -1,5 +1,4 @@
 
-import React from 'react';
 import { DateTime } from 'luxon';
 import { Appointment } from '@/types/appointment';
 
@@ -21,12 +20,11 @@ export interface TimeSlotProps {
   originalAppointments: any[];
 }
 
-export interface CalendarViewControlsProps {
-  showAvailability: boolean;
-  onToggleAvailability: () => void;
-  onNewAppointment: () => void;
-  selectedClinicianId: string | null;
-  onToggleGoogleCalendar?: () => void;
-  isGoogleCalendarConnected?: boolean;
-  isConnectingGoogleCalendar?: boolean;
+export interface EditAppointmentDialogProps {
+  appointment: Appointment;
+  onClose: () => void;
+  onUpdate: (updatedAppointment: Appointment) => void;
+  onDelete: (id: string) => void;
+  isOpen?: boolean;
+  onAppointmentUpdated?: () => void;
 }

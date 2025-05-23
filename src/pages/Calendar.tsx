@@ -1,8 +1,6 @@
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import Layout from "../components/layout/Layout";
-import { Button } from "@/components/ui/button";
-import { CalendarPlus, RefreshCw } from "lucide-react";
 import CalendarView from "../components/calendar/CalendarView";
 import { addWeeks, subWeeks } from "date-fns";
 import { useCalendarState } from "../hooks/useCalendarState";
@@ -32,10 +30,6 @@ const CalendarPage = () => {
     isLoadingTimeZone,
   } = useCalendarState(userId);
   
-  // Calculate date ranges for fetching appointments
-  const fetchRangeStart = subWeeks(currentDate, 4);
-  const fetchRangeEnd = addWeeks(currentDate, 8);
-  
   // Fetch appointments with better date range
   const {
     appointments,
@@ -45,9 +39,9 @@ const CalendarPage = () => {
   } = useAppointments(
     selectedClinicianId,
     // Start date for fetch range - 1 month before current date
-    fetchRangeStart,
+    subWeeks(currentDate, 4),
     // End date for fetch range - 2 months after current date
-    fetchRangeEnd,
+    addWeeks(currentDate, 8),
     userTimeZone,
     appointmentRefreshTrigger // Pass the refresh trigger to the hook
   );
@@ -110,9 +104,6 @@ const CalendarPage = () => {
                 onToggleAvailability={toggleAvailability}
                 onNewAppointment={() => setIsDialogOpen(true)}
                 selectedClinicianId={selectedClinicianId}
-                isGoogleCalendarConnected={false}
-                isConnectingGoogleCalendar={false}
-                onToggleGoogleCalendar={() => {}}
               />
             </div>
           </div>

@@ -1,3 +1,4 @@
+
 import React, { useMemo, useEffect } from "react";
 import {
   format,
@@ -106,8 +107,8 @@ const WeekViewDebug: React.FC<WeekViewDebugProps> = ({
 
   // Use the custom hook to get all the data and utility functions
   const hookProps = {
-    days,
-    selectedClinicianId: clinicianId,
+    currentDate,
+    clinicianId,
     userTimeZone,
     refreshTrigger,
     appointments,
@@ -395,7 +396,6 @@ const WeekViewDebug: React.FC<WeekViewDebugProps> = ({
                       isStartOfBlock={blockStartCheck}
                       isEndOfBlock={blockEndCheck}
                       isStartOfAppointment={appointmentStartCheck}
-                      isEndOfAppointment={false}
                       handleAvailabilityBlockClick={
                         handleAvailabilityBlockClick
                       }
