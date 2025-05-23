@@ -727,7 +727,16 @@ export const useWeekViewData = (
     
     const appointmentBlocks: AppointmentBlock[] = [];
     
+    // Group appointments by ID to ensure we don't have duplicates
+    const appointmentMap = new Map<string, Appointment>();
     appts.forEach(appointment => {
+      if (appointment.id) {
+        appointmentMap.set(appointment.id, appointment);
+      }
+    });
+    
+    // Process each unique appointment
+    Array.from(appointmentMap.values()).forEach(appointment => {
       if (!appointment.start_at || !appointment.end_at) {
         console.warn('[useWeekViewData] Invalid appointment', {
           appointmentId: appointment.id,
@@ -758,10 +767,7 @@ export const useWeekViewData = (
         // Get formatted date for logging
         const dayStr = day.toFormat('yyyy-MM-dd');
         
-        // Check if this appointment's day is in our view
-        // NEW: We no longer filter by day - we'll show all appointments in the data range
-        // Visibility will be controlled by the TimeSlot component
-        
+        // Create a single appointment block for the entire duration
         appointmentBlocks.push({
           id: appointment.id,
           start,
@@ -778,7 +784,8 @@ export const useWeekViewData = (
           start: start.toFormat('yyyy-MM-dd HH:mm'),
           end: end.toFormat('yyyy-MM-dd HH:mm'),
           day: dayStr,
-          inView: dayKeys.includes(dayStr)
+          inView: dayKeys.includes(dayStr),
+          durationMinutes: end.diff(start).as('minutes')
         });
       } catch (error) {
         console.error('[useWeekViewData] Error creating appointment block', {
@@ -965,20 +972,43 @@ export const useWeekViewData = (
     const dayDt = DateTime.fromJSDate(day, { zone: userTimeZone });
     const timeSlotDt = DateTime.fromJSDate(timeSlot, { zone: userTimeZone });
     
+    // Create the specific moment for this slot
+    const slotTime = dayDt.set({
+      hour: timeSlotDt.hour,
+      minute: timeSlotDt.minute,
+      second: 0,
+      millisecond: 0
+    });
+    
+    // Debug logging for specific date/time
+    const dayStrForLog = dayDt.toFormat('yyyy-MM-dd');
+    const slotTimeStrForLog = slotTime.toFormat('HH:mm:ss ZZZZ');
+    const shouldLog = dayStrForLog === '2025-05-15' && slotTime.hour >= 8 && slotTime.hour <= 18;
+    
+    if (shouldLog) {
+      console.log(`[getAppointmentForTimeSlot DEBUG] Searching for appointment at ${slotTimeStrForLog} on ${dayStrForLog}`);
+    }
+    
     // Find the appointment that contains this time slot
-    return appointmentBlocks.find(appt => {
+    const appointment = appointmentBlocks.find(appt => {
       const isSameDay = appt.day?.hasSame(dayDt, 'day') || false;
       if (!isSameDay) return false;
       
-      const slotTime = dayDt.set({
-        hour: timeSlotDt.hour,
-        minute: timeSlotDt.minute,
-        second: 0,
-        millisecond: 0
-      });
+      const isWithinTimeRange = slotTime >= appt.start && slotTime < appt.end;
       
-      return slotTime >= appt.start && slotTime < appt.end;
+      if (shouldLog && isWithinTimeRange) {
+        console.log(`[getAppointmentForTimeSlot DEBUG] FOUND APPOINTMENT: ${JSON.stringify({
+          id: appt.id,
+          clientName: appt.clientName,
+          start: appt.start.toFormat('HH:mm'),
+          end: appt.end.toFormat('HH:mm')
+        })}`);
+      }
+      
+      return isWithinTimeRange;
     });
+    
+    return appointment;
   };
 
   // Utility function to get availability for a block

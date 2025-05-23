@@ -295,8 +295,8 @@ const WeekView: React.FC<WeekViewProps> = (props) => {
         <div className="w-16 flex-shrink-0"></div>
         {/* Day headers - use exact same width as the day columns below */}
         {weekDays.map(day => (
-          <div 
-            key={day.toISO()} 
+          <div
+            key={day.toISO()}
             className="w-24 flex-1 px-2 py-1 font-semibold text-center border-r last:border-r-0"
           >
             <div className="text-sm">{day.toFormat('EEE')}</div>
@@ -306,7 +306,7 @@ const WeekView: React.FC<WeekViewProps> = (props) => {
       </div>
 
       {/* Time slots grid */}
-      <div className="flex">
+      <div className="flex relative">
         {/* Time labels column */}
         <div className="w-16 flex-shrink-0">
           {TIME_SLOTS.map((timeSlot, i) => (
@@ -318,7 +318,8 @@ const WeekView: React.FC<WeekViewProps> = (props) => {
 
         {/* Days columns */}
         {weekDays.map(day => (
-          <div key={day.toISO() || ''} className="flex-1 border-r last:border-r-0">
+          <div key={day.toISO() || ''} className="flex-1 border-r last:border-r-0 relative">
+            {/* Time slots grid (base layer) */}
             {TIME_SLOTS.map((timeSlot, i) => {
               // Convert JS Date to DateTime objects for consistent checking
               const dayDt = TimeZoneService.fromJSDate(day.toJSDate(), userTimeZone);
@@ -331,19 +332,19 @@ const WeekView: React.FC<WeekViewProps> = (props) => {
               
               // Perform availability checks and get relevant blocks
               const isAvailable = showAvailability && isTimeSlotAvailable(
-                dayDt.toJSDate(), 
+                dayDt.toJSDate(),
                 timeSlotDt.toJSDate()
               );
               
               // Get the corresponding block if available - this may be undefined
               const currentBlock = isAvailable ? getBlockForTimeSlot(
-                dayDt.toJSDate(), 
+                dayDt.toJSDate(),
                 timeSlotDt.toJSDate()
               ) : undefined;
               
               // Get any appointment for this time slot
               const appointment = getAppointmentForTimeSlot(
-                dayDt.toJSDate(), 
+                dayDt.toJSDate(),
                 timeSlotDt.toJSDate()
               );
               
@@ -364,26 +365,26 @@ const WeekView: React.FC<WeekViewProps> = (props) => {
               }
               
               // Determine if this is the start or end of a block
-              const isStartOfBlock = currentBlock && 
-                TimeZoneService.fromJSDate(timeSlot, userTimeZone).toFormat('HH:mm') === 
+              const isStartOfBlock = currentBlock &&
+                TimeZoneService.fromJSDate(timeSlot, userTimeZone).toFormat('HH:mm') ===
                 currentBlock.start.toFormat('HH:mm');
               
-              const isEndOfBlock = currentBlock && 
-                TimeZoneService.fromJSDate(timeSlot, userTimeZone).plus({ minutes: 30 }).toFormat('HH:mm') === 
+              const isEndOfBlock = currentBlock &&
+                TimeZoneService.fromJSDate(timeSlot, userTimeZone).plus({ minutes: 30 }).toFormat('HH:mm') ===
                 currentBlock.end.toFormat('HH:mm');
               
-              const isStartOfAppointment = appointment && 
-                TimeZoneService.fromJSDate(timeSlot, userTimeZone).toFormat('HH:mm') === 
+              const isStartOfAppointment = appointment &&
+                TimeZoneService.fromJSDate(timeSlot, userTimeZone).toFormat('HH:mm') ===
                 appointment.start.toFormat('HH:mm');
               
-              const isEndOfAppointment = appointment && 
-                TimeZoneService.fromJSDate(timeSlot, userTimeZone).plus({ minutes: 30 }).toFormat('HH:mm') === 
+              const isEndOfAppointment = appointment &&
+                TimeZoneService.fromJSDate(timeSlot, userTimeZone).plus({ minutes: 30 }).toFormat('HH:mm') ===
                 appointment.end.toFormat('HH:mm');
 
               return (
                 <div
                   key={i}
-                  className={`h-10 border-b border-l first:border-l-0 group 
+                  className={`h-10 border-b border-l first:border-l-0 group
                               ${i % 2 === 0 ? 'bg-gray-50' : 'bg-white'}`}
                 >
                   <TimeSlot
@@ -406,6 +407,74 @@ const WeekView: React.FC<WeekViewProps> = (props) => {
                 </div>
               );
             })}
+            
+            {/* Appointment layer (overlay) - Render continuous appointment blocks */}
+            <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
+              {appointmentBlocks
+                .filter(appt => appt.day.hasSame(day, 'day'))
+                .map(appt => {
+                  // Calculate position and height based on start/end times
+                  const startTime = appt.start;
+                  const endTime = appt.end;
+                  
+                  // Calculate top position (distance from top of container)
+                  const dayStartHour = START_HOUR;
+                  const startHour = startTime.hour + (startTime.minute / 60);
+                  const endHour = endTime.hour + (endTime.minute / 60);
+                  
+                  // Calculate position as percentage of the day
+                  const topPercentage = ((startHour - dayStartHour) / (END_HOUR - START_HOUR)) * 100;
+                  const heightPercentage = ((endHour - startHour) / (END_HOUR - START_HOUR)) * 100;
+                  
+                  // Style for absolute positioning
+                  const style = {
+                    top: `${topPercentage}%`,
+                    height: `${heightPercentage}%`,
+                    left: '0',
+                    width: '100%'
+                  };
+                  
+                  return (
+                    <div
+                      key={appt.id}
+                      className="absolute p-1 bg-blue-100 border-l-4 border-blue-500 rounded-md shadow-sm cursor-pointer transition-colors hover:bg-blue-200 z-20 pointer-events-auto"
+                      style={style}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        
+                        // Find the original appointment
+                        const originalAppointment = appointments.find(a => a.id === appt.id);
+                        if (originalAppointment && onAppointmentClick) {
+                          onAppointmentClick(originalAppointment);
+                        } else if (onAppointmentClick) {
+                          // Convert to full appointment if original not found
+                          const fullAppointment = convertAppointmentBlockToAppointment(appt, appointments);
+                          onAppointmentClick(fullAppointment);
+                        }
+                      }}
+                      draggable={true}
+                      onDragStart={(e) => {
+                        const original = appointments.find(a => a.id === appt.id) || appt;
+                        e.dataTransfer.setData('application/json', JSON.stringify({
+                          appointmentId: original.id,
+                          clientName: original.clientName
+                        }));
+                        handleAppointmentDragStart(original, e);
+                      }}
+                      title={`${appt.clientName || 'Unknown Client'} - ${appt.start.toFormat('h:mm a')} to ${appt.end.toFormat('h:mm a')}`}
+                      data-appointment-id={appt.id}
+                    >
+                      <div className="text-xs font-medium truncate">
+                        {appt.clientName || 'Unknown Client'}
+                      </div>
+                      <div className="text-xs opacity-75">
+                        {appt.start.toFormat('h:mm a')} - {appt.end.toFormat('h:mm a')}
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
           </div>
         ))}
       </div>

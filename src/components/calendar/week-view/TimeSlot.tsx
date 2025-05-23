@@ -67,8 +67,12 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
   let onClick = undefined;
   let draggable = false;
   let onDragStart = undefined;
+  
+  // For the new layer-based approach, we'll hide appointment rendering in the time slots
+  // since appointments are now rendered as continuous blocks in the overlay layer
+  const hideAppointmentInTimeSlot = true;
 
-  if (appointment) {
+  if (appointment && !hideAppointmentInTimeSlot) {
     onClick = (e: React.MouseEvent) => {
       e.stopPropagation(); // Stop event propagation
       e.preventDefault(); // Prevent default behavior
@@ -122,6 +126,7 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
       }
     };
 
+    // Enhanced appointment styling with better visual continuity
     const baseAppointmentClass = 'p-1 bg-blue-100 border-l-4 border-blue-500 h-full w-full cursor-pointer transition-colors hover:bg-blue-200 z-20 relative';
 
     onDragStart = (e: React.DragEvent) => {
@@ -133,16 +138,17 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
       onAppointmentDragStart?.(original, e);
     };
 
+    // Improved position classes for continuous appearance
     let positionClass = '';
     const isMiddleOfAppointment = appointment && !isStartOfAppointment && !isEndOfAppointment;
     
     if (isStartOfAppointment) {
-      positionClass = 'rounded-t border-t border-r border-l';
+      positionClass = 'rounded-t-md border-t border-r border-l shadow-sm';
       if (!isEndOfAppointment) positionClass += ' border-b-0';
     } else if (isMiddleOfAppointment) {
       positionClass = 'border-r border-l border-t-0 border-b-0';
     } else if (isEndOfAppointment) {
-      positionClass = 'rounded-b border-r border-l border-b border-t-0';
+      positionClass = 'rounded-b-md border-r border-l border-b border-t-0 shadow-sm';
     }
 
     title = `${appointment.clientName || 'Unknown Client'} - ${appointment.start.toFormat('h:mm a')} to ${appointment.end.toFormat('h:mm a')}`;
@@ -186,16 +192,19 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
       );
     }
   } else {
+    // Empty slot or hidden appointment
     className = 'h-full w-full z-0 relative empty-slot cursor-pointer';
   }
 
-  const debugClass = appointment
+  // Update debug class to account for hidden appointments
+  const debugClass = appointment && !hideAppointmentInTimeSlot
     ? 'has-appointment'
     : (isAvailable && currentBlock)
     ? 'has-availability'
     : 'empty-slot';
 
-  const shouldAcceptDrops = !appointment;
+  // Allow drops on time slots even if they have appointments in the new approach
+  const shouldAcceptDrops = hideAppointmentInTimeSlot || !appointment;
 
   return (
     <div
@@ -208,6 +217,7 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
       title={title}
       data-testid={`timeslot-${formattedDay}-${formattedTime}`}
       data-slot-type={appointment ? 'appointment' : (isAvailable && currentBlock) ? 'availability' : 'empty'}
+      data-appointment-id={appointment ? appointment.id : undefined}
     >
       {content}
     </div>
