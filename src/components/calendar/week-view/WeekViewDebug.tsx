@@ -396,6 +396,7 @@ const WeekViewDebug: React.FC<WeekViewDebugProps> = ({
                       isStartOfBlock={blockStartCheck}
                       isEndOfBlock={blockEndCheck}
                       isStartOfAppointment={appointmentStartCheck}
+                      isEndOfAppointment={false}
                       handleAvailabilityBlockClick={
                         handleAvailabilityBlockClick
                       }

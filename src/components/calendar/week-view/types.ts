@@ -6,8 +6,11 @@ export interface TimeBlock {
   id: string;
   start: DateTime;
   end: DateTime;
+  day?: DateTime;
   availabilityIds: string[];
   isAvailable: boolean;
+  isException?: boolean;
+  isStandalone?: boolean;
 }
 
 export interface AppointmentBlock {
@@ -16,10 +19,20 @@ export interface AppointmentBlock {
   clientName: string;
   start: DateTime;
   end: DateTime;
+  day?: DateTime;
   type: string;
-  status: string;
+  status?: string;
   notes?: string;
   video_room_url?: string;
+}
+
+export interface AvailabilityException {
+  id: string;
+  clinician_id: string;
+  start_time?: string;
+  end_time?: string;
+  date?: string;
+  is_active: boolean;
 }
 
 export interface TimeSlotProps {
