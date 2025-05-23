@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import WeekView from './week-view/WeekView';
 import MonthView from './MonthView';
@@ -8,6 +9,7 @@ import { DateTime } from 'luxon';
 import { AvailabilityBlock } from '@/types/availability';
 import AppointmentDetailsDialog from './AppointmentDetailsDialog';
 import { convertAppointmentBlockToAppointment } from '@/utils/appointmentUtils';
+import CalendarErrorBoundary from './CalendarErrorBoundary';
 
 interface CalendarProps {
   view: 'week' | 'month';
@@ -219,62 +221,64 @@ const CalendarView = ({
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-      <div className="md:col-span-3">
-        {view === 'week' ? (
-          <WeekView 
-            days={days}
-            currentDate={currentDate}
-            selectedClinicianId={clinicianId}
-            refreshTrigger={combinedRefreshTrigger}
-            appointments={appointments}
-            onAppointmentClick={handleAppointmentClick}
-            onAvailabilityClick={handleAvailabilityClick}
-            onAppointmentUpdate={handleAppointmentDragUpdate}
-            userTimeZone={validTimeZone}
-            isLoading={isLoading}
-            error={error}
-          />
-        ) : (
-          <MonthView 
-            currentDate={currentDate}
-            clinicianId={clinicianId}
-            refreshTrigger={combinedRefreshTrigger} // Use combined refresh trigger
-            appointments={appointments}
-            getClientName={(clientId: string): string => {
-              const appointment = appointments.find(app => app.client_id === clientId);
-              return appointment?.clientName || 'Unknown Client';
-            }}
-            onAppointmentClick={handleAppointmentClick}
-            onAvailabilityClick={handleAvailabilityClick}
-            userTimeZone={validTimeZone}
-          />
-        )}
-      </div>
-      
-      {showAvailability && (
-        <div className="md:col-span-1">
-          <ClinicianAvailabilityPanel 
-            clinicianId={clinicianId} 
-            onAvailabilityUpdated={handleAvailabilityUpdated} // Pass the refresh handler
-            userTimeZone={validTimeZone}
-          />
+    <CalendarErrorBoundary>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="md:col-span-3">
+          {view === 'week' ? (
+            <WeekView 
+              days={days}
+              currentDate={currentDate}
+              selectedClinicianId={clinicianId}
+              refreshTrigger={combinedRefreshTrigger}
+              appointments={appointments}
+              onAppointmentClick={handleAppointmentClick}
+              onAvailabilityClick={handleAvailabilityClick}
+              onAppointmentUpdate={handleAppointmentDragUpdate}
+              userTimeZone={validTimeZone}
+              isLoading={isLoading}
+              error={error}
+            />
+          ) : (
+            <MonthView 
+              currentDate={currentDate}
+              clinicianId={clinicianId}
+              refreshTrigger={combinedRefreshTrigger} // Use combined refresh trigger
+              appointments={appointments}
+              getClientName={(clientId: string): string => {
+                const appointment = appointments.find(app => app.client_id === clientId);
+                return appointment?.clientName || 'Unknown Client';
+              }}
+              onAppointmentClick={handleAppointmentClick}
+              onAvailabilityClick={handleAvailabilityClick}
+              userTimeZone={validTimeZone}
+            />
+          )}
         </div>
-      )}
-      
-      {/* Central AppointmentDetailsDialog - the ONLY instance in the application */}
-      <AppointmentDetailsDialog
-        isOpen={isAppointmentDialogOpen}
-        onClose={() => {
-          console.log('[CalendarView] Closing appointment dialog');
-          setIsAppointmentDialogOpen(false);
-          setSelectedAppointment(null); // Clear selection when dialog is closed
-        }}
-        appointment={selectedAppointment}
-        onAppointmentUpdated={handleAppointmentUpdated}
-        userTimeZone={validTimeZone}
-      />
-    </div>
+        
+        {showAvailability && (
+          <div className="md:col-span-1">
+            <ClinicianAvailabilityPanel 
+              clinicianId={clinicianId} 
+              onAvailabilityUpdated={handleAvailabilityUpdated} // Pass the refresh handler
+              userTimeZone={validTimeZone}
+            />
+          </div>
+        )}
+        
+        {/* Central AppointmentDetailsDialog - the ONLY instance in the application */}
+        <AppointmentDetailsDialog
+          isOpen={isAppointmentDialogOpen}
+          onClose={() => {
+            console.log('[CalendarView] Closing appointment dialog');
+            setIsAppointmentDialogOpen(false);
+            setSelectedAppointment(null); // Clear selection when dialog is closed
+          }}
+          appointment={selectedAppointment}
+          onAppointmentUpdated={handleAppointmentUpdated}
+          userTimeZone={validTimeZone}
+        />
+      </div>
+    </CalendarErrorBoundary>
   );
 };
 

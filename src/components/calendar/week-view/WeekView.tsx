@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { format } from 'date-fns';
 import { useWeekViewData } from './useWeekViewData';
@@ -406,7 +405,7 @@ const WeekView: React.FC<WeekViewProps> = ({
       </div>
 
       {/* Debug section */}
-      {process.env.NODE_ENV !== 'production' && (
+      {import.meta.env.MODE === 'development' && (
         <div className="mt-4 p-4 bg-gray-100 rounded">
           <h3 className="text-lg font-semibold">Debug Info</h3>
           <p>Clinician ID: {selectedClinicianId || 'None'}</p>
