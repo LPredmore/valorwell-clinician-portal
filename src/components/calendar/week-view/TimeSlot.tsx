@@ -1,27 +1,7 @@
 
 import React from 'react';
-import { TimeBlock, AppointmentBlock } from './types';
-import { Appointment } from '@/types/appointment';
-import { DateTime } from 'luxon';
-import { convertAppointmentBlockToAppointment } from '@/utils/appointmentUtils';
-
-interface TimeSlotProps {
-  day: Date;
-  timeSlot: Date;
-  isAvailable: boolean;
-  currentBlock?: TimeBlock;
-  appointment?: AppointmentBlock;
-  isStartOfBlock: boolean;
-  isEndOfBlock: boolean;
-  isStartOfAppointment: boolean;
-  isEndOfAppointment?: boolean;
-  handleAvailabilityBlockClick: (day: Date, block: TimeBlock) => void;
-  onAppointmentClick?: (appointmentBlock: any) => void;
-  onAppointmentDragStart?: (appointment: any, event: React.DragEvent) => void;
-  onAppointmentDragOver?: (day: Date, timeSlot: Date, event: React.DragEvent) => void;
-  onAppointmentDrop?: (day: Date, timeSlot: Date, event: React.DragEvent) => void;
-  originalAppointments: Appointment[];
-}
+import { TimeSlotProps } from './types';
+import { isStartOfBlock, isEndOfBlock, isStartOfAppointment, isWithinAppointment } from './utils';
 
 const TimeSlot: React.FC<TimeSlotProps> = ({
   day,
@@ -29,10 +9,9 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
   isAvailable,
   currentBlock,
   appointment,
-  isStartOfBlock,
-  isEndOfBlock,
-  isStartOfAppointment,
-  isEndOfAppointment = false,
+  isStartOfBlock: propIsStartOfBlock,
+  isEndOfBlock: propIsEndOfBlock,
+  isStartOfAppointment: propIsStartOfAppointment,
   handleAvailabilityBlockClick,
   onAppointmentClick,
   onAppointmentDragStart,
@@ -40,178 +19,138 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
   onAppointmentDrop,
   originalAppointments
 }) => {
-  const specificDate = '2025-05-15';
-  const formattedDay = new Date(day).toISOString().split('T')[0];
-  const slotHour = timeSlot.getHours();
-  const slotMinutes = timeSlot.getMinutes();
-  const formattedTime = `${slotHour}:${slotMinutes.toString().padStart(2, '0')}`;
-  const debugMode = formattedDay === specificDate && (slotHour >= 8 && slotHour <= 18);
+  // Use the props for determining block boundaries
+  const isBlockStart = propIsStartOfBlock;
+  const isBlockEnd = propIsEndOfBlock;
+  const isAppointmentStart = propIsStartOfAppointment;
+  const isWithinAppointmentSlot = appointment && isWithinAppointment(timeSlot, appointment);
+
+  // Handle click events
+  const handleClick = () => {
+    if (appointment && onAppointmentClick) {
+      console.log('[TimeSlot] Appointment clicked:', {
+        id: appointment.id,
+        clientName: appointment.clientName,
+        start: appointment.start?.toISO?.() || appointment.start,
+        end: appointment.end?.toISO?.() || appointment.end
+      });
+      onAppointmentClick(appointment);
+    } else if (currentBlock && isAvailable) {
+      handleAvailabilityBlockClick(day, currentBlock);
+    }
+  };
+
+  // Handle drag events
+  const handleDragStart = (e: React.DragEvent) => {
+    if (appointment && onAppointmentDragStart) {
+      onAppointmentDragStart(appointment, e);
+    }
+  };
 
   const handleDragOver = (e: React.DragEvent) => {
     if (onAppointmentDragOver) {
-      e.preventDefault();
       onAppointmentDragOver(day, timeSlot, e);
     }
   };
 
   const handleDrop = (e: React.DragEvent) => {
     if (onAppointmentDrop) {
-      e.preventDefault();
       onAppointmentDrop(day, timeSlot, e);
     }
   };
 
-  let content = null;
-  let className = '';
-  let title = '';
-  let onClick = undefined;
-  let draggable = false;
-  let onDragStart = undefined;
+  // Render appointment content with proper client name display
+  const renderAppointmentContent = () => {
+    if (!appointment) return null;
 
+    // Get client name from multiple possible sources
+    const clientName = appointment.clientName || 
+                      appointment.client_name || 
+                      (appointment.client?.client_preferred_name) ||
+                      (appointment.client?.client_first_name && appointment.client?.client_last_name 
+                        ? `${appointment.client.client_first_name} ${appointment.client.client_last_name}`
+                        : null) ||
+                      'Unknown Client';
+
+    console.log('[TimeSlot] Rendering appointment content:', {
+      appointmentId: appointment.id,
+      clientName,
+      isStart: isAppointmentStart,
+      appointmentData: appointment
+    });
+
+    return (
+      <div
+        className={`
+          appointment-slot h-full w-full relative cursor-pointer
+          ${isAppointmentStart 
+            ? 'bg-blue-500 text-white font-medium rounded-t border-2 border-blue-600' 
+            : 'bg-blue-400 text-white border-x-2 border-blue-600'
+          }
+          hover:bg-blue-600 transition-colors
+        `}
+        onClick={handleClick}
+        draggable={isAppointmentStart}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+        title={`${clientName} - ${appointment.type || 'Session'}`}
+      >
+        {isAppointmentStart && (
+          <div className="px-1 py-0.5 text-xs leading-tight overflow-hidden">
+            <div className="font-semibold truncate">{clientName}</div>
+            <div className="opacity-90 truncate">{appointment.type || 'Session'}</div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Render availability content
+  const renderAvailabilityContent = () => {
+    if (!isAvailable || !currentBlock) return null;
+
+    return (
+      <div
+        className={`
+          availability-slot h-full w-full cursor-pointer
+          ${isBlockStart 
+            ? 'bg-green-100 border-t-2 border-green-300 rounded-t' 
+            : isBlockEnd 
+            ? 'bg-green-50 border-b-2 border-green-300 rounded-b' 
+            : 'bg-green-50 border-l-2 border-r-2 border-green-300'
+          }
+          hover:bg-green-200 transition-colors
+        `}
+        onClick={handleClick}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+        title="Available time slot"
+      >
+        {isBlockStart && (
+          <div className="px-1 py-0.5 text-xs text-green-700">
+            Available
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Main render logic
   if (appointment) {
-    onClick = (e: React.MouseEvent) => {
-      e.stopPropagation(); // Stop event propagation
-      e.preventDefault(); // Prevent default behavior
-      
-      // Enhanced logging to debug appointment matching
-      console.log(`[TimeSlot] Looking for appointment with ID: ${appointment.id}`);
-      console.log(`[TimeSlot] Original appointments available: ${originalAppointments?.length || 0}`);
-      
-      try {
-        // More robust lookup with additional logging
-        const originalAppointment = originalAppointments?.find(a => a.id === appointment.id);
-        
-        if (originalAppointment) {
-          console.log(`[TimeSlot] Found original appointment:`, {
-            id: originalAppointment.id,
-            clientName: originalAppointment.clientName,
-            clientId: originalAppointment.client_id,
-            hasClient: !!originalAppointment.client,
-            start_at: originalAppointment.start_at,
-            end_at: originalAppointment.end_at
-          });
-          
-          // Ensure we have a valid callback before calling it
-          if (onAppointmentClick) {
-            onAppointmentClick(originalAppointment);
-          } else {
-            console.error('[TimeSlot] onAppointmentClick callback is not defined');
-          }
-        } else {
-          console.warn(`[TimeSlot] Original appointment not found for ID: ${appointment.id}. Converting AppointmentBlock to full Appointment.`);
-          // Convert the AppointmentBlock to a full Appointment object
-          const fullAppointment = convertAppointmentBlockToAppointment(appointment, originalAppointments || []);
-          console.log(`[TimeSlot] Converted appointment:`, {
-            id: fullAppointment.id,
-            clientName: fullAppointment.clientName,
-            clientId: fullAppointment.client_id,
-            hasClient: !!fullAppointment.client,
-            start_at: fullAppointment.start_at,
-            end_at: fullAppointment.end_at
-          });
-          
-          // Ensure we have a valid callback before calling it
-          if (onAppointmentClick) {
-            onAppointmentClick(fullAppointment);
-          } else {
-            console.error('[TimeSlot] onAppointmentClick callback is not defined');
-          }
-        }
-      } catch (error) {
-        console.error('[TimeSlot] Error handling appointment click:', error);
-      }
-    };
-
-    const baseAppointmentClass = 'p-1 bg-blue-100 border-l-4 border-blue-500 h-full w-full cursor-pointer transition-colors hover:bg-blue-200 z-20 relative';
-
-    onDragStart = (e: React.DragEvent) => {
-      const original = originalAppointments.find(a => a.id === appointment.id) || appointment;
-      e.dataTransfer.setData('application/json', JSON.stringify({
-        appointmentId: original.id,
-        clientName: original.clientName
-      }));
-      onAppointmentDragStart?.(original, e);
-    };
-
-    let positionClass = '';
-    const isMiddleOfAppointment = appointment && !isStartOfAppointment && !isEndOfAppointment;
-    
-    if (isStartOfAppointment) {
-      positionClass = 'rounded-t border-t border-r border-l';
-      if (!isEndOfAppointment) positionClass += ' border-b-0';
-    } else if (isMiddleOfAppointment) {
-      positionClass = 'border-r border-l border-t-0 border-b-0';
-    } else if (isEndOfAppointment) {
-      positionClass = 'rounded-b border-r border-l border-b border-t-0';
-    }
-
-    title = `${appointment.clientName || 'Unknown Client'} - ${appointment.start.toFormat('h:mm a')} to ${appointment.end.toFormat('h:mm a')}`;
-    draggable = true;
-
-    if (isStartOfAppointment) {
-      className = `${baseAppointmentClass} ${positionClass} text-xs font-medium truncate appointment-start`;
-      content = appointment.clientName || 'Unknown Client';
-    } else if (isEndOfAppointment) {
-      className = `${baseAppointmentClass} ${positionClass} text-xs opacity-75 appointment-end`;
-      content = '\u00A0';
-    } else {
-      className = `${baseAppointmentClass} ${positionClass} text-xs opacity-75 appointment-continuation`;
-      content = '\u00A0';
-    }
-  } else if (isAvailable && currentBlock && !appointment) {
-    const availabilityBaseClass = currentBlock.isException ? 'bg-teal-100 border-teal-500' : 'bg-green-100 border-green-500';
-    className = `p-1 ${availabilityBaseClass} border-l-4 border-r border-l w-full h-full cursor-pointer hover:bg-opacity-80 transition-colors z-10 relative availability-block`;
-
-    if (isStartOfBlock) {
-      className += ' border-t rounded-t';
-    } else {
-      className += ' border-t-0';
-    }
-    if (isEndOfBlock) {
-      className += ' border-b rounded-b';
-    } else {
-      className += ' border-b-0';
-    }
-
-    onClick = () => currentBlock && handleAvailabilityBlockClick(day, currentBlock);
-
-    if (isStartOfBlock) {
-      content = (
-        <div className="font-medium truncate flex items-center text-xs">
-          Available
-          {currentBlock.isException && (
-            <span className="ml-1 text-[10px] px-1 py-0.5 bg-teal-200 text-teal-800 rounded-full">Modified</span>
-          )}
-        </div>
-      );
-    }
+    return renderAppointmentContent();
+  } else if (isAvailable) {
+    return renderAvailabilityContent();
   } else {
-    className = 'h-full w-full z-0 relative empty-slot cursor-pointer';
+    // Empty time slot
+    return (
+      <div
+        className="h-full w-full cursor-default"
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+      />
+    );
   }
-
-  const debugClass = appointment
-    ? 'has-appointment'
-    : (isAvailable && currentBlock)
-    ? 'has-availability'
-    : 'empty-slot';
-
-  const shouldAcceptDrops = !appointment;
-
-  return (
-    <div
-      className={`${className} ${debugClass}`}
-      onClick={onClick}
-      draggable={draggable}
-      onDragStart={onDragStart}
-      onDragOver={shouldAcceptDrops ? handleDragOver : undefined}
-      onDrop={shouldAcceptDrops ? handleDrop : undefined}
-      title={title}
-      data-testid={`timeslot-${formattedDay}-${formattedTime}`}
-      data-slot-type={appointment ? 'appointment' : (isAvailable && currentBlock) ? 'availability' : 'empty'}
-    >
-      {content}
-    </div>
-  );
 };
 
 export default TimeSlot;
