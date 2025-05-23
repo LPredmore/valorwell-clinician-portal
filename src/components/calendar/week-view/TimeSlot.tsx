@@ -1,7 +1,6 @@
 
 import React from 'react';
 import { TimeSlotProps } from './types';
-import { isStartOfBlock, isEndOfBlock, isStartOfAppointment, isWithinAppointment } from './utils';
 
 const TimeSlot: React.FC<TimeSlotProps> = ({
   day,
@@ -9,9 +8,10 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
   isAvailable,
   currentBlock,
   appointment,
-  isStartOfBlock: propIsStartOfBlock,
-  isEndOfBlock: propIsEndOfBlock,
-  isStartOfAppointment: propIsStartOfAppointment,
+  isStartOfBlock,
+  isEndOfBlock,
+  isStartOfAppointment,
+  isEndOfAppointment,
   handleAvailabilityBlockClick,
   onAppointmentClick,
   onAppointmentDragStart,
@@ -19,138 +19,75 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
   onAppointmentDrop,
   originalAppointments
 }) => {
-  // Use the props for determining block boundaries
-  const isBlockStart = propIsStartOfBlock;
-  const isBlockEnd = propIsEndOfBlock;
-  const isAppointmentStart = propIsStartOfAppointment;
-  const isWithinAppointmentSlot = appointment && isWithinAppointment(timeSlot, appointment);
-
-  // Handle click events
-  const handleClick = () => {
-    if (appointment && onAppointmentClick) {
-      console.log('[TimeSlot] Appointment clicked:', {
-        id: appointment.id,
-        clientName: appointment.clientName,
-        start: appointment.start?.toISO?.() || appointment.start,
-        end: appointment.end?.toISO?.() || appointment.end
-      });
-      onAppointmentClick(appointment);
-    } else if (currentBlock && isAvailable) {
-      handleAvailabilityBlockClick(day, currentBlock);
-    }
-  };
-
   // Handle drag events
-  const handleDragStart = (e: React.DragEvent) => {
-    if (appointment && onAppointmentDragStart) {
-      onAppointmentDragStart(appointment, e);
-    }
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleDragOver = (event: React.DragEvent) => {
     if (onAppointmentDragOver) {
-      onAppointmentDragOver(day, timeSlot, e);
+      onAppointmentDragOver(day, timeSlot, event);
     }
   };
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleDrop = (event: React.DragEvent) => {
     if (onAppointmentDrop) {
-      onAppointmentDrop(day, timeSlot, e);
+      onAppointmentDrop(day, timeSlot, event);
     }
   };
 
-  // Render appointment content with proper client name display
-  const renderAppointmentContent = () => {
-    if (!appointment) return null;
-
-    // Get client name from multiple possible sources
-    const clientName = appointment.clientName || 
-                      appointment.client_name || 
-                      (appointment.client?.client_preferred_name) ||
-                      (appointment.client?.client_first_name && appointment.client?.client_last_name 
-                        ? `${appointment.client.client_first_name} ${appointment.client.client_last_name}`
-                        : null) ||
-                      'Unknown Client';
-
-    console.log('[TimeSlot] Rendering appointment content:', {
-      appointmentId: appointment.id,
-      clientName,
-      isStart: isAppointmentStart,
-      appointmentData: appointment
-    });
-
-    return (
-      <div
-        className={`
-          appointment-slot h-full w-full relative cursor-pointer
-          ${isAppointmentStart 
-            ? 'bg-blue-500 text-white font-medium rounded-t border-2 border-blue-600' 
-            : 'bg-blue-400 text-white border-x-2 border-blue-600'
-          }
-          hover:bg-blue-600 transition-colors
-        `}
-        onClick={handleClick}
-        draggable={isAppointmentStart}
-        onDragStart={handleDragStart}
-        onDragOver={handleDragOver}
-        onDrop={handleDrop}
-        title={`${clientName} - ${appointment.type || 'Session'}`}
-      >
-        {isAppointmentStart && (
-          <div className="px-1 py-0.5 text-xs leading-tight overflow-hidden">
-            <div className="font-semibold truncate">{clientName}</div>
-            <div className="opacity-90 truncate">{appointment.type || 'Session'}</div>
-          </div>
-        )}
-      </div>
-    );
+  const handleAppointmentDragStart = (event: React.DragEvent) => {
+    if (appointment && onAppointmentDragStart) {
+      onAppointmentDragStart(appointment, event);
+    }
   };
 
-  // Render availability content
-  const renderAvailabilityContent = () => {
-    if (!isAvailable || !currentBlock) return null;
-
+  // Render availability block
+  if (isAvailable && currentBlock && isStartOfBlock && !appointment) {
     return (
       <div
-        className={`
-          availability-slot h-full w-full cursor-pointer
-          ${isBlockStart 
-            ? 'bg-green-100 border-t-2 border-green-300 rounded-t' 
-            : isBlockEnd 
-            ? 'bg-green-50 border-b-2 border-green-300 rounded-b' 
-            : 'bg-green-50 border-l-2 border-r-2 border-green-300'
-          }
-          hover:bg-green-200 transition-colors
-        `}
-        onClick={handleClick}
-        onDragOver={handleDragOver}
-        onDrop={handleDrop}
-        title="Available time slot"
+        className="h-full bg-green-100 border border-green-300 cursor-pointer hover:bg-green-200 transition-colors duration-150 flex items-center justify-center text-xs text-green-700"
+        onClick={() => handleAvailabilityBlockClick(day, currentBlock)}
       >
-        {isBlockStart && (
-          <div className="px-1 py-0.5 text-xs text-green-700">
-            Available
-          </div>
-        )}
+        Available
       </div>
-    );
-  };
-
-  // Main render logic
-  if (appointment) {
-    return renderAppointmentContent();
-  } else if (isAvailable) {
-    return renderAvailabilityContent();
-  } else {
-    // Empty time slot
-    return (
-      <div
-        className="h-full w-full cursor-default"
-        onDragOver={handleDragOver}
-        onDrop={handleDrop}
-      />
     );
   }
+
+  // Render appointment block
+  if (appointment && isStartOfAppointment) {
+    // Find the original appointment data for more complete information
+    const originalAppointment = originalAppointments?.find(a => a.id === appointment.id);
+    
+    return (
+      <div
+        className="h-full bg-blue-100 border border-blue-300 cursor-pointer hover:bg-blue-200 transition-colors duration-150 p-1 text-xs overflow-hidden"
+        draggable
+        onDragStart={handleAppointmentDragStart}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+        onClick={() => {
+          if (onAppointmentClick) {
+            // Use original appointment data if available, otherwise use appointment block
+            const appointmentToPass = originalAppointment || appointment;
+            onAppointmentClick(appointmentToPass);
+          }
+        }}
+      >
+        <div className="font-medium text-blue-800 truncate">
+          {appointment.clientName || 'Unknown Client'}
+        </div>
+        <div className="text-blue-600 truncate">
+          {appointment.type || 'Appointment'}
+        </div>
+      </div>
+    );
+  }
+
+  // Render empty slot
+  return (
+    <div
+      className="h-full hover:bg-gray-100 transition-colors duration-150"
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    />
+  );
 };
 
 export default TimeSlot;
