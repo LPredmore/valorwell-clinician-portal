@@ -1,10 +1,9 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
-import GoogleIntegrationSetup from './GoogleIntegrationSetup';
+import GoogleCalendarPlaceholder from './GoogleCalendarPlaceholder';
 
 const SecurityTab = () => {
   const [userId, setUserId] = useState<string | null>(null);
@@ -101,7 +100,7 @@ const SecurityTab = () => {
           </CardContent>
         </Card>
         
-        <GoogleIntegrationSetup userId={userId || undefined} userEmail={userEmail || undefined} />
+        <GoogleCalendarPlaceholder />
       </div>
       
       {/* Additional security sections can be added here */}
