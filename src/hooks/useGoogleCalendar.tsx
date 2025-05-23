@@ -784,7 +784,7 @@ export const useGoogleCalendar = () => {
       const appointmentsByGoogleId = new Map<string, Appointment>();
       
       // Helper function for the old method fallback
-      const fallbackToOldMethod = () => {
+      const fallbackToOldMethod = async () => {
           // Process each Google Calendar event
           for (const googleEvent of busyEvents) {
             if (!googleEvent.id) {
@@ -945,7 +945,7 @@ export const useGoogleCalendar = () => {
             // Fall back to old method if table creation fails
             console.warn('[importEventsFromGoogle] Falling back to old method');
             
-            fallbackToOldMethod();
+            await fallbackToOldMethod();
           }
         } else {
           // synced_events table exists, use it
@@ -970,7 +970,7 @@ export const useGoogleCalendar = () => {
         }
       } catch (err) {
         console.error('[importEventsFromGoogle] Error checking synced_events table:', err);
-        const result = fallbackToOldMethod();
+        const result = await fallbackToOldMethod();
         return result;
       }
       
