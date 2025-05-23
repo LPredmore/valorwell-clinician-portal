@@ -16,7 +16,7 @@ export class DebugUtils {
   /**
    * Enable or disable detailed debug logging
    */
-  public static VERBOSE = true;
+  public static VERBOSE = import.meta.env.MODE === 'development';
   
   /**
    * Log with structured formatting and optional object inspection

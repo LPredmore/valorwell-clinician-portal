@@ -1,3 +1,4 @@
+
 import { DebugUtils, loadDebugModule } from './debugUtils';
 import { testAuthFixes, verifyAuthInitializedFlag } from './authFixesTest';
 
@@ -34,7 +35,7 @@ export const AuthDebug = {
 };
 
 // Helper to conditionally enable debug features based on environment
-export const isDebugEnabled = process.env.NODE_ENV === 'development';
+export const isDebugEnabled = import.meta.env.MODE === 'development';
 
 // Helper to conditionally log based on environment
 export function debugLog(context: string, message: string, data?: any): void {

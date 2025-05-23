@@ -17,7 +17,7 @@ export class DebugUtils {
    * Enable or disable detailed debug logging
    * Set to false in production environments
    */
-  public static VERBOSE = process.env.NODE_ENV === 'development';
+  public static VERBOSE = import.meta.env.MODE === 'development';
   
   /**
    * Log with structured formatting and optional object inspection
@@ -422,7 +422,7 @@ ${actualParams.map((param, index) =>
 
 // Export a conditional import helper to only load debug code in development
 export function loadDebugModule<T>(importFn: () => Promise<T>): Promise<T | null> {
-  if (process.env.NODE_ENV === 'development') {
+  if (import.meta.env.MODE === 'development') {
     return importFn();
   }
   return Promise.resolve(null);
