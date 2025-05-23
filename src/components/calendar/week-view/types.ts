@@ -33,6 +33,8 @@ export interface AvailabilityException {
   end_time?: string;
   date?: string;
   is_active: boolean;
+  is_deleted?: boolean;
+  specific_date?: string;
 }
 
 export interface TimeSlotProps {

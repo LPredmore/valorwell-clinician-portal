@@ -306,10 +306,12 @@ export const useWeekViewDataDebug = (props: UseWeekViewDataProps) => {
         const day = start.startOf('day');
         
         timeBlocks.push({
+          id: block.id,
           start,
           end,
           day,
           availabilityIds: [block.id],
+          isAvailable: true,
           isException: false,
           isStandalone: false
         });

@@ -17,6 +17,40 @@ export const error = (context: string, message: string, data?: any) => {
     console.error(`[${context}] ${message}`, data || '');
 };
 
+export class DebugUtils {
+  static VERBOSE = process.env.NODE_ENV !== 'production';
+
+  static log(context: string, message: string, data?: any) => {
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[${context}] ${message}`, data || '');
+    }
+  }
+
+  static warn(context: string, message: string, data?: any) => {
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn(`[${context}] ${message}`, data || '');
+    }
+  }
+
+  static error(context: string, message: string, data?: any) => {
+    if (process.env.NODE_ENV !== 'production') {
+      console.error(`[${context}] ${message}`, data || '');
+    }
+  }
+
+  static info(context: string, message: string, data?: any) => {
+    if (process.env.NODE_ENV !== 'production') {
+      console.info(`[${context}] ${message}`, data || '');
+    }
+  }
+}
+
+export const loadDebugModule = () => {
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('Debug module loaded');
+  }
+};
+
 // Function to log appointment details
 export const logAppointment = (context: string, appointment: any, timezone: string) => {
   if (!appointment) {
