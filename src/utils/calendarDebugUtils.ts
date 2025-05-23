@@ -1,3 +1,4 @@
+
 import { DateTime } from 'luxon';
 import { Appointment } from '@/types/appointment';
 import { AvailabilityBlock } from '@/types/availability';

@@ -30,22 +30,86 @@ export class DebugUtils {
     }
   }
 
-  static warn(context: string, message: string, data?: any) => {
+  static warn(context: string, message: string, data?: any) {
     if (DEBUG_ENABLED) {
       console.warn(`[${context}] ${message}`, data || '');
     }
   }
 
-  static error(context: string, message: string, data?: any) => {
+  static error(context: string, message: string, data?: any) {
     if (DEBUG_ENABLED) {
       console.error(`[${context}] ${message}`, data || '');
     }
   }
 
-  static info(context: string, message: string, data?: any) => {
+  static info(context: string, message: string, data?: any) {
     if (DEBUG_ENABLED) {
       console.info(`[${context}] ${message}`, data || '');
     }
+  }
+  
+  // Add methods that are referenced elsewhere in the codebase
+  static analyzeAppointment(context: string, appointment: any, timezone: string) {
+    this.log(context, 'Analyzing appointment data', { appointment, timezone });
+  }
+  
+  static visualizeAppointment(context: string, appointment: any) {
+    this.log(context, 'Visualizing appointment', appointment);
+  }
+  
+  static visualizeAppointmentBlock(context: string, block: any) {
+    this.log(context, 'Visualizing appointment block', block);
+  }
+  
+  static trackTimezoneConversion(context: string, timestamp: string, timezone: string) {
+    if (!timestamp) {
+      this.warn(context, 'Cannot track timezone conversion for null timestamp');
+      return;
+    }
+    
+    try {
+      const utcTime = DateTime.fromISO(timestamp, { zone: 'utc' });
+      const localTime = utcTime.setZone(timezone);
+      this.log(context, 'Timezone conversion tracking', { 
+        utc: timestamp, 
+        local: localTime.toISO(),
+        offset: localTime.offset 
+      });
+    } catch (e) {
+      this.error(context, 'Error tracking timezone conversion', e);
+    }
+  }
+  
+  static compareDataStructures(context: string, expected: any, actual: any) {
+    const expectedKeys = Object.keys(expected || {});
+    const actualKeys = Object.keys(actual || {});
+    
+    const missingKeys = expectedKeys.filter(k => !actualKeys.includes(k));
+    const extraKeys = actualKeys.filter(k => !expectedKeys.includes(k));
+    
+    this.log(context, 'Data structure comparison', { 
+      missingKeys, 
+      extraKeys, 
+      matching: missingKeys.length === 0 && extraKeys.length === 0 
+    });
+  }
+  
+  static logHookParameterMismatch(hookName: string, expected: any, actual: any) {
+    this.warn(hookName, 'Hook parameter mismatch', { expected, actual });
+  }
+  
+  static validateHookParameters(context: string, params: any) {
+    const nullParams = Object.entries(params)
+      .filter(([_, v]) => v === null || v === undefined)
+      .map(([k]) => k);
+      
+    if (nullParams.length > 0) {
+      this.warn(context, 'Some parameters are null or undefined', nullParams);
+    }
+  }
+  
+  static visualizeAvailabilityBlock(context: string, block: any) {
+    this.log(context, 'Visualizing availability block', block);
   }
 }
 
@@ -109,7 +173,6 @@ export const logAvailabilityBlock = (context: string, block: any, timezone: stri
   });
 };
 
-// Update the logAppointmentBlock function to handle optional day property
 export const logAppointmentBlock = (context: string, block: any, timezone: string) => {
   if (!block) {
     log(context, 'Appointment block is null/undefined');

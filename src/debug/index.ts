@@ -1,4 +1,5 @@
-import { DebugUtils, loadDebugModule } from './debugUtils';
+
+import { DebugUtils, loadDebugModule } from '../utils/debugUtils';
 import { testAuthFixes, verifyAuthInitializedFlag } from './authFixesTest';
 
 // Re-export the main debug utility
