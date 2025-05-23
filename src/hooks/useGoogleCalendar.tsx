@@ -783,6 +783,70 @@ export const useGoogleCalendar = () => {
       
       // Create a map of existing appointments by Google Calendar event ID
       const appointmentsByGoogleId = new Map<string, Appointment>();
+      
+      // Helper function for the old method fallback
+      const fallbackToOldMethod = () => {
+          // Process each Google Calendar event
+          for (const googleEvent of busyEvents) {
+            if (!googleEvent.id) {
+              console.warn('[importEventsFromGoogle] Skipping Google event without ID:', googleEvent);
+              continue;
+            }
+            
+            try {
+              const existingAppointment = appointmentsByGoogleId.get(googleEvent.id);
+              
+              if (existingAppointment) {
+                // Update existing appointment if it's changed
+                console.log(`[importEventsFromGoogle] Found existing appointment for Google event ${googleEvent.id}`);
+                
+                // Check if Google event is newer than our last sync
+                const lastSyncTime = existingAppointment.last_synced_at
+                  ? new Date(existingAppointment.last_synced_at).getTime()
+                  : 0;
+                  
+                const googleUpdateTime = googleEvent.updated
+                  ? new Date(googleEvent.updated).getTime()
+                  : Infinity; // If no update time, assume it's newer
+                
+                if (googleUpdateTime > lastSyncTime) {
+                  console.log(`[importEventsFromGoogle] Google event ${googleEvent.id} was updated after last sync, updating local appointment`);
+                  
+                  // Update appointment with Google data
+                  const { data, error } = supabase
+                    .from('appointments')
+                    .update({
+                      start_at: googleEvent.start.dateTime,
+                      end_at: googleEvent.end.dateTime,
+                      notes: googleEvent.description || existingAppointment.notes,
+                      last_synced_at: new Date().toISOString()
+                    })
+                    .eq('id', existingAppointment.id)
+                    .select();
+                    
+                  if (error) {
+                    console.error(`[importEventsFromGoogle] Error updating appointment ${existingAppointment.id}:`, error);
+                    errors++;
+                  } else {
+                    console.log(`[importEventsFromGoogle] Updated appointment ${existingAppointment.id} with Google data`);
+                    updated++;
+                  }
+                } else {
+                  console.log(`[importEventsFromGoogle] Google event ${googleEvent.id} has not changed since last sync, skipping`);
+                }
+              } else {
+                // Skip creating new appointments from Google events
+                // This avoids the clientName error
+                console.log(`[importEventsFromGoogle] No existing appointment for Google event ${googleEvent.id}, skipping creation`);
+              }
+            } catch (err) {
+              console.error(`[importEventsFromGoogle] Error processing Google event ${googleEvent.id}:`, err);
+              errors++;
+            }
+          }
+          
+          return { created, updated, errors };
+      };
       existingAppointments.forEach(appointment => {
         if (appointment.google_calendar_event_id) {
           appointmentsByGoogleId.set(appointment.google_calendar_event_id, appointment);
@@ -905,147 +969,10 @@ export const useGoogleCalendar = () => {
             created = count || syncedEvents.length;
           }
         }
-        
-        // Helper function for the old method fallback
-      // Helper function for the old method fallback
-      function fallbackToOldMethod() {
-          // Process each Google Calendar event
-          for (const googleEvent of busyEvents) {
-            if (!googleEvent.id) {
-              console.warn('[importEventsFromGoogle] Skipping Google event without ID:', googleEvent);
-              continue;
-            }
-            
-            try {
-              const existingAppointment = appointmentsByGoogleId.get(googleEvent.id);
-              
-              if (existingAppointment) {
-                // Update existing appointment if it's changed
-                console.log(`[importEventsFromGoogle] Found existing appointment for Google event ${googleEvent.id}`);
-                
-                // Check if Google event is newer than our last sync
-                const lastSyncTime = existingAppointment.last_synced_at
-                  ? new Date(existingAppointment.last_synced_at).getTime()
-                  : 0;
-                  
-                const googleUpdateTime = googleEvent.updated
-                  ? new Date(googleEvent.updated).getTime()
-                  : Infinity; // If no update time, assume it's newer
-                
-                if (googleUpdateTime > lastSyncTime) {
-                  console.log(`[importEventsFromGoogle] Google event ${googleEvent.id} was updated after last sync, updating local appointment`);
-                  
-                  // Update appointment with Google data
-                  const { data, error } = supabase
-                    .from('appointments')
-                    .update({
-                      start_at: googleEvent.start.dateTime,
-                      end_at: googleEvent.end.dateTime,
-                      notes: googleEvent.description || existingAppointment.notes,
-                      last_synced_at: new Date().toISOString()
-                    })
-                    .eq('id', existingAppointment.id)
-                    .select();
-                    
-                  if (error) {
-                    console.error(`[importEventsFromGoogle] Error updating appointment ${existingAppointment.id}:`, error);
-                    errors++;
-                  } else {
-                    console.log(`[importEventsFromGoogle] Updated appointment ${existingAppointment.id} with Google data`);
-                    updated++;
-                  }
-                } else {
-                  console.log(`[importEventsFromGoogle] Google event ${googleEvent.id} has not changed since last sync, skipping`);
-                }
-              } else {
-                // Skip creating new appointments from Google events
-                // This avoids the clientName error
-                console.log(`[importEventsFromGoogle] No existing appointment for Google event ${googleEvent.id}, skipping creation`);
-              }
-            } catch (err) {
-              console.error(`[importEventsFromGoogle] Error processing Google event ${googleEvent.id}:`, err);
-              errors++;
-            }
-          }
-        }
-        for (const googleEvent of busyEvents) {
-          if (!googleEvent.id) {
-            console.warn('Skipping Google event without ID:', googleEvent);
-            continue;
-          }
-          
-          try {
-            const existingAppointment = appointmentsByGoogleId.get(googleEvent.id);
-            
-            if (existingAppointment) {
-              // Update existing appointment if it's changed
-              console.log(`Found existing appointment for Google event ${googleEvent.id}`);
-              
-              // Check if Google event is newer than our last sync
-              const lastSyncTime = existingAppointment.last_synced_at 
-                ? new Date(existingAppointment.last_synced_at).getTime()
-                : 0;
-                
-              const googleUpdateTime = googleEvent.updated 
-                ? new Date(googleEvent.updated).getTime() 
-                : Infinity; // If no update time, assume it's newer
-              
-              if (googleUpdateTime > lastSyncTime) {
-                console.log(`Google event ${googleEvent.id} was updated after last sync, updating local appointment`);
-                
-                // Update appointment with Google data
-                const { data, error } = await supabase
-                  .from('appointments')
-                  .update({
-                    start_at: googleEvent.start.dateTime,
-                    end_at: googleEvent.end.dateTime,
-                    notes: googleEvent.description || existingAppointment.notes,
-                    last_synced_at: new Date().toISOString()
-                  })
-                  .eq('id', existingAppointment.id)
-                  .select();
-                  
-                if (error) {
-                  console.error(`Error updating appointment ${existingAppointment.id}:`, error);
-                  errors++;
-                } else {
-                  console.log(`Updated appointment ${existingAppointment.id} with Google data`);
-                  updated++;
-                }
-              } else {
-                console.log(`Google event ${googleEvent.id} has not changed since last sync, skipping`);
-              }
-            } else {
-              // Skip creating new appointments from Google events
-              // This avoids the clientName error
-              console.log(`No existing appointment for Google event ${googleEvent.id}, skipping creation`);
-            }
-          } catch (err) {
-            console.error(`Error processing Google event ${googleEvent.id}:`, err);
-            errors++;
-          }
-        }
-      } else {
-        // synced_events table exists, use it
-        console.log('[importEventsFromGoogle] Using synced_events table for Google Calendar sync');
-        
-        // Batch upsert to synced_events table
-        const { error, count } = await supabase
-          .from('synced_events')
-          .upsert(syncedEvents, {
-            onConflict: 'google_calendar_event_id',
-            ignoreDuplicates: false
-          })
-          .select('count');
-          
-        if (error) {
-          console.error('[importEventsFromGoogle] Error upserting synced events:', error);
-          errors += syncedEvents.length;
-        } else {
-          console.log(`[importEventsFromGoogle] Successfully synced ${count} events`);
-          created = count || syncedEvents.length;
-        }
-      }
+      } catch (err) {
+        console.error('[importEventsFromGoogle] Error checking synced_events table:', err);
+        const result = fallbackToOldMethod();
+        return result;
       }
       
       // Update clinician's last_google_sync timestamp
@@ -1085,11 +1012,6 @@ export const useGoogleCalendar = () => {
       }
       
       return result;
-      } catch (err) {
-        console.error('[importEventsFromGoogle] Error checking synced_events table:', err);
-        fallbackToOldMethod();
-        return { created, updated, errors };
-      }
     } catch (err) {
       console.error('[importEventsFromGoogle] Error importing Google Calendar events:', err);
       setError(err instanceof Error ? err.message : 'Failed to import events from Google Calendar');
