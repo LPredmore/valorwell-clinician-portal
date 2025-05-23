@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { format } from 'date-fns';
 import { useWeekViewData } from './useWeekViewData';
@@ -70,14 +69,14 @@ const WeekView: React.FC<WeekViewProps> = (props) => {
     isTimeSlotAvailable,
     getBlockForTimeSlot,
     getAppointmentForTimeSlot,
-  } = useWeekViewData(
+  } = useWeekViewData({
     days,
     selectedClinicianId,
     refreshTrigger,
     appointments,
-    (id: string) => `Client ${id}`,
+    getClientName: (id: string) => `Client ${id}`,
     userTimeZone
-  );
+  });
 
   // Handle click on an availability block
   const handleAvailabilityBlockClick = (day: Date, block: any) => {
