@@ -154,6 +154,14 @@ export const useWeekViewData = (
   getClientName = (id: string) => `Client ${id}`,
   userTimeZone: string
 ) => {
+  console.log('[useWeekViewData] Hook initialized with:', {
+    daysCount: days?.length || 0,
+    clinicianId,
+    refreshTrigger,
+    externalAppointmentsCount: externalAppointments?.length || 0,
+    userTimeZone
+  });
+
   const [loading, setLoading] = useState(true);
   const [availability, setAvailability] = useState<AvailabilityBlock[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -161,6 +169,7 @@ export const useWeekViewData = (
   const [exceptions, setExceptions] = useState<AvailabilityException[]>([]);
   const [timeBlocks, setTimeBlocks] = useState<TimeBlock[]>([]);
   const [appointmentBlocks, setAppointmentBlocks] = useState<AppointmentBlock[]>([]);
+  const [hookError, setHookError] = useState<Error | null>(null);
   
   // New state for clinician data and weekly pattern
   const [clinicianData, setClinicianData] = useState<any>(null);
@@ -411,9 +420,12 @@ export const useWeekViewData = (
   // Fetch clinician appointments and availability
   useEffect(() => {
     const initializeData = async () => {
+      console.log('[useWeekViewData] Starting data initialization...');
       setLoading(true);
+      setHookError(null);
       
       if (!clinicianId) {
+        console.log('[useWeekViewData] No clinicianId provided, clearing all data');
         setAppointments([]);
         setAvailability([]);
         setClients(new Map());
@@ -427,6 +439,14 @@ export const useWeekViewData = (
       }
 
       try {
+        console.log('[useWeekViewData] Processing with clinicianId:', clinicianId);
+        
+        // Validate weekDays array
+        if (!Array.isArray(weekDays) || weekDays.length === 0) {
+          console.error('[useWeekViewData] weekDays is not a valid array:', weekDays);
+          throw new Error('Invalid weekDays array');
+        }
+        
         // Use the first day to determine the week
         const firstDay = weekDays[0] || TimeZoneService.now(userTimeZone);
         
@@ -593,6 +613,7 @@ export const useWeekViewData = (
         
       } catch (error) {
         console.error('[useWeekViewData] Unexpected Error:', error);
+        setHookError(error instanceof Error ? error : new Error(String(error)));
       } finally {
         setLoading(false);
       }
@@ -999,5 +1020,6 @@ export const useWeekViewData = (
     isTimeSlotAvailable,
     getBlockForTimeSlot,
     getAppointmentForTimeSlot,
+    error: hookError
   };
 };

@@ -26,6 +26,7 @@ import ClinicianDashboard from "./pages/ClinicianDashboard";
 import ResetPassword from "./pages/ResetPassword";
 import UpdatePassword from "./pages/UpdatePassword";
 import CalendarDebugPage from "./pages/CalendarDebugPage";
+import CalendarTestPage from "./pages/CalendarTestPage";
 import AuthDebugPage from "./pages/AuthDebugPage";
 
 // Create a client
@@ -131,8 +132,10 @@ function App() {
                   </ProtectedRoute>
                 } />
                 
-                {/* Make auth debug page accessible without login for troubleshooting */}
+                {/* Make debug pages accessible without login for troubleshooting */}
                 <Route path="/debug/auth-public" element={<AuthDebugPage />} />
+                <Route path="/debug/calendar-public" element={<CalendarDebugPage />} />
+                <Route path="/debug/calendar-test" element={<CalendarTestPage />} />
                 
                 <Route path="*" element={<NotFound />} />
               </Routes>

@@ -1,134 +1,134 @@
-import React, { useState, useEffect } from 'react';
-import CalendarDebugWrapper from '@/components/calendar/CalendarDebugWrapper';
-import { Appointment } from '@/types/appointment';
-import { DebugUtils } from '@/utils/debugUtils';
-import { AppointmentDebugUtils } from '@/utils/appointmentDebugUtils';
-import { DateTime } from 'luxon';
+import React, { useEffect, useState } from 'react';
+import Layout from '../components/layout/Layout';
+import { debugCalendar, testWeekViewDataDependencies } from '../debug/calendarDebug';
+import { Button } from '@/components/ui/button';
+import { useWeekViewData } from '@/components/calendar/week-view/useWeekViewData';
+import { TimeZoneService } from '@/utils/timeZoneService';
 
-// Debug context name for this component
-const DEBUG_CONTEXT = 'CalendarDebugPage';
+const CalendarDebugPage = () => {
+  const [debugResults, setDebugResults] = useState<any>({});
+  const [hookTestResults, setHookTestResults] = useState<any>({});
+  const [weekViewDataResults, setWeekViewDataResults] = useState<any>({});
+  const [error, setError] = useState<Error | null>(null);
 
-/**
- * Debug page for calendar components
- * This page demonstrates the calendar debugging tools
- */
-const CalendarDebugPage: React.FC = () => {
-  const [clinicianId, setClinicianId] = useState<string | null>('test-clinician-123');
-  const [sampleAppointments, setSampleAppointments] = useState<Appointment[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  
-  // Generate sample appointments for testing
-  useEffect(() => {
-    DebugUtils.log(DEBUG_CONTEXT, 'Initializing debug page');
-    setLoading(true);
-    
-    // Generate sample appointments
-    const generateSampleAppointments = () => {
-      DebugUtils.log(DEBUG_CONTEXT, 'Generating sample appointments');
+  // Run basic debug tests
+  const runBasicTests = () => {
+    try {
+      const results = debugCalendar();
+      setDebugResults(results);
       
-      const now = DateTime.now();
-      const userTimeZone = 'America/Chicago';
-      const appointments: Appointment[] = [];
-      
-      // Create appointments for the current week
-      for (let i = 0; i < 5; i++) {
-        // Create appointment for each day of the week (Mon-Fri)
-        const appointmentDate = now.startOf('week').plus({ days: i + 1 });
-        
-        // Morning appointment (9 AM)
-        const morningAppointment = AppointmentDebugUtils.generateTestAppointment(
-          appointmentDate.toFormat('yyyy-MM-dd'),
-          '09:00',
-          60,
-          userTimeZone
-        );
-        morningAppointment.clientName = `Morning Client ${i + 1}`;
-        appointments.push(morningAppointment);
-        
-        // Afternoon appointment (2 PM)
-        const afternoonAppointment = AppointmentDebugUtils.generateTestAppointment(
-          appointmentDate.toFormat('yyyy-MM-dd'),
-          '14:00',
-          60,
-          userTimeZone
-        );
-        afternoonAppointment.clientName = `Afternoon Client ${i + 1}`;
-        appointments.push(afternoonAppointment);
+      const depResults = testWeekViewDataDependencies();
+      setHookTestResults(depResults);
+    } catch (err) {
+      console.error('Error running debug tests:', err);
+      setError(err instanceof Error ? err : new Error(String(err)));
+    }
+  };
+
+  // Test the useWeekViewData hook directly
+  const testWeekViewDataHook = () => {
+    try {
+      // Create test data
+      const today = new Date();
+      const days = [];
+      for (let i = 0; i < 7; i++) {
+        const day = new Date(today);
+        day.setDate(today.getDate() - today.getDay() + i);
+        days.push(day);
       }
+
+      // Get current timezone
+      const userTimeZone = TimeZoneService.DEFAULT_TIMEZONE;
       
-      // Create a problematic appointment that crosses midnight
-      const problematicDate = now.startOf('week').plus({ days: 3 });
-      const problematicAppointment = AppointmentDebugUtils.generateTestAppointment(
-        problematicDate.toFormat('yyyy-MM-dd'),
-        '23:30',
-        60,
+      console.log('Testing useWeekViewData hook with:', {
+        days: days.map(d => d.toISOString()),
+        clinicianId: 'test-clinician-id',
         userTimeZone
-      );
-      problematicAppointment.clientName = 'Midnight Crossing Client';
-      appointments.push(problematicAppointment);
-      
-      // Create an appointment with timezone issues (near DST transition)
-      // March 10, 2024 was a DST transition date in the US
-      const dstTransitionDate = DateTime.fromObject(
-        { year: 2024, month: 3, day: 10 },
-        { zone: userTimeZone }
-      );
-      
-      const dstAppointment = AppointmentDebugUtils.generateTestAppointment(
-        dstTransitionDate.toFormat('yyyy-MM-dd'),
-        '01:30',
-        60,
-        userTimeZone
-      );
-      dstAppointment.clientName = 'DST Transition Client';
-      appointments.push(dstAppointment);
-      
-      DebugUtils.log(DEBUG_CONTEXT, 'Sample appointments generated', {
-        count: appointments.length
       });
       
-      return appointments;
-    };
-    
-    // Set sample appointments
-    const appointments = generateSampleAppointments();
-    setSampleAppointments(appointments);
-    setLoading(false);
-    
-    DebugUtils.log(DEBUG_CONTEXT, 'Debug page initialized');
-  }, []);
-  
-  if (loading) {
-    return <div className="p-8 text-center">Loading debug tools...</div>;
-  }
-  
+      // Initialize the hook
+      const hookData = useWeekViewData(
+        days,
+        'test-clinician-id',
+        0,
+        [],
+        (id) => `Test Client ${id}`,
+        userTimeZone
+      );
+      
+      // Store the results
+      setWeekViewDataResults({
+        success: true,
+        loading: hookData.loading,
+        weekDaysCount: hookData.weekDays?.length || 0,
+        timeBlocksCount: hookData.timeBlocks?.length || 0,
+        appointmentBlocksCount: hookData.appointmentBlocks?.length || 0,
+        error: hookData.error ? hookData.error.message : null
+      });
+    } catch (err) {
+      console.error('Error testing useWeekViewData hook:', err);
+      setWeekViewDataResults({
+        success: false,
+        error: err instanceof Error ? err.message : String(err)
+      });
+    }
+  };
+
   return (
-    <div className="container mx-auto p-4 max-w-6xl">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold mb-2">Calendar Debugging Tools</h1>
-        <p className="text-gray-600">
-          This page provides tools for debugging calendar appointment display issues.
-          Open the browser console to view detailed logs.
-        </p>
+    <Layout>
+      <div className="p-6 bg-white rounded-lg shadow">
+        <h1 className="text-2xl font-bold mb-6">Calendar Debug Page</h1>
+        
+        {error && (
+          <div className="p-4 mb-6 bg-red-100 border border-red-300 rounded">
+            <h3 className="text-lg font-medium text-red-800 mb-2">Error</h3>
+            <p className="text-red-600">{error.message}</p>
+            <pre className="mt-2 text-xs bg-red-50 p-2 rounded overflow-auto">
+              {error.stack}
+            </pre>
+          </div>
+        )}
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="border rounded p-4">
+            <h2 className="text-xl font-semibold mb-4">Basic Calendar Tests</h2>
+            <Button onClick={runBasicTests} className="mb-4">Run Basic Tests</Button>
+            
+            {Object.keys(debugResults).length > 0 && (
+              <div className="mt-4">
+                <h3 className="text-lg font-medium mb-2">Results:</h3>
+                <pre className="bg-gray-100 p-3 rounded text-sm overflow-auto max-h-60">
+                  {JSON.stringify(debugResults, null, 2)}
+                </pre>
+              </div>
+            )}
+            
+            {Object.keys(hookTestResults).length > 0 && (
+              <div className="mt-4">
+                <h3 className="text-lg font-medium mb-2">Hook Dependencies:</h3>
+                <pre className="bg-gray-100 p-3 rounded text-sm overflow-auto max-h-60">
+                  {JSON.stringify(hookTestResults, null, 2)}
+                </pre>
+              </div>
+            )}
+          </div>
+          
+          <div className="border rounded p-4">
+            <h2 className="text-xl font-semibold mb-4">useWeekViewData Hook Test</h2>
+            <Button onClick={testWeekViewDataHook} className="mb-4">Test Hook</Button>
+            
+            {Object.keys(weekViewDataResults).length > 0 && (
+              <div className="mt-4">
+                <h3 className="text-lg font-medium mb-2">Hook Results:</h3>
+                <pre className="bg-gray-100 p-3 rounded text-sm overflow-auto max-h-60">
+                  {JSON.stringify(weekViewDataResults, null, 2)}
+                </pre>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
-      
-      <CalendarDebugWrapper
-        clinicianId={clinicianId}
-        initialAppointments={sampleAppointments}
-        userTimeZone="America/Chicago"
-      />
-      
-      <div className="mt-8 p-4 bg-gray-100 rounded-md">
-        <h2 className="text-lg font-semibold mb-2">Debugging Instructions</h2>
-        <ol className="list-decimal pl-5 space-y-2">
-          <li>Open the browser console to view detailed logs</li>
-          <li>Use the controls to change dates, timezones, and generate test appointments</li>
-          <li>Click on appointments to analyze their timezone conversions</li>
-          <li>Use the timezone tools to test specific date/time conversions</li>
-          <li>Toggle debug mode on/off to control the verbosity of logs</li>
-        </ol>
-      </div>
-    </div>
+    </Layout>
   );
 };
 

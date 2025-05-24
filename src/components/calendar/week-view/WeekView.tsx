@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { useWeekViewData } from './useWeekViewData';
 import { TimeZoneService } from '@/utils/timeZoneService';
@@ -55,23 +55,46 @@ const WeekView: React.FC<WeekViewProps> = ({
 }) => {
   const [selectedBlock, setSelectedBlock] = useState<any | null>(null);
   const [draggedAppointmentId, setDraggedAppointmentId] = useState<string | null>(null);
+  const [hookError, setHookError] = useState<Error | null>(null);
 
-  const {
-    loading,
-    weekDays,
-    appointmentBlocks,
-    timeBlocks,
-    isTimeSlotAvailable,
-    getBlockForTimeSlot,
-    getAppointmentForTimeSlot,
-  } = useWeekViewData(
-    days,
-    selectedClinicianId,
-    refreshTrigger,
-    appointments,
-    (id: string) => `Client ${id}`,
-    userTimeZone
-  );
+  // Add debugging for props
+  useEffect(() => {
+    console.log('[WeekView DEBUG] Component props:', {
+      daysCount: days?.length || 0,
+      selectedClinicianId,
+      userTimeZone,
+      showAvailability,
+      refreshTrigger,
+      appointmentsCount: appointments?.length || 0,
+      hasCallbacks: {
+        onAppointmentClick: !!onAppointmentClick,
+        onAvailabilityClick: !!onAvailabilityClick,
+        onAppointmentUpdate: !!onAppointmentUpdate,
+        onAppointmentDelete: !!onAppointmentDelete
+      },
+      isLoading,
+      hasError: !!error
+    });
+  }, [days, selectedClinicianId, userTimeZone, showAvailability, refreshTrigger, appointments,
+      onAppointmentClick, onAvailabilityClick, onAppointmentUpdate, onAppointmentDelete, isLoading, error]);
+
+  try {
+    const {
+      loading,
+      weekDays,
+      appointmentBlocks,
+      timeBlocks,
+      isTimeSlotAvailable,
+      getBlockForTimeSlot,
+      getAppointmentForTimeSlot,
+    } = useWeekViewData(
+      days,
+      selectedClinicianId,
+      refreshTrigger,
+      appointments,
+      (id: string) => `Client ${id}`,
+      userTimeZone
+    );
 
   // Handle click on an availability block
   const handleAvailabilityBlockClick = (day: Date, block: any) => {
@@ -281,6 +304,24 @@ const WeekView: React.FC<WeekViewProps> = ({
     debugBlocksForDay(debugDay);
   }
 
+  // Add debugging for the data we received from the hook
+  console.log('[WeekView DEBUG] Data from useWeekViewData:', {
+    weekDaysCount: weekDays?.length || 0,
+    appointmentBlocksCount: appointmentBlocks?.length || 0,
+    timeBlocksCount: timeBlocks?.length || 0,
+    sampleTimeBlock: timeBlocks?.length > 0 ? {
+      start: timeBlocks[0].start.toFormat('yyyy-MM-dd HH:mm'),
+      end: timeBlocks[0].end.toFormat('yyyy-MM-dd HH:mm'),
+      isException: timeBlocks[0].isException
+    } : 'No time blocks',
+    sampleAppointmentBlock: appointmentBlocks?.length > 0 ? {
+      id: appointmentBlocks[0].id,
+      clientName: appointmentBlocks[0].clientName,
+      start: appointmentBlocks[0].start.toFormat('yyyy-MM-dd HH:mm'),
+      end: appointmentBlocks[0].end.toFormat('yyyy-MM-dd HH:mm')
+    } : 'No appointment blocks'
+  });
+
   return (
     <div className="flex flex-col">
       {/* Time column headers */}
@@ -412,10 +453,28 @@ const WeekView: React.FC<WeekViewProps> = ({
           <p>Time Blocks: {timeBlocks.length}</p>
           <p>Appointments: {appointmentBlocks.length}</p>
           <p>User Timezone: {userTimeZone}</p>
+          <p>Refresh Trigger: {refreshTrigger}</p>
+          <p>External Error: {error ? error.message : 'None'}</p>
         </div>
       )}
     </div>
   );
+  } catch (error) {
+    console.error('[WeekView] Error rendering component:', error);
+    setHookError(error instanceof Error ? error : new Error(String(error)));
+    
+    return (
+      <div className="p-4 border border-red-300 bg-red-50 rounded-md">
+        <h3 className="text-lg font-medium text-red-800 mb-2">Calendar Error</h3>
+        <p className="text-red-600 mb-2">
+          There was an error rendering the calendar: {hookError?.message || String(error)}
+        </p>
+        <pre className="text-xs bg-red-100 p-2 rounded overflow-auto max-h-40">
+          {hookError?.stack || 'No stack trace available'}
+        </pre>
+      </div>
+    );
+  }
 };
 
 export default WeekView;

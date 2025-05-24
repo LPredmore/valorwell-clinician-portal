@@ -1,5 +1,5 @@
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import Layout from "../components/layout/Layout";
 import CalendarView from "../components/calendar/CalendarView";
 import { addWeeks, subWeeks } from "date-fns";
@@ -13,6 +13,7 @@ import { useAppointments } from "@/hooks/useAppointments";
 const CalendarPage = () => {
   // Get the logged-in user's ID
   const { userId } = useUser();
+  const [calendarError, setCalendarError] = useState<Error | null>(null);
 
   const {
     showAvailability,
@@ -45,6 +46,14 @@ const CalendarPage = () => {
     userTimeZone,
     appointmentRefreshTrigger // Pass the refresh trigger to the hook
   );
+
+  // Add detailed error logging
+  useEffect(() => {
+    if (appointmentsError) {
+      console.error('[CalendarPage] Appointments error:', appointmentsError);
+      setCalendarError(appointmentsError);
+    }
+  }, [appointmentsError]);
 
   // Log key information for debugging
   useEffect(() => {
@@ -117,17 +126,35 @@ const CalendarPage = () => {
             onNavigateToday={navigateToday}
           />
 
-          <CalendarView
-            view="week"
-            showAvailability={showAvailability}
-            clinicianId={selectedClinicianId}
-            currentDate={currentDate}
-            userTimeZone={userTimeZone}
-            refreshTrigger={appointmentRefreshTrigger}
-            appointments={appointments}
-            isLoading={isLoadingAppointments}
-            error={appointmentsError}
-          />
+          {calendarError ? (
+            <div className="p-4 border border-red-300 bg-red-50 rounded-md">
+              <h3 className="text-lg font-medium text-red-800 mb-2">Calendar Error</h3>
+              <p className="text-red-600 mb-2">
+                There was an error loading the calendar: {calendarError.message}
+              </p>
+              <button
+                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                onClick={() => {
+                  setCalendarError(null);
+                  refetchAppointments();
+                }}
+              >
+                Retry
+              </button>
+            </div>
+          ) : (
+            <CalendarView
+              view="week"
+              showAvailability={showAvailability}
+              clinicianId={selectedClinicianId}
+              currentDate={currentDate}
+              userTimeZone={userTimeZone}
+              refreshTrigger={appointmentRefreshTrigger}
+              appointments={appointments}
+              isLoading={isLoadingAppointments}
+              error={appointmentsError}
+            />
+          )}
         </div>
       </div>
 
