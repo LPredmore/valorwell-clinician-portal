@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import Layout from "../components/layout/Layout";
 import CalendarView from "../components/calendar/CalendarView";
 import { addWeeks, subWeeks } from "date-fns";
@@ -9,11 +9,32 @@ import CalendarViewControls from "../components/calendar/CalendarViewControls";
 import AppointmentDialog from "../components/calendar/AppointmentDialog";
 import { useUser } from "@/context/UserContext";
 import { useAppointments } from "@/hooks/useAppointments";
+import { CalendarDebugUtils } from "@/utils/calendarDebugUtils";
+
+// Component name for logging
+const COMPONENT_NAME = 'Calendar';
 
 const CalendarPage = () => {
+  // Performance tracking
+  const renderStartTime = useRef(performance.now());
+  const dataLoadStartTime = useRef(0);
+  
   // Get the logged-in user's ID
   const { userId } = useUser();
   const [calendarError, setCalendarError] = useState<Error | null>(null);
+
+  // Log component mount
+  useEffect(() => {
+    CalendarDebugUtils.logLifecycle(COMPONENT_NAME, 'mount', { userId });
+    
+    // Log render time on mount
+    const mountTime = performance.now() - renderStartTime.current;
+    CalendarDebugUtils.logPerformance(COMPONENT_NAME, 'initial-render', mountTime);
+    
+    return () => {
+      CalendarDebugUtils.logLifecycle(COMPONENT_NAME, 'unmount');
+    };
+  }, [userId]);
 
   const {
     showAvailability,
@@ -31,6 +52,34 @@ const CalendarPage = () => {
     isLoadingTimeZone,
   } = useCalendarState(userId);
   
+  // Log calendar state initialization
+  useEffect(() => {
+    CalendarDebugUtils.logDataLoading(COMPONENT_NAME, 'calendar-state-initialized', {
+      selectedClinicianId,
+      userTimeZone,
+      isLoadingTimeZone,
+      currentDate: currentDate.toISOString(),
+      showAvailability,
+      clientsCount: clients?.length || 0,
+      loadingClients,
+      appointmentRefreshTrigger
+    });
+  }, [selectedClinicianId, userTimeZone, isLoadingTimeZone, currentDate, showAvailability, clients, loadingClients, appointmentRefreshTrigger]);
+  
+  // Start tracking data load time
+  useEffect(() => {
+    if (selectedClinicianId && userTimeZone) {
+      dataLoadStartTime.current = performance.now();
+      CalendarDebugUtils.logDataLoading(COMPONENT_NAME, 'appointments-fetch-start', {
+        clinicianId: selectedClinicianId,
+        timeZone: userTimeZone,
+        startDate: subWeeks(currentDate, 4).toISOString(),
+        endDate: addWeeks(currentDate, 8).toISOString(),
+        refreshTrigger: appointmentRefreshTrigger
+      });
+    }
+  }, [selectedClinicianId, userTimeZone, currentDate, appointmentRefreshTrigger]);
+  
   // Fetch appointments with better date range
   const {
     appointments,
@@ -47,56 +96,86 @@ const CalendarPage = () => {
     appointmentRefreshTrigger // Pass the refresh trigger to the hook
   );
 
+  // Log appointments data loading completion
+  useEffect(() => {
+    if (!isLoadingAppointments && dataLoadStartTime.current > 0) {
+      const loadTime = performance.now() - dataLoadStartTime.current;
+      CalendarDebugUtils.logPerformance(COMPONENT_NAME, 'appointments-load', loadTime, {
+        appointmentsCount: appointments?.length || 0,
+        hasError: !!appointmentsError
+      });
+      
+      // Reset the timer
+      dataLoadStartTime.current = 0;
+      
+      // Log detailed appointment data
+      if (appointments && appointments.length > 0) {
+        CalendarDebugUtils.logDataLoading(COMPONENT_NAME, 'appointments-loaded', {
+          count: appointments.length,
+          samples: appointments.slice(0, 3).map(a => ({
+            id: a.id,
+            clientName: a.clientName,
+            start_at: a.start_at,
+            end_at: a.end_at,
+            type: a.type,
+            status: a.status
+          }))
+        });
+      } else {
+        CalendarDebugUtils.logDataLoading(COMPONENT_NAME, 'no-appointments-loaded', {
+          clinicianId: selectedClinicianId,
+          timeZone: userTimeZone
+        });
+      }
+    }
+  }, [isLoadingAppointments, appointments, appointmentsError, selectedClinicianId, userTimeZone]);
+
   // Add detailed error logging
   useEffect(() => {
     if (appointmentsError) {
-      console.error('[CalendarPage] Appointments error:', appointmentsError);
+      CalendarDebugUtils.error(COMPONENT_NAME, 'Appointments fetch error', appointmentsError);
       setCalendarError(appointmentsError);
     }
   }, [appointmentsError]);
 
-  // Log key information for debugging
-  useEffect(() => {
-    console.log("[CalendarPage] Calendar initialized:", {
-      userTimeZone,
-      currentDate: currentDate.toISOString(),
-      selectedClinicianId,
-      appointmentsCount: appointments?.length || 0,
-      refreshTrigger: appointmentRefreshTrigger
-    });
-    
-    // Log first few appointments for verification
-    if (appointments && appointments.length > 0) {
-      console.log("[CalendarPage] Sample appointments:", 
-        appointments.slice(0, 3).map(a => ({
-          id: a.id,
-          clientName: a.clientName,
-          start_at: a.start_at,
-          end_at: a.end_at
-        }))
-      );
-    }
-  }, [appointments, userTimeZone, currentDate, selectedClinicianId, appointmentRefreshTrigger]);
-
   const navigatePrevious = () => {
+    CalendarDebugUtils.log(COMPONENT_NAME, 'Navigating to previous week', {
+      from: currentDate.toISOString(),
+      to: subWeeks(currentDate, 1).toISOString()
+    });
     setCurrentDate(subWeeks(currentDate, 1));
   };
 
   const navigateNext = () => {
+    CalendarDebugUtils.log(COMPONENT_NAME, 'Navigating to next week', {
+      from: currentDate.toISOString(),
+      to: addWeeks(currentDate, 1).toISOString()
+    });
     setCurrentDate(addWeeks(currentDate, 1));
   };
 
   const navigateToday = () => {
+    CalendarDebugUtils.log(COMPONENT_NAME, 'Navigating to today', {
+      from: currentDate.toISOString(),
+      to: new Date().toISOString()
+    });
     setCurrentDate(new Date());
   };
 
   const toggleAvailability = () => {
+    CalendarDebugUtils.log(COMPONENT_NAME, 'Toggling availability display', {
+      current: showAvailability,
+      new: !showAvailability
+    });
     setShowAvailability(!showAvailability);
   };
 
   // Central function to handle any data changes that should trigger a refresh
   const handleDataChanged = () => {
-    console.log("[CalendarPage] Data changed, refreshing calendar...");
+    CalendarDebugUtils.logDataLoading(COMPONENT_NAME, 'data-changed-refresh-triggered', {
+      currentRefreshTrigger: appointmentRefreshTrigger,
+      newRefreshTrigger: appointmentRefreshTrigger + 1
+    });
     refetchAppointments();
     setAppointmentRefreshTrigger(prev => prev + 1);
   };

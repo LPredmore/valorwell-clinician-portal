@@ -1,9 +1,12 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { TimeBlock, AppointmentBlock } from './types';
 import { Appointment } from '@/types/appointment';
 import { DateTime } from 'luxon';
 import { convertAppointmentBlockToAppointment } from '@/utils/appointmentUtils';
+import { CalendarDebugUtils } from '@/utils/calendarDebugUtils';
+import CalendarComponentErrorBoundary from './CalendarComponentErrorBoundary';
+import CalendarErrorMessage from './CalendarErrorMessage';
 
 interface TimeSlotProps {
   day: Date;
@@ -23,6 +26,9 @@ interface TimeSlotProps {
   originalAppointments: Appointment[];
 }
 
+// Component name for logging
+const COMPONENT_NAME = 'TimeSlot';
+
 const TimeSlot: React.FC<TimeSlotProps> = ({
   day,
   timeSlot,
@@ -40,6 +46,8 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
   onAppointmentDrop,
   originalAppointments
 }) => {
+  // State for handling errors
+  const [slotError, setSlotError] = useState<Error | null>(null);
   const specificDate = '2025-05-15';
   const formattedDay = new Date(day).toISOString().split('T')[0];
   const slotHour = timeSlot.getHours();
@@ -74,15 +82,17 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
       e.preventDefault(); // Prevent default behavior
       
       // Enhanced logging to debug appointment matching
-      console.log(`[TimeSlot] Looking for appointment with ID: ${appointment.id}`);
-      console.log(`[TimeSlot] Original appointments available: ${originalAppointments?.length || 0}`);
+      CalendarDebugUtils.log(COMPONENT_NAME, `Looking for appointment with ID: ${appointment.id}`, {
+        appointmentId: appointment.id,
+        originalAppointmentsCount: originalAppointments?.length || 0
+      });
       
       try {
         // More robust lookup with additional logging
         const originalAppointment = originalAppointments?.find(a => a.id === appointment.id);
         
         if (originalAppointment) {
-          console.log(`[TimeSlot] Found original appointment:`, {
+          CalendarDebugUtils.log(COMPONENT_NAME, 'Found original appointment', {
             id: originalAppointment.id,
             clientName: originalAppointment.clientName,
             clientId: originalAppointment.client_id,
@@ -95,13 +105,17 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
           if (onAppointmentClick) {
             onAppointmentClick(originalAppointment);
           } else {
-            console.error('[TimeSlot] onAppointmentClick callback is not defined');
+            throw new Error('onAppointmentClick callback is not defined');
           }
         } else {
-          console.warn(`[TimeSlot] Original appointment not found for ID: ${appointment.id}. Converting AppointmentBlock to full Appointment.`);
+          CalendarDebugUtils.warn(COMPONENT_NAME, `Original appointment not found for ID: ${appointment.id}`, {
+            appointmentId: appointment.id,
+            availableAppointmentsCount: originalAppointments?.length || 0
+          });
+          
           // Convert the AppointmentBlock to a full Appointment object
           const fullAppointment = convertAppointmentBlockToAppointment(appointment, originalAppointments || []);
-          console.log(`[TimeSlot] Converted appointment:`, {
+          CalendarDebugUtils.log(COMPONENT_NAME, 'Using converted appointment', {
             id: fullAppointment.id,
             clientName: fullAppointment.clientName,
             clientId: fullAppointment.client_id,
@@ -114,23 +128,34 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
           if (onAppointmentClick) {
             onAppointmentClick(fullAppointment);
           } else {
-            console.error('[TimeSlot] onAppointmentClick callback is not defined');
+            throw new Error('onAppointmentClick callback is not defined');
           }
         }
       } catch (error) {
-        console.error('[TimeSlot] Error handling appointment click:', error);
+        const err = error instanceof Error ? error : new Error(String(error));
+        CalendarDebugUtils.error(COMPONENT_NAME, 'Error handling appointment click', err);
+        setSlotError(err);
       }
     };
 
     const baseAppointmentClass = 'p-1 bg-blue-100 border-l-4 border-blue-500 h-full w-full cursor-pointer transition-colors hover:bg-blue-200 z-20 relative';
 
     onDragStart = (e: React.DragEvent) => {
-      const original = originalAppointments.find(a => a.id === appointment.id) || appointment;
-      e.dataTransfer.setData('application/json', JSON.stringify({
-        appointmentId: original.id,
-        clientName: original.clientName
-      }));
-      onAppointmentDragStart?.(original, e);
+      try {
+        const original = originalAppointments.find(a => a.id === appointment.id) || appointment;
+        e.dataTransfer.setData('application/json', JSON.stringify({
+          appointmentId: original.id,
+          clientName: original.clientName
+        }));
+        
+        if (onAppointmentDragStart) {
+          onAppointmentDragStart(original, e);
+        }
+      } catch (error) {
+        const err = error instanceof Error ? error : new Error(String(error));
+        CalendarDebugUtils.error(COMPONENT_NAME, 'Error starting drag operation', err);
+        setSlotError(err);
+      }
     };
 
     let positionClass = '';
@@ -173,7 +198,17 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
       className += ' border-b-0';
     }
 
-    onClick = () => currentBlock && handleAvailabilityBlockClick(day, currentBlock);
+    onClick = () => {
+      try {
+        if (currentBlock && handleAvailabilityBlockClick) {
+          handleAvailabilityBlockClick(day, currentBlock);
+        }
+      } catch (error) {
+        const err = error instanceof Error ? error : new Error(String(error));
+        CalendarDebugUtils.error(COMPONENT_NAME, 'Error handling availability click', err);
+        setSlotError(err);
+      }
+    };
 
     if (isStartOfBlock) {
       content = (
@@ -197,20 +232,57 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
 
   const shouldAcceptDrops = !appointment;
 
+  // Handle error reset
+  const handleErrorReset = () => {
+    setSlotError(null);
+  };
+
+  // If there's an error, show the error message
+  if (slotError) {
+    return (
+      <CalendarErrorMessage
+        componentName={COMPONENT_NAME}
+        error={slotError}
+        message="Error in time slot"
+        details="There was a problem with this calendar slot."
+        onRetry={handleErrorReset}
+        severity="error"
+        contextData={{
+          day: formattedDay,
+          time: formattedTime,
+          hasAppointment: !!appointment,
+          hasAvailability: isAvailable && !!currentBlock
+        }}
+      />
+    );
+  }
+
+  // Wrap the time slot in an error boundary
   return (
-    <div
-      className={`${className} ${debugClass}`}
-      onClick={onClick}
-      draggable={draggable}
-      onDragStart={onDragStart}
-      onDragOver={shouldAcceptDrops ? handleDragOver : undefined}
-      onDrop={shouldAcceptDrops ? handleDrop : undefined}
-      title={title}
-      data-testid={`timeslot-${formattedDay}-${formattedTime}`}
-      data-slot-type={appointment ? 'appointment' : (isAvailable && currentBlock) ? 'availability' : 'empty'}
+    <CalendarComponentErrorBoundary
+      componentName={COMPONENT_NAME}
+      contextData={{
+        day: formattedDay,
+        time: formattedTime,
+        hasAppointment: !!appointment,
+        hasAvailability: isAvailable && !!currentBlock
+      }}
+      onError={(error) => setSlotError(error)}
     >
-      {content}
-    </div>
+      <div
+        className={`${className} ${debugClass}`}
+        onClick={onClick}
+        draggable={draggable}
+        onDragStart={onDragStart}
+        onDragOver={shouldAcceptDrops ? handleDragOver : undefined}
+        onDrop={shouldAcceptDrops ? handleDrop : undefined}
+        title={title}
+        data-testid={`timeslot-${formattedDay}-${formattedTime}`}
+        data-slot-type={appointment ? 'appointment' : (isAvailable && currentBlock) ? 'availability' : 'empty'}
+      >
+        {content}
+      </div>
+    </CalendarComponentErrorBoundary>
   );
 };
 

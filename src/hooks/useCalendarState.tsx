@@ -1,9 +1,8 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { getUserTimeZone } from '@/utils/timeZoneUtils';
+import * as TimeZoneUtils from '@/utils/timeZoneUtils';
 import { getClinicianTimeZone, getClinicianById } from '@/hooks/useClinicianData';
-import { TimeZoneService } from '@/utils/timeZoneService';
 
 interface Client {
   id: string;
@@ -29,7 +28,7 @@ export const useCalendarState = (initialClinicianId: string | null = null) => {
   const [loadingClients, setLoadingClients] = useState(false);
   const [appointmentRefreshTrigger, setAppointmentRefreshTrigger] = useState(0);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [userTimeZone, setUserTimeZone] = useState<string>(TimeZoneService.DEFAULT_TIMEZONE);
+  const [userTimeZone, setUserTimeZone] = useState<string>("America/Chicago");
   const [isLoadingTimeZone, setIsLoadingTimeZone] = useState(true);
 
   const formattedClinicianId = ensureStringId(selectedClinicianId);
@@ -53,21 +52,21 @@ export const useCalendarState = (initialClinicianId: string | null = null) => {
         try {
           const timeZone = await getClinicianTimeZone(formattedClinicianId);
           if (timeZone) {
-            setUserTimeZone(TimeZoneService.ensureIANATimeZone(timeZone));
+            setUserTimeZone(TimeZoneUtils.ensureIANATimeZone(timeZone));
           } else {
             // Fallback to browser timezone if clinician timezone is not set
-            setUserTimeZone(TimeZoneService.ensureIANATimeZone(getUserTimeZone()));
+            setUserTimeZone(TimeZoneUtils.getUserTimeZone());
           }
         } catch (error) {
           console.error("[useCalendarState] Error fetching clinician timezone:", error);
           // Fallback to browser timezone on error
-          setUserTimeZone(TimeZoneService.ensureIANATimeZone(getUserTimeZone()));
+          setUserTimeZone(TimeZoneUtils.getUserTimeZone());
         } finally {
           setIsLoadingTimeZone(false);
         }
       } else {
         // No clinician ID provided, use browser timezone
-        setUserTimeZone(TimeZoneService.ensureIANATimeZone(getUserTimeZone()));
+        setUserTimeZone(TimeZoneUtils.getUserTimeZone());
         setIsLoadingTimeZone(false);
       }
     };

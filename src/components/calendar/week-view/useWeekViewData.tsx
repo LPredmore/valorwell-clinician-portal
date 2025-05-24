@@ -1,16 +1,16 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { DateTime } from 'luxon';
 import { Appointment } from '@/types/appointment';
 import { AvailabilityBlock } from '@/types/availability';
 import { ClientDetails } from '@/types/client';
-import { TimeZoneService } from '@/utils/timeZoneService';
-import { DebugUtils } from '@/utils/debugUtils';
+import * as TimeZoneUtils from '@/utils/timeZoneUtils';
+import { CalendarDebugUtils } from '@/utils/calendarDebugUtils';
 import { TimeBlock, AppointmentBlock, AvailabilityException } from './types';
 import { formatClientName } from '@/utils/appointmentUtils';
 
 // Debug context name for this component
-const DEBUG_CONTEXT = 'useWeekViewData';
+const COMPONENT_NAME = 'useWeekViewData';
 
 // Types for recurring weekly availability pattern
 interface TimeSlot {
@@ -71,7 +71,11 @@ function safeClone<T>(obj: T): T {
   return cloned as T;
 }
 
-// Helper function to extract weekly pattern from clinician data
+/**
+ * Extract weekly availability pattern from clinician data
+ * @param clinicianData - The clinician data from the database
+ * @returns A structured weekly availability pattern
+ */
 const extractWeeklyPatternFromClinicianData = (clinicianData: any): ClinicianWeeklyAvailability => {
   // Create a default structure with all days set to unavailable
   const defaultAvailability: ClinicianWeeklyAvailability = {
@@ -88,14 +92,12 @@ const extractWeeklyPatternFromClinicianData = (clinicianData: any): ClinicianWee
   
   // Days of week for iteration
   const daysOfWeek = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-  
-  // Default timezone
   const defaultTimezone = 'America/Chicago';
   
   // Get clinician's default timezone (ensuring it's a string)
-  const clinicianDefaultTimezone = 
-    typeof clinicianData.clinician_time_zone === 'string' 
-      ? TimeZoneService.ensureIANATimeZone(clinicianData.clinician_time_zone) 
+  const clinicianDefaultTimezone =
+    typeof clinicianData.clinician_time_zone === 'string'
+      ? TimeZoneUtils.ensureIANATimeZone(clinicianData.clinician_time_zone)
       : defaultTimezone;
   
   // Process each day
@@ -116,21 +118,12 @@ const extractWeeklyPatternFromClinicianData = (clinicianData: any): ClinicianWee
         
         // Try to use the slot-specific timezone if it's a valid string
         if (typeof rawTimezoneFromDbSlot === 'string' && rawTimezoneFromDbSlot.trim()) {
-          determinedTimezoneString = TimeZoneService.ensureIANATimeZone(rawTimezoneFromDbSlot.trim());
-        } 
+          determinedTimezoneString = TimeZoneUtils.ensureIANATimeZone(rawTimezoneFromDbSlot.trim());
+        }
         // Otherwise fall back to clinician's default timezone
         else if (typeof clinicianDefaultTimezone === 'string' && clinicianDefaultTimezone.trim()) {
-          determinedTimezoneString = TimeZoneService.ensureIANATimeZone(clinicianDefaultTimezone.trim());
+          determinedTimezoneString = TimeZoneUtils.ensureIANATimeZone(clinicianDefaultTimezone.trim());
         }
-        
-        // Log the timezone being used for this slot
-        console.log(`[extractWeeklyPatternFromClinicianData] Timezone for ${day}_${slotNum}:`, {
-          rawTimezone: rawTimezoneFromDbSlot,
-          timezoneType: typeof rawTimezoneFromDbSlot,
-          defaultTz: clinicianDefaultTimezone,
-          determinedTz: determinedTimezoneString,
-          finalType: typeof determinedTimezoneString
-        });
         
         // Add this time slot with explicit string timezone
         defaultAvailability[day as keyof ClinicianWeeklyAvailability].timeSlots.push({
@@ -145,7 +138,10 @@ const extractWeeklyPatternFromClinicianData = (clinicianData: any): ClinicianWee
   return defaultAvailability;
 };
 
-// Main hook for week view data processing
+/**
+ * Main hook for week view data processing
+ * Optimized for performance and reduced complexity
+ */
 export const useWeekViewData = (
   days: Date[],
   clinicianId: string | null,
@@ -154,7 +150,12 @@ export const useWeekViewData = (
   getClientName = (id: string) => `Client ${id}`,
   userTimeZone: string
 ) => {
-  console.log('[useWeekViewData] Hook initialized with:', {
+  // Performance tracking
+  const hookStartTime = performance.now();
+  const dataFetchStartTime = { current: 0 };
+  const processingStartTime = { current: 0 };
+  
+  CalendarDebugUtils.logLifecycle(COMPONENT_NAME, 'hook-initialized', {
     daysCount: days?.length || 0,
     clinicianId,
     refreshTrigger,
@@ -162,6 +163,7 @@ export const useWeekViewData = (
     userTimeZone
   });
 
+  // State variables
   const [loading, setLoading] = useState(true);
   const [availability, setAvailability] = useState<AvailabilityBlock[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -170,43 +172,30 @@ export const useWeekViewData = (
   const [timeBlocks, setTimeBlocks] = useState<TimeBlock[]>([]);
   const [appointmentBlocks, setAppointmentBlocks] = useState<AppointmentBlock[]>([]);
   const [hookError, setHookError] = useState<Error | null>(null);
-  
-  // New state for clinician data and weekly pattern
-  const [clinicianData, setClinicianData] = useState<any>(null);
   const [weeklyPattern, setWeeklyPattern] = useState<ClinicianWeeklyAvailability | null>(null);
+  const [clinicianData, setClinicianData] = useState<any>(null);
 
-  // Convert JS Date array to DateTime array in user timezone
-  const weekDays = useMemo(() => 
-    days.map(day => TimeZoneService.fromJSDate(day, userTimeZone)),
+  // Convert JS Date array to DateTime array in user timezone - memoized
+  const weekDays = useMemo(() =>
+    days.map(day => TimeZoneUtils.fromJSDate(day, userTimeZone)),
     [days, userTimeZone]
   );
 
-  // Format day strings ('yyyy-MM-dd') for mapping
-  const dayKeys = useMemo(() => 
+  // Format day strings ('yyyy-MM-dd') for mapping - memoized
+  const dayKeys = useMemo(() =>
     weekDays.map(day => day.toFormat('yyyy-MM-dd')),
     [weekDays]
   );
 
-  // Generate time blocks from weekly recurring pattern
-  const generateTimeBlocksFromWeeklyPattern = (
-    pattern: ClinicianWeeklyAvailability, 
+  /**
+   * Generate time blocks from weekly recurring pattern
+   * Memoized to prevent unnecessary recalculations
+   */
+  const generateTimeBlocksFromWeeklyPattern = useCallback((
+    pattern: ClinicianWeeklyAvailability,
     days: DateTime[]
   ): TimeBlock[] => {
     if (!pattern) return [];
-    
-    // DEBUG: Log the pattern we received to check timezone values
-    console.log('[generateTimeBlocksFromWeeklyPattern DEBUG] Received pattern structure:', JSON.stringify({
-      monday: { 
-        isAvailable: pattern.monday.isAvailable,
-        slotsCount: pattern.monday.timeSlots.length,
-        sampleSlot: pattern.monday.timeSlots.length > 0 ? {
-          startTime: pattern.monday.timeSlots[0]?.startTime,
-          endTime: pattern.monday.timeSlots[0]?.endTime,
-          timezone: pattern.monday.timeSlots[0]?.timezone,
-          timezoneType: typeof pattern.monday.timeSlots[0]?.timezone
-        } : null
-      }
-    }, null, 2));
     
     const generatedBlocks: TimeBlock[] = [];
     const defaultTimezone = 'America/Chicago';
@@ -228,37 +217,7 @@ export const useWeekViewData = (
         dayAvailability.timeSlots.forEach((slot, index) => {
           try {
             // Enhanced timezone validation - always ensure we have a valid string
-            let slotTimezone = defaultTimezone; // Default fallback
-            
-            // First, ensure the value exists and is a string
-            if (slot.timezone) {
-              // Check if it's a string (it should be)
-              if (typeof slot.timezone === 'string') {
-                slotTimezone = TimeZoneService.ensureIANATimeZone(slot.timezone);
-              } 
-              // If somehow it's an object (which should never happen after our fixes), convert to string
-              else if (typeof slot.timezone === 'object') {
-                console.error(`[generateTimeBlocksFromWeeklyPattern] Found object timezone for ${dayName} slot ${index}:`, 
-                  slot.timezone);
-                // Try to extract a useful string, or use default
-                slotTimezone = defaultTimezone;
-              } 
-              // Handle any other unexpected type
-              else {
-                console.error(`[generateTimeBlocksFromWeeklyPattern] Unexpected timezone type for ${dayName} slot ${index}:`,
-                  typeof slot.timezone);
-                slotTimezone = defaultTimezone;
-              }
-            }
-            
-            // Log timezone details
-            console.log('[generateTimeBlocksFromWeeklyPattern] Processing slot timezone:', {
-              rawTimezone: slot.timezone,
-              timezoneType: typeof slot.timezone,
-              normalizedTimezone: slotTimezone,
-              day: dayName,
-              slot: index
-            });
+            const slotTimezone = TimeZoneUtils.serializeTimeZone(slot.timezone) || defaultTimezone;
             
             // Create DateTime objects for start and end times in the slot's timezone
             const [startHour, startMinute] = slot.startTime.split(':').map(Number);
@@ -294,32 +253,21 @@ export const useWeekViewData = (
             };
             
             generatedBlocks.push(timeBlock);
-            
-            console.log('[useWeekViewData] Generated recurring time block:', {
-              day: day.toFormat('yyyy-MM-dd'),
-              dayOfWeek: dayName,
-              start: displayStart.toFormat('HH:mm'),
-              end: displayEnd.toFormat('HH:mm'),
-              timezone: {
-                slot: slotTimezone,
-                display: userTimeZone
-              }
-            });
           } catch (error) {
-            console.error('[useWeekViewData] Error creating recurring time block:', error, {
-              day: day.toISO(),
-              slot
-            });
+            console.error('[useWeekViewData] Error creating recurring time block:', error);
           }
         });
       }
     });
     
     return generatedBlocks;
-  };
+  }, [userTimeZone]);
 
-  // Fetch clinician data to get recurring availability pattern
-  const fetchClinicianData = async (clinicianId: string) => {
+  /**
+   * Fetch clinician data to get recurring availability pattern
+   * Memoized to prevent unnecessary recreations
+   */
+  const fetchClinicianData = useCallback(async (clinicianId: string) => {
     try {
       // Explicitly list all required columns instead of using wildcard
       const { data, error } = await supabase
@@ -415,17 +363,25 @@ export const useWeekViewData = (
       console.error('[useWeekViewData] Unexpected error fetching clinician data:', error);
       return null;
     }
-  };
+  }, []);
 
   // Fetch clinician appointments and availability
   useEffect(() => {
     const initializeData = async () => {
-      console.log('[useWeekViewData] Starting data initialization...');
+      CalendarDebugUtils.logDataLoading(COMPONENT_NAME, 'data-initialization-start', {
+        clinicianId,
+        refreshTrigger,
+        userTimeZone
+      });
+      
       setLoading(true);
       setHookError(null);
       
       if (!clinicianId) {
-        console.log('[useWeekViewData] No clinicianId provided, clearing all data');
+        CalendarDebugUtils.logDataLoading(COMPONENT_NAME, 'no-clinician-id-provided', {
+          clearingData: true
+        });
+        
         setAppointments([]);
         setAvailability([]);
         setClients(new Map());
@@ -439,16 +395,22 @@ export const useWeekViewData = (
       }
 
       try {
-        console.log('[useWeekViewData] Processing with clinicianId:', clinicianId);
+        CalendarDebugUtils.logDataLoading(COMPONENT_NAME, 'processing-with-clinician', {
+          clinicianId,
+          userTimeZone
+        });
         
         // Validate weekDays array
         if (!Array.isArray(weekDays) || weekDays.length === 0) {
-          console.error('[useWeekViewData] weekDays is not a valid array:', weekDays);
+          CalendarDebugUtils.error(COMPONENT_NAME, 'weekDays is not a valid array', {
+            weekDays,
+            type: typeof weekDays
+          });
           throw new Error('Invalid weekDays array');
         }
         
         // Use the first day to determine the week
-        const firstDay = weekDays[0] || TimeZoneService.now(userTimeZone);
+        const firstDay = weekDays[0] || TimeZoneUtils.now(userTimeZone);
         
         // Get expanded date range for better data capture - add padding
         // Start a week before the displayed week, end a week after
@@ -459,19 +421,35 @@ export const useWeekViewData = (
         const utcStart = padStartDay.toUTC().toISO();
         const utcEnd = padEndDay.toUTC().toISO();
 
-        console.log('[useWeekViewData] Fetching for week:', {
+        CalendarDebugUtils.logDataLoading(COMPONENT_NAME, 'date-range-calculation', {
           localStart: firstDay.toISO(),
           paddedStart: padStartDay.toISO(),
           paddedEnd: padEndDay.toISO(),
           utcStart,
           utcEnd,
-          tz: userTimeZone
+          timezone: userTimeZone,
+          weekDaysCount: weekDays.length
         });
 
-        // *** NEW: Fetch clinician data for recurring pattern ***
+        // Start tracking data fetch time
+        dataFetchStartTime.current = performance.now();
+        CalendarDebugUtils.logDataLoading(COMPONENT_NAME, 'data-fetch-start', {
+          clinicianId,
+          utcStart,
+          utcEnd
+        });
+        
+        // *** Fetch clinician data for recurring pattern ***
         const fetchedClinicianData = await fetchClinicianData(clinicianId);
         
         // Fetch all required data in parallel
+        CalendarDebugUtils.logApiRequest(COMPONENT_NAME, 'parallel-data-fetch', {
+          fetchingAppointments: externalAppointments.length === 0,
+          fetchingAvailability: true,
+          fetchingClients: true,
+          fetchingExceptions: true
+        });
+        
         const [appointmentData, availabilityData, clientData, exceptionData] = await Promise.all([
           // Fetch appointments if no external appointments provided
           externalAppointments.length === 0 && clinicianId ? supabase
@@ -505,29 +483,57 @@ export const useWeekViewData = (
             .eq('clinician_id', clinicianId) : Promise.resolve({ data: [], error: null })
         ]);
 
+        // Log data fetch completion time
+        const dataFetchTime = performance.now() - dataFetchStartTime.current;
+        CalendarDebugUtils.logPerformance(COMPONENT_NAME, 'data-fetch-complete', dataFetchTime, {
+          appointmentsSuccess: !appointmentData.error,
+          availabilitySuccess: !availabilityData.error,
+          clientsSuccess: !clientData.error,
+          exceptionsSuccess: !exceptionData.error
+        });
+        
+        // Start tracking data processing time
+        processingStartTime.current = performance.now();
+        
         // Process appointments - use external if provided, otherwise use fetched
-        const fetchedAppts = externalAppointments.length > 0 
-          ? externalAppointments 
+        const fetchedAppts = externalAppointments.length > 0
+          ? externalAppointments
           : (appointmentData.error ? [] : appointmentData.data);
           
-        console.log('[useWeekViewData] Using Appointments:', {
+        CalendarDebugUtils.logDataLoading(COMPONENT_NAME, 'appointments-processed', {
           count: fetchedAppts.length,
           source: externalAppointments.length > 0 ? 'external' : 'database',
-          sample: fetchedAppts.length ? fetchedAppts[0] : null,
-          tz: userTimeZone
+          sample: fetchedAppts.length ? {
+            id: fetchedAppts[0].id,
+            start_at: fetchedAppts[0].start_at,
+            end_at: fetchedAppts[0].end_at
+          } : null,
+          timezone: userTimeZone,
+          error: appointmentData.error ? appointmentData.error.message : null
         });
 
         // Process availability
         const fetchedBlocks = availabilityData.error ? [] : availabilityData.data;
-        console.log('[useWeekViewData] Fetched blocks:', {
-          tz: userTimeZone,
-          blocksCount: fetchedBlocks.length
+        CalendarDebugUtils.logDataLoading(COMPONENT_NAME, 'availability-blocks-processed', {
+          timezone: userTimeZone,
+          blocksCount: fetchedBlocks.length,
+          error: availabilityData.error ? availabilityData.error.message : null,
+          sample: fetchedBlocks.length > 0 ? {
+            id: fetchedBlocks[0].id,
+            start_at: fetchedBlocks[0].start_at,
+            end_at: fetchedBlocks[0].end_at
+          } : null
         });
 
         // Process exceptions
         const fetchedExceptions = exceptionData.error ? [] : exceptionData.data;
-        console.log('[useWeekViewData] Fetched exceptions:', {
-          count: fetchedExceptions.length
+        CalendarDebugUtils.logDataLoading(COMPONENT_NAME, 'exceptions-processed', {
+          count: fetchedExceptions.length,
+          error: exceptionData.error ? exceptionData.error.message : null,
+          sample: fetchedExceptions.length > 0 ? {
+            id: fetchedExceptions[0].id,
+            specific_date: fetchedExceptions[0].specific_date
+          } : null
         });
 
         // Build client map
@@ -611,30 +617,58 @@ export const useWeekViewData = (
         processTimeBlocks(fetchedBlocks, fetchedExceptions, extractedPattern, weekDays);
         processAppointmentBlocks(fetchedAppts, clientMap);
         
+        // Log data processing completion time
+        const dataProcessingTime = performance.now() - processingStartTime.current;
+        CalendarDebugUtils.logPerformance(COMPONENT_NAME, 'data-processing-complete', dataProcessingTime, {
+          appointmentsCount: fetchedAppts.length,
+          blocksCount: fetchedBlocks.length,
+          exceptionsCount: fetchedExceptions.length,
+          clientsCount: clientMap.size
+        });
+        
       } catch (error) {
-        console.error('[useWeekViewData] Unexpected Error:', error);
+        CalendarDebugUtils.error(COMPONENT_NAME, 'Unexpected error during data initialization', error);
         setHookError(error instanceof Error ? error : new Error(String(error)));
       } finally {
+        // Log total hook execution time
+        const totalHookTime = performance.now() - hookStartTime;
+        CalendarDebugUtils.logPerformance(COMPONENT_NAME, 'hook-execution-complete', totalHookTime);
         setLoading(false);
       }
     };
 
     initializeData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clinicianId, refreshTrigger, userTimeZone, externalAppointments]);
+    // Include all dependencies to prevent stale closures
+  }, [
+    clinicianId,
+    refreshTrigger,
+    userTimeZone,
+    externalAppointments,
+    weekDays,
+    dayKeys,
+    generateTimeBlocksFromWeeklyPattern,
+    fetchClinicianData
+  ]);
 
-  // Process availability blocks into time blocks
-  const processTimeBlocks = (
-    blocks: AvailabilityBlock[], 
+  /**
+   * Process availability blocks into time blocks
+   * Memoized to prevent unnecessary recreations
+   */
+  const processTimeBlocks = useCallback((
+    blocks: AvailabilityBlock[],
     exceptions: AvailabilityException[],
     weeklyPattern: ClinicianWeeklyAvailability | null,
     days: DateTime[]
   ) => {
-    console.log('[useWeekViewData] Processing time blocks', {
+    CalendarDebugUtils.logDataLoading(COMPONENT_NAME, 'processing-time-blocks', {
       blocksCount: blocks.length,
       exceptionsCount: exceptions.length,
-      hasWeeklyPattern: !!weeklyPattern
+      hasWeeklyPattern: !!weeklyPattern,
+      daysCount: days.length
     });
+    
+    // Start tracking processing time
+    const blockProcessingStart = performance.now();
     
     const timeBlocks: TimeBlock[] = [];
     
@@ -650,8 +684,8 @@ export const useWeekViewData = (
       }
       
       try {
-        const start = DateTime.fromISO(block.start_at, { zone: 'UTC' }).setZone(userTimeZone);
-        const end = DateTime.fromISO(block.end_at, { zone: 'UTC' }).setZone(userTimeZone);
+        const start = TimeZoneUtils.fromUTC(block.start_at, userTimeZone);
+        const end = TimeZoneUtils.fromUTC(block.end_at, userTimeZone);
         const day = start.startOf('day');
         
         timeBlocks.push({
@@ -685,7 +719,7 @@ export const useWeekViewData = (
       
       try {
         // Create a DateTime from the specific date and time
-        const specificDate = DateTime.fromISO(exception.specific_date, { zone: userTimeZone });
+        const specificDate = TimeZoneUtils.fromISO(exception.specific_date, userTimeZone);
         const startTime = exception.start_time.split(':').map(Number);
         const endTime = exception.end_time.split(':').map(Number);
         
@@ -729,18 +763,29 @@ export const useWeekViewData = (
     }
     
     setTimeBlocks(timeBlocks);
-    console.log('[useWeekViewData] Finished processing time blocks', {
-      totalBlocks: timeBlocks.length
+    // Log processing time
+    const blockProcessingTime = performance.now() - blockProcessingStart;
+    CalendarDebugUtils.logPerformance(COMPONENT_NAME, 'time-blocks-processing', blockProcessingTime, {
+      totalBlocks: timeBlocks.length,
+      regularBlocks: blocks.length,
+      exceptionBlocks: exceptions.length,
+      hasWeeklyPattern: !!weeklyPattern
     });
-  };
+  }, [userTimeZone, generateTimeBlocksFromWeeklyPattern, setTimeBlocks]);
   
-  // Process appointments into appointment blocks - UPDATED to use formatClientName utility
-  const processAppointmentBlocks = (appts: Appointment[], clientMap: Map<string, Client>) => {
-    console.log('[useWeekViewData] Processing appointment blocks', {
+  /**
+   * Process appointments into appointment blocks
+   * Memoized to prevent unnecessary recreations
+   */
+  const processAppointmentBlocks = useCallback((appts: Appointment[], clientMap: Map<string, Client>) => {
+    CalendarDebugUtils.logDataLoading(COMPONENT_NAME, 'processing-appointment-blocks-start', {
       appointmentsCount: appts.length,
       clientsCount: clientMap.size,
       dayKeys
     });
+    
+    // Start tracking processing time
+    const appointmentProcessingStart = performance.now();
     
     const appointmentBlocks: AppointmentBlock[] = [];
     
@@ -756,8 +801,8 @@ export const useWeekViewData = (
       
       try {
         // Convert start/end times to the user's timezone
-        const start = DateTime.fromISO(appointment.start_at, { zone: 'UTC' }).setZone(userTimeZone);
-        const end = DateTime.fromISO(appointment.end_at, { zone: 'UTC' }).setZone(userTimeZone);
+        const start = TimeZoneUtils.fromUTC(appointment.start_at, userTimeZone);
+        const end = TimeZoneUtils.fromUTC(appointment.end_at, userTimeZone);
         const day = start.startOf('day');
         
         // Get client name using formatClientName utility for consistent formatting
@@ -806,10 +851,15 @@ export const useWeekViewData = (
     });
     
     setAppointmentBlocks(appointmentBlocks);
-    console.log('[useWeekViewData] Finished processing appointment blocks', {
-      totalBlocks: appointmentBlocks.length
+    
+    // Log processing time
+    const appointmentProcessingTime = performance.now() - appointmentProcessingStart;
+    CalendarDebugUtils.logPerformance(COMPONENT_NAME, 'appointment-blocks-processing', appointmentProcessingTime, {
+      totalBlocks: appointmentBlocks.length,
+      originalAppointments: appts.length,
+      clientsUsed: clientMap.size
     });
-  };
+  }, [userTimeZone, dayKeys, getClientName, setAppointmentBlocks]);
 
   // Map appointments by day for the week
   const dayAppointmentsMap = useMemo(() => {
@@ -821,7 +871,7 @@ export const useWeekViewData = (
     appointments.forEach(appointment => {
       try {
         // UTC to local conversion
-        const slotTime = DateTime.fromISO(appointment.start_at).setZone(userTimeZone);
+        const slotTime = TimeZoneUtils.fromUTC(appointment.start_at, userTimeZone);
         const dayStr = slotTime.toFormat('yyyy-MM-dd');
         
         if (resultMap.has(dayStr)) {
@@ -852,7 +902,7 @@ export const useWeekViewData = (
     
     availability.forEach(block => {
       // UTC->local conversion with time zone
-      const blockTime = block.start_at ? DateTime.fromISO(block.start_at).setZone(userTimeZone) : null;
+      const blockTime = block.start_at ? TimeZoneUtils.fromUTC(block.start_at, userTimeZone) : null;
       const dayStr = blockTime ? blockTime.toFormat('yyyy-MM-dd') : '';
       
       if (dayStr && resultMap.has(dayStr)) {
@@ -864,11 +914,14 @@ export const useWeekViewData = (
     return resultMap;
   }, [availability, dayKeys, userTimeZone]);
 
-  // Utility function to check if a time slot is available
-  const isTimeSlotAvailable = (day: Date, timeSlot: Date): boolean => {
+  /**
+   * Utility function to check if a time slot is available
+   * Memoized to prevent unnecessary recreations
+   */
+  const isTimeSlotAvailable = useCallback((day: Date, timeSlot: Date): boolean => {
     // Convert JS Date to DateTime
-    const dayDt = DateTime.fromJSDate(day, { zone: userTimeZone });
-    const timeSlotDt = DateTime.fromJSDate(timeSlot, { zone: userTimeZone });
+    const dayDt = TimeZoneUtils.fromJSDate(day, userTimeZone);
+    const timeSlotDt = TimeZoneUtils.fromJSDate(timeSlot, userTimeZone);
     
     // Create the specific moment for this slot
     const slotTime = dayDt.set({
@@ -911,10 +964,13 @@ export const useWeekViewData = (
     }
     
     return isAvailable;
-  };
+  }, [userTimeZone, timeBlocks]);
 
-  // Utility function to get the block for a time slot
-  const getBlockForTimeSlot = (day: Date, timeSlot: Date): TimeBlock | undefined => {
+  /**
+   * Utility function to get the block for a time slot
+   * Memoized to prevent unnecessary recreations
+   */
+  const getBlockForTimeSlot = useCallback((day: Date, timeSlot: Date): TimeBlock | undefined => {
     // Convert JS Date to DateTime
     const dayDt = DateTime.fromJSDate(day, { zone: userTimeZone });
     const timeSlotDt = DateTime.fromJSDate(timeSlot, { zone: userTimeZone });
@@ -974,10 +1030,13 @@ export const useWeekViewData = (
     }
     
     return foundBlock;
-  };
+  }, [userTimeZone, timeBlocks]);
 
-  // Utility function to get the appointment for a time slot
-  const getAppointmentForTimeSlot = (day: Date, timeSlot: Date): AppointmentBlock | undefined => {
+  /**
+   * Utility function to get the appointment for a time slot
+   * Memoized to prevent unnecessary recreations
+   */
+  const getAppointmentForTimeSlot = useCallback((day: Date, timeSlot: Date): AppointmentBlock | undefined => {
     // Convert JS Date to DateTime
     const dayDt = DateTime.fromJSDate(day, { zone: userTimeZone });
     const timeSlotDt = DateTime.fromJSDate(timeSlot, { zone: userTimeZone });
@@ -996,12 +1055,15 @@ export const useWeekViewData = (
       
       return slotTime >= appt.start && slotTime < appt.end;
     });
-  };
+  }, [userTimeZone, appointmentBlocks]);
 
-  // Utility function to get availability for a block
-  const getAvailabilityForBlock = (blockId: string): AvailabilityBlock | undefined => {
+  /**
+   * Utility function to get availability for a block
+   * Memoized to prevent unnecessary recreations
+   */
+  const getAvailabilityForBlock = useCallback((blockId: string): AvailabilityBlock | undefined => {
     return availability.find(block => block.id === blockId);
-  };
+  }, [availability]);
 
   return {
     loading,
