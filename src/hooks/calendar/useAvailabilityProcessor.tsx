@@ -53,7 +53,12 @@ const extractWeeklyPatternFromClinicianData = (clinicianData: ClinicianColumnDat
     sunday: { dayOfWeek: 'Sunday', isAvailable: false, timeSlots: [] },
   };
   
-  if (!clinicianData) return defaultAvailability;
+  if (!clinicianData) {
+    CalendarDebugUtils.log(COMPONENT_NAME, 'No clinician data provided', {
+      action: 'returning-default-availability'
+    });
+    return defaultAvailability;
+  }
   
   // Days of week for iteration
   const daysOfWeek = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
@@ -88,13 +93,29 @@ const extractWeeklyPatternFromClinicianData = (clinicianData: ClinicianColumnDat
       const endTimeKey = `clinician_availability_end_${day}_${slotNum}`;
       const timezoneKey = `clinician_availability_timezone_${day}_${slotNum}`;
       
-      if (clinicianData[startTimeKey] && clinicianData[endTimeKey]) {
-        // We found a valid slot - ensure the day is marked as available
-        defaultAvailability[day as keyof ClinicianWeeklyAvailability].isAvailable = true;
+      // Handle partial data cases - if either start or end time exists but not both
+      const hasStartTime = !!clinicianData[startTimeKey];
+      const hasEndTime = !!clinicianData[endTimeKey];
+      
+      if (hasStartTime || hasEndTime) {
+        // Log partial data cases
+        if (hasStartTime !== hasEndTime) {
+          CalendarDebugUtils.warn(COMPONENT_NAME, 'Partial availability data detected', {
+            day,
+            slotNum,
+            hasStartTime,
+            hasEndTime
+          });
+        }
         
-        // Extract timezone value with improved validation
-        const rawTimezoneFromDbSlot = clinicianData[timezoneKey];
-        let determinedTimezoneString = defaultTimezone; // Start with fallback
+        // Only process complete slots
+        if (hasStartTime && hasEndTime) {
+          // We found a valid slot - ensure the day is marked as available
+          defaultAvailability[day as keyof ClinicianWeeklyAvailability].isAvailable = true;
+          
+          // Extract timezone value with improved validation
+          const rawTimezoneFromDbSlot = clinicianData[timezoneKey];
+          let determinedTimezoneString = defaultTimezone; // Start with fallback
         
         // Enhanced timezone handling to handle array values
         if (rawTimezoneFromDbSlot) {
@@ -344,7 +365,12 @@ export const useAvailabilityProcessor = (
     pattern: ClinicianWeeklyAvailability,
     days: DateTime[]
   ): TimeBlock[] => {
-    if (!pattern) return [];
+    if (!pattern) {
+      CalendarDebugUtils.log(COMPONENT_NAME, 'No availability pattern provided', {
+        action: 'returning-empty-time-blocks'
+      });
+      return [];
+    }
     
     const generatedBlocks: TimeBlock[] = [];
     const defaultTimezone = 'America/Chicago';

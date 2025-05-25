@@ -42,7 +42,7 @@ export const useCalendarDataFetching = (
           clinician_last_name,
           clinician_professional_name,
           clinician_email,
-          clinician_time_zone,
+          clinician_time_zone:coalesce(clinician_time_zone, 'America/Chicago'),
           clinician_bio,
           clinician_image_url,
           clinician_availability_start_monday_1,
@@ -120,7 +120,21 @@ export const useCalendarDataFetching = (
       CalendarDebugUtils.log(COMPONENT_NAME, 'Fetched clinician data for availability', {
         clinicianId,
         hasData: !!data,
+        timezone: data?.clinician_time_zone
       });
+      
+      // Validate timezone format before returning
+      if (data?.clinician_time_zone) {
+        try {
+          DateTime.local().setZone(data.clinician_time_zone);
+        } catch (err) {
+          CalendarDebugUtils.error(COMPONENT_NAME, 'Invalid timezone format in clinician data', {
+            clinicianId,
+            timezone: data.clinician_time_zone
+          });
+          data.clinician_time_zone = 'America/Chicago';
+        }
+      }
       
       return data;
     } catch (error) {
