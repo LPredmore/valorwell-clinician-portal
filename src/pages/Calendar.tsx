@@ -7,10 +7,13 @@ import { useCalendarState } from "../hooks/useCalendarState";
 import CalendarHeader from "../components/calendar/CalendarHeader";
 import CalendarViewControls from "../components/calendar/CalendarViewControls";
 import AppointmentDialog from "../components/calendar/AppointmentDialog";
+import RealTimeCalendarIndicator from "../components/calendar/RealTimeCalendarIndicator";
 import { useUser } from "@/context/UserContext";
 import { useTimeZone } from "@/context/TimeZoneContext";
 import { useAppointments } from "@/hooks/useAppointments";
+import { useRealTimeCalendar } from "@/hooks/useRealTimeCalendar";
 import { CalendarDebugUtils } from "@/utils/calendarDebugUtils";
+import { Appointment } from "@/types/appointment";
 
 // Component name for logging
 const COMPONENT_NAME = 'Calendar';
@@ -98,6 +101,34 @@ const CalendarPage = () => {
     userTimeZone,
     appointmentRefreshTrigger // Pass the refresh trigger to the hook
   );
+  
+  // Initialize real-time calendar updates
+  const { isConnected: isRealTimeConnected } = useRealTimeCalendar({
+    onAppointmentCreated: (appointment: Appointment) => {
+      CalendarDebugUtils.log(COMPONENT_NAME, 'Real-time appointment created', {
+        appointmentId: appointment.id,
+        clientName: appointment.clientName
+      });
+      handleDataChanged();
+    },
+    onAppointmentUpdated: (appointment: Appointment) => {
+      CalendarDebugUtils.log(COMPONENT_NAME, 'Real-time appointment updated', {
+        appointmentId: appointment.id,
+        clientName: appointment.clientName
+      });
+      handleDataChanged();
+    },
+    onAppointmentDeleted: (appointment: Appointment) => {
+      CalendarDebugUtils.log(COMPONENT_NAME, 'Real-time appointment deleted', {
+        appointmentId: appointment.id,
+        clientName: appointment.clientName
+      });
+      handleDataChanged();
+    },
+    onConnectionChange: (status: string) => {
+      CalendarDebugUtils.log(COMPONENT_NAME, 'Real-time connection status changed', { status });
+    }
+  });
 
   // Log appointments data loading completion
   useEffect(() => {
@@ -190,6 +221,11 @@ const CalendarPage = () => {
           <div className="flex justify-between items-center">
             <h1 className="text-2xl font-bold text-gray-800">Calendar</h1>
             <div className="flex items-center gap-4">
+              <RealTimeCalendarIndicator
+                compact={true}
+                onAppointmentUpdate={handleDataChanged}
+                className="mr-2"
+              />
               <CalendarViewControls
                 showAvailability={showAvailability}
                 onToggleAvailability={toggleAvailability}
@@ -237,6 +273,14 @@ const CalendarPage = () => {
               error={appointmentsError}
             />
           )}
+          
+          {/* Full real-time indicator at the bottom of the calendar */}
+          <div className="mt-4">
+            <RealTimeCalendarIndicator
+              onAppointmentUpdate={handleDataChanged}
+              showControls={true}
+            />
+          </div>
         </div>
       </div>
 
