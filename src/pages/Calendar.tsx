@@ -8,6 +8,7 @@ import CalendarHeader from "../components/calendar/CalendarHeader";
 import CalendarViewControls from "../components/calendar/CalendarViewControls";
 import AppointmentDialog from "../components/calendar/AppointmentDialog";
 import { useUser } from "@/context/UserContext";
+import { useTimeZone } from "@/context/TimeZoneContext";
 import { useAppointments } from "@/hooks/useAppointments";
 import { CalendarDebugUtils } from "@/utils/calendarDebugUtils";
 
@@ -48,9 +49,11 @@ const CalendarPage = () => {
     setAppointmentRefreshTrigger,
     isDialogOpen,
     setIsDialogOpen,
-    userTimeZone,
-    isLoadingTimeZone,
   } = useCalendarState(userId);
+  
+  // Use the TimeZoneContext instead of getting timezone from useCalendarState
+  const { userTimeZone } = useTimeZone();
+  const isLoadingTimeZone = false; // TimeZoneContext is always available
   
   // Log calendar state initialization
   useEffect(() => {
@@ -177,7 +180,7 @@ const CalendarPage = () => {
       newRefreshTrigger: appointmentRefreshTrigger + 1
     });
     refetchAppointments();
-    setAppointmentRefreshTrigger(prev => prev + 1);
+    setAppointmentRefreshTrigger();
   };
 
   return (
@@ -199,7 +202,7 @@ const CalendarPage = () => {
           <CalendarHeader
             currentDate={currentDate}
             userTimeZone={userTimeZone}
-            isLoadingTimeZone={isLoadingTimeZone}
+            isLoadingTimeZone={false}
             onNavigatePrevious={navigatePrevious}
             onNavigateNext={navigateNext}
             onNavigateToday={navigateToday}

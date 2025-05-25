@@ -83,8 +83,57 @@ export function formatWithTimeZone(date: Date, timezone: string, formatStr: stri
  * @param timezone The timezone string to validate
  * @returns A valid IANA timezone string
  */
+/**
+ * Ensures a timezone string is a valid IANA timezone
+ * Enhanced to handle more edge cases and provide better error reporting
+ * @param timezone The timezone string to validate
+ * @returns A valid IANA timezone string
+ */
 export function ensureIANATimeZone(timezone: string | null | undefined): string {
-  return TimeZoneService.ensureIANATimeZone(timezone);
+  // Handle null or undefined
+  if (!timezone) {
+    console.warn('No timezone provided, using default timezone:', TimeZoneService.DEFAULT_TIMEZONE);
+    return TimeZoneService.DEFAULT_TIMEZONE;
+  }
+  
+  // Handle empty strings
+  if (typeof timezone === 'string' && timezone.trim() === '') {
+    console.warn('Empty timezone string provided, using default timezone');
+    return TimeZoneService.DEFAULT_TIMEZONE;
+  }
+  
+  // Handle object conversion issues - if timezone is somehow an object
+  if (typeof timezone === 'object') {
+    console.warn('Timezone is an object instead of a string:', timezone);
+    try {
+      // Try to extract a string representation
+      const tzString = String(timezone);
+      if (tzString && tzString.length > 0 && tzString !== '[object Object]') {
+        return normalizeTimezoneString(tzString);
+      }
+    } catch (error) {
+      console.error('Error converting timezone object to string:', error);
+    }
+    return TimeZoneService.DEFAULT_TIMEZONE;
+  }
+  
+  return normalizeTimezoneString(String(timezone));
+}
+
+/**
+ * Helper function to normalize timezone strings
+ * @param timezoneStr The timezone string to normalize
+ * @returns A normalized timezone string
+ */
+function normalizeTimezoneString(timezoneStr: string): string {
+  // Normalize common timezone abbreviations
+  if (timezoneStr === 'EST') return 'America/New_York';
+  if (timezoneStr === 'CST') return 'America/Chicago';
+  if (timezoneStr === 'MST') return 'America/Denver';
+  if (timezoneStr === 'PST') return 'America/Los_Angeles';
+  
+  // Use TimeZoneService for final validation
+  return TimeZoneService.ensureIANATimeZone(timezoneStr);
 }
 
 /**
@@ -231,4 +280,42 @@ export function serializeTimeZone(timezone: any): string {
   
   console.error('Could not serialize timezone:', timezone);
   return TimeZoneService.DEFAULT_TIMEZONE;
+}
+
+/**
+ * Safely clone objects without losing string types or timezone information
+ * This is a replacement for JSON.parse(JSON.stringify()) which can corrupt timezone strings
+ * @param obj The object to clone
+ * @returns A deep clone of the object with preserved string types
+ */
+export function safeClone<T>(obj: T): T {
+  if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+  
+  // Handle Date objects
+  if (obj instanceof Date) {
+    return new Date(obj.getTime()) as unknown as T;
+  }
+  
+  // Handle arrays
+  if (Array.isArray(obj)) {
+    return obj.map(safeClone) as unknown as T;
+  }
+  
+  // Handle objects
+  const cloned: Record<string, any> = {};
+  for (const key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      const value = (obj as Record<string, any>)[key];
+      // Special handling for timezone strings to prevent object conversion
+      if ((key === 'timezone' || key.includes('timezone') || key.includes('time_zone')) && typeof value === 'string') {
+        cloned[key] = String(value); // Ensure it's a primitive string
+      } else {
+        cloned[key] = safeClone(value);
+      }
+    }
+  }
+  
+  return cloned as T;
 }

@@ -1,17 +1,17 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { format } from 'date-fns';
 import { useWeekViewData } from './useWeekViewData';
-import { TimeZoneService } from '@/utils/timeZoneService';
+import { useTimeZone } from '@/context/TimeZoneContext';
 import { DateTime } from 'luxon';
-import TimeSlot from './TimeSlot';
 import { AvailabilityBlock } from '@/types/availability';
 import { Appointment } from '@/types/appointment';
-import { convertAppointmentBlockToAppointment } from '@/utils/appointmentUtils';
 import { CalendarDebugUtils } from '@/utils/calendarDebugUtils';
 import CalendarComponentErrorBoundary from './CalendarComponentErrorBoundary';
 import CalendarErrorMessage from './CalendarErrorMessage';
 import { useCalendarErrorHandler } from '@/hooks/useCalendarErrorHandler';
 import WeekViewSectionErrorBoundary from './WeekViewSectionErrorBoundary';
+import WeekViewHeader from './WeekViewHeader';
+import TimeColumn from './TimeColumn';
+import DayColumn from './DayColumn';
 
 // Component name for logging
 const COMPONENT_NAME = 'WeekView';
@@ -32,20 +32,35 @@ interface WeekViewProps {
   error?: any;
 }
 
+// Define time slots constants
 const START_HOUR = 7;
 const END_HOUR = 19;
 const INTERVAL_MINUTES = 30;
-const TIME_SLOTS: Date[] = [];
-const baseDate = new Date();
-baseDate.setHours(0, 0, 0, 0);
-for (let hour = START_HOUR; hour < END_HOUR; hour++) {
-  for (let minute = 0; minute < 60; minute += INTERVAL_MINUTES) {
-    const slot = new Date(baseDate);
-    slot.setHours(hour, minute, 0, 0);
-    TIME_SLOTS.push(slot);
-  }
-}
 
+// Generate time slots
+const generateTimeSlots = (): Date[] => {
+  const slots: Date[] = [];
+  const baseDate = new Date();
+  baseDate.setHours(0, 0, 0, 0);
+  
+  for (let hour = START_HOUR; hour < END_HOUR; hour++) {
+    for (let minute = 0; minute < 60; minute += INTERVAL_MINUTES) {
+      const slot = new Date(baseDate);
+      slot.setHours(hour, minute, 0, 0);
+      slots.push(slot);
+    }
+  }
+  
+  return slots;
+};
+
+// Memoize time slots to prevent unnecessary recreations
+const TIME_SLOTS = generateTimeSlots();
+
+/**
+ * WeekView component - Displays a week view of the calendar
+ * Refactored for better separation of concerns and performance
+ */
 const WeekView: React.FC<WeekViewProps> = ({
   days,
   selectedClinicianId,
@@ -68,6 +83,9 @@ const WeekView: React.FC<WeekViewProps> = ({
   
   const [selectedBlock, setSelectedBlock] = useState<any | null>(null);
   const [draggedAppointmentId, setDraggedAppointmentId] = useState<string | null>(null);
+  
+  // Use TimeZoneContext
+  const { fromJSDate, toUTC } = useTimeZone();
 
   // Use our custom error handler hook
   const {
@@ -210,7 +228,7 @@ const WeekView: React.FC<WeekViewProps> = ({
   // Wrap event handlers with error handling
   const handleAvailabilityBlockClick = withErrorHandling((day: Date, block: any) => {
     CalendarDebugUtils.log(COMPONENT_NAME, 'Availability block clicked', {
-      day: format(day, 'yyyy-MM-dd'),
+      day: new Date(day).toISOString().split('T')[0],
       start: block.start.toFormat('HH:mm'),
       end: block.end.toFormat('HH:mm'),
       blockId: block.availabilityIds?.[0] || 'unknown'
@@ -250,39 +268,9 @@ const WeekView: React.FC<WeekViewProps> = ({
       end_at: appointment.end_at
     });
     
-    // Find the complete original appointment with all data
-    const originalAppointment = appointments?.find(a => a.id === appointment.id);
-    
-    if (originalAppointment) {
-      CalendarDebugUtils.log(COMPONENT_NAME, 'Found original appointment with complete data', {
-        id: originalAppointment.id
-      });
-      
-      // Call the parent's onAppointmentClick with the complete appointment data
-      if (onAppointmentClick) {
-        onAppointmentClick(originalAppointment);
-      }
-    } else {
-      CalendarDebugUtils.warn(COMPONENT_NAME, 'Original appointment not found, converting to full appointment', {
-        id: appointment.id,
-        availableAppointmentsCount: appointments?.length || 0
-      });
-      
-      // Convert to a full appointment object if the original can't be found
-      const fullAppointment = convertAppointmentBlockToAppointment(appointment, appointments || []);
-      CalendarDebugUtils.log(COMPONENT_NAME, 'Using converted appointment', {
-        id: fullAppointment.id,
-        clientName: fullAppointment.clientName,
-        clientId: fullAppointment.client_id,
-        hasClient: !!fullAppointment.client,
-        start_at: fullAppointment.start_at,
-        end_at: fullAppointment.end_at
-      });
-      
-      // Call the parent's onAppointmentClick with the converted appointment
-      if (onAppointmentClick) {
-        onAppointmentClick(fullAppointment);
-      }
+    // Call the parent's onAppointmentClick with the appointment data
+    if (onAppointmentClick) {
+      onAppointmentClick(appointment);
     }
   }, { operation: 'handleAppointmentClick' });
   
@@ -352,12 +340,12 @@ const WeekView: React.FC<WeekViewProps> = ({
       const durationMinutes = endDateTime.diff(startDateTime).as('minutes');
       
       // Create new start and end times based on the drop target
-      const newStartDateTime = TimeZoneService.fromJSDate(timeSlot, userTimeZone);
+      const newStartDateTime = fromJSDate(timeSlot);
       const newEndDateTime = newStartDateTime.plus({ minutes: durationMinutes });
       
       // Convert to UTC ISO strings for the database
-      const newStartAt = newStartDateTime.toUTC().toISO();
-      const newEndAt = newEndDateTime.toUTC().toISO();
+      const newStartAt = toUTC(newStartDateTime);
+      const newEndAt = toUTC(newEndDateTime);
       
       CalendarDebugUtils.log(COMPONENT_NAME, 'About to update appointment in database', {
         appointmentId,
@@ -380,13 +368,13 @@ const WeekView: React.FC<WeekViewProps> = ({
       });
       
       // Create new start and end times based on the drop target
-      const newStartDateTime = TimeZoneService.fromJSDate(timeSlot, userTimeZone);
+      const newStartDateTime = fromJSDate(timeSlot);
       // Assume a default duration of 60 minutes if we can't determine it from the appointment
       const newEndDateTime = newStartDateTime.plus({ minutes: 60 });
       
       // Convert to UTC ISO strings for the database
-      const newStartAt = newStartDateTime.toUTC().toISO();
-      const newEndAt = newEndDateTime.toUTC().toISO();
+      const newStartAt = toUTC(newStartDateTime);
+      const newEndAt = toUTC(newEndDateTime);
       
       onAppointmentUpdate(appointmentId, newStartAt, newEndAt);
     }
@@ -394,31 +382,6 @@ const WeekView: React.FC<WeekViewProps> = ({
     // Reset the dragged appointment ID
     setDraggedAppointmentId(null);
   }, { operation: 'handleAppointmentDrop' });
-
-  // Debug function to log all blocks for a specific day
-  const debugBlocksForDay = (day: DateTime) => {
-    const dayBlocks = timeBlocks.filter(block =>
-      block.day && block.day.hasSame(day, 'day')
-    );
-    
-    CalendarDebugUtils.log(COMPONENT_NAME, `Blocks for ${day.toFormat('yyyy-MM-dd')}`, {
-      count: dayBlocks.length,
-      blocks: dayBlocks.map(block => ({
-        start: block.start.toFormat('HH:mm'),
-        end: block.end.toFormat('HH:mm'),
-        isException: block.isException,
-        isStandalone: block.isStandalone,
-        availabilityIds: block.availabilityIds
-      }))
-    });
-    
-    return dayBlocks;
-  };
-  
-  // Get a formatted time string for display
-  const formatTime = (date: Date) => {
-    return format(date, 'h:mm a');
-  };
 
   // If there's an error from the hook or component, show the error message
   if (weekViewError) {
@@ -488,37 +451,6 @@ const WeekView: React.FC<WeekViewProps> = ({
     return <div className="flex justify-center items-center h-32">Loading calendar...</div>;
   }
 
-  // Check if we have the day we're looking for (Thursday, May 15, 2025)
-  const debugDay = weekDays.find(day => day.toFormat('yyyy-MM-dd') === '2025-05-15');
-  if (debugDay) {
-    CalendarDebugUtils.log(COMPONENT_NAME, 'Found debug day 2025-05-15, analyzing blocks');
-    debugBlocksForDay(debugDay);
-  }
-
-  // Log detailed data from the hook
-  CalendarDebugUtils.logDataLoading(COMPONENT_NAME, 'hook-data-processed', {
-    weekDaysCount: weekDays?.length || 0,
-    appointmentBlocksCount: appointmentBlocks?.length || 0,
-    timeBlocksCount: timeBlocks?.length || 0,
-    sampleTimeBlock: timeBlocks?.length > 0 ? {
-      start: timeBlocks[0].start.toFormat('yyyy-MM-dd HH:mm'),
-      end: timeBlocks[0].end.toFormat('yyyy-MM-dd HH:mm'),
-      isException: timeBlocks[0].isException,
-      isStandalone: timeBlocks[0].isStandalone,
-      availabilityIds: timeBlocks[0].availabilityIds
-    } : 'No time blocks',
-    sampleAppointmentBlock: appointmentBlocks?.length > 0 ? {
-      id: appointmentBlocks[0].id,
-      clientName: appointmentBlocks[0].clientName,
-      start: appointmentBlocks[0].start.toFormat('yyyy-MM-dd HH:mm'),
-      end: appointmentBlocks[0].end.toFormat('yyyy-MM-dd HH:mm')
-    } : 'No appointment blocks',
-    weekDays: weekDays.map(day => day.toFormat('yyyy-MM-dd'))
-  });
-  
-  // Start tracking render time for the grid
-  const gridRenderStart = performance.now();
-
   return (
     <CalendarComponentErrorBoundary
       componentName={COMPONENT_NAME}
@@ -529,182 +461,87 @@ const WeekView: React.FC<WeekViewProps> = ({
         userTimeZone,
         appointmentsCount: appointments?.length || 0
       }}
-      onError={(error) => handleError(error, { operation: 'render' })}
+      onError={(error) => handleError(error, { operation: 'renderWeekView' })}
     >
       <div className="flex flex-col">
-        {/* Time column headers */}
+        {/* Week header with days */}
         <WeekViewSectionErrorBoundary
-          sectionName="header"
-          componentName={COMPONENT_NAME}
+          sectionName="Header"
+          componentName="WeekViewHeader"
           contextData={{
-            componentName: COMPONENT_NAME,
-            daysCount: weekDays?.length || 0,
-            selectedClinicianId,
-            userTimeZone
+            componentName: "WeekViewHeader",
+            daysCount: weekDays?.length || 0
           }}
+          onError={(error) => handleError(error, { operation: 'renderWeekViewHeader' })}
         >
-          <div className="flex">
-            {/* Time label column header - add matching width to align with time labels */}
-            <div className="w-16 flex-shrink-0"></div>
-            {/* Day headers - use exact same width as the day columns below */}
-            {weekDays.map(day => (
-              <div 
-                key={day.toISO()} 
-                className="w-24 flex-1 px-2 py-1 font-semibold text-center border-r last:border-r-0"
-              >
-                <div className="text-sm">{day.toFormat('EEE')}</div>
-                <div className="text-xs">{day.toFormat('MMM d')}</div>
-              </div>
-            ))}
-          </div>
+          <WeekViewHeader 
+            weekDays={weekDays} 
+            currentDate={currentDate || new Date()} 
+          />
         </WeekViewSectionErrorBoundary>
 
-        {/* Time slots grid */}
+        {/* Calendar grid with time slots */}
         <div className="flex">
-          {/* Time labels column */}
+          {/* Time column */}
           <WeekViewSectionErrorBoundary
-            sectionName="time-labels"
-            componentName={COMPONENT_NAME}
+            sectionName="TimeColumn"
+            componentName="TimeColumn"
             contextData={{
-              componentName: COMPONENT_NAME,
-              timeSlotsCount: TIME_SLOTS.length,
-              userTimeZone
+              componentName: "TimeColumn",
+              timeSlotsCount: TIME_SLOTS?.length || 0
             }}
+            onError={(error) => handleError(error, { operation: 'renderTimeColumn' })}
           >
-            <div className="w-16 flex-shrink-0">
-              {TIME_SLOTS.map((timeSlot, i) => (
-                <div key={i} className="h-10 flex items-center justify-end pr-2 text-xs text-gray-500">
-                  {formatTime(timeSlot)}
-                </div>
-              ))}
-            </div>
+            <TimeColumn timeSlots={TIME_SLOTS} />
           </WeekViewSectionErrorBoundary>
 
-          {/* Days columns */}
+          {/* Day columns */}
           {weekDays.map(day => (
             <WeekViewSectionErrorBoundary
-              key={day.toISO() || ''}
-              sectionName={`day-column-${day.toFormat('yyyy-MM-dd')}`}
-              componentName={COMPONENT_NAME}
+              key={day.toFormat('yyyy-MM-dd')}
+              sectionName={`DayColumn-${day.toFormat('yyyy-MM-dd')}`}
+              componentName={`DayColumn-${day.toFormat('yyyy-MM-dd')}`}
               contextData={{
-                componentName: COMPONENT_NAME,
+                componentName: `DayColumn-${day.toFormat('yyyy-MM-dd')}`,
                 day: day.toFormat('yyyy-MM-dd'),
-                selectedClinicianId,
-                userTimeZone,
-                timeSlotsCount: TIME_SLOTS.length
+                timeSlotsCount: TIME_SLOTS?.length || 0
               }}
+              onError={(error) => handleError(error, {
+                operation: 'renderDayColumn',
+                additionalData: { day: day.toFormat('yyyy-MM-dd') }
+              })}
             >
-              <div className="flex-1 border-r last:border-r-0">
-                {TIME_SLOTS.map((timeSlot, i) => {
-                  // Convert JS Date to DateTime objects for consistent checking
-                  const dayDt = TimeZoneService.fromJSDate(day.toJSDate(), userTimeZone);
-                  const timeSlotDt = TimeZoneService.fromJSDate(timeSlot, userTimeZone);
-                  
-                  // Get formatted day and hour for debugging logs
-                  const formattedDay = dayDt.toFormat('yyyy-MM-dd');
-                  const formattedTime = timeSlotDt.toFormat('HH:mm');
-                  const debugMode = formattedDay === '2025-05-15' && (timeSlotDt.hour >= 8 && timeSlotDt.hour <= 18);
-                  
-                  // Perform availability checks and get relevant blocks
-                  const isAvailable = showAvailability && isTimeSlotAvailable(
-                    dayDt.toJSDate(), 
-                    timeSlotDt.toJSDate()
-                  );
-                  
-                  // Get the corresponding block if available - this may be undefined
-                  const currentBlock = isAvailable ? getBlockForTimeSlot(
-                    dayDt.toJSDate(), 
-                    timeSlotDt.toJSDate()
-                  ) : undefined;
-                  
-                  // Get any appointment for this time slot
-                  const appointment = getAppointmentForTimeSlot(
-                    dayDt.toJSDate(), 
-                    timeSlotDt.toJSDate()
-                  );
-                  
-                  // Debug comparison logging
-                  if (debugMode) {
-                    // Direct comparison between isTimeSlotAvailable and getBlockForTimeSlot results
-                    CalendarDebugUtils.log(COMPONENT_NAME, `Time slot comparison for ${formattedDay} ${formattedTime}`, {
-                      isTimeSlotAvailable: isAvailable,
-                      hasBlock: !!currentBlock,
-                      blockDetails: currentBlock ? {
-                        start: currentBlock.start.toFormat('HH:mm'),
-                        end: currentBlock.end.toFormat('HH:mm'),
-                        day: currentBlock.day?.toFormat('yyyy-MM-dd'),
-                        isException: currentBlock.isException,
-                        isStandalone: currentBlock.isStandalone,
-                        availabilityIds: currentBlock.availabilityIds
-                      } : null
-                    });
-                  }
-                  
-                  // Determine if this is the start or end of a block
-                  const isStartOfBlock = currentBlock && 
-                    TimeZoneService.fromJSDate(timeSlot, userTimeZone).toFormat('HH:mm') === 
-                    currentBlock.start.toFormat('HH:mm');
-                  
-                  const isEndOfBlock = currentBlock && 
-                    TimeZoneService.fromJSDate(timeSlot, userTimeZone).plus({ minutes: 30 }).toFormat('HH:mm') === 
-                    currentBlock.end.toFormat('HH:mm');
-                  
-                  const isStartOfAppointment = appointment && 
-                    TimeZoneService.fromJSDate(timeSlot, userTimeZone).toFormat('HH:mm') === 
-                    appointment.start.toFormat('HH:mm');
-                  
-                  const isEndOfAppointment = appointment && 
-                    TimeZoneService.fromJSDate(timeSlot, userTimeZone).plus({ minutes: 30 }).toFormat('HH:mm') === 
-                    appointment.end.toFormat('HH:mm');
-
-                  return (
-                    <div
-                      key={i}
-                      className={`h-10 border-b border-l first:border-l-0 group 
-                                  ${i % 2 === 0 ? 'bg-gray-50' : 'bg-white'}`}
-                    >
-                      <TimeSlot
-                        day={dayDt.toJSDate()}
-                        timeSlot={timeSlot}
-                        isAvailable={isAvailable}
-                        currentBlock={currentBlock}
-                        appointment={appointment}
-                        isStartOfBlock={!!isStartOfBlock}
-                        isEndOfBlock={!!isEndOfBlock}
-                        isStartOfAppointment={!!isStartOfAppointment}
-                        isEndOfAppointment={!!isEndOfAppointment}
-                        handleAvailabilityBlockClick={handleAvailabilityBlockClick}
-                        onAppointmentClick={handleAppointmentClick}
-                        onAppointmentDragStart={handleAppointmentDragStart}
-                        onAppointmentDragOver={handleAppointmentDragOver}
-                        onAppointmentDrop={handleAppointmentDrop}
-                        originalAppointments={appointments}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
+              <DayColumn
+                day={day}
+                timeSlots={TIME_SLOTS}
+                isTimeSlotAvailable={isTimeSlotAvailable}
+                getBlockForTimeSlot={getBlockForTimeSlot}
+                getAppointmentForTimeSlot={getAppointmentForTimeSlot}
+                handleAvailabilityBlockClick={handleAvailabilityBlockClick}
+                onAppointmentClick={handleAppointmentClick}
+                onAppointmentDragStart={handleAppointmentDragStart}
+                onAppointmentDragOver={handleAppointmentDragOver}
+                onAppointmentDrop={handleAppointmentDrop}
+                originalAppointments={appointments}
+              />
             </WeekViewSectionErrorBoundary>
           ))}
         </div>
 
-        {/* Debug section */}
+        {/* Debug panel for development mode */}
         {import.meta.env.MODE === 'development' && (
           <WeekViewSectionErrorBoundary
-            sectionName="debug-info"
-            componentName={COMPONENT_NAME}
-            contextData={{
-              componentName: COMPONENT_NAME
-            }}
+            sectionName="DebugPanel"
+            componentName="DebugPanel"
+            contextData={{ componentName: "DebugPanel" }}
+            onError={(error) => handleError(error, { operation: 'renderDebugPanel' })}
           >
-            <div className="mt-4 p-4 bg-gray-100 rounded">
-              <h3 className="text-lg font-semibold">Debug Info</h3>
-              <p>Clinician ID: {selectedClinicianId || 'None'}</p>
-              <p>Time Blocks: {timeBlocks.length}</p>
-              <p>Appointments: {appointmentBlocks.length}</p>
-              <p>User Timezone: {userTimeZone}</p>
-              <p>Refresh Trigger: {refreshTrigger}</p>
-              <p>External Error: {error ? error.message : 'None'}</p>
+            <div className="mt-4 p-4 bg-gray-100 rounded text-xs">
+              <h3 className="font-bold mb-2">Debug Info</h3>
+              <div>Selected Clinician: {selectedClinicianId || 'None'}</div>
+              <div>Time Blocks: {timeBlocks?.length || 0}</div>
+              <div>Appointment Blocks: {appointmentBlocks?.length || 0}</div>
+              <div>Refresh Trigger: {refreshTrigger}</div>
             </div>
           </WeekViewSectionErrorBoundary>
         )}

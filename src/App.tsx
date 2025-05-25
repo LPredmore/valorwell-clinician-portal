@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { UserProvider } from "./context/UserContext";
+import { TimeZoneProvider } from "./context/TimeZoneContext";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 
 // Pages
@@ -39,8 +40,9 @@ function App() {
         <QueryClientProvider client={queryClient}>
           <TooltipProvider>
             <UserProvider>
-              {/* Sonner Toaster - the only toast component we need */}
-              <Toaster richColors position="top-right" />
+              <TimeZoneProvider>
+                {/* Sonner Toaster - the only toast component we need */}
+                <Toaster richColors position="top-right" />
               <Routes>
                 {/* Public routes */}
                 <Route path="/" element={<Index />} />
@@ -139,6 +141,7 @@ function App() {
                 
                 <Route path="*" element={<NotFound />} />
               </Routes>
+              </TimeZoneProvider>
             </UserProvider>
           </TooltipProvider>
         </QueryClientProvider>

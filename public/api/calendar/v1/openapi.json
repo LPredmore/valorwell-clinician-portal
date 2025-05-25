@@ -1,0 +1,705 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Valorwell Calendar API",
+    "description": "API for integrating with the Valorwell Calendar system",
+    "version": "1.0.0",
+    "contact": {
+      "name": "Valorwell Support",
+      "email": "support@valorwell.com",
+      "url": "https://valorwell.com/support"
+    }
+  },
+  "servers": [
+    {
+      "url": "/api/calendar/v1",
+      "description": "Production server"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key"
+      }
+    },
+    "schemas": {
+      "Appointment": {
+        "type": "object",
+        "required": [
+          "id",
+          "client_id",
+          "clinician_id",
+          "start_at",
+          "end_at",
+          "type",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique identifier for the appointment"
+          },
+          "client_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Client ID"
+          },
+          "clinician_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Clinician ID"
+          },
+          "start_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Start time of the appointment (UTC)"
+          },
+          "end_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "End time of the appointment (UTC)"
+          },
+          "type": {
+            "type": "string",
+            "description": "Type of appointment",
+            "enum": [
+              "initial_consultation",
+              "follow_up",
+              "therapy_session",
+              "assessment",
+              "group_therapy",
+              "emergency",
+              "telehealth",
+              "in_person"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "description": "Status of the appointment",
+            "enum": [
+              "scheduled",
+              "confirmed",
+              "completed",
+              "cancelled",
+              "no_show",
+              "rescheduled",
+              "pending"
+            ]
+          },
+          "notes": {
+            "type": "string",
+            "description": "Notes for the appointment",
+            "nullable": true
+          },
+          "appointment_recurring": {
+            "type": "object",
+            "description": "Recurring pattern for the appointment",
+            "nullable": true
+          },
+          "recurring_group_id": {
+            "type": "string",
+            "description": "ID for the recurring appointment group",
+            "nullable": true
+          },
+          "client": {
+            "type": "object",
+            "description": "Client information",
+            "properties": {
+              "client_first_name": {
+                "type": "string",
+                "description": "Client's first name"
+              },
+              "client_last_name": {
+                "type": "string",
+                "description": "Client's last name"
+              },
+              "client_preferred_name": {
+                "type": "string",
+                "description": "Client's preferred name"
+              },
+              "client_email": {
+                "type": "string",
+                "format": "email",
+                "description": "Client's email address"
+              },
+              "client_phone": {
+                "type": "string",
+                "description": "Client's phone number"
+              }
+            }
+          },
+          "clientName": {
+            "type": "string",
+            "description": "Formatted client name"
+          }
+        }
+      },
+      "AppointmentCreate": {
+        "type": "object",
+        "required": [
+          "client_id",
+          "start_at",
+          "end_at",
+          "type"
+        ],
+        "properties": {
+          "client_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Client ID"
+          },
+          "clinician_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Clinician ID (defaults to authenticated user)"
+          },
+          "start_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Start time of the appointment (UTC)"
+          },
+          "end_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "End time of the appointment (UTC)"
+          },
+          "type": {
+            "type": "string",
+            "description": "Type of appointment"
+          },
+          "status": {
+            "type": "string",
+            "description": "Status of the appointment",
+            "default": "scheduled"
+          },
+          "notes": {
+            "type": "string",
+            "description": "Notes for the appointment"
+          },
+          "appointment_recurring": {
+            "type": "object",
+            "description": "Recurring pattern for the appointment"
+          }
+        }
+      },
+      "AppointmentUpdate": {
+        "type": "object",
+        "properties": {
+          "client_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Client ID"
+          },
+          "clinician_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Clinician ID"
+          },
+          "start_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Start time of the appointment (UTC)"
+          },
+          "end_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "End time of the appointment (UTC)"
+          },
+          "type": {
+            "type": "string",
+            "description": "Type of appointment"
+          },
+          "status": {
+            "type": "string",
+            "description": "Status of the appointment"
+          },
+          "notes": {
+            "type": "string",
+            "description": "Notes for the appointment"
+          },
+          "appointment_recurring": {
+            "type": "object",
+            "description": "Recurring pattern for the appointment"
+          }
+        }
+      },
+      "AvailabilitySlot": {
+        "type": "object",
+        "properties": {
+          "start": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Start time of the availability slot (UTC)"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time",
+            "description": "End time of the availability slot (UTC)"
+          },
+          "duration": {
+            "type": "integer",
+            "description": "Duration of the slot in minutes"
+          }
+        }
+      },
+      "ApiResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the request was successful"
+          },
+          "data": {
+            "type": "object",
+            "description": "Response data"
+          },
+          "error": {
+            "type": "string",
+            "description": "Error message if the request failed"
+          },
+          "meta": {
+            "type": "object",
+            "description": "Metadata about the response",
+            "properties": {
+              "page": {
+                "type": "integer",
+                "description": "Current page number"
+              },
+              "pageSize": {
+                "type": "integer",
+                "description": "Number of items per page"
+              },
+              "totalCount": {
+                "type": "integer",
+                "description": "Total number of items"
+              },
+              "totalPages": {
+                "type": "integer",
+                "description": "Total number of pages"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "security": [
+    {
+      "ApiKeyAuth": []
+    }
+  ],
+  "paths": {
+    "/appointments": {
+      "get": {
+        "summary": "Get appointments",
+        "description": "Retrieves a list of appointments based on query parameters",
+        "operationId": "getAppointments",
+        "parameters": [
+          {
+            "name": "startDate",
+            "in": "query",
+            "description": "Start date (ISO format)",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "endDate",
+            "in": "query",
+            "description": "End date (ISO format)",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Appointment status",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "description": "Appointment type",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "clientId",
+            "in": "query",
+            "description": "Client ID",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "clinicianId",
+            "in": "query",
+            "description": "Clinician ID",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "description": "Page size",
+            "schema": {
+              "type": "integer",
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiResponse"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Appointment"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create appointment",
+        "description": "Creates a new appointment",
+        "operationId": "createAppointment",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppointmentCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiResponse"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/Appointment"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/appointments/{id}": {
+      "get": {
+        "summary": "Get appointment by ID",
+        "description": "Retrieves a specific appointment by ID",
+        "operationId": "getAppointmentById",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Appointment ID",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiResponse"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/Appointment"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Appointment not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update appointment",
+        "description": "Updates an existing appointment",
+        "operationId": "updateAppointment",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Appointment ID",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppointmentUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiResponse"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/Appointment"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Appointment not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete appointment",
+        "description": "Deletes an appointment",
+        "operationId": "deleteAppointment",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Appointment ID",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiResponse"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid",
+                              "description": "ID of the deleted appointment"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Appointment not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/availability": {
+      "get": {
+        "summary": "Get availability",
+        "description": "Retrieves available time slots based on query parameters",
+        "operationId": "getAvailability",
+        "parameters": [
+          {
+            "name": "startDate",
+            "in": "query",
+            "required": true,
+            "description": "Start date (ISO format)",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "endDate",
+            "in": "query",
+            "required": true,
+            "description": "End date (ISO format)",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "clinicianId",
+            "in": "query",
+            "description": "Clinician ID",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "duration",
+            "in": "query",
+            "description": "Appointment duration in minutes",
+            "schema": {
+              "type": "integer",
+              "default": 60
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiResponse"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/AvailabilitySlot"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    }
+  }
+}

@@ -4,6 +4,7 @@ import WeekView from './week-view/WeekView';
 import MonthView from './MonthView';
 import ClinicianAvailabilityPanel from './ClinicianAvailabilityPanel';
 import { TimeZoneService } from '@/utils/timeZoneService';
+import { useTimeZone } from '@/context/TimeZoneContext';
 import { Appointment } from '@/types/appointment';
 import { DateTime } from 'luxon';
 import { AvailabilityBlock } from '@/types/availability';
@@ -62,8 +63,11 @@ const CalendarView = ({
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [isAppointmentDialogOpen, setIsAppointmentDialogOpen] = useState(false);
   
-  // Ensure we have a valid IANA timezone
-  const validTimeZone = TimeZoneService.ensureIANATimeZone(userTimeZone);
+  // Use TimeZoneContext for timezone operations
+  const { userTimeZone: contextTimeZone, ensureIANATimeZone } = useTimeZone();
+  
+  // Use the provided timezone or fall back to the context timezone
+  const validTimeZone = ensureIANATimeZone(userTimeZone || contextTimeZone);
   
   // Use a local refresh trigger that combines the external one plus local changes
   const [localRefreshTrigger, setLocalRefreshTrigger] = useState(0);
@@ -202,8 +206,9 @@ const CalendarView = ({
   // Handle availability block clicked in calendar
   const handleAvailabilityClick = withErrorHandling((date: DateTime | Date, availabilityBlock: AvailabilityBlock) => {
     // Convert Date to DateTime if needed for consistent handling
+    const { fromJSDate } = useTimeZone();
     const dateTime = date instanceof Date ?
-      TimeZoneService.fromJSDate(date, validTimeZone) : date;
+      fromJSDate(date) : date;
       
     CalendarDebugUtils.log(COMPONENT_NAME, `Availability clicked for ${dateTime.toFormat('yyyy-MM-dd')}`, {
       blockId: availabilityBlock.id,
@@ -306,6 +311,8 @@ const CalendarView = ({
         }}
         severity="error"
         contextData={{
+          componentName: COMPONENT_NAME,
+          operation: 'renderCalendarView',
           view,
           clinicianId,
           userTimeZone,
@@ -329,6 +336,8 @@ const CalendarView = ({
         }}
         severity="error"
         contextData={{
+          componentName: COMPONENT_NAME,
+          operation: 'renderCalendarView',
           view,
           clinicianId,
           userTimeZone,

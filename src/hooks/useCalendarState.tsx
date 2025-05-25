@@ -1,180 +1,75 @@
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useTimeZone } from '@/context/TimeZoneContext';
+import { CalendarDebugUtils } from '@/utils/calendarDebugUtils';
+import { useClinicianFetcher } from './calendar/useClinicianFetcher';
+import { useClientFetcher } from './calendar/useClientFetcher';
 
-import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import * as TimeZoneUtils from '@/utils/timeZoneUtils';
-import { getClinicianTimeZone, getClinicianById } from '@/hooks/useClinicianData';
-
-interface Client {
-  id: string;
-  displayName: string;
-}
-
-// Helper function to ensure consistent ID format for database queries
-const ensureStringId = (id: string | null): string | null => {
-  if (!id) return null;
-  
-  // Ensure the ID is a clean string without any format issues
-  return id.toString().trim();
-};
-
+/**
+ * Enhanced calendar state management hook with better separation of concerns
+ * Refactored to use specialized hooks for data fetching
+ */
 export const useCalendarState = (initialClinicianId: string | null = null) => {
+  // Performance tracking
+  const hookStartTime = performance.now();
+  
+  // State variables
   const [view, setView] = useState<'week' | 'month'>('week');
   const [showAvailability, setShowAvailability] = useState(false);
   const [selectedClinicianId, setSelectedClinicianId] = useState<string | null>(initialClinicianId);
-  const [clinicians, setClinicians] = useState<Array<{ id: string; clinician_professional_name: string }>>([]);
-  const [loadingClinicians, setLoadingClinicians] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [clients, setClients] = useState<Client[]>([]);
-  const [loadingClients, setLoadingClients] = useState(false);
   const [appointmentRefreshTrigger, setAppointmentRefreshTrigger] = useState(0);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [userTimeZone, setUserTimeZone] = useState<string>("America/Chicago");
-  const [isLoadingTimeZone, setIsLoadingTimeZone] = useState(true);
+  const [lastError, setLastError] = useState<Error | null>(null);
+  
+  // Get timezone from context
+  const { userTimeZone } = useTimeZone();
 
-  const formattedClinicianId = ensureStringId(selectedClinicianId);
+  // Memoize the formatted clinician ID to prevent unnecessary recalculations
+  const formattedClinicianId = useMemo(() => {
+    if (!selectedClinicianId) return null;
+    return selectedClinicianId.toString().trim();
+  }, [selectedClinicianId]);
   
   // Log important state information
   useEffect(() => {
-    console.log('[useCalendarState] Current state:', {
+    const stateInfo = {
       view,
       clinicianId: formattedClinicianId,
       originalClinicianId: selectedClinicianId,
       timeZone: userTimeZone,
-      isLoadingTimeZone,
       refreshTrigger: appointmentRefreshTrigger
-    });
-  }, [view, selectedClinicianId, formattedClinicianId, userTimeZone, isLoadingTimeZone, appointmentRefreshTrigger]);
-
-  // Set user timezone from clinician or browser
-  useEffect(() => {
-    const fetchClinicianTimeZone = async () => {
-      if (formattedClinicianId) {
-        try {
-          const timeZone = await getClinicianTimeZone(formattedClinicianId);
-          if (timeZone) {
-            setUserTimeZone(TimeZoneUtils.ensureIANATimeZone(timeZone));
-          } else {
-            // Fallback to browser timezone if clinician timezone is not set
-            setUserTimeZone(TimeZoneUtils.getUserTimeZone());
-          }
-        } catch (error) {
-          console.error("[useCalendarState] Error fetching clinician timezone:", error);
-          // Fallback to browser timezone on error
-          setUserTimeZone(TimeZoneUtils.getUserTimeZone());
-        } finally {
-          setIsLoadingTimeZone(false);
-        }
-      } else {
-        // No clinician ID provided, use browser timezone
-        setUserTimeZone(TimeZoneUtils.getUserTimeZone());
-        setIsLoadingTimeZone(false);
-      }
     };
     
-    fetchClinicianTimeZone();
-  }, [formattedClinicianId]);
+    CalendarDebugUtils.log('useCalendarState', 'Current state updated', stateInfo);
+  }, [view, selectedClinicianId, formattedClinicianId, userTimeZone, appointmentRefreshTrigger]);
 
-  // Load clinicians
+  // Use specialized hook for clinician fetching
+  const {
+    clinicians,
+    loadingClinicians,
+    refreshClinicians
+  } = useClinicianFetcher(initialClinicianId, selectedClinicianId, setSelectedClinicianId, setLastError);
+
+  // Use specialized hook for client fetching
+  const {
+    clients,
+    loadingClients,
+    refreshClients
+  } = useClientFetcher(formattedClinicianId, setLastError);
+
+  // Memoized trigger for appointment refresh to prevent unnecessary renders
+  const triggerAppointmentRefresh = useCallback(() => {
+    setAppointmentRefreshTrigger(prev => prev + 1);
+  }, []);
+
+  // Log hook performance
   useEffect(() => {
-    const fetchClinicians = async () => {
-      setLoadingClinicians(true);
-      try {
-        const { data, error } = await supabase
-          .from('clinicians')
-          .select('id, clinician_professional_name')
-          .order('clinician_professional_name');
+    const hookDuration = performance.now() - hookStartTime;
+    CalendarDebugUtils.logPerformance('useCalendarState', 'hook-initialization', hookDuration);
+  }, []);
 
-        if (error) {
-          console.error('[useCalendarState] Error fetching clinicians:', error);
-          setClinicians([]);
-          return;
-        }
-
-        setClinicians(data);
-        
-        // Set default clinician if none is selected
-        if (!selectedClinicianId && data?.length > 0) {
-          const primaryId = data[0]?.id;
-          console.log('[useCalendarState] Setting default clinician:', {
-            clinicianId: primaryId,
-            name: data[0]?.clinician_professional_name
-          });
-          setSelectedClinicianId(primaryId);
-        } else if (initialClinicianId) {
-          console.log('[useCalendarState] Using provided initial clinician ID:', initialClinicianId);
-          setSelectedClinicianId(initialClinicianId);
-        }
-      } catch (error) {
-        console.error("[useCalendarState] Critical error in fetchClinicians:", error);
-      } finally {
-        setLoadingClinicians(false);
-      }
-    };
-
-    fetchClinicians();
-  }, [initialClinicianId, selectedClinicianId]);
-
-  // Load clients for selected clinician
-  useEffect(() => {
-    const fetchClientsForClinician = async () => {
-      if (!formattedClinicianId) {
-        console.log('[useCalendarState] Not fetching clients: clinicianId is null');
-        return;
-      }
-      
-      console.log('[useCalendarState] Fetching clients for clinician ID:', formattedClinicianId);
-      setLoadingClients(true);
-      setClients([]);
-      
-      try {
-        // First, fetch the clinician record to get the correctly formatted ID from the database
-        console.log('[useCalendarState] Calling getClinicianById with ID:', formattedClinicianId);
-        const clinicianRecord = await getClinicianById(formattedClinicianId);
-        console.log('[useCalendarState] Clinician record returned:', !!clinicianRecord);
-        
-        if (!clinicianRecord) {
-          console.error('[useCalendarState] Could not find clinician with ID:', formattedClinicianId);
-          setLoadingClients(false);
-          return;
-        }
-        
-        // Use the database-retrieved ID to ensure exact format match
-        const databaseClinicianId = clinicianRecord.id;
-        console.log('[useCalendarState] Database-retrieved clinician ID:', databaseClinicianId);
-        
-        // Query clients assigned by current clinician_id relationship
-        // FIXED: Use client_assigned_therapist column instead of clinician_id
-        const { data: clientData, error } = await supabase
-          .from('clients')
-          .select('id, client_first_name, client_preferred_name, client_last_name')
-          // Use client_assigned_therapist column which is TEXT type not UUID
-          .eq('client_assigned_therapist', databaseClinicianId.toString())
-          .order('client_last_name');
-          
-        if (error) {
-          console.error('[useCalendarState] Error fetching clients:', error);
-        } else {
-          console.log(`[useCalendarState] Found ${clientData?.length || 0} clients for clinician:`, databaseClinicianId);
-          
-          // Format client data for display
-          const formattedClients = (clientData || []).map(client => ({
-            id: client.id,
-            displayName: `${client.client_preferred_name || client.client_first_name || ''} ${client.client_last_name || ''}`.trim() || 'Unnamed Client'
-          }));
-          
-          setClients(formattedClients);
-        }
-      } catch (error) {
-        console.error('[useCalendarState] Error fetching clients:', error);
-      } finally {
-        setLoadingClients(false);
-      }
-    };
-
-    fetchClientsForClinician();
-  }, [formattedClinicianId]);
-
-  return {
+  // Memoize the return value to prevent unnecessary object creation
+  return useMemo(() => ({
     view,
     setView,
     showAvailability,
@@ -188,12 +83,17 @@ export const useCalendarState = (initialClinicianId: string | null = null) => {
     clients,
     loadingClients,
     appointmentRefreshTrigger,
-    setAppointmentRefreshTrigger,
+    setAppointmentRefreshTrigger: triggerAppointmentRefresh,
     isDialogOpen,
     setIsDialogOpen,
-    userTimeZone,
-    isLoadingTimeZone,
-  };
+    lastError,
+    refreshClinicians,
+    refreshClients
+  }), [
+    view, showAvailability, selectedClinicianId, clinicians, loadingClinicians,
+    currentDate, clients, loadingClients, appointmentRefreshTrigger,
+    isDialogOpen, lastError, refreshClinicians, refreshClients, triggerAppointmentRefresh
+  ]);
 };
 
 export default useCalendarState;
