@@ -60,10 +60,25 @@ const extractWeeklyPatternFromClinicianData = (clinicianData: ClinicianColumnDat
   const defaultTimezone = 'America/Chicago';
   
   // Get clinician's default timezone (ensuring it's a string)
-  const clinicianDefaultTimezone =
-    typeof clinicianData.clinician_time_zone === 'string'
-      ? TimeZoneUtils.ensureIANATimeZone(clinicianData.clinician_time_zone)
-      : defaultTimezone;
+  // Enhanced to handle array values
+  let clinicianDefaultTimezone = defaultTimezone;
+  
+  if (clinicianData?.clinician_time_zone) {
+    // Handle array case explicitly
+    if (Array.isArray(clinicianData.clinician_time_zone)) {
+      CalendarDebugUtils.warn(COMPONENT_NAME, 'Default timezone received as array:', clinicianData.clinician_time_zone);
+      clinicianDefaultTimezone = TimeZoneUtils.ensureIANATimeZone(clinicianData.clinician_time_zone);
+    }
+    // Handle string case
+    else if (typeof clinicianData.clinician_time_zone === 'string') {
+      clinicianDefaultTimezone = TimeZoneUtils.ensureIANATimeZone(clinicianData.clinician_time_zone);
+    }
+    // Handle object case
+    else if (typeof clinicianData.clinician_time_zone === 'object') {
+      CalendarDebugUtils.warn(COMPONENT_NAME, 'Default timezone received as object:', clinicianData.clinician_time_zone);
+      clinicianDefaultTimezone = TimeZoneUtils.serializeTimeZone(clinicianData.clinician_time_zone);
+    }
+  }
   
   // Process each day
   daysOfWeek.forEach(day => {
@@ -81,13 +96,26 @@ const extractWeeklyPatternFromClinicianData = (clinicianData: ClinicianColumnDat
         const rawTimezoneFromDbSlot = clinicianData[timezoneKey];
         let determinedTimezoneString = defaultTimezone; // Start with fallback
         
-        // Try to use the slot-specific timezone if it's a valid string
-        if (typeof rawTimezoneFromDbSlot === 'string' && rawTimezoneFromDbSlot.trim()) {
-          determinedTimezoneString = TimeZoneUtils.ensureIANATimeZone(rawTimezoneFromDbSlot.trim());
+        // Enhanced timezone handling to handle array values
+        if (rawTimezoneFromDbSlot) {
+          // Handle array case explicitly
+          if (Array.isArray(rawTimezoneFromDbSlot)) {
+            CalendarDebugUtils.warn(COMPONENT_NAME, 'Timezone received as array:', rawTimezoneFromDbSlot);
+            determinedTimezoneString = TimeZoneUtils.ensureIANATimeZone(rawTimezoneFromDbSlot);
+          }
+          // Handle string case
+          else if (typeof rawTimezoneFromDbSlot === 'string' && rawTimezoneFromDbSlot.trim()) {
+            determinedTimezoneString = TimeZoneUtils.ensureIANATimeZone(rawTimezoneFromDbSlot.trim());
+          }
+          // Handle object case
+          else if (typeof rawTimezoneFromDbSlot === 'object') {
+            CalendarDebugUtils.warn(COMPONENT_NAME, 'Timezone received as object:', rawTimezoneFromDbSlot);
+            determinedTimezoneString = TimeZoneUtils.serializeTimeZone(rawTimezoneFromDbSlot);
+          }
         }
         // Otherwise fall back to clinician's default timezone
-        else if (typeof clinicianDefaultTimezone === 'string' && clinicianDefaultTimezone.trim()) {
-          determinedTimezoneString = TimeZoneUtils.ensureIANATimeZone(clinicianDefaultTimezone.trim());
+        else if (clinicianDefaultTimezone) {
+          determinedTimezoneString = TimeZoneUtils.ensureIANATimeZone(clinicianDefaultTimezone);
         }
         
         // Add this time slot with explicit string timezone
@@ -116,10 +144,25 @@ const extractAvailabilitySlotsFromClinicianData = (clinicianData: ClinicianColum
   const defaultTimezone = 'America/Chicago';
   
   // Get clinician's default timezone
-  const clinicianDefaultTimezone =
-    typeof clinicianData.clinician_time_zone === 'string'
-      ? TimeZoneUtils.ensureIANATimeZone(clinicianData.clinician_time_zone)
-      : defaultTimezone;
+  // Enhanced to handle array values
+  let clinicianDefaultTimezone = defaultTimezone;
+  
+  if (clinicianData?.clinician_time_zone) {
+    // Handle array case explicitly
+    if (Array.isArray(clinicianData.clinician_time_zone)) {
+      CalendarDebugUtils.warn(COMPONENT_NAME, 'Default timezone received as array:', clinicianData.clinician_time_zone);
+      clinicianDefaultTimezone = TimeZoneUtils.ensureIANATimeZone(clinicianData.clinician_time_zone);
+    }
+    // Handle string case
+    else if (typeof clinicianData.clinician_time_zone === 'string') {
+      clinicianDefaultTimezone = TimeZoneUtils.ensureIANATimeZone(clinicianData.clinician_time_zone);
+    }
+    // Handle object case
+    else if (typeof clinicianData.clinician_time_zone === 'object') {
+      CalendarDebugUtils.warn(COMPONENT_NAME, 'Default timezone received as object:', clinicianData.clinician_time_zone);
+      clinicianDefaultTimezone = TimeZoneUtils.serializeTimeZone(clinicianData.clinician_time_zone);
+    }
+  }
   
   // Process each day and slot
   daysOfWeek.forEach(day => {
@@ -130,12 +173,29 @@ const extractAvailabilitySlotsFromClinicianData = (clinicianData: ClinicianColum
       
       // Only add slots that have both start and end times
       if (clinicianData[startTimeKey] && clinicianData[endTimeKey]) {
-        // Determine timezone with fallbacks
+        // Determine timezone with fallbacks - enhanced to handle array values
         let timezone = defaultTimezone;
-        if (typeof clinicianData[timezoneKey] === 'string' && clinicianData[timezoneKey].trim()) {
-          timezone = TimeZoneUtils.ensureIANATimeZone(clinicianData[timezoneKey].trim());
-        } else if (typeof clinicianDefaultTimezone === 'string' && clinicianDefaultTimezone.trim()) {
-          timezone = clinicianDefaultTimezone;
+        const rawTimezone = clinicianData[timezoneKey];
+        
+        if (rawTimezone) {
+          // Handle array case explicitly
+          if (Array.isArray(rawTimezone)) {
+            CalendarDebugUtils.warn(COMPONENT_NAME, 'Timezone received as array:', rawTimezone);
+            timezone = TimeZoneUtils.ensureIANATimeZone(rawTimezone);
+          }
+          // Handle string case
+          else if (typeof rawTimezone === 'string' && rawTimezone.trim()) {
+            timezone = TimeZoneUtils.ensureIANATimeZone(rawTimezone.trim());
+          }
+          // Handle object case
+          else if (typeof rawTimezone === 'object') {
+            CalendarDebugUtils.warn(COMPONENT_NAME, 'Timezone received as object:', rawTimezone);
+            timezone = TimeZoneUtils.serializeTimeZone(rawTimezone);
+          }
+        }
+        // Otherwise fall back to clinician's default timezone
+        else if (clinicianDefaultTimezone) {
+          timezone = TimeZoneUtils.ensureIANATimeZone(clinicianDefaultTimezone);
         }
         
         // Create and add the availability slot
@@ -164,10 +224,25 @@ const convertToColumnBasedAvailability = (clinicianData: ClinicianColumnData | n
   const defaultTimezone = 'America/Chicago';
   
   // Get clinician's default timezone
-  const clinicianDefaultTimezone =
-    typeof clinicianData.clinician_time_zone === 'string'
-      ? TimeZoneUtils.ensureIANATimeZone(clinicianData.clinician_time_zone)
-      : defaultTimezone;
+  // Enhanced to handle array values
+  let clinicianDefaultTimezone = defaultTimezone;
+  
+  if (clinicianData?.clinician_time_zone) {
+    // Handle array case explicitly
+    if (Array.isArray(clinicianData.clinician_time_zone)) {
+      CalendarDebugUtils.warn(COMPONENT_NAME, 'Default timezone received as array:', clinicianData.clinician_time_zone);
+      clinicianDefaultTimezone = TimeZoneUtils.ensureIANATimeZone(clinicianData.clinician_time_zone);
+    }
+    // Handle string case
+    else if (typeof clinicianData.clinician_time_zone === 'string') {
+      clinicianDefaultTimezone = TimeZoneUtils.ensureIANATimeZone(clinicianData.clinician_time_zone);
+    }
+    // Handle object case
+    else if (typeof clinicianData.clinician_time_zone === 'object') {
+      CalendarDebugUtils.warn(COMPONENT_NAME, 'Default timezone received as object:', clinicianData.clinician_time_zone);
+      clinicianDefaultTimezone = TimeZoneUtils.serializeTimeZone(clinicianData.clinician_time_zone);
+    }
+  }
   
   // Initialize the column-based availability structure
   const columnBasedAvailability: ColumnBasedAvailability = {
@@ -196,12 +271,29 @@ const convertToColumnBasedAvailability = (clinicianData: ClinicianColumnData | n
       
       // Only add slots that have both start and end times
       if (clinicianData[startTimeKey] && clinicianData[endTimeKey]) {
-        // Determine timezone with fallbacks
+        // Determine timezone with fallbacks - enhanced to handle array values
         let timezone = defaultTimezone;
-        if (typeof clinicianData[timezoneKey] === 'string' && clinicianData[timezoneKey].trim()) {
-          timezone = TimeZoneUtils.ensureIANATimeZone(clinicianData[timezoneKey].trim());
-        } else if (typeof clinicianDefaultTimezone === 'string' && clinicianDefaultTimezone.trim()) {
-          timezone = clinicianDefaultTimezone;
+        const rawTimezone = clinicianData[timezoneKey];
+        
+        if (rawTimezone) {
+          // Handle array case explicitly
+          if (Array.isArray(rawTimezone)) {
+            CalendarDebugUtils.warn(COMPONENT_NAME, 'Timezone received as array:', rawTimezone);
+            timezone = TimeZoneUtils.ensureIANATimeZone(rawTimezone);
+          }
+          // Handle string case
+          else if (typeof rawTimezone === 'string' && rawTimezone.trim()) {
+            timezone = TimeZoneUtils.ensureIANATimeZone(rawTimezone.trim());
+          }
+          // Handle object case
+          else if (typeof rawTimezone === 'object') {
+            CalendarDebugUtils.warn(COMPONENT_NAME, 'Timezone received as object:', rawTimezone);
+            timezone = TimeZoneUtils.serializeTimeZone(rawTimezone);
+          }
+        }
+        // Otherwise fall back to clinician's default timezone
+        else if (clinicianDefaultTimezone) {
+          timezone = TimeZoneUtils.ensureIANATimeZone(clinicianDefaultTimezone);
         }
         
         // Add the slot to the appropriate day

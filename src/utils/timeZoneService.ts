@@ -12,7 +12,13 @@ export class TimeZoneService {
    * @param timezone The timezone string to validate.
    * @returns A valid IANA timezone string.
    */
-  public static ensureIANATimeZone(timezone: string | null | undefined): string {
+  public static ensureIANATimeZone(timezone: string | string[] | null | undefined): string {
+    // Handle array values - CRITICAL FIX for timezone conversion bug
+    if (Array.isArray(timezone)) {
+      console.warn('Timezone received as array, extracting first element:', timezone);
+      timezone = timezone[0];
+    }
+    
     // Handle null, undefined, or empty string
     if (!timezone || (typeof timezone === 'string' && timezone.trim() === '')) {
       console.warn('No timezone provided, using default timezone:', this.DEFAULT_TIMEZONE);

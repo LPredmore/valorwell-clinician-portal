@@ -9,10 +9,12 @@ import WeekViewTester from '../debug/WeekViewTester';
 import CalendarDataFlow from '../debug/CalendarDataFlow';
 import { CalendarDebugUtils } from '@/utils/calendarDebugUtils';
 import { testTimezones } from '@/debug/mockCalendarData';
+import runAllTimezoneFixTests from '../debug/timezoneFixTest';
 
 const CalendarTestPage: React.FC = () => {
   const [testResults, setTestResults] = useState<any>(null);
   const [importResults, setImportResults] = useState<any>(null);
+  const [timezoneFixResults, setTimezoneFixResults] = useState<any>(null);
   const [selectedTimezone, setSelectedTimezone] = useState('America/Chicago');
   const [debugLevel, setDebugLevel] = useState(CalendarDebugUtils.LOG_LEVELS.DEBUG);
   const [activeTab, setActiveTab] = useState<'components' | 'dataflow' | 'basic'>('components');
@@ -51,6 +53,19 @@ const CalendarTestPage: React.FC = () => {
       ...prev,
       [component]: !prev[component]
     }));
+  };
+  
+  // Run timezone fix tests
+  const runTimezoneFixTests = () => {
+    try {
+      const results = runAllTimezoneFixTests();
+      setTimezoneFixResults(results);
+    } catch (error) {
+      setTimezoneFixResults({
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
   };
 
   return (
@@ -218,6 +233,39 @@ const CalendarTestPage: React.FC = () => {
                   </div>
                 </div>
               )}
+              
+              <div className="mb-6 p-4 border rounded bg-gray-50">
+                <h2 className="text-xl font-semibold mb-2">Timezone Fix Tests</h2>
+                <p className="mb-4">
+                  Test the timezone conversion bug fixes to ensure they're working correctly.
+                  These tests verify that array timezone values are properly handled.
+                </p>
+                
+                <button
+                  onClick={runTimezoneFixTests}
+                  className="mb-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                >
+                  Run Timezone Fix Tests
+                </button>
+                
+                {timezoneFixResults && (
+                  <div className={`p-3 rounded ${timezoneFixResults.success ? 'bg-green-100' : 'bg-red-100'}`}>
+                    <p className={timezoneFixResults.success ? 'text-green-800' : 'text-red-800'}>
+                      {timezoneFixResults.success ? 'Timezone fix tests passed!' : 'Timezone fix tests failed!'}
+                    </p>
+                    {timezoneFixResults.message && (
+                      <p className="mt-2 text-sm">
+                        {timezoneFixResults.message}
+                      </p>
+                    )}
+                    {timezoneFixResults.error && (
+                      <pre className="mt-2 text-xs bg-red-50 p-2 rounded overflow-auto">
+                        {timezoneFixResults.error}
+                      </pre>
+                    )}
+                  </div>
+                )}
+              </div>
               
               <div className="grid grid-cols-1 gap-6 mb-6">
                 <CalendarTest />

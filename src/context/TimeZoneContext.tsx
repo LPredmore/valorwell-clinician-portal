@@ -25,8 +25,8 @@ interface TimeZoneContextType {
   
   // Utility functions
   getTimeZoneDisplayName: (timezone?: string) => string;
-  isValidTimeZone: (timezone: string | null | undefined) => boolean;
-  ensureIANATimeZone: (timezone: string | null | undefined) => string;
+  isValidTimeZone: (timezone: string | string[] | null | undefined) => boolean;
+  ensureIANATimeZone: (timezone: string | string[] | null | undefined) => string;
   
   // Current time
   now: () => DateTime;
@@ -118,14 +118,14 @@ export const TimeZoneProvider: React.FC<TimeZoneProviderProps> = ({
     [userTimeZone]
   );
 
-  const isValidTimeZone = useMemo(() => 
-    (timezone: string | null | undefined): boolean => 
+  const isValidTimeZone = useMemo(() =>
+    (timezone: string | string[] | null | undefined): boolean =>
       TimeZoneUtils.isValidTimeZone(timezone),
     []
   );
 
-  const ensureIANATimeZone = useMemo(() => 
-    (timezone: string | null | undefined): string => 
+  const ensureIANATimeZone = useMemo(() =>
+    (timezone: string | string[] | null | undefined): string =>
       TimeZoneUtils.ensureIANATimeZone(timezone),
     []
   );

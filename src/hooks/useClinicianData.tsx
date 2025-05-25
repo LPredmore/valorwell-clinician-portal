@@ -67,6 +67,16 @@ export const getClinicianTimeZone = async (clinicianId: string): Promise<string>
       return 'America/Chicago'; // Default to Central Time
     }
     
+    // Handle the case where clinician_timezone is an array
+    if (Array.isArray(data?.clinician_timezone)) {
+      console.warn('Clinician timezone received as array:', data.clinician_timezone);
+      // Extract the first element if it exists
+      if (data.clinician_timezone.length > 0) {
+        return data.clinician_timezone[0];
+      }
+      return 'America/Chicago'; // Default if array is empty
+    }
+    
     // Return the timezone or a default if not set
     return data?.clinician_timezone || 'America/Chicago';
   } catch (error) {

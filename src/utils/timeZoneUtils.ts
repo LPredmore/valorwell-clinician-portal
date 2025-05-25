@@ -103,7 +103,7 @@ export function formatWithTimeZone(date: Date, timezone: string, formatStr: stri
  * @param timezone The timezone string to validate
  * @returns A valid IANA timezone string
  */
-export function ensureIANATimeZone(timezone: string | null | undefined): string {
+export function ensureIANATimeZone(timezone: string | string[] | null | undefined): string {
   // Delegate to the improved TimeZoneService implementation
   return TimeZoneService.ensureIANATimeZone(timezone);
 }
@@ -270,11 +270,18 @@ export function formatDateTime(dateTime: DateTime, format: string): string {
  * @param timezone The timezone string to validate
  * @returns True if the timezone is valid, false otherwise
  */
-export function isValidTimeZone(timezone: string | null | undefined): boolean {
+export function isValidTimeZone(timezone: string | string[] | null | undefined): boolean {
   if (!timezone) return false;
+  
+  // Handle array case
+  if (Array.isArray(timezone)) {
+    if (timezone.length === 0) return false;
+    timezone = timezone[0];
+  }
+  
   try {
     const result = TimeZoneService.ensureIANATimeZone(timezone);
-    return result === timezone;
+    return typeof timezone === 'string' && result === timezone;
   } catch (error) {
     return false;
   }
@@ -288,6 +295,15 @@ export function isValidTimeZone(timezone: string | null | undefined): boolean {
  */
 export function serializeTimeZone(timezone: any): string {
   if (!timezone) return TimeZoneService.DEFAULT_TIMEZONE;
+  
+  // Handle array case explicitly
+  if (Array.isArray(timezone)) {
+    console.warn('Timezone was an array, extracting first element:', timezone);
+    if (timezone.length > 0) {
+      return ensureIANATimeZone(timezone[0]);
+    }
+    return TimeZoneService.DEFAULT_TIMEZONE;
+  }
   
   if (typeof timezone === 'string') {
     return ensureIANATimeZone(timezone);
