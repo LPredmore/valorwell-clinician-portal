@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { RecurringPattern } from '@/types/appointment';
-import { formatRecurringPattern } from '@/utils/recurringAppointmentUtils';
-import { TimeZoneService } from '@/utils/timeZoneService';
-import { DateTime } from 'luxon';
-import { format } from 'date-fns';
+import React, { useState, useEffect, useCallback } from "react";
+import { RecurringPattern } from "@/types/appointment";
+import { formatRecurringPattern } from "@/utils/recurringAppointmentUtils";
+import { TimeZoneService } from "@/utils/timeZoneService";
+import { DateTime } from "luxon";
+import { format } from "date-fns";
 
 import {
   Select,
@@ -11,7 +11,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from "@/components/ui/select";
 import {
   Form,
   FormControl,
@@ -20,16 +20,20 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
-import { Checkbox } from '@/components/ui/checkbox';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { useForm } from 'react-hook-form';
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Checkbox } from "@/components/ui/checkbox";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { CalendarIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useForm } from "react-hook-form";
 
 export interface RecurringPatternEditorProps {
   initialPattern?: RecurringPattern;
@@ -42,26 +46,30 @@ export const RecurringPatternEditor: React.FC<RecurringPatternEditorProps> = ({
   initialPattern,
   onChange,
   onCancel,
-  timezone = 'America/Chicago'
+  timezone = "America/Chicago",
 }) => {
   // Default pattern
   const defaultPattern: RecurringPattern = {
-    frequency: 'weekly',
+    frequency: "weekly",
     interval: 1,
     daysOfWeek: [DateTime.now().weekday % 7], // Current day of week (0-based)
-    timezone: TimeZoneService.ensureIANATimeZone(timezone)
+    timezone: TimeZoneService.ensureIANATimeZone(timezone),
   };
 
   // Initialize with provided pattern or default
-  const [pattern, setPattern] = useState<RecurringPattern>(initialPattern || defaultPattern);
-  
-  // End type radio options
-  const [endType, setEndType] = useState<'never' | 'after' | 'on'>(
-    initialPattern?.endDate ? 'on' : 
-    initialPattern?.endAfterOccurrences ? 'after' : 
-    'never'
+  const [pattern, setPattern] = useState<RecurringPattern>(
+    initialPattern || defaultPattern,
   );
-  
+
+  // End type radio options
+  const [endType, setEndType] = useState<"never" | "after" | "on">(
+    initialPattern?.endDate
+      ? "on"
+      : initialPattern?.endAfterOccurrences
+        ? "after"
+        : "never",
+  );
+
   // Form setup
   const form = useForm({
     defaultValues: {
@@ -73,147 +81,170 @@ export const RecurringPatternEditor: React.FC<RecurringPatternEditorProps> = ({
       dayOfWeekMonth: pattern.dayOfWeekMonth || 1,
       monthOfYear: pattern.monthOfYear || 1,
       endAfterOccurrences: pattern.endAfterOccurrences || 10,
-      endDate: pattern.endDate ? DateTime.fromISO(pattern.endDate).toJSDate() : undefined
-    }
-  };
-  
+      endDate: pattern.endDate
+        ? DateTime.fromISO(pattern.endDate).toJSDate()
+        : undefined,
+    },
+  });
+
+  // Form values type
+  interface FormValues {
+    frequency: RecurringPattern["frequency"];
+    interval: number;
+    daysOfWeek?: number[];
+    dayOfMonth?: number;
+    weekOfMonth?: number;
+    dayOfWeekMonth?: number;
+    monthOfYear?: number;
+    endAfterOccurrences?: number;
+    endDate?: Date;
+  }
+
   // Update pattern when form values change
-  const updatePattern = (values: any) => {
-    const updatedPattern: RecurringPattern = {
-      ...pattern,
-      frequency: values.frequency,
-      interval: Number(values.interval),
-      timezone: TimeZoneService.ensureIANATimeZone(timezone)
-    };
-    
-    // Add frequency-specific fields
-    if (values.frequency === 'weekly' && values.daysOfWeek?.length > 0) {
-      updatedPattern.daysOfWeek = values.daysOfWeek;
-    }
-    
-    if (values.frequency === 'monthly') {
-      if (values.dayOfMonth) {
-        updatedPattern.dayOfMonth = Number(values.dayOfMonth);
+  const updatePattern = useCallback(
+    (values: FormValues) => {
+      const updatedPattern: RecurringPattern = {
+        ...pattern,
+        frequency: values.frequency,
+        interval: Number(values.interval),
+        timezone: TimeZoneService.ensureIANATimeZone(timezone),
+      };
+
+      // Add frequency-specific fields
+      if (values.frequency === "weekly" && values.daysOfWeek?.length > 0) {
+        updatedPattern.daysOfWeek = values.daysOfWeek;
       }
-      
-      if (values.weekOfMonth && values.dayOfWeekMonth !== undefined) {
-        updatedPattern.weekOfMonth = Number(values.weekOfMonth);
-        updatedPattern.dayOfWeekMonth = Number(values.dayOfWeekMonth);
+
+      if (values.frequency === "monthly") {
+        if (values.dayOfMonth) {
+          updatedPattern.dayOfMonth = Number(values.dayOfMonth);
+        }
+
+        if (values.weekOfMonth && values.dayOfWeekMonth !== undefined) {
+          updatedPattern.weekOfMonth = Number(values.weekOfMonth);
+          updatedPattern.dayOfWeekMonth = Number(values.dayOfWeekMonth);
+        }
       }
-    }
-    
-    if (values.frequency === 'yearly' && values.monthOfYear) {
-      updatedPattern.monthOfYear = Number(values.monthOfYear);
-    }
-    
-    // Add end condition
-    if (endType === 'after' && values.endAfterOccurrences) {
-      updatedPattern.endAfterOccurrences = Number(values.endAfterOccurrences);
-      delete updatedPattern.endDate;
-    } else if (endType === 'on' && values.endDate) {
-      updatedPattern.endDate = DateTime.fromJSDate(values.endDate).toISODate();
-      delete updatedPattern.endAfterOccurrences;
-    } else {
-      // No end date or occurrences limit
-      delete updatedPattern.endDate;
-      delete updatedPattern.endAfterOccurrences;
-    }
-    
-    setPattern(updatedPattern);
-    onChange(updatedPattern);
-  };
-  
+
+      if (values.frequency === "yearly" && values.monthOfYear) {
+        updatedPattern.monthOfYear = Number(values.monthOfYear);
+      }
+
+      // Add end condition
+      if (endType === "after" && values.endAfterOccurrences) {
+        updatedPattern.endAfterOccurrences = Number(values.endAfterOccurrences);
+        delete updatedPattern.endDate;
+      } else if (endType === "on" && values.endDate) {
+        updatedPattern.endDate = DateTime.fromJSDate(
+          values.endDate as Date,
+        ).toISODate();
+        delete updatedPattern.endAfterOccurrences;
+      } else {
+        // No end date or occurrences limit
+        delete updatedPattern.endDate;
+        delete updatedPattern.endAfterOccurrences;
+      }
+
+      setPattern(updatedPattern);
+      onChange(updatedPattern);
+    },
+    [pattern, timezone, endType, onChange],
+  );
+
   // Handle form submission
-  const onSubmit = (values: any) => {
+  const onSubmit = (values: FormValues) => {
     updatePattern(values);
   };
-  
+
   // Update form when frequency changes
   useEffect(() => {
     const subscription = form.watch((value, { name }) => {
-      if (name === 'frequency') {
+      if (name === "frequency") {
         // Reset fields when frequency changes
-        if (value.frequency === 'daily') {
-          form.setValue('daysOfWeek', []);
-          form.setValue('dayOfMonth', undefined);
-          form.setValue('weekOfMonth', undefined);
-          form.setValue('dayOfWeekMonth', undefined);
-          form.setValue('monthOfYear', undefined);
-        } else if (value.frequency === 'weekly') {
+        if (value.frequency === "daily") {
+          form.setValue("daysOfWeek", []);
+          form.setValue("dayOfMonth", undefined);
+          form.setValue("weekOfMonth", undefined);
+          form.setValue("dayOfWeekMonth", undefined);
+          form.setValue("monthOfYear", undefined);
+        } else if (value.frequency === "weekly") {
           // Set current day of week if empty
-          if (!form.getValues('daysOfWeek') || form.getValues('daysOfWeek').length === 0) {
-            form.setValue('daysOfWeek', [DateTime.now().weekday % 7]);
+          if (
+            !form.getValues("daysOfWeek") ||
+            form.getValues("daysOfWeek").length === 0
+          ) {
+            form.setValue("daysOfWeek", [DateTime.now().weekday % 7]);
           }
-          form.setValue('dayOfMonth', undefined);
-          form.setValue('weekOfMonth', undefined);
-          form.setValue('dayOfWeekMonth', undefined);
-          form.setValue('monthOfYear', undefined);
-        } else if (value.frequency === 'monthly') {
-          form.setValue('daysOfWeek', []);
+          form.setValue("dayOfMonth", undefined);
+          form.setValue("weekOfMonth", undefined);
+          form.setValue("dayOfWeekMonth", undefined);
+          form.setValue("monthOfYear", undefined);
+        } else if (value.frequency === "monthly") {
+          form.setValue("daysOfWeek", []);
           // Set current day of month if empty
-          if (!form.getValues('dayOfMonth')) {
-            form.setValue('dayOfMonth', DateTime.now().day);
+          if (!form.getValues("dayOfMonth")) {
+            form.setValue("dayOfMonth", DateTime.now().day);
           }
-          form.setValue('monthOfYear', undefined);
-        } else if (value.frequency === 'yearly') {
-          form.setValue('daysOfWeek', []);
-          form.setValue('dayOfMonth', undefined);
-          form.setValue('weekOfMonth', undefined);
-          form.setValue('dayOfWeekMonth', undefined);
+          form.setValue("monthOfYear", undefined);
+        } else if (value.frequency === "yearly") {
+          form.setValue("daysOfWeek", []);
+          form.setValue("dayOfMonth", undefined);
+          form.setValue("weekOfMonth", undefined);
+          form.setValue("dayOfWeekMonth", undefined);
           // Set current month if empty
-          if (!form.getValues('monthOfYear')) {
-            form.setValue('monthOfYear', DateTime.now().month);
+          if (!form.getValues("monthOfYear")) {
+            form.setValue("monthOfYear", DateTime.now().month);
           }
         }
       }
-      
+
       // Update pattern as user types
       updatePattern(form.getValues());
     });
-    
+
     return () => subscription.unsubscribe();
-  }, [form, form.watch]);
-  
+  }, [form, form.watch, updatePattern, DateTime]);
+
   // Days of week options
   const daysOfWeek = [
-    { value: 0, label: 'Sunday' },
-    { value: 1, label: 'Monday' },
-    { value: 2, label: 'Tuesday' },
-    { value: 3, label: 'Wednesday' },
-    { value: 4, label: 'Thursday' },
-    { value: 5, label: 'Friday' },
-    { value: 6, label: 'Saturday' }
+    { value: 0, label: "Sunday" },
+    { value: 1, label: "Monday" },
+    { value: 2, label: "Tuesday" },
+    { value: 3, label: "Wednesday" },
+    { value: 4, label: "Thursday" },
+    { value: 5, label: "Friday" },
+    { value: 6, label: "Saturday" },
   ];
-  
+
   // Week of month options
   const weeksOfMonth = [
-    { value: 1, label: 'First' },
-    { value: 2, label: 'Second' },
-    { value: 3, label: 'Third' },
-    { value: 4, label: 'Fourth' },
-    { value: 5, label: 'Last' }
+    { value: 1, label: "First" },
+    { value: 2, label: "Second" },
+    { value: 3, label: "Third" },
+    { value: 4, label: "Fourth" },
+    { value: 5, label: "Last" },
   ];
-  
+
   // Month options
   const months = [
-    { value: 1, label: 'January' },
-    { value: 2, label: 'February' },
-    { value: 3, label: 'March' },
-    { value: 4, label: 'April' },
-    { value: 5, label: 'May' },
-    { value: 6, label: 'June' },
-    { value: 7, label: 'July' },
-    { value: 8, label: 'August' },
-    { value: 9, label: 'September' },
-    { value: 10, label: 'October' },
-    { value: 11, label: 'November' },
-    { value: 12, label: 'December' }
+    { value: 1, label: "January" },
+    { value: 2, label: "February" },
+    { value: 3, label: "March" },
+    { value: 4, label: "April" },
+    { value: 5, label: "May" },
+    { value: 6, label: "June" },
+    { value: 7, label: "July" },
+    { value: 8, label: "August" },
+    { value: 9, label: "September" },
+    { value: 10, label: "October" },
+    { value: 11, label: "November" },
+    { value: 12, label: "December" },
   ];
-  
+
   return (
     <div className="space-y-4">
       <h3 className="text-lg font-medium">Recurring Pattern</h3>
-      
+
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           {/* Frequency */}
@@ -243,7 +274,7 @@ export const RecurringPatternEditor: React.FC<RecurringPatternEditorProps> = ({
               </FormItem>
             )}
           />
-          
+
           {/* Interval */}
           <FormField
             control={form.control}
@@ -258,24 +289,30 @@ export const RecurringPatternEditor: React.FC<RecurringPatternEditorProps> = ({
                       min={1}
                       max={99}
                       {...field}
-                      onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
+                      onChange={(e) =>
+                        field.onChange(parseInt(e.target.value) || 1)
+                      }
                       className="w-20"
                     />
                   </FormControl>
                   <span>
-                    {form.watch('frequency') === 'daily' && (form.watch('interval') === 1 ? 'day' : 'days')}
-                    {form.watch('frequency') === 'weekly' && (form.watch('interval') === 1 ? 'week' : 'weeks')}
-                    {form.watch('frequency') === 'monthly' && (form.watch('interval') === 1 ? 'month' : 'months')}
-                    {form.watch('frequency') === 'yearly' && (form.watch('interval') === 1 ? 'year' : 'years')}
+                    {form.watch("frequency") === "daily" &&
+                      (form.watch("interval") === 1 ? "day" : "days")}
+                    {form.watch("frequency") === "weekly" &&
+                      (form.watch("interval") === 1 ? "week" : "weeks")}
+                    {form.watch("frequency") === "monthly" &&
+                      (form.watch("interval") === 1 ? "month" : "months")}
+                    {form.watch("frequency") === "yearly" &&
+                      (form.watch("interval") === 1 ? "year" : "years")}
                   </span>
                 </div>
                 <FormMessage />
               </FormItem>
             )}
           />
-          
+
           {/* Weekly options */}
-          {form.watch('frequency') === 'weekly' && (
+          {form.watch("frequency") === "weekly" && (
             <FormField
               control={form.control}
               name="daysOfWeek"
@@ -284,13 +321,18 @@ export const RecurringPatternEditor: React.FC<RecurringPatternEditorProps> = ({
                   <FormLabel>On these days</FormLabel>
                   <div className="grid grid-cols-4 gap-2">
                     {daysOfWeek.map((day) => (
-                      <div key={day.value} className="flex items-center space-x-2">
+                      <div
+                        key={day.value}
+                        className="flex items-center space-x-2"
+                      >
                         <Checkbox
                           checked={field.value?.includes(day.value)}
                           onCheckedChange={(checked) => {
                             const updatedDays = checked
                               ? [...(field.value || []), day.value]
-                              : (field.value || []).filter((d: number) => d !== day.value);
+                              : (field.value || []).filter(
+                                  (d: number) => d !== day.value,
+                                );
                             field.onChange(updatedDays);
                           }}
                           id={`day-${day.value}`}
@@ -306,9 +348,9 @@ export const RecurringPatternEditor: React.FC<RecurringPatternEditorProps> = ({
               )}
             />
           )}
-          
+
           {/* Monthly options */}
-          {form.watch('frequency') === 'monthly' && (
+          {form.watch("frequency") === "monthly" && (
             <div className="space-y-4">
               <FormField
                 control={form.control}
@@ -322,7 +364,9 @@ export const RecurringPatternEditor: React.FC<RecurringPatternEditorProps> = ({
                         min={1}
                         max={31}
                         {...field}
-                        onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
+                        onChange={(e) =>
+                          field.onChange(parseInt(e.target.value) || 1)
+                        }
                         className="w-20"
                       />
                     </FormControl>
@@ -333,7 +377,7 @@ export const RecurringPatternEditor: React.FC<RecurringPatternEditorProps> = ({
                   </FormItem>
                 )}
               />
-              
+
               <div className="flex items-center space-x-2">
                 <span>Or on the</span>
                 <FormField
@@ -349,7 +393,10 @@ export const RecurringPatternEditor: React.FC<RecurringPatternEditorProps> = ({
                       </SelectTrigger>
                       <SelectContent>
                         {weeksOfMonth.map((week) => (
-                          <SelectItem key={week.value} value={week.value.toString()}>
+                          <SelectItem
+                            key={week.value}
+                            value={week.value.toString()}
+                          >
                             {week.label}
                           </SelectItem>
                         ))}
@@ -357,7 +404,7 @@ export const RecurringPatternEditor: React.FC<RecurringPatternEditorProps> = ({
                     </Select>
                   )}
                 />
-                
+
                 <FormField
                   control={form.control}
                   name="dayOfWeekMonth"
@@ -371,7 +418,10 @@ export const RecurringPatternEditor: React.FC<RecurringPatternEditorProps> = ({
                       </SelectTrigger>
                       <SelectContent>
                         {daysOfWeek.map((day) => (
-                          <SelectItem key={day.value} value={day.value.toString()}>
+                          <SelectItem
+                            key={day.value}
+                            value={day.value.toString()}
+                          >
                             {day.label}
                           </SelectItem>
                         ))}
@@ -379,14 +429,14 @@ export const RecurringPatternEditor: React.FC<RecurringPatternEditorProps> = ({
                     </Select>
                   )}
                 />
-                
+
                 <span>of the month</span>
               </div>
             </div>
           )}
-          
+
           {/* Yearly options */}
-          {form.watch('frequency') === 'yearly' && (
+          {form.watch("frequency") === "yearly" && (
             <FormField
               control={form.control}
               name="monthOfYear"
@@ -402,7 +452,10 @@ export const RecurringPatternEditor: React.FC<RecurringPatternEditorProps> = ({
                     </SelectTrigger>
                     <SelectContent>
                       {months.map((month) => (
-                        <SelectItem key={month.value} value={month.value.toString()}>
+                        <SelectItem
+                          key={month.value}
+                          value={month.value.toString()}
+                        >
                           {month.label}
                         </SelectItem>
                       ))}
@@ -413,20 +466,22 @@ export const RecurringPatternEditor: React.FC<RecurringPatternEditorProps> = ({
               )}
             />
           )}
-          
+
           {/* End options */}
           <div className="space-y-2">
             <FormLabel>End</FormLabel>
             <RadioGroup
               value={endType}
-              onValueChange={(value) => setEndType(value as 'never' | 'after' | 'on')}
+              onValueChange={(value) =>
+                setEndType(value as "never" | "after" | "on")
+              }
               className="space-y-2"
             >
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="never" id="end-never" />
                 <label htmlFor="end-never">Never</label>
               </div>
-              
+
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="after" id="end-after" />
                 <label htmlFor="end-after">After</label>
@@ -438,16 +493,18 @@ export const RecurringPatternEditor: React.FC<RecurringPatternEditorProps> = ({
                       type="number"
                       min={1}
                       max={999}
-                      disabled={endType !== 'after'}
+                      disabled={endType !== "after"}
                       {...field}
-                      onChange={(e) => field.onChange(parseInt(e.target.value) || 10)}
+                      onChange={(e) =>
+                        field.onChange(parseInt(e.target.value) || 10)
+                      }
                       className="w-20"
                     />
                   )}
                 />
                 <span>occurrences</span>
               </div>
-              
+
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="on" id="end-on" />
                 <label htmlFor="end-on">On</label>
@@ -463,9 +520,9 @@ export const RecurringPatternEditor: React.FC<RecurringPatternEditorProps> = ({
                             className={cn(
                               "w-[240px] pl-3 text-left font-normal",
                               !field.value && "text-muted-foreground",
-                              endType !== 'on' && "opacity-50"
+                              endType !== "on" && "opacity-50",
                             )}
-                            disabled={endType !== 'on'}
+                            disabled={endType !== "on"}
                           >
                             {field.value ? (
                               format(field.value, "PPP")
@@ -491,13 +548,13 @@ export const RecurringPatternEditor: React.FC<RecurringPatternEditorProps> = ({
               </div>
             </RadioGroup>
           </div>
-          
+
           {/* Summary */}
           <div className="p-4 bg-muted rounded-md">
             <h4 className="font-medium mb-1">Summary</h4>
             <p>{formatRecurringPattern(pattern)}</p>
           </div>
-          
+
           {/* Actions */}
           <div className="flex justify-end space-x-2">
             {onCancel && (
@@ -505,9 +562,7 @@ export const RecurringPatternEditor: React.FC<RecurringPatternEditorProps> = ({
                 Cancel
               </Button>
             )}
-            <Button type="submit">
-              Apply
-            </Button>
+            <Button type="submit">Apply</Button>
           </div>
         </form>
       </Form>
