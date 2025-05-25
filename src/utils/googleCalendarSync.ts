@@ -1,3 +1,4 @@
+
 /**
  * Google Calendar Synchronization Utility
  * Handles two-way synchronization between the application and Google Calendar
@@ -139,7 +140,8 @@ export class GoogleCalendarConnector implements CalendarConnector {
       throw new Error(`Failed to connect to Google Calendar: ${error.message}`);
     }
   }
-/**
+
+  /**
    * Disconnect from Google Calendar
    * @param connectionId Connection ID
    */
@@ -410,7 +412,9 @@ export class GoogleCalendarConnector implements CalendarConnector {
       
       throw new Error(`Failed to fetch Google Calendar events: ${error.message}`);
     }
-/**
+  }
+
+  /**
    * Create a new event in Google Calendar
    * @param connectionId Connection ID
    * @param appointment Appointment to create in Google Calendar
@@ -681,7 +685,10 @@ export class GoogleCalendarConnector implements CalendarConnector {
         .eq('id', syncedEvent.id);
       
       throw new Error(`Failed to delete Google Calendar event: ${error.message}`);
-/**
+    }
+  }
+
+  /**
    * Start synchronization for a connection
    * @param connectionId Connection ID
    */
