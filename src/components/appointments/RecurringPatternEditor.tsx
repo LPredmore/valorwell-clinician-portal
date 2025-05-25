@@ -3,6 +3,7 @@ import { RecurringPattern } from '@/types/appointment';
 import { formatRecurringPattern } from '@/utils/recurringAppointmentUtils';
 import { TimeZoneService } from '@/utils/timeZoneService';
 import { DateTime } from 'luxon';
+import { format } from 'date-fns';
 
 import {
   Select,
@@ -74,7 +75,7 @@ export const RecurringPatternEditor: React.FC<RecurringPatternEditorProps> = ({
       endAfterOccurrences: pattern.endAfterOccurrences || 10,
       endDate: pattern.endDate ? DateTime.fromISO(pattern.endDate).toJSDate() : undefined
     }
-  });
+  };
   
   // Update pattern when form values change
   const updatePattern = (values: any) => {

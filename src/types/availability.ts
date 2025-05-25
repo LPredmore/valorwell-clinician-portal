@@ -1,3 +1,4 @@
+
 /**
  * Availability Status Enum
  * Defines all possible availability statuses
@@ -43,163 +44,119 @@ export interface DayAvailability {
 }
 
 /**
- * Weekly Availability Pattern Interface
- * Represents a clinician's weekly availability pattern
+ * Availability Exception Interface
+ * Represents an exception to regular availability
  */
-export interface WeeklyAvailabilityPattern {
-  [DayOfWeek.MONDAY]: DayAvailability;
-  [DayOfWeek.TUESDAY]: DayAvailability;
-  [DayOfWeek.WEDNESDAY]: DayAvailability;
-  [DayOfWeek.THURSDAY]: DayAvailability;
-  [DayOfWeek.FRIDAY]: DayAvailability;
-  [DayOfWeek.SATURDAY]: DayAvailability;
-  [DayOfWeek.SUNDAY]: DayAvailability;
+export interface AvailabilityException {
+  id: string;
+  clinician_id: string;
+  specific_date: string;
+  start_time: string;
+  end_time: string;
+  day_of_week?: string;
+  is_active: boolean;
+  is_deleted: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 /**
- * Clinician Availability Slot Interface
- * Represents a single availability slot for a clinician
- * This directly reflects the clinician table structure
- */
-export interface ClinicianAvailabilitySlot {
-  day: string;            // "monday", "tuesday", etc.
-  slot: number;           // 1 | 2 | 3
-  start_time: string | null;
-  end_time: string | null;
-  timezone: string;
-}
-
-/**
- * AvailabilityBlock Interface
- * This is a compatibility interface that maps the clinician availability data
- * to the format expected by existing components.
- * @deprecated Use ClinicianAvailabilitySlot or ColumnBasedAvailability instead for new code
+ * Availability Block Interface
+ * Represents a block of availability for a clinician
  */
 export interface AvailabilityBlock {
   id: string;
   clinician_id: string;
-  start_at: string; // UTC ISO string
-  end_at: string;   // UTC ISO string
+  day_of_week: string;
+  start_at: string;
+  end_at: string;
   is_active: boolean;
-  recurring_pattern?: WeeklyAvailabilityPattern | null;
-  created_at?: string;
-  updated_at?: string;
+  is_deleted: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 /**
- * ColumnBasedTimeSlot Interface
- * Represents a single time slot in the column-based availability system
- */
-export interface ColumnBasedTimeSlot {
-  startTime: string; // Format: "HH:MM"
-  endTime: string;   // Format: "HH:MM"
-  timezone: string;  // IANA timezone string
-}
-
-/**
- * ColumnBasedDaySlots Interface
- * Represents all time slots for a specific day in the column-based availability system
- */
-export interface ColumnBasedDaySlots {
-  slots: ColumnBasedTimeSlot[];
-}
-
-/**
- * ColumnBasedAvailability Interface
- * This represents the availability data stored directly in clinician columns
- */
-export interface ColumnBasedAvailability {
-  clinicianId: string;
-  daySlots: {
-    [key in DayOfWeek]: ColumnBasedDaySlots;
-  };
-}
-
-/**
- * ClinicianColumnData Interface
- * Represents the raw column data from the clinician table that contains availability information
+ * Clinician Column Data Interface
+ * Represents data structure directly from clinicians table columns
  */
 export interface ClinicianColumnData {
   id: string;
   clinician_first_name: string;
   clinician_last_name: string;
+  clinician_professional_name?: string;
+  clinician_email?: string;
   clinician_time_zone: string;
-  [key: string]: any; // For all the availability columns like clinician_availability_start_monday_1, etc.
-}
-
-/**
- * Type guard to check if an object is a valid TimeSlot
- */
-export function isTimeSlot(obj: any): obj is TimeSlot {
-  return (
-    obj &&
-    typeof obj === 'object' &&
-    typeof obj.startTime === 'string' &&
-    typeof obj.endTime === 'string' &&
-    typeof obj.timezone === 'string' &&
-    /^\d{2}:\d{2}$/.test(obj.startTime) &&
-    /^\d{2}:\d{2}$/.test(obj.endTime)
-  );
-}
-
-/**
- * Type guard to check if an object is a valid DayAvailability
- */
-export function isDayAvailability(obj: any): obj is DayAvailability {
-  return (
-    obj &&
-    typeof obj === 'object' &&
-    (Object.values(DayOfWeek).includes(obj.dayOfWeek as DayOfWeek) || typeof obj.dayOfWeek === 'string') &&
-    typeof obj.isAvailable === 'boolean' &&
-    Array.isArray(obj.timeSlots) &&
-    obj.timeSlots.every((slot: any) => isTimeSlot(slot))
-  );
-}
-
-/**
- * Type guard to check if an object is a valid WeeklyAvailabilityPattern
- */
-export function isWeeklyAvailabilityPattern(obj: any): obj is WeeklyAvailabilityPattern {
-  return (
-    obj &&
-    typeof obj === 'object' &&
-    isDayAvailability(obj[DayOfWeek.MONDAY]) &&
-    isDayAvailability(obj[DayOfWeek.TUESDAY]) &&
-    isDayAvailability(obj[DayOfWeek.WEDNESDAY]) &&
-    isDayAvailability(obj[DayOfWeek.THURSDAY]) &&
-    isDayAvailability(obj[DayOfWeek.FRIDAY]) &&
-    isDayAvailability(obj[DayOfWeek.SATURDAY]) &&
-    isDayAvailability(obj[DayOfWeek.SUNDAY])
-  );
-}
-
-/**
- * Type guard to check if an object is a valid ClinicianAvailabilitySlot
- */
-export function isClinicianAvailabilitySlot(obj: any): obj is ClinicianAvailabilitySlot {
-  return (
-    obj &&
-    typeof obj === 'object' &&
-    typeof obj.day === 'string' &&
-    typeof obj.slot === 'number' &&
-    (obj.start_time === null || typeof obj.start_time === 'string') &&
-    (obj.end_time === null || typeof obj.end_time === 'string') &&
-    typeof obj.timezone === 'string'
-  );
-}
-
-/**
- * Type guard to check if an object is a valid AvailabilityBlock
- * @deprecated Use isClinicianAvailabilitySlot instead for new code
- */
-export function isAvailabilityBlock(obj: any): obj is AvailabilityBlock {
-  return (
-    obj &&
-    typeof obj === 'object' &&
-    typeof obj.id === 'string' &&
-    typeof obj.clinician_id === 'string' &&
-    typeof obj.start_at === 'string' &&
-    typeof obj.end_at === 'string' &&
-    typeof obj.is_active === 'boolean'
-  );
+  clinician_bio?: string;
+  clinician_image_url?: string;
+  // Monday availability slots
+  clinician_availability_start_monday_1?: string;
+  clinician_availability_end_monday_1?: string;
+  clinician_availability_timezone_monday_1?: string;
+  clinician_availability_start_monday_2?: string;
+  clinician_availability_end_monday_2?: string;
+  clinician_availability_timezone_monday_2?: string;
+  clinician_availability_start_monday_3?: string;
+  clinician_availability_end_monday_3?: string;
+  clinician_availability_timezone_monday_3?: string;
+  // Tuesday availability slots
+  clinician_availability_start_tuesday_1?: string;
+  clinician_availability_end_tuesday_1?: string;
+  clinician_availability_timezone_tuesday_1?: string;
+  clinician_availability_start_tuesday_2?: string;
+  clinician_availability_end_tuesday_2?: string;
+  clinician_availability_timezone_tuesday_2?: string;
+  clinician_availability_start_tuesday_3?: string;
+  clinician_availability_end_tuesday_3?: string;
+  clinician_availability_timezone_tuesday_3?: string;
+  // Wednesday availability slots
+  clinician_availability_start_wednesday_1?: string;
+  clinician_availability_end_wednesday_1?: string;
+  clinician_availability_timezone_wednesday_1?: string;
+  clinician_availability_start_wednesday_2?: string;
+  clinician_availability_end_wednesday_2?: string;
+  clinician_availability_timezone_wednesday_2?: string;
+  clinician_availability_start_wednesday_3?: string;
+  clinician_availability_end_wednesday_3?: string;
+  clinician_availability_timezone_wednesday_3?: string;
+  // Thursday availability slots
+  clinician_availability_start_thursday_1?: string;
+  clinician_availability_end_thursday_1?: string;
+  clinician_availability_timezone_thursday_1?: string;
+  clinician_availability_start_thursday_2?: string;
+  clinician_availability_end_thursday_2?: string;
+  clinician_availability_timezone_thursday_2?: string;
+  clinician_availability_start_thursday_3?: string;
+  clinician_availability_end_thursday_3?: string;
+  clinician_availability_timezone_thursday_3?: string;
+  // Friday availability slots
+  clinician_availability_start_friday_1?: string;
+  clinician_availability_end_friday_1?: string;
+  clinician_availability_timezone_friday_1?: string;
+  clinician_availability_start_friday_2?: string;
+  clinician_availability_end_friday_2?: string;
+  clinician_availability_timezone_friday_2?: string;
+  clinician_availability_start_friday_3?: string;
+  clinician_availability_end_friday_3?: string;
+  clinician_availability_timezone_friday_3?: string;
+  // Saturday availability slots
+  clinician_availability_start_saturday_1?: string;
+  clinician_availability_end_saturday_1?: string;
+  clinician_availability_timezone_saturday_1?: string;
+  clinician_availability_start_saturday_2?: string;
+  clinician_availability_end_saturday_2?: string;
+  clinician_availability_timezone_saturday_2?: string;
+  clinician_availability_start_saturday_3?: string;
+  clinician_availability_end_saturday_3?: string;
+  clinician_availability_timezone_saturday_3?: string;
+  // Sunday availability slots
+  clinician_availability_start_sunday_1?: string;
+  clinician_availability_end_sunday_1?: string;
+  clinician_availability_timezone_sunday_1?: string;
+  clinician_availability_start_sunday_2?: string;
+  clinician_availability_end_sunday_2?: string;
+  clinician_availability_timezone_sunday_2?: string;
+  clinician_availability_start_sunday_3?: string;
+  clinician_availability_end_sunday_3?: string;
+  clinician_availability_timezone_sunday_3?: string;
 }

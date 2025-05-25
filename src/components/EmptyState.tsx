@@ -1,7 +1,6 @@
+
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
-import { CalendarErrorReporter } from '@/utils/calendarErrorReporter';
-import type { ErrorContextData } from '@/utils/calendarErrorReporter';
 
 interface EmptyStateProps {
   title: string;
@@ -11,7 +10,7 @@ interface EmptyStateProps {
     label: string;
     onClick: () => void;
   };
-  contextData?: ErrorContextData;
+  contextData?: any;
 }
 
 export const EmptyState = ({
@@ -20,7 +19,7 @@ export const EmptyState = ({
   icon,
   action,
   contextData,
-}) => {
+}: EmptyStateProps) => {
   return (
     <div className="flex flex-col items-center justify-center p-8 text-center">
       {icon && <div className="mb-4">{icon}</div>}
@@ -44,14 +43,14 @@ export const DataEmptyState = ({
   componentName,
   onRetry,
   ...props
-}) => {
+}: DataEmptyStateProps) => {
   return (
     <EmptyState
       {...props}
       action={onRetry ? {
         label: 'Retry',
         onClick: () => {
-          CalendarErrorReporter.recordRecoveryAttempt(componentName, props.contextData);
+          console.log(`Retry attempted for ${componentName}`);
           onRetry();
         },
       } : undefined}

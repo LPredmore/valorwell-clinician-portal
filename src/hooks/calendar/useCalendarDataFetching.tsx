@@ -33,7 +33,7 @@ export const useCalendarDataFetching = (
   // Fetch clinician data for availability
   const fetchClinicianData = useCallback(async (clinicianId: string): Promise<ClinicianColumnData | null> => {
     try {
-      // Explicitly list all required columns instead of using wildcard
+      // Use proper Supabase select syntax without column aliasing
       const { data, error } = await supabase
         .from('clinicians')
         .select(`
@@ -42,7 +42,7 @@ export const useCalendarDataFetching = (
           clinician_last_name,
           clinician_professional_name,
           clinician_email,
-          clinician_time_zone:coalesce(clinician_time_zone, 'America/Chicago'),
+          clinician_time_zone,
           clinician_bio,
           clinician_image_url,
           clinician_availability_start_monday_1,
@@ -132,6 +132,11 @@ export const useCalendarDataFetching = (
             clinicianId,
             timezone: data.clinician_time_zone
           });
+          data.clinician_time_zone = 'America/Chicago';
+        }
+      } else {
+        // Set default timezone if missing
+        if (data) {
           data.clinician_time_zone = 'America/Chicago';
         }
       }
@@ -276,8 +281,6 @@ export const useCalendarDataFetching = (
         }
         
         setClients(clientMap);
-        
-        // Availability is now processed directly from clinicianData in useAvailabilityProcessor
         
         // Log fetch performance
         const fetchDuration = performance.now() - fetchStartTime;
