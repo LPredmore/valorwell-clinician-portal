@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { DateTime } from 'luxon';
 import { Appointment } from '@/types/appointment';
+import { ClinicianColumnData, ColumnBasedAvailability } from '@/types/availability';
 import { useTimeZone } from '@/context/TimeZoneContext';
 import { CalendarDebugUtils } from '@/utils/calendarDebugUtils';
 import { TimeBlock, AppointmentBlock } from './types';
@@ -68,10 +69,8 @@ export const useWeekViewData = (
   const {
     loading,
     appointments,
-    availability,
     clients,
-    exceptions,
-    clinicianData,
+    clinicianData, // ClinicianColumnData
     error: fetchError
   } = useCalendarDataFetching(
     clinicianId,
@@ -83,11 +82,10 @@ export const useWeekViewData = (
   // Process availability data using specialized hook
   const {
     timeBlocks,
-    weeklyPattern
+    weeklyPattern,
+    columnBasedAvailability
   } = useAvailabilityProcessor(
     clinicianData,
-    availability,
-    exceptions,
     weekDays,
     userTimeZone
   );
@@ -145,7 +143,8 @@ export const useWeekViewData = (
     getAppointmentForTimeSlot,
     error: hookError,
     weeklyPattern,
-    clinicianData
+    clinicianData: clinicianData as ClinicianColumnData | null,
+    columnBasedAvailability
   };
 };
 

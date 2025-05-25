@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { DateTime } from 'luxon';
 import { Appointment } from '@/types/appointment';
-import { AvailabilityBlock } from '@/types/availability';
+import { ClinicianColumnData } from '@/types/availability';
 import { ClientDetails } from '@/types/client';
 import { CalendarDebugUtils } from '@/utils/calendarDebugUtils';
 import { appointmentsCache, clientsCache } from '@/utils/cacheUtils';
@@ -26,13 +26,12 @@ export const useCalendarDataFetching = (
   // State variables
   const [loading, setLoading] = useState(true);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [availability, setAvailability] = useState<AvailabilityBlock[]>([]);
   const [clients, setClients] = useState<Map<string, Client>>(new Map());
-  const [clinicianData, setClinicianData] = useState<any>(null);
+  const [clinicianData, setClinicianData] = useState<ClinicianColumnData | null>(null);
   const [error, setError] = useState<Error | null>(null);
 
   // Fetch clinician data for availability
-  const fetchClinicianData = useCallback(async (clinicianId: string) => {
+  const fetchClinicianData = useCallback(async (clinicianId: string): Promise<ClinicianColumnData | null> => {
     try {
       // Explicitly list all required columns instead of using wildcard
       const { data, error } = await supabase
@@ -154,7 +153,6 @@ export const useCalendarDataFetching = (
         });
         
         setAppointments([]);
-        setAvailability([]);
         setClients(new Map());
         setClinicianData(null);
         setLoading(false);
@@ -265,8 +263,7 @@ export const useCalendarDataFetching = (
         
         setClients(clientMap);
         
-        // Set availability to empty array - will be processed from clinicianData in useAvailabilityProcessor
-        setAvailability([]);
+        // Availability is now processed directly from clinicianData in useAvailabilityProcessor
         
         // Log fetch performance
         const fetchDuration = performance.now() - fetchStartTime;
@@ -290,9 +287,7 @@ export const useCalendarDataFetching = (
   return {
     loading,
     appointments,
-    availability,
     clients,
-    exceptions: [], // Return empty array for backward compatibility
     clinicianData,
     error
   };

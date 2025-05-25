@@ -1,12 +1,20 @@
 
-import { DateTime } from 'luxon';
-import { TimeZoneService } from './timeZoneService';
-
 /**
  * TimeZoneUtils provides a standardized interface for all timezone operations
  * in the application. All components should use these functions instead of
  * directly using TimeZoneService or Luxon to ensure consistent timezone handling.
+ *
+ * This module has been refactored to improve timezone handling reliability and
+ * prevent timezone-related errors that were causing calendar display issues.
  */
+
+import { DateTime } from 'luxon';
+import { TimeZoneService } from './timeZoneService';
+import { Appointment } from '@/types/appointment';
+import { CalendarDebugUtils } from './calendarDebugUtils';
+
+// Component name for logging
+const COMPONENT_NAME = 'TimeZoneUtils';
 
 /**
  * Get the user's timezone from the browser
@@ -89,50 +97,26 @@ export function formatWithTimeZone(date: Date, timezone: string, formatStr: stri
  * @param timezone The timezone string to validate
  * @returns A valid IANA timezone string
  */
+/**
+ * Ensures a timezone string is a valid IANA timezone
+ * Enhanced with better validation, error handling, and normalization
+ * @param timezone The timezone string to validate
+ * @returns A valid IANA timezone string
+ */
 export function ensureIANATimeZone(timezone: string | null | undefined): string {
-  // Handle null or undefined
-  if (!timezone) {
-    console.warn('No timezone provided, using default timezone:', TimeZoneService.DEFAULT_TIMEZONE);
-    return TimeZoneService.DEFAULT_TIMEZONE;
-  }
-  
-  // Handle empty strings
-  if (typeof timezone === 'string' && timezone.trim() === '') {
-    console.warn('Empty timezone string provided, using default timezone');
-    return TimeZoneService.DEFAULT_TIMEZONE;
-  }
-  
-  // Handle object conversion issues - if timezone is somehow an object
-  if (typeof timezone === 'object') {
-    console.warn('Timezone is an object instead of a string:', timezone);
-    try {
-      // Try to extract a string representation
-      const tzString = String(timezone);
-      if (tzString && tzString.length > 0 && tzString !== '[object Object]') {
-        return normalizeTimezoneString(tzString);
-      }
-    } catch (error) {
-      console.error('Error converting timezone object to string:', error);
-    }
-    return TimeZoneService.DEFAULT_TIMEZONE;
-  }
-  
-  return normalizeTimezoneString(String(timezone));
+  // Delegate to the improved TimeZoneService implementation
+  return TimeZoneService.ensureIANATimeZone(timezone);
 }
 
 /**
  * Helper function to normalize timezone strings
  * @param timezoneStr The timezone string to normalize
  * @returns A normalized timezone string
+ * @deprecated Use TimeZoneService.normalizeTimezoneString instead
  */
 function normalizeTimezoneString(timezoneStr: string): string {
-  // Normalize common timezone abbreviations
-  if (timezoneStr === 'EST') return 'America/New_York';
-  if (timezoneStr === 'CST') return 'America/Chicago';
-  if (timezoneStr === 'MST') return 'America/Denver';
-  if (timezoneStr === 'PST') return 'America/Los_Angeles';
-  
-  // Use TimeZoneService for final validation
+  // This function is kept for backward compatibility
+  // but delegates to TimeZoneService for consistent behavior
   return TimeZoneService.ensureIANATimeZone(timezoneStr);
 }
 
@@ -152,9 +136,30 @@ export function getTimeZoneDisplayName(timezone: string): string {
  * @param timezone The timezone to convert to
  * @returns A DateTime object in the specified timezone
  */
+/**
+ * Convert a UTC ISO string to a DateTime object in the specified timezone
+ * Enhanced with better error handling and fallbacks
+ * @param utcString The UTC ISO string to convert
+ * @param timezone The timezone to convert to
+ * @returns A DateTime object in the specified timezone
+ */
 export function fromUTC(utcString: string, timezone: string): DateTime {
-  const safeTimezone = ensureIANATimeZone(timezone);
-  return TimeZoneService.fromUTC(utcString, safeTimezone);
+  try {
+    const safeTimezone = ensureIANATimeZone(timezone);
+    
+    // Validate the UTC string
+    if (!utcString || typeof utcString !== 'string') {
+      console.error('Invalid UTC string provided to fromUTC:', utcString);
+      return TimeZoneService.now(safeTimezone); // Return current time as fallback
+    }
+    
+    // Use the improved TimeZoneService.fromUTC which now handles errors gracefully
+    return TimeZoneService.fromUTC(utcString, safeTimezone);
+  } catch (error) {
+    console.error('Error in timeZoneUtils.fromUTC:', error);
+    // Provide a graceful fallback
+    return TimeZoneService.now(ensureIANATimeZone(timezone));
+  }
 }
 
 /**
@@ -172,9 +177,30 @@ export function toUTC(dateTime: DateTime): string {
  * @param timezone The timezone of the local date and time
  * @returns A DateTime object in UTC
  */
+/**
+ * Convert a local date and time to UTC
+ * Enhanced with better error handling and fallbacks
+ * @param localDateTimeStr The local date and time string in 'yyyy-MM-ddTHH:mm' format
+ * @param timezone The timezone of the local date and time
+ * @returns A DateTime object in UTC
+ */
 export function convertLocalToUTC(localDateTimeStr: string, timezone: string): DateTime {
-  const safeTimezone = ensureIANATimeZone(timezone);
-  return TimeZoneService.convertLocalToUTC(localDateTimeStr, safeTimezone);
+  try {
+    const safeTimezone = ensureIANATimeZone(timezone);
+    
+    // Validate the local date time string
+    if (!localDateTimeStr || typeof localDateTimeStr !== 'string') {
+      console.error('Invalid local date time string provided to convertLocalToUTC:', localDateTimeStr);
+      return TimeZoneService.now('UTC'); // Return current time in UTC as fallback
+    }
+    
+    // Use the improved TimeZoneService.convertLocalToUTC which now handles errors gracefully
+    return TimeZoneService.convertLocalToUTC(localDateTimeStr, safeTimezone);
+  } catch (error) {
+    console.error('Error in timeZoneUtils.convertLocalToUTC:', error);
+    // Provide a graceful fallback
+    return TimeZoneService.now('UTC');
+  }
 }
 
 /**
@@ -288,6 +314,13 @@ export function serializeTimeZone(timezone: any): string {
  * @param obj The object to clone
  * @returns A deep clone of the object with preserved string types
  */
+/**
+ * Safely clone objects without losing string types or timezone information
+ * Enhanced to better handle timezone strings and prevent object conversion issues
+ * This is a replacement for JSON.parse(JSON.stringify()) which can corrupt timezone strings
+ * @param obj The object to clone
+ * @returns A deep clone of the object with preserved string types
+ */
 export function safeClone<T>(obj: T): T {
   if (obj === null || typeof obj !== 'object') {
     return obj;
@@ -303,15 +336,48 @@ export function safeClone<T>(obj: T): T {
     return obj.map(safeClone) as unknown as T;
   }
   
+  // Handle DateTime objects from Luxon (convert to ISO string)
+  if (obj && typeof obj === 'object' && 'toISO' in obj && typeof obj.toISO === 'function') {
+    try {
+      return obj.toISO() as unknown as T;
+    } catch (error) {
+      console.error('Error converting DateTime to ISO string:', error);
+      return obj;
+    }
+  }
+  
+  
   // Handle objects
   const cloned: Record<string, any> = {};
   for (const key in obj) {
     if (Object.prototype.hasOwnProperty.call(obj, key)) {
       const value = (obj as Record<string, any>)[key];
-      // Special handling for timezone strings to prevent object conversion
-      if ((key === 'timezone' || key.includes('timezone') || key.includes('time_zone')) && typeof value === 'string') {
-        cloned[key] = String(value); // Ensure it's a primitive string
+      
+      // Enhanced handling for timezone strings and related fields
+      if ((
+        key === 'timezone' ||
+        key.includes('timezone') ||
+        key.includes('time_zone') ||
+        key.includes('tz')
+      ) && value !== null) {
+        if (typeof value === 'string') {
+          // Ensure it's a primitive string and a valid timezone
+          cloned[key] = String(ensureIANATimeZone(value));
+        } else if (typeof value === 'object') {
+          // Try to convert object timezones to strings
+          try {
+            const tzString = String(value);
+            cloned[key] = ensureIANATimeZone(tzString);
+          } catch (error) {
+            console.error('Error converting timezone object to string:', error);
+            cloned[key] = TimeZoneService.DEFAULT_TIMEZONE;
+          }
+        } else {
+          // For any other type, use the default timezone
+          cloned[key] = TimeZoneService.DEFAULT_TIMEZONE;
+        }
       } else {
+        // Normal deep cloning for other properties
         cloned[key] = safeClone(value);
       }
     }

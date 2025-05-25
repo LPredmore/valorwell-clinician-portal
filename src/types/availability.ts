@@ -73,7 +73,7 @@ export interface ClinicianAvailabilitySlot {
  * AvailabilityBlock Interface
  * This is a compatibility interface that maps the clinician availability data
  * to the format expected by existing components.
- * @deprecated Use ClinicianAvailabilitySlot instead for new code
+ * @deprecated Use ClinicianAvailabilitySlot or ColumnBasedAvailability instead for new code
  */
 export interface AvailabilityBlock {
   id: string;
@@ -84,6 +84,47 @@ export interface AvailabilityBlock {
   recurring_pattern?: WeeklyAvailabilityPattern | null;
   created_at?: string;
   updated_at?: string;
+}
+
+/**
+ * ColumnBasedTimeSlot Interface
+ * Represents a single time slot in the column-based availability system
+ */
+export interface ColumnBasedTimeSlot {
+  startTime: string; // Format: "HH:MM"
+  endTime: string;   // Format: "HH:MM"
+  timezone: string;  // IANA timezone string
+}
+
+/**
+ * ColumnBasedDaySlots Interface
+ * Represents all time slots for a specific day in the column-based availability system
+ */
+export interface ColumnBasedDaySlots {
+  slots: ColumnBasedTimeSlot[];
+}
+
+/**
+ * ColumnBasedAvailability Interface
+ * This represents the availability data stored directly in clinician columns
+ */
+export interface ColumnBasedAvailability {
+  clinicianId: string;
+  daySlots: {
+    [key in DayOfWeek]: ColumnBasedDaySlots;
+  };
+}
+
+/**
+ * ClinicianColumnData Interface
+ * Represents the raw column data from the clinician table that contains availability information
+ */
+export interface ClinicianColumnData {
+  id: string;
+  clinician_first_name: string;
+  clinician_last_name: string;
+  clinician_time_zone: string;
+  [key: string]: any; // For all the availability columns like clinician_availability_start_monday_1, etc.
 }
 
 /**

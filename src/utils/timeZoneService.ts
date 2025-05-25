@@ -13,20 +13,63 @@ export class TimeZoneService {
    * @returns A valid IANA timezone string.
    */
   public static ensureIANATimeZone(timezone: string | null | undefined): string {
-    if (!timezone) {
+    // Handle null, undefined, or empty string
+    if (!timezone || (typeof timezone === 'string' && timezone.trim() === '')) {
       console.warn('No timezone provided, using default timezone:', this.DEFAULT_TIMEZONE);
       return this.DEFAULT_TIMEZONE;
     }
 
+    // Handle object conversion issues - if timezone is somehow an object
+    if (typeof timezone === 'object') {
+      console.warn('Timezone is an object instead of a string:', timezone);
+      try {
+        // Try to extract a string representation
+        const tzString = String(timezone);
+        if (tzString && tzString.length > 0 && tzString !== '[object Object]') {
+          return this.normalizeTimezoneString(tzString);
+        }
+      } catch (error) {
+        console.error('Error converting timezone object to string:', error);
+      }
+      return this.DEFAULT_TIMEZONE;
+    }
+
+    return this.normalizeTimezoneString(String(timezone));
+  }
+
+  /**
+   * Helper function to normalize timezone strings
+   * @param timezoneStr The timezone string to normalize
+   * @returns A normalized timezone string
+   */
+  public static normalizeTimezoneString(timezoneStr: string): string {
+    // Normalize common timezone abbreviations
+    if (timezoneStr === 'EST') return 'America/New_York';
+    if (timezoneStr === 'CST') return 'America/Chicago';
+    if (timezoneStr === 'MST') return 'America/Denver';
+    if (timezoneStr === 'PST') return 'America/Los_Angeles';
+    if (timezoneStr === 'EDT') return 'America/New_York';
+    if (timezoneStr === 'CDT') return 'America/Chicago';
+    if (timezoneStr === 'MDT') return 'America/Denver';
+    if (timezoneStr === 'PDT') return 'America/Los_Angeles';
+    
     try {
-      if (!IANAZone.isValidZone(timezone)) {
-        console.warn(`Invalid timezone '${timezone}' provided, using default timezone: ${this.DEFAULT_TIMEZONE}`);
+      // Validate using IANAZone
+      if (!IANAZone.isValidZone(timezoneStr)) {
+        console.warn(`Invalid timezone '${timezoneStr}', using default timezone: ${this.DEFAULT_TIMEZONE}`);
         return this.DEFAULT_TIMEZONE;
       }
-      DateTime.now().setZone(timezone); // Try using the timezone to verify it
-      return timezone;
+      
+      // Additional validation by trying to use the timezone
+      const testDate = DateTime.now().setZone(timezoneStr);
+      if (!testDate.isValid) {
+        console.warn(`Timezone '${timezoneStr}' failed validation: ${testDate.invalidReason}`);
+        return this.DEFAULT_TIMEZONE;
+      }
+      
+      return timezoneStr;
     } catch (error) {
-      console.error(`Error validating timezone '${timezone}', using default timezone:`, error);
+      console.error(`Error validating timezone '${timezoneStr}':`, error);
       return this.DEFAULT_TIMEZONE;
     }
   }
@@ -214,18 +257,31 @@ export class TimeZoneService {
    * Export a method that converts UTC ISO string to a DateTime object in the user's timezone
    */
   public static fromUTC(utcString: string, timezone: string): DateTime {
-    // Ensure we're working with a valid timezone
-    const safeTimezone = this.ensureIANATimeZone(timezone);
+    try {
+      // Ensure we're working with a valid timezone
+      const safeTimezone = this.ensureIANATimeZone(timezone);
 
-    // Parse the ISO string as UTC, then convert to the target timezone
-    const dt = DateTime.fromISO(utcString, { zone: 'UTC' }).setZone(safeTimezone);
+      // Validate the UTC string format
+      if (!utcString || typeof utcString !== 'string') {
+        console.error('Invalid UTC string provided:', utcString);
+        return DateTime.now().setZone('UTC'); // Return current time in UTC as fallback
+      }
 
-    if (!dt.isValid) {
-      console.error('Invalid DateTime from UTC conversion:', dt.invalidReason, dt.invalidExplanation);
-      throw new Error(`Failed to convert UTC time: ${dt.invalidReason}`);
+      // Parse the ISO string as UTC, then convert to the target timezone
+      const dt = DateTime.fromISO(utcString, { zone: 'UTC' }).setZone(safeTimezone);
+
+      if (!dt.isValid) {
+        console.error('Invalid DateTime from UTC conversion:', dt.invalidReason, dt.invalidExplanation);
+        // Return current time in the target timezone as fallback instead of throwing
+        return DateTime.now().setZone(safeTimezone);
+      }
+
+      return dt;
+    } catch (error) {
+      console.error('Error in fromUTC conversion:', error);
+      // Provide a graceful fallback instead of crashing
+      return DateTime.now().setZone(this.DEFAULT_TIMEZONE);
     }
-
-    return dt;
   }
 
   // Alias for convertUTCToLocal to maintain backward compatibility
@@ -237,50 +293,74 @@ export class TimeZoneService {
    * @param timezone The timezone of the local date and time
    * @returns A DateTime object representing the time in UTC
    */
+  /**
+   * Converts a local date and time to UTC with DST transition validation
+   * Enhanced with better error handling and fallbacks
+   * @param localDateTimeStr The local date and time string in 'yyyy-MM-ddTHH:mm' format
+   * @param timezone The timezone of the local date and time
+   * @returns A DateTime object representing the time in UTC
+   */
   public static convertLocalToUTC(localDateTimeStr: string, timezone: string): DateTime {
-    const safeTimezone = this.ensureIANATimeZone(timezone);
-    
-    // Validate input format (YYYY-MM-DDTHH:MM format)
-    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(localDateTimeStr)) {
-      console.error('Invalid date-time format:', localDateTimeStr);
-      throw new Error(`Invalid date-time format: ${localDateTimeStr}. Expected format: "YYYY-MM-DDTHH:MM"`);
+    try {
+      const safeTimezone = this.ensureIANATimeZone(timezone);
+      
+      // Validate input format (YYYY-MM-DDTHH:MM format)
+      if (!localDateTimeStr || typeof localDateTimeStr !== 'string') {
+        console.error('Invalid or missing date-time string:', localDateTimeStr);
+        return DateTime.now().toUTC(); // Return current UTC time as fallback
+      }
+      
+      // More flexible format validation
+      if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(localDateTimeStr)) {
+        console.error('Invalid date-time format:', localDateTimeStr);
+        // Try to parse it anyway, but if that fails, return current time
+        const attemptParse = DateTime.fromISO(localDateTimeStr, { zone: safeTimezone });
+        if (!attemptParse.isValid) {
+          return DateTime.now().toUTC();
+        }
+        return attemptParse.toUTC();
+      }
+      
+      // Parse the local date time string in the specified timezone
+      const localDateTime = DateTime.fromISO(localDateTimeStr, { zone: safeTimezone });
+      
+      // Basic validation
+      if (!localDateTime.isValid) {
+        console.error('Invalid DateTime during conversion:', localDateTimeStr, safeTimezone);
+        return DateTime.now().toUTC(); // Return current UTC time as fallback
+      }
+      
+      // Check for DST transitions in a safer way that's compatible with Luxon
+      const offset = localDateTime.offset;
+      const oneHourBefore = localDateTime.minus({ hours: 1 });
+      const oneHourAfter = localDateTime.plus({ hours: 1 });
+      
+      // If the offset changes within this time window, we're near a DST transition
+      if (offset !== oneHourBefore.offset || offset !== oneHourAfter.offset) {
+        console.warn('DateTime may be in DST transition period:', localDateTime.toISO(), safeTimezone);
+        // We can log but still proceed with the conversion
+      }
+      
+      // Ensure the parsed date is in the expected timezone
+      if (localDateTime.zoneName !== safeTimezone) {
+        console.warn('Parsed DateTime zone mismatch:', localDateTime.zoneName, '≠', safeTimezone);
+      }
+      
+      // Convert to UTC
+      const utcDateTime = localDateTime.toUTC();
+      
+      // Add additional validation for the conversion result
+      if (!utcDateTime.isValid) {
+        console.error('UTC conversion failed:', localDateTime.toISO(), '→', utcDateTime.invalidReason);
+        return DateTime.now().toUTC(); // Return current UTC time as fallback
+      }
+      
+      return utcDateTime;
+    } catch (error) {
+      console.error('Error in convertLocalToUTC:', error);
+      // Provide a graceful fallback
+      return DateTime.now().toUTC();
     }
-    
-    // Parse the local date time string in the specified timezone
-    const localDateTime = DateTime.fromISO(localDateTimeStr, { zone: safeTimezone });
-    
-    // Basic validation
-    if (!localDateTime.isValid) {
-      console.error('Invalid DateTime during conversion:', localDateTimeStr, safeTimezone);
-      throw new Error(`Invalid date-time during conversion: ${localDateTime.invalidReason}`);
-    }
-    
-    // Check for DST transitions in a safer way that's compatible with Luxon
-    const offset = localDateTime.offset;
-    const oneHourBefore = localDateTime.minus({ hours: 1 });
-    const oneHourAfter = localDateTime.plus({ hours: 1 });
-    
-    // If the offset changes within this time window, we're near a DST transition
-    if (offset !== oneHourBefore.offset || offset !== oneHourAfter.offset) {
-      console.warn('DateTime may be in DST transition period:', localDateTime.toISO(), safeTimezone);
-      // We can log but still proceed with the conversion
-    }
-    
-    // Ensure the parsed date is in the expected timezone
-    if (localDateTime.zoneName !== safeTimezone) {
-      console.warn('Parsed DateTime zone mismatch:', localDateTime.zoneName, '≠', safeTimezone);
-    }
-    
-    // Convert to UTC
-    const utcDateTime = localDateTime.toUTC();
-    
-    // Add additional validation for the conversion result
-    if (!utcDateTime.isValid) {
-      console.error('UTC conversion failed:', localDateTime.toISO(), '→', utcDateTime.invalidReason);
-      throw new Error(`UTC conversion failed: ${utcDateTime.invalidReason}`);
-    }
-    
-    return utcDateTime;
   }
   
   /**

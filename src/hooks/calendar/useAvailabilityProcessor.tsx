@@ -1,6 +1,12 @@
 import { useState, useCallback, useMemo } from 'react';
 import { DateTime } from 'luxon';
-import { AvailabilityBlock, ClinicianAvailabilitySlot } from '@/types/availability';
+import {
+  AvailabilityBlock,
+  ClinicianAvailabilitySlot,
+  ColumnBasedAvailability,
+  ColumnBasedTimeSlot,
+  ClinicianColumnData
+} from '@/types/availability';
 import { TimeBlock } from '@/components/calendar/week-view/types';
 import { CalendarDebugUtils } from '@/utils/calendarDebugUtils';
 import * as TimeZoneUtils from '@/utils/timeZoneUtils';
@@ -33,8 +39,9 @@ interface ClinicianWeeklyAvailability {
 
 /**
  * Extract weekly availability pattern from clinician data
+ * This function has been refactored to work exclusively with column-based availability
  */
-const extractWeeklyPatternFromClinicianData = (clinicianData: any): ClinicianWeeklyAvailability => {
+const extractWeeklyPatternFromClinicianData = (clinicianData: ClinicianColumnData | null): ClinicianWeeklyAvailability => {
   // Create a default structure with all days set to unavailable
   const defaultAvailability: ClinicianWeeklyAvailability = {
     monday: { dayOfWeek: 'Monday', isAvailable: false, timeSlots: [] },
@@ -99,8 +106,9 @@ const extractWeeklyPatternFromClinicianData = (clinicianData: any): ClinicianWee
 /**
  * Extract clinician availability slots from clinician data
  * This function extracts the availability slots directly from the clinician table columns
+ * Refactored to work exclusively with column-based availability
  */
-const extractAvailabilitySlotsFromClinicianData = (clinicianData: any): ClinicianAvailabilitySlot[] => {
+const extractAvailabilitySlotsFromClinicianData = (clinicianData: ClinicianColumnData | null): ClinicianAvailabilitySlot[] => {
   if (!clinicianData) return [];
   
   const availabilitySlots: ClinicianAvailabilitySlot[] = [];
@@ -146,30 +154,67 @@ const extractAvailabilitySlotsFromClinicianData = (clinicianData: any): Clinicia
 };
 
 /**
- * Convert clinician availability slots to availability blocks
- * This function creates compatibility availability blocks from the clinician availability slots
+ * Convert clinician data to ColumnBasedAvailability
+ * This function creates a structured representation of the clinician's availability
+ * directly from the column-based data in the clinician record
  */
-const convertSlotsToAvailabilityBlocks = (
-  slots: ClinicianAvailabilitySlot[],
-  clinicianId: string
-): AvailabilityBlock[] => {
-  if (!slots.length || !clinicianId) return [];
+const convertToColumnBasedAvailability = (clinicianData: ClinicianColumnData | null): ColumnBasedAvailability | null => {
+  if (!clinicianData) return null;
   
-  return slots.map((slot, index) => {
-    // Generate a deterministic ID for the availability block
-    const id = `clinician-${clinicianId}-${slot.day}-${slot.slot}`;
-    
-    // Create the availability block
-    return {
-      id,
-      clinician_id: clinicianId,
-      start_at: '', // Will be set in processTimeBlocks
-      end_at: '',   // Will be set in processTimeBlocks
-      is_active: true,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    };
+  const defaultTimezone = 'America/Chicago';
+  
+  // Get clinician's default timezone
+  const clinicianDefaultTimezone =
+    typeof clinicianData.clinician_time_zone === 'string'
+      ? TimeZoneUtils.ensureIANATimeZone(clinicianData.clinician_time_zone)
+      : defaultTimezone;
+  
+  // Initialize the column-based availability structure
+  const columnBasedAvailability: ColumnBasedAvailability = {
+    clinicianId: clinicianData.id,
+    daySlots: {
+      monday: { slots: [] },
+      tuesday: { slots: [] },
+      wednesday: { slots: [] },
+      thursday: { slots: [] },
+      friday: { slots: [] },
+      saturday: { slots: [] },
+      sunday: { slots: [] }
+    }
+  };
+  
+  // Days of week for iteration
+  const daysOfWeek = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+  
+  // Process each day
+  daysOfWeek.forEach(day => {
+    // For each potential slot (1, 2, 3)
+    for (let slotNum = 1; slotNum <= 3; slotNum++) {
+      const startTimeKey = `clinician_availability_start_${day}_${slotNum}`;
+      const endTimeKey = `clinician_availability_end_${day}_${slotNum}`;
+      const timezoneKey = `clinician_availability_timezone_${day}_${slotNum}`;
+      
+      // Only add slots that have both start and end times
+      if (clinicianData[startTimeKey] && clinicianData[endTimeKey]) {
+        // Determine timezone with fallbacks
+        let timezone = defaultTimezone;
+        if (typeof clinicianData[timezoneKey] === 'string' && clinicianData[timezoneKey].trim()) {
+          timezone = TimeZoneUtils.ensureIANATimeZone(clinicianData[timezoneKey].trim());
+        } else if (typeof clinicianDefaultTimezone === 'string' && clinicianDefaultTimezone.trim()) {
+          timezone = clinicianDefaultTimezone;
+        }
+        
+        // Add the slot to the appropriate day
+        columnBasedAvailability.daySlots[day as keyof typeof columnBasedAvailability.daySlots].slots.push({
+          startTime: clinicianData[startTimeKey].substring(0, 5),  // Ensure "HH:MM" format
+          endTime: clinicianData[endTimeKey].substring(0, 5),      // Ensure "HH:MM" format
+          timezone: String(timezone)  // Explicitly convert to string to prevent object references
+        });
+      }
+    }
   });
+  
+  return columnBasedAvailability;
 };
 
 /**
@@ -177,9 +222,7 @@ const convertSlotsToAvailabilityBlocks = (
  * Refactored to use clinician table columns directly for availability data
  */
 export const useAvailabilityProcessor = (
-  clinicianData: any,
-  availabilityBlocks: AvailabilityBlock[], // Kept for backward compatibility
-  exceptions: any[], // Kept for backward compatibility
+  clinicianData: ClinicianColumnData | null,
   weekDays: DateTime[],
   userTimeZone: string
 ) => {
@@ -191,9 +234,19 @@ export const useAvailabilityProcessor = (
     extractWeeklyPatternFromClinicianData(clinicianData),
     [clinicianData]
   );
+  
+  // Convert clinician data to column-based availability
+  const columnBasedAvailability = useMemo(() =>
+    convertToColumnBasedAvailability(clinicianData),
+    [clinicianData]
+  );
 
   /**
    * Generate time blocks from weekly recurring pattern
+   */
+  /**
+   * Generate time blocks from weekly recurring pattern
+   * Refactored to work exclusively with column-based availability
    */
   const generateTimeBlocksFromWeeklyPattern = useCallback((
     pattern: ClinicianWeeklyAvailability,
@@ -291,7 +344,8 @@ export const useAvailabilityProcessor = (
 
   return {
     timeBlocks,
-    weeklyPattern
+    weeklyPattern,
+    columnBasedAvailability
   };
 };
 
