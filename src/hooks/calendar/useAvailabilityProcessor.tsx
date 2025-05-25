@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo } from 'react';
 import { DateTime } from 'luxon';
-import { AvailabilityBlock } from '@/types/availability';
+import { AvailabilityBlock, ClinicianAvailabilitySlot } from '@/types/availability';
 import { TimeBlock } from '@/components/calendar/week-view/types';
 import { CalendarDebugUtils } from '@/utils/calendarDebugUtils';
 import * as TimeZoneUtils from '@/utils/timeZoneUtils';
@@ -97,13 +97,89 @@ const extractWeeklyPatternFromClinicianData = (clinicianData: any): ClinicianWee
 };
 
 /**
+ * Extract clinician availability slots from clinician data
+ * This function extracts the availability slots directly from the clinician table columns
+ */
+const extractAvailabilitySlotsFromClinicianData = (clinicianData: any): ClinicianAvailabilitySlot[] => {
+  if (!clinicianData) return [];
+  
+  const availabilitySlots: ClinicianAvailabilitySlot[] = [];
+  const daysOfWeek = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+  const defaultTimezone = 'America/Chicago';
+  
+  // Get clinician's default timezone
+  const clinicianDefaultTimezone =
+    typeof clinicianData.clinician_time_zone === 'string'
+      ? TimeZoneUtils.ensureIANATimeZone(clinicianData.clinician_time_zone)
+      : defaultTimezone;
+  
+  // Process each day and slot
+  daysOfWeek.forEach(day => {
+    for (let slotNum = 1; slotNum <= 3; slotNum++) {
+      const startTimeKey = `clinician_availability_start_${day}_${slotNum}`;
+      const endTimeKey = `clinician_availability_end_${day}_${slotNum}`;
+      const timezoneKey = `clinician_availability_timezone_${day}_${slotNum}`;
+      
+      // Only add slots that have both start and end times
+      if (clinicianData[startTimeKey] && clinicianData[endTimeKey]) {
+        // Determine timezone with fallbacks
+        let timezone = defaultTimezone;
+        if (typeof clinicianData[timezoneKey] === 'string' && clinicianData[timezoneKey].trim()) {
+          timezone = TimeZoneUtils.ensureIANATimeZone(clinicianData[timezoneKey].trim());
+        } else if (typeof clinicianDefaultTimezone === 'string' && clinicianDefaultTimezone.trim()) {
+          timezone = clinicianDefaultTimezone;
+        }
+        
+        // Create and add the availability slot
+        availabilitySlots.push({
+          day,
+          slot: slotNum,
+          start_time: clinicianData[startTimeKey],
+          end_time: clinicianData[endTimeKey],
+          timezone: String(timezone)
+        });
+      }
+    }
+  });
+  
+  return availabilitySlots;
+};
+
+/**
+ * Convert clinician availability slots to availability blocks
+ * This function creates compatibility availability blocks from the clinician availability slots
+ */
+const convertSlotsToAvailabilityBlocks = (
+  slots: ClinicianAvailabilitySlot[],
+  clinicianId: string
+): AvailabilityBlock[] => {
+  if (!slots.length || !clinicianId) return [];
+  
+  return slots.map((slot, index) => {
+    // Generate a deterministic ID for the availability block
+    const id = `clinician-${clinicianId}-${slot.day}-${slot.slot}`;
+    
+    // Create the availability block
+    return {
+      id,
+      clinician_id: clinicianId,
+      start_at: '', // Will be set in processTimeBlocks
+      end_at: '',   // Will be set in processTimeBlocks
+      is_active: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+  });
+};
+
+/**
  * Hook for processing availability data into time blocks
- * Extracted from useWeekViewData for better separation of concerns
+ * Refactored to use clinician table columns directly for availability data
  */
 export const useAvailabilityProcessor = (
   clinicianData: any,
-  availabilityBlocks: AvailabilityBlock[],
-  exceptions: any[],
+  availabilityBlocks: AvailabilityBlock[], // Kept for backward compatibility
+  exceptions: any[], // Kept for backward compatibility
   weekDays: DateTime[],
   userTimeZone: string
 ) => {
@@ -111,7 +187,7 @@ export const useAvailabilityProcessor = (
   const processingStartTime = { current: 0 };
   
   // Extract weekly pattern from clinician data
-  const weeklyPattern = useMemo(() => 
+  const weeklyPattern = useMemo(() =>
     extractWeeklyPatternFromClinicianData(clinicianData),
     [clinicianData]
   );
@@ -191,118 +267,27 @@ export const useAvailabilityProcessor = (
     return generatedBlocks;
   }, [userTimeZone]);
 
-  /**
-   * Process availability blocks and exceptions into time blocks
-   */
-  const processTimeBlocks = useCallback((
-    blocks: AvailabilityBlock[],
-    exceptions: any[]
-  ): TimeBlock[] => {
+  // Process time blocks directly from clinician data
+  const timeBlocks = useMemo(() => {
     processingStartTime.current = performance.now();
     
     CalendarDebugUtils.logDataLoading(COMPONENT_NAME, 'processing-time-blocks-start', {
-      blocksCount: blocks?.length || 0,
-      exceptionsCount: exceptions?.length || 0
-    });
-    
-    const timeBlocks: TimeBlock[] = [];
-    
-    // Process regular availability blocks
-    blocks.forEach(block => {
-      try {
-        // Convert UTC ISO strings to DateTime objects in user timezone
-        const start = DateTime.fromISO(block.start_at).setZone(userTimeZone);
-        const end = DateTime.fromISO(block.end_at).setZone(userTimeZone);
-        const day = start.startOf('day');
-        
-        // Create time block
-        const timeBlock: TimeBlock = {
-          start,
-          end,
-          day,
-          availabilityIds: [block.id],
-          isException: false,
-          isStandalone: true
-        };
-        
-        timeBlocks.push(timeBlock);
-      } catch (error) {
-        CalendarDebugUtils.error(COMPONENT_NAME, 'Error processing availability block', {
-          blockId: block.id,
-          error
-        });
-      }
-    });
-    
-    // Process exceptions
-    exceptions.forEach(exception => {
-      try {
-        if (!exception.is_active) return;
-        
-        // Parse the specific date
-        const specificDate = DateTime.fromFormat(exception.specific_date, 'yyyy-MM-dd')
-          .setZone(userTimeZone);
-        
-        // Parse the start and end times
-        const [startHour, startMinute] = exception.start_time.split(':').map(Number);
-        const [endHour, endMinute] = exception.end_time.split(':').map(Number);
-        
-        // Create start and end DateTimes
-        const start = specificDate.set({
-          hour: startHour,
-          minute: startMinute,
-          second: 0,
-          millisecond: 0
-        });
-        
-        const end = specificDate.set({
-          hour: endHour,
-          minute: endMinute,
-          second: 0,
-          millisecond: 0
-        });
-        
-        // Create time block
-        const timeBlock: TimeBlock = {
-          start,
-          end,
-          day: specificDate.startOf('day'),
-          availabilityIds: [exception.id],
-          isException: true,
-          isStandalone: false
-        };
-        
-        timeBlocks.push(timeBlock);
-      } catch (error) {
-        CalendarDebugUtils.error(COMPONENT_NAME, 'Error processing availability exception', {
-          exceptionId: exception.id,
-          error
-        });
-      }
+      hasClinicianData: !!clinicianData,
+      weekDaysCount: weekDays?.length || 0
     });
     
     // Generate recurring blocks from weekly pattern
     const recurringBlocks = generateTimeBlocksFromWeeklyPattern(weeklyPattern, weekDays);
     
-    // Combine all blocks
-    const allBlocks = [...timeBlocks, ...recurringBlocks];
-    
     // Log processing performance
     const processingDuration = performance.now() - processingStartTime.current;
     CalendarDebugUtils.logPerformance(COMPONENT_NAME, 'time-blocks-processing', processingDuration, {
-      regularBlocksCount: timeBlocks.length,
       recurringBlocksCount: recurringBlocks.length,
-      totalBlocksCount: allBlocks.length
+      totalBlocksCount: recurringBlocks.length
     });
     
-    return allBlocks;
-  }, [weeklyPattern, weekDays, userTimeZone, generateTimeBlocksFromWeeklyPattern]);
-
-  // Process time blocks
-  const timeBlocks = useMemo(() => 
-    processTimeBlocks(availabilityBlocks, exceptions),
-    [availabilityBlocks, exceptions, processTimeBlocks]
-  );
+    return recurringBlocks;
+  }, [weeklyPattern, weekDays, clinicianData, generateTimeBlocksFromWeeklyPattern]);
 
   return {
     timeBlocks,

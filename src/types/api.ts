@@ -1,5 +1,5 @@
 import { Appointment, AppointmentStatus, AppointmentType } from './appointment';
-import { AvailabilityBlock, AvailabilityException } from './availability';
+import { AvailabilityBlock } from './availability';
 
 /**
  * API Response Interface
@@ -56,13 +56,16 @@ export enum ApiEndpoint {
   DELETE_APPOINTMENT = 'appointments/{id}',
   
   // Availability endpoints
+  GET_CLINICIAN_AVAILABILITY = 'clinicians/{id}/availability',
+  
+  // Deprecated availability endpoints - kept for backward compatibility
   GET_AVAILABILITY_BLOCKS = 'availability_blocks',
   GET_AVAILABILITY_BLOCK = 'availability_blocks/{id}',
   CREATE_AVAILABILITY_BLOCK = 'availability_blocks',
   UPDATE_AVAILABILITY_BLOCK = 'availability_blocks/{id}',
   DELETE_AVAILABILITY_BLOCK = 'availability_blocks/{id}',
-  
-  // Availability exceptions endpoints
+
+  // Deprecated availability exceptions endpoints - kept for backward compatibility
   GET_AVAILABILITY_EXCEPTIONS = 'availability_exceptions',
   GET_AVAILABILITY_EXCEPTION = 'availability_exceptions/{id}',
   CREATE_AVAILABILITY_EXCEPTION = 'availability_exceptions',
@@ -244,7 +247,7 @@ export interface DeleteAvailabilityExceptionRequest {
  * Availability Exception Response Types
  */
 
-export interface GetAvailabilityExceptionsResponse extends ApiResponse<AvailabilityException[]> {
+export interface GetAvailabilityExceptionsResponse extends ApiResponse<AvailabilityBlock[]> {
   pagination?: {
     total: number;
     page: number;
@@ -253,13 +256,31 @@ export interface GetAvailabilityExceptionsResponse extends ApiResponse<Availabil
   };
 }
 
-export interface GetAvailabilityExceptionResponse extends ApiResponse<AvailabilityException> {}
+export interface GetAvailabilityExceptionResponse extends ApiResponse<AvailabilityBlock> {}
 
-export interface CreateAvailabilityExceptionResponse extends ApiResponse<AvailabilityException> {}
+export interface CreateAvailabilityExceptionResponse extends ApiResponse<AvailabilityBlock> {}
 
-export interface UpdateAvailabilityExceptionResponse extends ApiResponse<AvailabilityException> {}
+export interface UpdateAvailabilityExceptionResponse extends ApiResponse<AvailabilityBlock> {}
 
 export interface DeleteAvailabilityExceptionResponse extends ApiResponse<{ id: string }> {}
+
+/**
+ * Clinician Availability Request Types
+ */
+export interface GetClinicianAvailabilityRequest {
+  clinicianId: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface GetClinicianAvailabilityResponse extends ApiResponse<AvailabilityBlock[]> {
+  pagination?: {
+    total: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+  };
+}
 
 /**
  * Clinician Request Types

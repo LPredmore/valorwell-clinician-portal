@@ -378,90 +378,130 @@ export class CalendarApiClient {
    * @param request The request parameters
    * @returns A promise that resolves to the availability blocks response
    */
-  public static async getAvailabilityBlocks(
-    request: ApiTypes.GetAvailabilityBlocksRequest
-  ): Promise<ApiTypes.GetAvailabilityBlocksResponse> {
+  /**
+   * Fetches clinician availability data directly from the clinicians table
+   * @param request The request parameters
+   * @returns A promise that resolves to the availability response
+   */
+  public static async getClinicianAvailability(
+    request: ApiTypes.GetClinicianAvailabilityRequest
+  ): Promise<ApiTypes.GetClinicianAvailabilityResponse> {
     try {
-      CalendarDebugUtils.log(COMPONENT_NAME, 'Fetching availability blocks', request);
+      CalendarDebugUtils.log(COMPONENT_NAME, 'Fetching clinician availability', request);
       
-      const { 
-        clinicianId, 
-        startDate, 
-        endDate, 
-        isActive,
+      const {
+        clinicianId,
         page = 1,
-        pageSize = 100,
-        orderBy = 'start_at',
-        orderDirection = 'asc'
+        pageSize = 100
       } = request;
       
-      // Build query
-      let query = supabase
-        .from('availability_blocks')
-        .select('*')
-        .order(orderBy, { ascending: orderDirection === 'asc' });
-      
-      // Add filters
-      if (clinicianId) {
-        query = query.eq('clinician_id', clinicianId);
+      if (!clinicianId) {
+        throw new Error('Clinician ID is required');
       }
       
-      if (startDate) {
-        query = query.gte('start_at', startDate);
-      }
-      
-      if (endDate) {
-        query = query.lt('end_at', endDate);
-      }
-      
-      if (isActive !== undefined) {
-        query = query.eq('is_active', isActive);
-      }
-      
-      // Add pagination
-      const from = (page - 1) * pageSize;
-      const to = from + pageSize - 1;
-      query = query.range(from, to);
+      // Build query to get clinician data with availability columns
+      const query = supabase
+        .from('clinicians')
+        .select(`
+          id,
+          clinician_first_name,
+          clinician_last_name,
+          clinician_professional_name,
+          clinician_email,
+          clinician_time_zone,
+          clinician_availability_start_monday_1,
+          clinician_availability_end_monday_1,
+          clinician_availability_timezone_monday_1,
+          clinician_availability_start_monday_2,
+          clinician_availability_end_monday_2,
+          clinician_availability_timezone_monday_2,
+          clinician_availability_start_monday_3,
+          clinician_availability_end_monday_3,
+          clinician_availability_timezone_monday_3,
+          clinician_availability_start_tuesday_1,
+          clinician_availability_end_tuesday_1,
+          clinician_availability_timezone_tuesday_1,
+          clinician_availability_start_tuesday_2,
+          clinician_availability_end_tuesday_2,
+          clinician_availability_timezone_tuesday_2,
+          clinician_availability_start_tuesday_3,
+          clinician_availability_end_tuesday_3,
+          clinician_availability_timezone_tuesday_3,
+          clinician_availability_start_wednesday_1,
+          clinician_availability_end_wednesday_1,
+          clinician_availability_timezone_wednesday_1,
+          clinician_availability_start_wednesday_2,
+          clinician_availability_end_wednesday_2,
+          clinician_availability_timezone_wednesday_2,
+          clinician_availability_start_wednesday_3,
+          clinician_availability_end_wednesday_3,
+          clinician_availability_timezone_wednesday_3,
+          clinician_availability_start_thursday_1,
+          clinician_availability_end_thursday_1,
+          clinician_availability_timezone_thursday_1,
+          clinician_availability_start_thursday_2,
+          clinician_availability_end_thursday_2,
+          clinician_availability_timezone_thursday_2,
+          clinician_availability_start_thursday_3,
+          clinician_availability_end_thursday_3,
+          clinician_availability_timezone_thursday_3,
+          clinician_availability_start_friday_1,
+          clinician_availability_end_friday_1,
+          clinician_availability_timezone_friday_1,
+          clinician_availability_start_friday_2,
+          clinician_availability_end_friday_2,
+          clinician_availability_timezone_friday_2,
+          clinician_availability_start_friday_3,
+          clinician_availability_end_friday_3,
+          clinician_availability_timezone_friday_3,
+          clinician_availability_start_saturday_1,
+          clinician_availability_end_saturday_1,
+          clinician_availability_timezone_saturday_1,
+          clinician_availability_start_saturday_2,
+          clinician_availability_end_saturday_2,
+          clinician_availability_timezone_saturday_2,
+          clinician_availability_start_saturday_3,
+          clinician_availability_end_saturday_3,
+          clinician_availability_timezone_saturday_3,
+          clinician_availability_start_sunday_1,
+          clinician_availability_end_sunday_1,
+          clinician_availability_timezone_sunday_1,
+          clinician_availability_start_sunday_2,
+          clinician_availability_end_sunday_2,
+          clinician_availability_timezone_sunday_2,
+          clinician_availability_start_sunday_3,
+          clinician_availability_end_sunday_3,
+          clinician_availability_timezone_sunday_3
+        `)
+        .eq('id', clinicianId)
+        .single();
       
       // Execute query
-      const { data, error, count } = await query;
+      const { data, error } = await query;
       
       if (error) {
         throw error;
       }
       
-      // Validate response data
-      const validatedData = validateAvailabilityBlockData(data, true) as AvailabilityBlock[] | null;
+      // Convert clinician data to availability blocks
+      const availabilityBlocks = this.convertClinicianDataToAvailabilityBlocks(data);
       
       return {
-        data: validatedData,
+        data: availabilityBlocks,
         error: null,
         status: 200,
         success: true,
         pagination: {
-          total: count || 0,
+          total: availabilityBlocks.length,
           page,
           pageSize,
-          totalPages: Math.ceil((count || 0) / pageSize)
+          totalPages: 1
         }
       };
     } catch (error) {
-      if (error instanceof SchemaValidationError) {
-        return handleValidationError(error, {
-          data: null,
-          error: {
-            code: 'VALIDATION_ERROR',
-            message: 'Invalid availability block data received from API',
-            details: error.message
-          },
-          status: 422,
-          success: false
-        });
-      }
-      
       return {
         data: null,
-        error: this.handleApiError(error, 'getAvailabilityBlocks'),
+        error: this.handleApiError(error, 'getClinicianAvailability'),
         status: 500,
         success: false
       };
@@ -469,9 +509,58 @@ export class CalendarApiClient {
   }
   
   /**
-   * Fetches availability exceptions for a clinician
-   * @param request The request parameters
-   * @returns A promise that resolves to the availability exceptions response
+   * Converts clinician data to availability blocks
+   * @param clinicianData The clinician data from the database
+   * @returns An array of availability blocks
+   */
+  private static convertClinicianDataToAvailabilityBlocks(clinicianData: any): AvailabilityBlock[] {
+    if (!clinicianData) return [];
+    
+    const availabilityBlocks: AvailabilityBlock[] = [];
+    const daysOfWeek = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    
+    // Process each day and slot
+    daysOfWeek.forEach(day => {
+      for (let slotNum = 1; slotNum <= 3; slotNum++) {
+        const startTimeKey = `clinician_availability_start_${day}_${slotNum}`;
+        const endTimeKey = `clinician_availability_end_${day}_${slotNum}`;
+        const timezoneKey = `clinician_availability_timezone_${day}_${slotNum}`;
+        
+        // Only add slots that have both start and end times
+        if (clinicianData[startTimeKey] && clinicianData[endTimeKey]) {
+          // Generate a deterministic ID for the availability block
+          const id = `clinician-${clinicianData.id}-${day}-${slotNum}`;
+          
+          // Create the availability block
+          availabilityBlocks.push({
+            id,
+            clinician_id: clinicianData.id,
+            start_at: '', // This would be calculated based on the specific date
+            end_at: '',   // This would be calculated based on the specific date
+            is_active: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+        }
+      }
+    });
+    
+    return availabilityBlocks;
+  }
+  
+  /**
+   * @deprecated Use getClinicianAvailability instead
+   * This method is kept for backward compatibility
+   */
+  public static async getAvailabilityBlocks(
+    request: ApiTypes.GetAvailabilityBlocksRequest
+  ): Promise<ApiTypes.GetAvailabilityBlocksResponse> {
+    return this.getClinicianAvailability(request);
+  }
+  
+  /**
+   * @deprecated Use getClinicianAvailability instead
+   * This method is kept for backward compatibility
    */
   public static async getAvailabilityExceptions(
     request: ApiTypes.GetAvailabilityExceptionsRequest

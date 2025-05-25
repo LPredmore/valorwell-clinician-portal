@@ -57,25 +57,23 @@ export interface WeeklyAvailabilityPattern {
 }
 
 /**
- * Availability Exception Interface
- * Represents an exception to the regular availability pattern
+ * Clinician Availability Slot Interface
+ * Represents a single availability slot for a clinician
+ * This directly reflects the clinician table structure
  */
-export interface AvailabilityException {
-  id: string;
-  clinician_id: string;
-  specific_date: string;
-  start_time: string;
-  end_time: string;
-  day_of_week?: DayOfWeek | string;
-  is_active: boolean;
-  is_deleted: boolean;
-  created_at: string;
-  updated_at: string;
+export interface ClinicianAvailabilitySlot {
+  day: string;            // "monday", "tuesday", etc.
+  slot: number;           // 1 | 2 | 3
+  start_time: string | null;
+  end_time: string | null;
+  timezone: string;
 }
 
 /**
- * Represents an availability block for a clinician in the UTC-only data model.
- * This type matches the schema of the availability_blocks table.
+ * AvailabilityBlock Interface
+ * This is a compatibility interface that maps the clinician availability data
+ * to the format expected by existing components.
+ * @deprecated Use ClinicianAvailabilitySlot instead for new code
  */
 export interface AvailabilityBlock {
   id: string;
@@ -86,21 +84,6 @@ export interface AvailabilityBlock {
   recurring_pattern?: WeeklyAvailabilityPattern | null;
   created_at?: string;
   updated_at?: string;
-}
-
-/**
- * Type guard to check if an object is a valid AvailabilityBlock
- */
-export function isAvailabilityBlock(obj: any): obj is AvailabilityBlock {
-  return (
-    obj &&
-    typeof obj === 'object' &&
-    typeof obj.id === 'string' &&
-    typeof obj.clinician_id === 'string' &&
-    typeof obj.start_at === 'string' &&
-    typeof obj.end_at === 'string' &&
-    typeof obj.is_active === 'boolean'
-  );
 }
 
 /**
@@ -150,23 +133,32 @@ export function isWeeklyAvailabilityPattern(obj: any): obj is WeeklyAvailability
 }
 
 /**
- * Type guard to check if an object is a valid AvailabilityException
+ * Type guard to check if an object is a valid ClinicianAvailabilitySlot
  */
-export function isAvailabilityException(obj: any): obj is AvailabilityException {
+export function isClinicianAvailabilitySlot(obj: any): obj is ClinicianAvailabilitySlot {
+  return (
+    obj &&
+    typeof obj === 'object' &&
+    typeof obj.day === 'string' &&
+    typeof obj.slot === 'number' &&
+    (obj.start_time === null || typeof obj.start_time === 'string') &&
+    (obj.end_time === null || typeof obj.end_time === 'string') &&
+    typeof obj.timezone === 'string'
+  );
+}
+
+/**
+ * Type guard to check if an object is a valid AvailabilityBlock
+ * @deprecated Use isClinicianAvailabilitySlot instead for new code
+ */
+export function isAvailabilityBlock(obj: any): obj is AvailabilityBlock {
   return (
     obj &&
     typeof obj === 'object' &&
     typeof obj.id === 'string' &&
     typeof obj.clinician_id === 'string' &&
-    typeof obj.specific_date === 'string' &&
-    typeof obj.start_time === 'string' &&
-    typeof obj.end_time === 'string' &&
-    typeof obj.is_active === 'boolean' &&
-    typeof obj.is_deleted === 'boolean' &&
-    typeof obj.created_at === 'string' &&
-    typeof obj.updated_at === 'string' &&
-    (obj.day_of_week === undefined || 
-     Object.values(DayOfWeek).includes(obj.day_of_week as DayOfWeek) || 
-     typeof obj.day_of_week === 'string')
+    typeof obj.start_at === 'string' &&
+    typeof obj.end_at === 'string' &&
+    typeof obj.is_active === 'boolean'
   );
 }

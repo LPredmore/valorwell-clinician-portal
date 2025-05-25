@@ -5,7 +5,7 @@ import { Appointment } from '@/types/appointment';
 import { AvailabilityBlock } from '@/types/availability';
 import { ClientDetails } from '@/types/client';
 import { CalendarDebugUtils } from '@/utils/calendarDebugUtils';
-import { appointmentsCache, availabilityCache, clientsCache } from '@/utils/cacheUtils';
+import { appointmentsCache, clientsCache } from '@/utils/cacheUtils';
 
 // Component name for logging
 const COMPONENT_NAME = 'useCalendarDataFetching';
@@ -14,8 +14,8 @@ const COMPONENT_NAME = 'useCalendarDataFetching';
 type Client = ClientDetails;
 
 /**
- * Hook for fetching calendar data (appointments, availability, clients)
- * Extracted from useWeekViewData for better separation of concerns
+ * Hook for fetching calendar data (appointments, clients, and clinician availability)
+ * Refactored to use clinician table columns directly for availability data
  */
 export const useCalendarDataFetching = (
   clinicianId: string | null,
@@ -28,11 +28,10 @@ export const useCalendarDataFetching = (
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [availability, setAvailability] = useState<AvailabilityBlock[]>([]);
   const [clients, setClients] = useState<Map<string, Client>>(new Map());
-  const [exceptions, setExceptions] = useState<any[]>([]);
   const [clinicianData, setClinicianData] = useState<any>(null);
   const [error, setError] = useState<Error | null>(null);
 
-  // Fetch clinician data for recurring availability pattern
+  // Fetch clinician data for availability
   const fetchClinicianData = useCallback(async (clinicianId: string) => {
     try {
       // Explicitly list all required columns instead of using wildcard
@@ -119,7 +118,7 @@ export const useCalendarDataFetching = (
         return null;
       }
       
-      CalendarDebugUtils.log(COMPONENT_NAME, 'Fetched clinician data for recurring availability', {
+      CalendarDebugUtils.log(COMPONENT_NAME, 'Fetched clinician data for availability', {
         clinicianId,
         hasData: !!data,
       });
@@ -157,7 +156,6 @@ export const useCalendarDataFetching = (
         setAppointments([]);
         setAvailability([]);
         setClients(new Map());
-        setExceptions([]);
         setClinicianData(null);
         setLoading(false);
         return;
@@ -177,25 +175,21 @@ export const useCalendarDataFetching = (
         
         // Create cache keys for this data request
         const appointmentsCacheKey = `clinician:${clinicianId}:range:${utcStart}:${utcEnd}:refresh:${refreshTrigger}`;
-        const availabilityCacheKey = `clinician:${clinicianId}:range:${utcStart}:${utcEnd}`;
         const clientsCacheKey = `clinician:${clinicianId}:clients`;
         
         // Check if we have cached data
         const cachedAppointments = externalAppointments.length === 0 ?
           appointmentsCache.get(appointmentsCacheKey) : null;
-        const cachedAvailability = availabilityCache.get(availabilityCacheKey);
         const cachedClients = clientsCache.get(clientsCacheKey);
         
-        // Fetch clinician data for recurring pattern
+        // Fetch clinician data for availability
         const fetchedClinicianData = await fetchClinicianData(clinicianId);
         setClinicianData(fetchedClinicianData);
         
         // Prepare fetch promises based on cache status
         const fetchPromises = [];
         let appointmentData;
-        let availabilityData;
         let clientData;
-        let exceptionData;
         
         // 1. Appointments fetch (if needed)
         if (externalAppointments.length === 0 && !cachedAppointments) {
@@ -216,26 +210,7 @@ export const useCalendarDataFetching = (
           fetchPromises.push(Promise.resolve({ data: [], error: null }));
         }
         
-        // 2. Availability blocks fetch (if needed)
-        if (!cachedAvailability) {
-          fetchPromises.push(
-            supabase
-              .from('availability_blocks')
-              .select('*')
-              .eq('clinician_id', clinicianId)
-              .gte('start_at', utcStart)
-              .lt('end_at', utcEnd)
-              .order('start_at', { ascending: true })
-              .then(result => {
-                availabilityData = result;
-                return result;
-              })
-          );
-        } else {
-          fetchPromises.push(Promise.resolve({ data: [], error: null }));
-        }
-        
-        // 3. Clients fetch (if needed)
+        // 2. Clients fetch (if needed)
         if (!cachedClients) {
           fetchPromises.push(
             supabase
@@ -250,20 +225,6 @@ export const useCalendarDataFetching = (
         } else {
           fetchPromises.push(Promise.resolve({ data: [], error: null }));
         }
-        
-        // 4. Exceptions fetch (always fetch fresh)
-        fetchPromises.push(
-          supabase
-            .from('availability_exceptions')
-            .select('*')
-            .eq('clinician_id', clinicianId)
-            .gte('specific_date', dateRange.start.toFormat('yyyy-MM-dd'))
-            .lte('specific_date', dateRange.end.toFormat('yyyy-MM-dd'))
-            .then(result => {
-              exceptionData = result;
-              return result;
-            })
-        );
         
         // Execute all fetch promises in parallel
         const results = await Promise.all(fetchPromises);
@@ -282,19 +243,6 @@ export const useCalendarDataFetching = (
         } else {
           // Default to empty array
           setAppointments([]);
-        }
-        
-        // Process availability blocks
-        if (cachedAvailability) {
-          // Use cached availability
-          setAvailability(cachedAvailability);
-        } else if (availabilityData?.data) {
-          // Use fetched availability
-          availabilityCache.set(availabilityCacheKey, availabilityData.data);
-          setAvailability(availabilityData.data);
-        } else {
-          // Default to empty array
-          setAvailability([]);
         }
         
         // Process clients
@@ -317,20 +265,15 @@ export const useCalendarDataFetching = (
         
         setClients(clientMap);
         
-        // Process exceptions
-        if (exceptionData?.data) {
-          setExceptions(exceptionData.data);
-        } else {
-          setExceptions([]);
-        }
+        // Set availability to empty array - will be processed from clinicianData in useAvailabilityProcessor
+        setAvailability([]);
         
         // Log fetch performance
         const fetchDuration = performance.now() - fetchStartTime;
         CalendarDebugUtils.logPerformance(COMPONENT_NAME, 'data-fetch-complete', fetchDuration, {
           appointmentsCount: appointments.length,
-          availabilityCount: availability.length,
           clientsCount: clientMap.size,
-          exceptionsCount: exceptionData?.data?.length || 0
+          hasClinicianData: !!fetchedClinicianData
         });
       } catch (err) {
         const error = err instanceof Error ? err : new Error(String(err));
@@ -349,7 +292,7 @@ export const useCalendarDataFetching = (
     appointments,
     availability,
     clients,
-    exceptions,
+    exceptions: [], // Return empty array for backward compatibility
     clinicianData,
     error
   };
