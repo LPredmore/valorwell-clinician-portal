@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { format } from 'date-fns';
 import { useWeekViewDataSimplified } from './week-view/useWeekViewDataSimplified';
@@ -17,6 +16,7 @@ interface WeekViewProps {
   days: Date[];
   selectedClinicianId: string | null;
   userTimeZone: string;
+  clinicianTimeZone: string;
   showAvailability?: boolean;
   refreshTrigger?: number;
   appointments?: any[];
@@ -38,6 +38,7 @@ const WeekView: React.FC<WeekViewProps> = ({
   days,
   selectedClinicianId,
   userTimeZone,
+  clinicianTimeZone,
   showAvailability = true,
   refreshTrigger = 0,
   appointments = [],
@@ -57,18 +58,19 @@ const WeekView: React.FC<WeekViewProps> = ({
     daysCount: days.length,
     appointmentsCount: appointments?.length || 0,
     clinicianId: selectedClinicianId,
-    timeZone: userTimeZone,
+    userTimeZone,
+    clinicianTimeZone,
     isLoading,
     hasError: !!error
   });
 
-  // CRITICAL FIX: Generate timezone-aware TIME_SLOTS
+  // CRITICAL FIX: Generate timezone-aware TIME_SLOTS using clinician's timezone
   const TIME_SLOTS = useMemo(() => {
-    console.log('[WeekView] Generating timezone-aware TIME_SLOTS for userTimeZone:', userTimeZone);
+    console.log('[WeekView] Generating timezone-aware TIME_SLOTS for clinician timezone:', clinicianTimeZone);
     
     const slots: DateTime[] = [];
-    // Create a base date in the user's timezone (today at midnight)
-    const baseDate = DateTime.now().setZone(userTimeZone).startOf('day');
+    // Create a base date in the clinician's timezone (today at midnight)
+    const baseDate = DateTime.now().setZone(clinicianTimeZone).startOf('day');
     
     for (let hour = START_HOUR; hour < END_HOUR; hour++) {
       for (let minute = 0; minute < 60; minute += INTERVAL_MINUTES) {
@@ -77,16 +79,16 @@ const WeekView: React.FC<WeekViewProps> = ({
       }
     }
     
-    console.log('[WeekView] Generated timezone-aware TIME_SLOTS:', {
+    console.log('[WeekView] Generated timezone-aware TIME_SLOTS for clinician:', {
       count: slots.length,
-      timezone: userTimeZone,
+      timezone: clinicianTimeZone,
       firstSlot: slots[0]?.toFormat('HH:mm'),
       lastSlot: slots[slots.length - 1]?.toFormat('HH:mm'),
       sampleSlot: slots[10]?.toISO() // 10:00 AM slot for reference
     });
     
     return slots;
-  }, [userTimeZone]);
+  }, [clinicianTimeZone]);
 
   const {
     loading: hookLoading,
@@ -103,7 +105,8 @@ const WeekView: React.FC<WeekViewProps> = ({
     refreshTrigger,
     appointments,
     (id: string) => `Client ${id}`,
-    userTimeZone
+    userTimeZone,
+    clinicianTimeZone
   );
 
   // Handle click on an availability block
@@ -220,9 +223,9 @@ const WeekView: React.FC<WeekViewProps> = ({
           {weekDays.map(day => (
             <div key={day.toISO() || ''} className="flex-1 border-r last:border-r-0">
               {TIME_SLOTS.map((timeSlot, i) => {
-                // CRITICAL FIX: Use consistent timezone-aware DateTime objects
-                const dayDt = day; // weekDays are already timezone-aware DateTime objects
-                const timeSlotDt = timeSlot; // TIME_SLOTS are now timezone-aware DateTime objects
+                // CRITICAL FIX: Use consistent timezone-aware DateTime objects in clinician's timezone
+                const dayDt = day; // weekDays are already timezone-aware DateTime objects in clinician's timezone
+                const timeSlotDt = timeSlot; // TIME_SLOTS are now timezone-aware DateTime objects in clinician's timezone
                 
                 // Create the specific time slot for this day by combining day and time
                 const dayTimeSlot = dayDt.set({
@@ -232,11 +235,11 @@ const WeekView: React.FC<WeekViewProps> = ({
                   millisecond: 0
                 });
                 
-                console.log(`[WeekView] Processing slot ${dayDt.toFormat('yyyy-MM-dd')} ${timeSlotDt.toFormat('HH:mm')}:`, {
+                console.log(`[WeekView] Processing slot ${dayDt.toFormat('yyyy-MM-dd')} ${timeSlotDt.toFormat('HH:mm')} in clinician timezone:`, {
                   dayDt: dayDt.toISO(),
                   timeSlotDt: timeSlotDt.toISO(),
                   combinedDayTimeSlot: dayTimeSlot.toISO(),
-                  userTimeZone
+                  clinicianTimeZone
                 });
                 
                 const isAvailable = showAvailability && isTimeSlotAvailable(
@@ -254,14 +257,14 @@ const WeekView: React.FC<WeekViewProps> = ({
                   timeSlotDt.toJSDate()
                 );
 
-                // Enhanced debug logging for appointment positioning
+                // Enhanced debug logging for appointment positioning in clinician timezone
                 if (appointment) {
-                  console.log(`[WeekView] Appointment found at ${dayDt.toFormat('yyyy-MM-dd')} ${timeSlotDt.toFormat('HH:mm')}:`, {
+                  console.log(`[WeekView] Appointment found at ${dayDt.toFormat('yyyy-MM-dd')} ${timeSlotDt.toFormat('HH:mm')} in clinician timezone:`, {
                     appointmentId: appointment.id,
-                    appointmentTimezone: appointment.appointment_timezone,
+                    originalTimezone: appointment.appointment_timezone,
                     originalStart: appointment.start_at,
                     convertedStart: appointment.start.toFormat('yyyy-MM-dd HH:mm'),
-                    userTimeZone,
+                    clinicianTimeZone,
                     slotTime: dayTimeSlot.toFormat('yyyy-MM-dd HH:mm')
                   });
                 }
@@ -304,13 +307,15 @@ const WeekView: React.FC<WeekViewProps> = ({
             <p>Time Blocks: {timeBlocks.length}</p>
             <p>Appointments: {appointmentBlocks.length}</p>
             <p>User Timezone: {userTimeZone}</p>
+            <p>Clinician Timezone: {clinicianTimeZone}</p>
             <p>TIME_SLOTS Generated: {TIME_SLOTS.length}</p>
             {appointmentBlocks.length > 0 && (
               <div className="mt-2">
-                <p className="font-medium">Appointment Timezones:</p>
+                <p className="font-medium">Appointment Display Info:</p>
                 {appointmentBlocks.slice(0, 3).map(apt => (
                   <p key={apt.id} className="text-sm">
-                    {apt.clientName}: {apt.appointment_timezone || 'No timezone saved'}
+                    {apt.clientName}: Original timezone: {apt.appointment_timezone || 'None'}, 
+                    Positioned in: {clinicianTimeZone}
                   </p>
                 ))}
               </div>

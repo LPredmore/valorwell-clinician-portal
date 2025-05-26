@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { DateTime } from 'luxon';
@@ -16,7 +15,8 @@ export const useWeekViewDataSimplified = (
   refreshTrigger: number,
   appointments: Appointment[],
   getClientName: (clientId: string) => string,
-  userTimeZone: string
+  userTimeZone: string,
+  clinicianTimeZone: string
 ) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -24,14 +24,14 @@ export const useWeekViewDataSimplified = (
   const [timeBlocks, setTimeBlocks] = useState<TimeBlock[]>([]);
   const [appointmentBlocks, setAppointmentBlocks] = useState<AppointmentBlock[]>([]);
 
-  // Generate week days from the provided days array
+  // Generate week days using clinician's timezone for calendar grid consistency
   const weekDays = useMemo(() => {
     if (!days || days.length === 0) {
       return [];
     }
     
-    return days.map(day => TimeZoneService.fromJSDate(day, userTimeZone));
-  }, [days, userTimeZone]);
+    return days.map(day => TimeZoneService.fromJSDate(day, clinicianTimeZone));
+  }, [days, clinicianTimeZone]);
 
   // Fetch availability data
   useEffect(() => {
@@ -96,10 +96,11 @@ export const useWeekViewDataSimplified = (
     fetchAvailability();
   }, [selectedClinicianId, days, userTimeZone, refreshTrigger]);
 
-  // Process appointments into appointment blocks
+  // Process appointments into appointment blocks using clinician's current timezone
   useEffect(() => {
-    console.log('[useWeekViewDataSimplified] Processing appointments for WeekView positioning:', {
+    console.log('[useWeekViewDataSimplified] Processing appointments for WeekView positioning using clinician timezone:', {
       appointmentsCount: appointments.length,
+      clinicianTimeZone,
       userTimeZone,
       sampleAppointment: appointments[0] ? {
         id: appointments[0].id,
@@ -121,30 +122,17 @@ export const useWeekViewDataSimplified = (
       }
 
       try {
-        // CRITICAL: Use appointment's saved timezone for positioning, NOT user timezone
-        const getAppointmentTimezone = () => {
-          if (appointment.appointment_timezone) {
-            return appointment.appointment_timezone;
-          }
-          
-          // Fallback to user timezone with warning
-          console.warn(`[useWeekViewDataSimplified] Missing appointment_timezone for appointment ${appointment.id}, falling back to user timezone`);
-          return userTimeZone;
-        };
-
-        const appointmentTimezone = getAppointmentTimezone();
-
-        console.log('[useWeekViewDataSimplified] Converting appointment times for WeekView positioning:', {
+        console.log('[useWeekViewDataSimplified] Converting appointment times for WeekView positioning using clinician timezone:', {
           appointmentId: appointment.id,
           originalStart: appointment.start_at,
-          appointmentTimezone,
-          userTimeZone,
-          usingFallback: !appointment.appointment_timezone
+          originalTimezone: appointment.appointment_timezone,
+          clinicianTimeZone,
+          userTimeZone
         });
 
-        // Convert UTC times to appointment's saved timezone for correct positioning
-        const start = DateTime.fromISO(appointment.start_at, { zone: 'UTC' }).setZone(appointmentTimezone);
-        const end = DateTime.fromISO(appointment.end_at, { zone: 'UTC' }).setZone(appointmentTimezone);
+        // CRITICAL FIX: Use clinician's current timezone for calendar positioning
+        const start = DateTime.fromISO(appointment.start_at, { zone: 'UTC' }).setZone(clinicianTimeZone);
+        const end = DateTime.fromISO(appointment.end_at, { zone: 'UTC' }).setZone(clinicianTimeZone);
         const day = start.startOf('day');
 
         // Get client name
@@ -179,15 +167,16 @@ export const useWeekViewDataSimplified = (
 
         processedAppointmentBlocks.push(appointmentBlock);
 
-        console.log('[useWeekViewDataSimplified] Created appointment block for WeekView:', {
+        console.log('[useWeekViewDataSimplified] Created appointment block for WeekView using clinician timezone:', {
           appointmentId: appointment.id,
           clientName,
           originalStart: appointment.start_at,
+          originalTimezone: appointment.appointment_timezone,
           convertedStart: start.toFormat('yyyy-MM-dd HH:mm'),
           convertedEnd: end.toFormat('yyyy-MM-dd HH:mm'),
           day: day.toFormat('yyyy-MM-dd'),
-          appointmentTimezone,
-          positionedInTimezone: appointmentTimezone
+          clinicianTimeZone,
+          positionedInTimezone: clinicianTimeZone
         });
       } catch (error) {
         console.error('[useWeekViewDataSimplified] Error creating appointment block:', {
@@ -199,7 +188,7 @@ export const useWeekViewDataSimplified = (
 
     setAppointmentBlocks(processedAppointmentBlocks);
     setLoading(false);
-  }, [appointments, userTimeZone, getClientName]);
+  }, [appointments, clinicianTimeZone, getClientName]);
 
   // Utility function to check if a time slot is available
   const isTimeSlotAvailable = (day: Date, timeSlot: Date): boolean => {
@@ -241,48 +230,40 @@ export const useWeekViewDataSimplified = (
     });
   };
 
-  // CRITICAL: Updated appointment slot matching using appointment's timezone
+  // CRITICAL FIX: Updated appointment slot matching using clinician's current timezone
   const getAppointmentForTimeSlot = (day: Date, timeSlot: Date): AppointmentBlock | undefined => {
-    const dayDt = DateTime.fromJSDate(day, { zone: userTimeZone });
-    const timeSlotDt = DateTime.fromJSDate(timeSlot, { zone: userTimeZone });
+    const dayDt = DateTime.fromJSDate(day, { zone: clinicianTimeZone });
+    const timeSlotDt = DateTime.fromJSDate(timeSlot, { zone: clinicianTimeZone });
 
     const result = appointmentBlocks.find(appt => {
-      // Check if it's the same day in the appointment's timezone
+      // Check if it's the same day in the clinician's timezone
       const isSameDay = appt.day?.hasSame(dayDt, 'day') || false;
       if (!isSameDay) return false;
 
-      // CRITICAL: Create slot time in appointment's timezone for accurate comparison
-      const appointmentTimezone = appt.appointment_timezone || userTimeZone;
-      
-      // Convert the grid slot time to the appointment's timezone
-      const slotTimeInUserTz = dayDt.set({
+      // Create slot time in clinician's timezone for accurate comparison
+      const slotTimeInClinicianTz = dayDt.set({
         hour: timeSlotDt.hour,
         minute: timeSlotDt.minute,
         second: 0,
         millisecond: 0
       });
       
-      // Since appointment positioning uses appointment's timezone, 
-      // we need to compare in appointment's timezone
-      const slotTimeInApptTz = slotTimeInUserTz.setZone(appointmentTimezone);
-      const apptStartInApptTz = appt.start;
-      const apptEndInApptTz = appt.end;
+      // Since appointments are now positioned in clinician's timezone, compare directly
+      const apptStartInClinicianTz = appt.start;
+      const apptEndInClinicianTz = appt.end;
 
-      const isInRange = slotTimeInApptTz >= apptStartInApptTz && slotTimeInApptTz < apptEndInApptTz;
+      const isInRange = slotTimeInClinicianTz >= apptStartInClinicianTz && slotTimeInClinicianTz < apptEndInClinicianTz;
       
-      // Enhanced logging for debugging
-      console.log(`[getAppointmentForTimeSlot] Checking appointment ${appt.id}:`, {
+      console.log(`[getAppointmentForTimeSlot] Checking appointment ${appt.id} in clinician timezone:`, {
         appointmentId: appt.id,
         clientName: appt.clientName,
         dayCheck: isSameDay,
         slotDay: dayDt.toFormat('yyyy-MM-dd'),
         apptDay: appt.day?.toFormat('yyyy-MM-dd'),
-        slotTimeUserTz: slotTimeInUserTz.toFormat('HH:mm'),
-        slotTimeApptTz: slotTimeInApptTz.toFormat('HH:mm'),
-        apptStart: apptStartInApptTz.toFormat('HH:mm'),
-        apptEnd: apptEndInApptTz.toFormat('HH:mm'),
-        appointmentTimezone,
-        userTimeZone,
+        slotTime: slotTimeInClinicianTz.toFormat('HH:mm'),
+        apptStart: apptStartInClinicianTz.toFormat('HH:mm'),
+        apptEnd: apptEndInClinicianTz.toFormat('HH:mm'),
+        clinicianTimeZone,
         isInRange
       });
 

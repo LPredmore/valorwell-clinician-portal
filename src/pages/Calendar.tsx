@@ -9,6 +9,7 @@ import AppointmentDialog from "../components/calendar/AppointmentDialog";
 import { useUser } from "@/context/UserContext";
 import { useAppointments } from "@/hooks/useAppointments";
 import CalendarErrorBoundary from "../components/calendar/CalendarErrorBoundary";
+import { getClinicianTimeZone } from "../hooks/useClinicianData";
 
 const CalendarPage = () => {
   console.log('[CalendarPage] Component initializing...');
@@ -32,11 +33,43 @@ const CalendarPage = () => {
     userTimeZone,
     isLoadingTimeZone,
   } = useCalendarState(userId);
+
+  // Fetch clinician's current timezone for WeekView display
+  const [clinicianTimeZone, setClinicianTimeZone] = React.useState<string | null>(null);
+  const [isLoadingClinicianTimeZone, setIsLoadingClinicianTimeZone] = React.useState(true);
+
+  useEffect(() => {
+    const fetchClinicianTimeZone = async () => {
+      if (!selectedClinicianId) {
+        setClinicianTimeZone(null);
+        setIsLoadingClinicianTimeZone(false);
+        return;
+      }
+
+      try {
+        setIsLoadingClinicianTimeZone(true);
+        const timezone = await getClinicianTimeZone(selectedClinicianId);
+        // Handle array timezone values by taking the first element
+        const resolvedTimezone = Array.isArray(timezone) ? timezone[0] : timezone;
+        setClinicianTimeZone(resolvedTimezone);
+        console.log('[CalendarPage] Fetched clinician timezone:', resolvedTimezone);
+      } catch (error) {
+        console.error('[CalendarPage] Error fetching clinician timezone:', error);
+        setClinicianTimeZone(userTimeZone); // Fallback to user timezone
+      } finally {
+        setIsLoadingClinicianTimeZone(false);
+      }
+    };
+
+    fetchClinicianTimeZone();
+  }, [selectedClinicianId, userTimeZone]);
   
   console.log('[CalendarPage] Calendar state:', {
     selectedClinicianId,
     userTimeZone,
+    clinicianTimeZone,
     isLoadingTimeZone,
+    isLoadingClinicianTimeZone,
     currentDate: currentDate?.toISOString(),
     appointmentRefreshTrigger
   });
@@ -65,6 +98,7 @@ const CalendarPage = () => {
   useEffect(() => {
     console.log("[CalendarPage] Calendar initialized:", {
       userTimeZone,
+      clinicianTimeZone,
       currentDate: currentDate?.toISOString(),
       selectedClinicianId,
       appointmentsCount: appointments?.length || 0,
@@ -81,7 +115,7 @@ const CalendarPage = () => {
         }))
       );
     }
-  }, [appointments, userTimeZone, currentDate, selectedClinicianId, appointmentRefreshTrigger]);
+  }, [appointments, userTimeZone, clinicianTimeZone, currentDate, selectedClinicianId, appointmentRefreshTrigger]);
 
   const navigatePrevious = () => {
     setCurrentDate(subWeeks(currentDate, 1));
@@ -106,7 +140,7 @@ const CalendarPage = () => {
   };
 
   // Show loading state while timezone is loading
-  if (isLoadingTimeZone) {
+  if (isLoadingTimeZone || isLoadingClinicianTimeZone) {
     return (
       <Layout>
         <div className="bg-white rounded-lg shadow-sm p-6 animate-fade-in">
@@ -153,6 +187,7 @@ const CalendarPage = () => {
               clinicianId={selectedClinicianId}
               currentDate={currentDate}
               userTimeZone={userTimeZone}
+              clinicianTimeZone={clinicianTimeZone || userTimeZone}
               refreshTrigger={appointmentRefreshTrigger}
               appointments={appointments}
               isLoading={isLoadingAppointments}
