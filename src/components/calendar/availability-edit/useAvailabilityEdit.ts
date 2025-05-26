@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
@@ -137,6 +138,13 @@ export const useAvailabilityEdit = (
    * Delete availability by setting start and end times to null
    */
   const handleDeleteClick = async () => {
+    setIsDeleteDialogOpen(true);
+  };
+
+  /**
+   * Confirm delete availability
+   */
+  const confirmDelete = async () => {
     if (!clinicianId || !availabilityBlock) {
       toast({
         title: "Missing Information",
@@ -217,6 +225,7 @@ export const useAvailabilityEdit = (
     setEndTime,
     setIsDeleteDialogOpen,
     handleSaveClick,
-    handleDeleteClick
+    handleDeleteClick,
+    confirmDelete
   };
 };

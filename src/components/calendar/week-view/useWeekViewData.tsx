@@ -1,210 +1,177 @@
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { DateTime } from 'luxon';
-import { Appointment } from '@/types/appointment';
-import { ClinicianColumnData } from '@/types/availability';
-import { useTimeZone } from '@/context/TimeZoneContext';
-import { CalendarDebugUtils } from '@/utils/calendarDebugUtils';
-import { TimeBlock, AppointmentBlock } from './types';
+import { format } from 'date-fns';
 import { useCalendarDataFetching } from '@/hooks/calendar/useCalendarDataFetching';
-import { useAvailabilityProcessor } from '@/hooks/calendar/useAvailabilityProcessor';
-import { useAppointmentProcessor } from '@/hooks/calendar/useAppointmentProcessor';
-import { useTimeSlotAvailability } from '@/hooks/calendar/useTimeSlotAvailability';
+import { TimeZoneService } from '@/utils/timeZoneService';
+import { Appointment } from '@/types/appointment';
+import { PartialClientDetails } from '@/types/client';
+import { TimeBlock, AppointmentBlock } from './types';
 
-// Component name for logging
-const COMPONENT_NAME = 'useWeekViewData';
+interface WeekViewData {
+  loading: boolean;
+  error: Error | null;
+  weekDays: Date[];
+  timeSlots: Date[];
+  availabilityByDay: Map<string, TimeBlock[]>;
+  appointmentsByDay: Map<string, AppointmentBlock[]>;
+}
 
-/**
- * Main hook for week view data processing
- * Refactored to use specialized hooks for better separation of concerns
- */
 export const useWeekViewData = (
-  days: Date[],
+  currentDate: Date,
   clinicianId: string | null,
-  refreshTrigger = 0,
+  refreshTrigger: number = 0,
   externalAppointments: Appointment[] = [],
-  getClientName = (id: string) => `Client ${id}`,
-  userTimeZone: string
-) => {
-  // Performance tracking
-  const hookStartTime = performance.now();
-  
-  // Use TimeZoneContext for timezone operations
-  const { fromJSDate } = useTimeZone();
-  
-  // State for error handling
-  const [hookError, setHookError] = useState<Error | null>(null);
-  
-  // Log hook initialization
-  console.log(`[${COMPONENT_NAME}] Hook initialized:`, {
-    daysCount: days?.length || 0,
-    clinicianId,
-    refreshTrigger,
-    externalAppointmentsCount: externalAppointments?.length || 0,
-    userTimeZone
-  });
-
-  // Convert JS Date array to DateTime array in user timezone - memoized
-  const weekDays = useMemo(() => {
-    const result = days.map(day => fromJSDate(day));
-    console.log(`[${COMPONENT_NAME}] Week days processed:`, {
-      originalDays: days.map(d => d.toISOString()),
-      processedDays: result.map(d => d.toISO())
-    });
-    return result;
-  }, [days, fromJSDate]);
-
-  // Calculate date range for data fetching
-  const dateRange = useMemo(() => {
-    // Use the first day to determine the week
-    const firstDay = weekDays[0] || DateTime.now().setZone(userTimeZone);
-    
-    // Get expanded date range for better data capture - add padding
-    // Start a week before the displayed week, end a week after
-    const padStartDay = firstDay.minus({ days: 7 });
-    const padEndDay = firstDay.plus({ days: 21 }); // current week (7) + padding (14)
-    
-    const range = {
-      start: padStartDay,
-      end: padEndDay
+  userTimeZone: string = 'America/Chicago'
+): WeekViewData => {
+  // Calculate week boundaries
+  const { startOfWeek, endOfWeek } = useMemo(() => {
+    const start = DateTime.fromJSDate(currentDate).setZone(userTimeZone).startOf('week');
+    const end = start.endOf('week');
+    return {
+      startOfWeek: start,
+      endOfWeek: end
     };
-    
-    console.log(`[${COMPONENT_NAME}] Date range calculated:`, {
-      firstDay: firstDay.toISO(),
-      padStartDay: padStartDay.toISO(),
-      padEndDay: padEndDay.toISO()
-    });
-    
-    return range;
-  }, [weekDays, userTimeZone]);
+  }, [currentDate, userTimeZone]);
 
-  // Fetch calendar data using specialized hook
+  // Generate week days
+  const weekDays = useMemo(() => {
+    return Array.from({ length: 7 }, (_, i) => 
+      startOfWeek.plus({ days: i }).toJSDate()
+    );
+  }, [startOfWeek]);
+
+  // Generate time slots (15-minute intervals from 6 AM to 10 PM)
+  const timeSlots = useMemo(() => {
+    const slots: Date[] = [];
+    const startHour = 6;
+    const endHour = 22;
+    
+    for (let hour = startHour; hour <= endHour; hour++) {
+      for (let minute = 0; minute < 60; minute += 15) {
+        const slot = startOfWeek.set({ hour, minute }).toJSDate();
+        slots.push(slot);
+      }
+    }
+    
+    return slots;
+  }, [startOfWeek]);
+
+  // Fetch calendar data
   const {
     loading,
     appointments,
     clients,
-    clinicianData, // ClinicianColumnData
-    error: fetchError
+    clinicianData,
+    error
   } = useCalendarDataFetching(
     clinicianId,
-    dateRange,
+    { start: startOfWeek, end: endOfWeek },
     refreshTrigger,
     externalAppointments
   );
 
-  // Log data fetching results
-  useEffect(() => {
-    console.log(`[${COMPONENT_NAME}] Data fetching results:`, {
-      loading,
-      appointmentsCount: appointments?.length || 0,
-      clientsCount: clients?.size || 0,
-      hasClinicianData: !!clinicianData,
-      fetchError: fetchError?.message
-    });
-  }, [loading, appointments, clients, clinicianData, fetchError]);
-
-  // Process availability data using specialized hook
-  const {
-    timeBlocks,
-    weeklyPattern,
-    columnBasedAvailability
-  } = useAvailabilityProcessor(
-    clinicianData,
-    weekDays,
-    userTimeZone
-  );
-
-  // Log availability processing results
-  useEffect(() => {
-    console.log(`[${COMPONENT_NAME}] Availability processing results:`, {
-      timeBlocksCount: timeBlocks?.length || 0,
-      hasWeeklyPattern: !!weeklyPattern,
-      hasColumnBasedAvailability: !!columnBasedAvailability,
-      sampleTimeBlocks: timeBlocks?.slice(0, 3).map(tb => ({
-        start: tb.start.toISO(),
-        end: tb.end.toISO(),
-        day: tb.day?.toISO()
-      }))
-    });
-  }, [timeBlocks, weeklyPattern, columnBasedAvailability]);
-
-  // Process appointment data using specialized hook
-  const {
-    appointmentBlocks,
-    dayAppointmentsMap,
-    getAppointmentForTimeSlot
-  } = useAppointmentProcessor(
-    appointments,
-    clients,
-    weekDays,
-    userTimeZone,
-    getClientName
-  );
-
-  // Log appointment processing results
-  useEffect(() => {
-    console.log(`[${COMPONENT_NAME}] Appointment processing results:`, {
-      appointmentBlocksCount: appointmentBlocks?.length || 0,
-      dayAppointmentsMapSize: dayAppointmentsMap?.size || 0,
-      sampleAppointmentBlocks: appointmentBlocks?.slice(0, 3).map(ab => ({
-        id: ab.id,
-        clientName: ab.clientName,
-        start: ab.start.toISO(),
-        end: ab.end.toISO()
-      }))
-    });
-  }, [appointmentBlocks, dayAppointmentsMap, getAppointmentForTimeSlot]);
-
-  // Check time slot availability using specialized hook
-  const {
-    isTimeSlotAvailable,
-    getBlockForTimeSlot
-  } = useTimeSlotAvailability(
-    timeBlocks,
-    userTimeZone
-  );
-
-  // Handle errors
-  useEffect(() => {
-    if (fetchError) {
-      console.error(`[${COMPONENT_NAME}] Fetch error detected:`, fetchError);
-      setHookError(fetchError);
-    } else {
-      setHookError(null);
-    }
-  }, [fetchError]);
-
-  // Log hook performance
-  useEffect(() => {
-    const hookDuration = performance.now() - hookStartTime;
-    console.log(`[${COMPONENT_NAME}] Hook execution completed:`, {
-      duration: `${hookDuration.toFixed(2)}ms`,
-      success: !hookError,
-      weekDaysCount: weekDays?.length || 0,
-      appointmentBlocksCount: appointmentBlocks?.length || 0,
-      timeBlocksCount: timeBlocks?.length || 0,
-      finalState: {
-        loading,
-        hasError: !!hookError,
-        hasTimeBlocks: timeBlocks?.length > 0,
-        hasAppointmentBlocks: appointmentBlocks?.length > 0
+  // Process availability data
+  const availabilityByDay = useMemo(() => {
+    const availabilityMap = new Map<string, TimeBlock[]>();
+    
+    if (!clinicianData) return availabilityMap;
+    
+    const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    
+    weekDays.forEach((day, dayIndex) => {
+      const dayKey = format(day, 'yyyy-MM-dd');
+      const dayName = days[dayIndex];
+      const blocks: TimeBlock[] = [];
+      
+      for (let slot = 1; slot <= 3; slot++) {
+        const startKey = `clinician_availability_start_${dayName}_${slot}`;
+        const endKey = `clinician_availability_end_${dayName}_${slot}`;
+        
+        const startTime = clinicianData[startKey];
+        const endTime = clinicianData[endKey];
+        
+        if (startTime && endTime) {
+          const dayStart = DateTime.fromJSDate(day).setZone(userTimeZone);
+          const [startHour, startMinute] = startTime.split(':').map(Number);
+          const [endHour, endMinute] = endTime.split(':').map(Number);
+          
+          const start = dayStart.set({ hour: startHour, minute: startMinute });
+          const end = dayStart.set({ hour: endHour, minute: endMinute });
+          
+          blocks.push({
+            start,
+            end,
+            day: dayStart,
+            availabilityIds: [`${clinicianData.id}-${dayName}-${slot}`],
+            isException: false,
+            isStandalone: false
+          });
+        }
+      }
+      
+      if (blocks.length > 0) {
+        availabilityMap.set(dayKey, blocks);
       }
     });
-  }, [hookError, weekDays, appointmentBlocks, timeBlocks, loading]);
+    
+    return availabilityMap;
+  }, [clinicianData, weekDays, userTimeZone]);
+
+  // Process appointment data
+  const appointmentsByDay = useMemo(() => {
+    const appointmentMap = new Map<string, AppointmentBlock[]>();
+    
+    // Use external appointments if provided, otherwise use fetched appointments
+    const appointmentsToProcess = externalAppointments.length > 0 ? externalAppointments : appointments;
+    
+    appointmentsToProcess.forEach(appointment => {
+      if (!appointment.start_at || !appointment.end_at) return;
+      
+      try {
+        const start = TimeZoneService.fromUTC(appointment.start_at, userTimeZone);
+        const end = TimeZoneService.fromUTC(appointment.end_at, userTimeZone);
+        const day = start.startOf('day');
+        const dayKey = day.toFormat('yyyy-MM-dd');
+        
+        // Get client name from clients map or appointment data
+        let clientName = appointment.clientName || 'Unknown Client';
+        if (!clientName && appointment.client_id && clients.has(appointment.client_id)) {
+          const client = clients.get(appointment.client_id);
+          if (client) {
+            clientName = client.client_preferred_name || 
+                        `${client.client_first_name} ${client.client_last_name}`;
+          }
+        }
+        
+        const appointmentBlock: AppointmentBlock = {
+          id: appointment.id,
+          start,
+          end,
+          day,
+          clientId: appointment.client_id,
+          clientName,
+          type: appointment.type
+        };
+        
+        if (!appointmentMap.has(dayKey)) {
+          appointmentMap.set(dayKey, []);
+        }
+        appointmentMap.get(dayKey)!.push(appointmentBlock);
+      } catch (error) {
+        console.error('Error processing appointment:', error);
+      }
+    });
+    
+    return appointmentMap;
+  }, [appointments, externalAppointments, clients, userTimeZone]);
 
   return {
     loading,
+    error,
     weekDays,
-    appointmentBlocks,
-    timeBlocks,
-    isTimeSlotAvailable,
-    getBlockForTimeSlot,
-    getAppointmentForTimeSlot,
-    error: hookError,
-    weeklyPattern,
-    clinicianData: clinicianData as ClinicianColumnData | null,
-    columnBasedAvailability
+    timeSlots,
+    availabilityByDay,
+    appointmentsByDay
   };
 };
-
-export default useWeekViewData;

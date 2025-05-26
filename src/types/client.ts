@@ -61,6 +61,43 @@ export interface ClientDetails {
   client_billing_zipcode?: string;
   created_at?: string;
   updated_at?: string;
+
+  // Additional fields for session notes and treatment plans
+  client_diagnosis?: string[];
+  client_planlength?: string;
+  client_treatmentfrequency?: string;
+  client_personsinattendance?: string;
+  client_appearance?: string;
+  client_attitude?: string;
+  client_behavior?: string;
+  client_speech?: string;
+  client_affect?: string;
+  client_thoughtprocess?: string;
+  client_perception?: string;
+  client_orientation?: string;
+  client_memoryconcentration?: string;
+  client_insightjudgement?: string;
+  client_mood?: string;
+  client_substanceabuserisk?: string;
+  client_suicidalideation?: string;
+  client_homicidalideation?: string;
+  client_primaryobjective?: string;
+  client_intervention1?: string;
+  client_intervention2?: string;
+  client_secondaryobjective?: string;
+  client_intervention3?: string;
+  client_intervention4?: string;
+  client_tertiaryobjective?: string;
+  client_intervention5?: string;
+  client_intervention6?: string;
+  client_functioning?: string;
+  client_prognosis?: string;
+  client_progress?: string;
+  client_problem?: string;
+  client_treatmentgoal?: string;
+  client_sessionnarrative?: string;
+  client_nexttreatmentplanupdate?: string;
+  client_privatenote?: string;
 }
 
 /**
@@ -72,4 +109,52 @@ export interface PartialClientDetails {
   client_first_name: string;
   client_last_name: string;
   client_preferred_name?: string;
+  client_email?: string;
+  client_phone?: string;
 }
+
+/**
+ * Tab Props Interface
+ * For client detail tabs
+ */
+export interface TabProps {
+  clientData: ClientDetails | null;
+  isEditing: boolean;
+  onSave: (data: Partial<ClientDetails>) => void;
+  onCancel: () => void;
+}
+
+/**
+ * Session Note Template Props Interface
+ */
+export interface SessionNoteTemplateProps {
+  clientData: ClientDetails | null;
+  clinicianName: string;
+  appointment?: any;
+  onClose: () => void;
+}
+
+/**
+ * Insurance Type Options
+ */
+export const insuranceTypeOptions = [
+  'Private Insurance',
+  'Medicare',
+  'Medicaid',
+  'Self-Pay',
+  'Worker\'s Compensation',
+  'Other'
+];
+
+/**
+ * Relationship Options
+ */
+export const relationshipOptions = [
+  'Spouse',
+  'Parent',
+  'Child',
+  'Sibling',
+  'Friend',
+  'Guardian',
+  'Other'
+];
