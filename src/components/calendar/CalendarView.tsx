@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import WeekView from './week-view/WeekView';
+import WeekView from './WeekView';
 import MonthView from './MonthView';
 import ClinicianAvailabilityPanel from './ClinicianAvailabilityPanel';
 import { TimeZoneService } from '@/utils/timeZoneService';
