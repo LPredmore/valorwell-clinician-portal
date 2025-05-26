@@ -27,6 +27,7 @@ interface EditAppointmentFormProps {
     status: string;
     notes?: string;
     clinician_id: string;
+    appointment_timezone?: string;
     client?: {
       client_first_name: string;
       client_last_name: string;
@@ -46,6 +47,9 @@ const EditAppointmentForm: React.FC<EditAppointmentFormProps> = ({
   const [isLoading, setIsLoading] = React.useState(false);
   const { toast } = useToast();
 
+  // Use the appointment's saved timezone, fall back to user timezone
+  const displayTimeZone = appointment.appointment_timezone || userTimeZone;
+
   // Schema for form validation
   const formSchema = z.object({
     start_at: z.string().min(1, 'Start time is required'),
@@ -53,9 +57,9 @@ const EditAppointmentForm: React.FC<EditAppointmentFormProps> = ({
     notes: z.string().optional(),
   });
 
-  // Format start_at for the datetime-local input
+  // Format start_at for the datetime-local input using the appointment's timezone
   const defaultStartTime = appointment.start_at 
-    ? DateTime.fromISO(appointment.start_at).toFormat('yyyy-MM-dd\'T\'HH:mm')
+    ? DateTime.fromISO(appointment.start_at).setZone(displayTimeZone).toFormat('yyyy-MM-dd\'T\'HH:mm')
     : '';
 
   const form = useForm({
@@ -70,8 +74,8 @@ const EditAppointmentForm: React.FC<EditAppointmentFormProps> = ({
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsLoading(true);
     try {
-      // Convert start time to DateTime object in user timezone
-      const startDateTime = DateTime.fromISO(values.start_at, { zone: userTimeZone });
+      // Convert start time to DateTime object in appointment's timezone
+      const startDateTime = DateTime.fromISO(values.start_at, { zone: displayTimeZone });
       
       // Calculate end time as 1 hour after start time
       const endDateTime = startDateTime.plus({ hours: 1 });
@@ -80,8 +84,11 @@ const EditAppointmentForm: React.FC<EditAppointmentFormProps> = ({
       const startUtc = startDateTime.toUTC().toISO();
       const endUtc = endDateTime.toUTC().toISO();
 
-      // Fetch the clinician's current timezone to save with the appointment
-      const clinicianTimeZone = await getClinicianTimeZone(appointment.clinician_id);
+      // Use the existing appointment timezone or fetch the clinician's current timezone
+      let appointmentTimeZone = appointment.appointment_timezone;
+      if (!appointmentTimeZone) {
+        appointmentTimeZone = await getClinicianTimeZone(appointment.clinician_id);
+      }
 
       const { error } = await supabase
         .from('appointments')
@@ -91,7 +98,7 @@ const EditAppointmentForm: React.FC<EditAppointmentFormProps> = ({
           type: 'Therapy Session', // Always set to Therapy Session
           status: values.status,
           notes: values.notes,
-          appointment_timezone: clinicianTimeZone // Correct column name
+          appointment_timezone: appointmentTimeZone
         })
         .eq('id', appointment.id);
 

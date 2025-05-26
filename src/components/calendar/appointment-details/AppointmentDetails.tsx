@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Calendar, Clock, User, MoreVertical, Edit, Trash } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -26,6 +27,9 @@ const AppointmentDetails: React.FC<AppointmentDetailsProps> = ({
 }) => {
   const isRecurring = !!appointment.recurring_group_id;
 
+  // Use the appointment's saved timezone, fall back to user timezone
+  const displayTimeZone = appointment.appointment_timezone || userTimeZone;
+
   const getClientName = () => {
     // If we have a complete client object with the fields we need
     if (appointment.client) {
@@ -44,12 +48,12 @@ const AppointmentDetails: React.FC<AppointmentDetailsProps> = ({
 
   const getFormattedDate = () => {
     if (!appointment.start_at) return 'No date available';
-    return formatAppointmentDate(appointment.start_at, userTimeZone);
+    return formatAppointmentDate(appointment.start_at, displayTimeZone);
   };
 
   const getFormattedTime = (isoString: string | undefined) => {
     if (!isoString) return 'N/A';
-    return formatAppointmentTime(isoString, userTimeZone);
+    return formatAppointmentTime(isoString, displayTimeZone);
   };
 
   const getRecurrenceText = () => {
