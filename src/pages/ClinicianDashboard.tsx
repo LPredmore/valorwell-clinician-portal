@@ -9,6 +9,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  CardFooter,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -70,7 +71,7 @@ const ClinicianDashboard = () => {
   const [clients, setClients] = useState<ClientDetails[]>([]);
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const { user, signOut } = useUser();
+  const { user, logout } = useUser();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -127,14 +128,13 @@ const ClinicianDashboard = () => {
   const addClient = async (formData: z.infer<typeof formSchema>) => {
     try {
       const newClientData: ClientDetails = {
-        id: nanoid(),
+        id: crypto.randomUUID(),
         client_first_name: formData.client_first_name,
         client_last_name: formData.client_last_name,
         client_email: formData.client_email,
         client_phone: formData.client_phone,
         client_status: 'active',
         client_intake_date: new Date().toISOString(),
-        // Remove client_recentdischarge property as it doesn't exist in ClientDetails interface
       };
 
       setClients(prevClients => [...prevClients, newClientData]);
@@ -156,7 +156,7 @@ const ClinicianDashboard = () => {
 
   const handleSignOut = async () => {
     try {
-      await signOut();
+      await logout();
       navigate('/login');
       toast({
         title: "Success",

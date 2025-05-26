@@ -72,7 +72,12 @@ const WeekViewDataTest: React.FC = () => {
               <div className="text-sm">
                 {hookData.weekDays.map((day, index) => (
                   <div key={index} className="mb-1">
-                    {day.toFormat('EEE, MMM d, yyyy')}
+                    {day.toLocaleDateString('en-US', { 
+                      weekday: 'short', 
+                      month: 'short', 
+                      day: 'numeric', 
+                      year: 'numeric' 
+                    })}
                   </div>
                 ))}
               </div>

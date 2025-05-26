@@ -28,7 +28,7 @@ export interface PaginationInfo {
 
 // Availability API types
 export interface GetAvailabilityBlocksRequest {
-  clinicianId?: string;
+  clinicianId: string;
   startDate?: string;
   endDate?: string;
 }
