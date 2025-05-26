@@ -9,10 +9,14 @@ import CalendarViewControls from "../components/calendar/CalendarViewControls";
 import AppointmentDialog from "../components/calendar/AppointmentDialog";
 import { useUser } from "@/context/UserContext";
 import { useAppointments } from "@/hooks/useAppointments";
+import CalendarErrorBoundary from "../components/calendar/CalendarErrorBoundary";
 
 const CalendarPage = () => {
+  console.log('[CalendarPage] Component initializing...');
+  
   // Get the logged-in user's ID
   const { userId } = useUser();
+  console.log('[CalendarPage] User ID:', userId);
 
   const {
     showAvailability,
@@ -30,6 +34,14 @@ const CalendarPage = () => {
     isLoadingTimeZone,
   } = useCalendarState(userId);
   
+  console.log('[CalendarPage] Calendar state:', {
+    selectedClinicianId,
+    userTimeZone,
+    isLoadingTimeZone,
+    currentDate: currentDate?.toISOString(),
+    appointmentRefreshTrigger
+  });
+  
   // Fetch appointments with better date range
   const {
     appointments,
@@ -38,25 +50,28 @@ const CalendarPage = () => {
     refetch: refetchAppointments
   } = useAppointments(
     selectedClinicianId,
-    // Start date for fetch range - 1 month before current date
     subWeeks(currentDate, 4),
-    // End date for fetch range - 2 months after current date
     addWeeks(currentDate, 8),
     userTimeZone,
-    appointmentRefreshTrigger // Pass the refresh trigger to the hook
+    appointmentRefreshTrigger
   );
+
+  console.log('[CalendarPage] Appointments hook result:', {
+    appointmentsCount: appointments?.length || 0,
+    isLoadingAppointments,
+    appointmentsError: appointmentsError?.message || null
+  });
 
   // Log key information for debugging
   useEffect(() => {
     console.log("[CalendarPage] Calendar initialized:", {
       userTimeZone,
-      currentDate: currentDate.toISOString(),
+      currentDate: currentDate?.toISOString(),
       selectedClinicianId,
       appointmentsCount: appointments?.length || 0,
       refreshTrigger: appointmentRefreshTrigger
     });
     
-    // Log first few appointments for verification
     if (appointments && appointments.length > 0) {
       console.log("[CalendarPage] Sample appointments:", 
         appointments.slice(0, 3).map(a => ({
@@ -85,60 +100,77 @@ const CalendarPage = () => {
     setShowAvailability(!showAvailability);
   };
 
-  // Central function to handle any data changes that should trigger a refresh
   const handleDataChanged = () => {
     console.log("[CalendarPage] Data changed, refreshing calendar...");
     refetchAppointments();
     setAppointmentRefreshTrigger(prev => prev + 1);
   };
 
-  return (
-    <Layout>
-      <div className="bg-white rounded-lg shadow-sm p-6 animate-fade-in">
-        <div className="flex flex-col space-y-6">
-          <div className="flex justify-between items-center">
-            <h1 className="text-2xl font-bold text-gray-800">Calendar</h1>
-            <div className="flex items-center gap-4">
-              <CalendarViewControls
-                showAvailability={showAvailability}
-                onToggleAvailability={toggleAvailability}
-                onNewAppointment={() => setIsDialogOpen(true)}
-                selectedClinicianId={selectedClinicianId}
-              />
+  // Show loading state while timezone is loading
+  if (isLoadingTimeZone) {
+    return (
+      <Layout>
+        <div className="bg-white rounded-lg shadow-sm p-6 animate-fade-in">
+          <div className="flex justify-center items-center h-64">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+              <p>Loading calendar settings...</p>
             </div>
           </div>
-
-          <CalendarHeader
-            currentDate={currentDate}
-            userTimeZone={userTimeZone}
-            isLoadingTimeZone={isLoadingTimeZone}
-            onNavigatePrevious={navigatePrevious}
-            onNavigateNext={navigateNext}
-            onNavigateToday={navigateToday}
-          />
-
-          <CalendarView
-            view="week"
-            showAvailability={showAvailability}
-            clinicianId={selectedClinicianId}
-            currentDate={currentDate}
-            userTimeZone={userTimeZone}
-            refreshTrigger={appointmentRefreshTrigger}
-            appointments={appointments}
-            isLoading={isLoadingAppointments}
-            error={appointmentsError}
-          />
         </div>
-      </div>
+      </Layout>
+    );
+  }
 
-      <AppointmentDialog
-        isOpen={isDialogOpen}
-        onClose={() => setIsDialogOpen(false)}
-        clients={clients}
-        loadingClients={loadingClients}
-        selectedClinicianId={selectedClinicianId}
-        onAppointmentCreated={handleDataChanged} // Use the central data changed handler
-      />
+  return (
+    <Layout>
+      <CalendarErrorBoundary>
+        <div className="bg-white rounded-lg shadow-sm p-6 animate-fade-in">
+          <div className="flex flex-col space-y-6">
+            <div className="flex justify-between items-center">
+              <h1 className="text-2xl font-bold text-gray-800">Calendar</h1>
+              <div className="flex items-center gap-4">
+                <CalendarViewControls
+                  showAvailability={showAvailability}
+                  onToggleAvailability={toggleAvailability}
+                  onNewAppointment={() => setIsDialogOpen(true)}
+                  selectedClinicianId={selectedClinicianId}
+                />
+              </div>
+            </div>
+
+            <CalendarHeader
+              currentDate={currentDate}
+              userTimeZone={userTimeZone}
+              isLoadingTimeZone={isLoadingTimeZone}
+              onNavigatePrevious={navigatePrevious}
+              onNavigateNext={navigateNext}
+              onNavigateToday={navigateToday}
+            />
+
+            <CalendarView
+              view="week"
+              showAvailability={showAvailability}
+              clinicianId={selectedClinicianId}
+              currentDate={currentDate}
+              userTimeZone={userTimeZone}
+              refreshTrigger={appointmentRefreshTrigger}
+              appointments={appointments}
+              isLoading={isLoadingAppointments}
+              error={appointmentsError}
+            />
+          </div>
+        </div>
+
+        <AppointmentDialog
+          isOpen={isDialogOpen}
+          onClose={() => setIsDialogOpen(false)}
+          clients={clients}
+          loadingClients={loadingClients}
+          selectedClinicianId={selectedClinicianId}
+          onAppointmentCreated={handleDataChanged}
+        />
+      </CalendarErrorBoundary>
     </Layout>
   );
 };

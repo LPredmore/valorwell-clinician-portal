@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import WeekView from './week-view/WeekView';
 import MonthView from './MonthView';
@@ -8,6 +9,7 @@ import { DateTime } from 'luxon';
 import { AvailabilityBlock } from '@/types/availability';
 import AppointmentDetailsDialog from './AppointmentDetailsDialog';
 import { convertAppointmentBlockToAppointment } from '@/utils/appointmentUtils';
+import CalendarErrorBoundary from './CalendarErrorBoundary';
 
 interface CalendarProps {
   view: 'week' | 'month';
@@ -35,6 +37,15 @@ const CalendarView = ({
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [isAppointmentDialogOpen, setIsAppointmentDialogOpen] = useState(false);
   
+  console.log('[CalendarView] Rendering with:', {
+    view,
+    clinicianId,
+    appointmentsCount: appointments?.length || 0,
+    timeZone: userTimeZone,
+    isLoading,
+    hasError: !!error
+  });
+  
   // Ensure we have a valid IANA timezone
   const validTimeZone = TimeZoneService.ensureIANATimeZone(userTimeZone);
   
@@ -54,114 +65,58 @@ const CalendarView = ({
     return day;
   });
   
-  // Log appointments data for debugging - CRITICAL FIX: Guard the map call
+  // Log appointments data for debugging
   if (Array.isArray(appointments)) {
     console.log('[CalendarView] Raw appointments received:', appointments.map(appt => ({
       id: appt.id,
       startAt: appt.start_at,
       clientName: appt.clientName,
       hasClient: !!appt.client,
-      clientDetails: appt.client || 'No client data'
     })));
   } else {
-    console.log('[CalendarView] Raw appointments received: (appointments is not an array or is undefined)', appointments);
+    console.log('[CalendarView] Raw appointments received: (not an array)', appointments);
   }
   
   if (!clinicianId) {
     console.error('No clinician ID provided to Calendar component');
   }
-  
-  // Enhanced logging for appointments with comprehensive client name information
-  useEffect(() => {
-    console.log(`[CalendarView] Rendering with ${Array.isArray(appointments) ? appointments.length : 0} appointments for clinician ${clinicianId}`);
-    console.log(`[CalendarView] Calendar view: ${view}, timezone: ${validTimeZone}, refreshTrigger: ${combinedRefreshTrigger}`);
-    
-    if (Array.isArray(appointments) && appointments.length > 0) {
-      // Sample appointments for inspection
-      const sampleSize = Math.min(3, appointments.length);
-      console.log(`[CalendarView] Sample of ${sampleSize} appointments:`);
-      appointments.slice(0, sampleSize).forEach((app, idx) => {
-        console.log(`[CalendarView] Sample appointment ${idx+1}/${sampleSize}:`, {
-          id: app.id,
-          startAt: app.start_at,
-          endAt: app.end_at,
-          clientId: app.client_id,
-          clinicianId: app.clinician_id,
-          clientName: app.clientName,
-          clientInfo: app.client ? {
-            preferredName: app.client.client_preferred_name,
-            firstName: app.client.client_first_name,
-            lastName: app.client.client_last_name
-          } : 'No client data'
-        });
-      });
-    }
-    
-    if (error) {
-      console.error('[CalendarView] Error detected:', error);
-    }
-  }, [appointments, clinicianId, error, view, validTimeZone, combinedRefreshTrigger]);
 
   // Handle click on an appointment clicked in calendar
   const handleAppointmentClick = (appointment: Appointment) => {
-    // Enhanced logging to debug appointment data
     console.log(`[CalendarView] Appointment clicked:`, {
       id: appointment.id,
       clientName: appointment.clientName,
       clientId: appointment.client_id,
       hasClient: !!appointment.client,
-      clientDetails: appointment.client ? {
-        firstName: appointment.client.client_first_name,
-        lastName: appointment.client.client_last_name,
-        preferredName: appointment.client.client_preferred_name
-      } : 'No client data',
       startAt: appointment.start_at,
       endAt: appointment.end_at
     });
     
-    // Verify we have a complete appointment object before storing it
     if (!appointment.client && appointment.client_id) {
-      console.warn(`[CalendarView] Appointment is missing client data. Attempting to find complete appointment.`);
-      
-      // Try to find the complete appointment in the appointments array
       const completeAppointment = appointments.find(a => a.id === appointment.id);
       
       if (completeAppointment && completeAppointment.client) {
-        console.log(`[CalendarView] Found complete appointment with client data.`);
         setSelectedAppointment(completeAppointment);
       } else {
-        console.warn(`[CalendarView] Could not find complete appointment. Converting to full appointment.`);
-        // Convert to a full appointment object
         const fullAppointment = convertAppointmentBlockToAppointment(appointment, appointments);
-        console.log(`[CalendarView] Using converted appointment:`, {
-          id: fullAppointment.id,
-          clientName: fullAppointment.clientName,
-          clientId: fullAppointment.client_id,
-          hasClient: !!fullAppointment.client,
-          start_at: fullAppointment.start_at,
-          end_at: fullAppointment.end_at
-        });
         setSelectedAppointment(fullAppointment);
       }
     } else {
-      // Store the full appointment object
       setSelectedAppointment(appointment);
     }
     
-    // Open the dialog
     setIsAppointmentDialogOpen(true);
   };
 
   // Handle availability block clicked in calendar
   const handleAvailabilityClick = (date: DateTime | Date, availabilityBlock: AvailabilityBlock) => {
-    // Convert Date to DateTime if needed for consistent handling
     const dateTime = date instanceof Date ? 
       TimeZoneService.fromJSDate(date, validTimeZone) : date;
       
     console.log(`[CalendarView] Availability clicked for ${dateTime.toFormat('yyyy-MM-dd')} - Block:`, availabilityBlock);
   };
 
-  // Handler for when availability is updated - triggers refresh of data
+  // Handler for when availability is updated
   const handleAvailabilityUpdated = () => {
     console.log('[CalendarView] Availability updated, triggering calendar refresh...');
     setLocalRefreshTrigger(prev => prev + 1);
@@ -172,20 +127,18 @@ const CalendarView = ({
     console.log('[CalendarView] Appointment updated, triggering calendar refresh...');
     setLocalRefreshTrigger(prev => prev + 1);
     setIsAppointmentDialogOpen(false);
-    setSelectedAppointment(null); // Clear the selected appointment
+    setSelectedAppointment(null);
   };
   
   // Handler for when an appointment is updated via drag-and-drop
   const handleAppointmentDragUpdate = (appointmentId: string, newStartAt: string, newEndAt: string) => {
     console.log('[CalendarView] Appointment updated via drag-and-drop, triggering calendar refresh...');
     
-    // If it's just a refresh trigger with no actual update (used for signaling)
     if (appointmentId === "refresh-trigger" && !newStartAt && !newEndAt) {
       setLocalRefreshTrigger(prev => prev + 1);
       return;
     }
     
-    // Otherwise attempt to update the appointment in the database
     if (appointmentId && newStartAt && newEndAt) {
       console.log('[CalendarView] Updating appointment:', {
         appointmentId,
@@ -193,7 +146,6 @@ const CalendarView = ({
         newEndAt
       });
       
-      // Update the appointment in the database via Supabase
       (async () => {
         try {
           const { supabase } = await import('@/integrations/supabase/client');
@@ -218,63 +170,85 @@ const CalendarView = ({
     }
   };
 
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-      <div className="md:col-span-3">
-        {view === 'week' ? (
-          <WeekView 
-            days={days}
-            currentDate={currentDate}
-            selectedClinicianId={clinicianId}
-            refreshTrigger={combinedRefreshTrigger}
-            appointments={appointments}
-            onAppointmentClick={handleAppointmentClick}
-            onAvailabilityClick={handleAvailabilityClick}
-            onAppointmentUpdate={handleAppointmentDragUpdate}
-            userTimeZone={validTimeZone}
-            isLoading={isLoading}
-            error={error}
-          />
-        ) : (
-          <MonthView 
-            currentDate={currentDate}
-            clinicianId={clinicianId}
-            refreshTrigger={combinedRefreshTrigger} // Use combined refresh trigger
-            appointments={appointments}
-            getClientName={(clientId: string): string => {
-              const appointment = appointments.find(app => app.client_id === clientId);
-              return appointment?.clientName || 'Unknown Client';
-            }}
-            onAppointmentClick={handleAppointmentClick}
-            onAvailabilityClick={handleAvailabilityClick}
-            userTimeZone={validTimeZone}
-          />
-        )}
-      </div>
-      
-      {showAvailability && (
-        <div className="md:col-span-1">
-          <ClinicianAvailabilityPanel 
-            clinicianId={clinicianId} 
-            onAvailabilityUpdated={handleAvailabilityUpdated} // Pass the refresh handler
-            userTimeZone={validTimeZone}
-          />
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+          <p>Loading calendar...</p>
         </div>
-      )}
-      
-      {/* Central AppointmentDetailsDialog - the ONLY instance in the application */}
-      <AppointmentDetailsDialog
-        isOpen={isAppointmentDialogOpen}
-        onClose={() => {
-          console.log('[CalendarView] Closing appointment dialog');
-          setIsAppointmentDialogOpen(false);
-          setSelectedAppointment(null); // Clear selection when dialog is closed
-        }}
-        appointment={selectedAppointment}
-        onAppointmentUpdated={handleAppointmentUpdated}
-        userTimeZone={validTimeZone}
-      />
-    </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="text-center text-red-600">
+          <p>Error loading calendar: {error?.message || 'Unknown error'}</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <CalendarErrorBoundary>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="md:col-span-3">
+          {view === 'week' ? (
+            <WeekView 
+              days={days}
+              currentDate={currentDate}
+              selectedClinicianId={clinicianId}
+              refreshTrigger={combinedRefreshTrigger}
+              appointments={appointments}
+              onAppointmentClick={handleAppointmentClick}
+              onAvailabilityClick={handleAvailabilityClick}
+              onAppointmentUpdate={handleAppointmentDragUpdate}
+              userTimeZone={validTimeZone}
+              isLoading={isLoading}
+              error={error}
+            />
+          ) : (
+            <MonthView 
+              currentDate={currentDate}
+              clinicianId={clinicianId}
+              refreshTrigger={combinedRefreshTrigger}
+              appointments={appointments}
+              getClientName={(clientId: string): string => {
+                const appointment = appointments.find(app => app.client_id === clientId);
+                return appointment?.clientName || 'Unknown Client';
+              }}
+              onAppointmentClick={handleAppointmentClick}
+              onAvailabilityClick={handleAvailabilityClick}
+              userTimeZone={validTimeZone}
+            />
+          )}
+        </div>
+        
+        {showAvailability && (
+          <div className="md:col-span-1">
+            <ClinicianAvailabilityPanel 
+              clinicianId={clinicianId} 
+              onAvailabilityUpdated={handleAvailabilityUpdated}
+              userTimeZone={validTimeZone}
+            />
+          </div>
+        )}
+        
+        <AppointmentDetailsDialog
+          isOpen={isAppointmentDialogOpen}
+          onClose={() => {
+            console.log('[CalendarView] Closing appointment dialog');
+            setIsAppointmentDialogOpen(false);
+            setSelectedAppointment(null);
+          }}
+          appointment={selectedAppointment}
+          onAppointmentUpdated={handleAppointmentUpdated}
+          userTimeZone={validTimeZone}
+        />
+      </div>
+    </CalendarErrorBoundary>
   );
 };
 

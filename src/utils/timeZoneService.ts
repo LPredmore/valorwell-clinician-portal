@@ -13,8 +13,8 @@ export class TimeZoneService {
    * @returns A valid IANA timezone string.
    */
   public static ensureIANATimeZone(timezone: string | null | undefined): string {
-    if (!timezone) {
-      console.warn('No timezone provided, using default timezone:', this.DEFAULT_TIMEZONE);
+    if (!timezone || typeof timezone !== 'string') {
+      console.warn('No valid timezone provided, using default timezone:', this.DEFAULT_TIMEZONE);
       return this.DEFAULT_TIMEZONE;
     }
 
@@ -326,11 +326,25 @@ export class TimeZoneService {
    * @returns A user-friendly display name for the timezone
    */
   public static getTimeZoneDisplayName(timezone: string): string {
+    // Ensure we have a valid string timezone
     const safeTimezone = this.ensureIANATimeZone(timezone);
+    
     try {
       const now = DateTime.now().setZone(safeTimezone);
+      if (!now.isValid) {
+        console.error('Invalid DateTime for timezone display:', now.invalidReason);
+        return safeTimezone;
+      }
+      
       const offsetFormatted = now.toFormat('ZZ');
-      const zoneName = safeTimezone.split('/').pop()?.replace('_', ' ') || safeTimezone;
+      
+      // Safely extract zone name from timezone string
+      let zoneName = safeTimezone;
+      if (typeof safeTimezone === 'string' && safeTimezone.includes('/')) {
+        const parts = safeTimezone.split('/');
+        zoneName = parts[parts.length - 1]?.replace(/_/g, ' ') || safeTimezone;
+      }
+      
       return `${zoneName} (${offsetFormatted})`;
     } catch (error) {
       console.error('Error getting timezone display name:', error);
