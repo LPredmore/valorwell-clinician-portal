@@ -17,6 +17,7 @@ interface CalendarProps {
   clinicianId: string | null;
   currentDate: Date;
   userTimeZone: string;
+  clinicianTimeZone: string;
   refreshTrigger: number;
   appointments: Appointment[];
   isLoading: boolean;
@@ -29,6 +30,7 @@ const CalendarView = ({
   clinicianId, 
   currentDate, 
   userTimeZone,
+  clinicianTimeZone,
   refreshTrigger = 0,
   appointments = [],
   isLoading = false,
@@ -206,6 +208,7 @@ const CalendarView = ({
               onAvailabilityClick={handleAvailabilityClick}
               onAppointmentUpdate={handleAppointmentDragUpdate}
               userTimeZone={validTimeZone}
+              clinicianTimeZone={clinicianTimeZone}
               isLoading={isLoading}
               error={error}
             />
