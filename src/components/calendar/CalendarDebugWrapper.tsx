@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -18,7 +19,7 @@ const DEBUG_CONTEXT = 'CalendarDebugWrapper';
 interface CalendarDebugWrapperProps {
   clinicianId: string | null;
   initialAppointments?: Appointment[];
-  clinicianTimeZone: string; // Changed from userTimeZone to clinicianTimeZone
+  clinicianTimeZone: string; // Kept as clinicianTimeZone but will pass as userTimeZone to children
 }
 
 /**
@@ -28,7 +29,7 @@ interface CalendarDebugWrapperProps {
 export const CalendarDebugWrapper: React.FC<CalendarDebugWrapperProps> = ({
   clinicianId,
   initialAppointments = [],
-  clinicianTimeZone // Changed from userTimeZone
+  clinicianTimeZone
 }) => {
   // State for controlling the calendar view
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
@@ -328,7 +329,7 @@ export const CalendarDebugWrapper: React.FC<CalendarDebugWrapperProps> = ({
             getClientName={getClientName}
             onAppointmentClick={handleAppointmentClick}
             onAvailabilityClick={handleAvailabilityClick}
-            clinicianTimeZone={selectedTimezone}
+            userTimeZone={selectedTimezone}
           />
         </CardContent>
       </Card>

@@ -208,7 +208,6 @@ const CalendarView = ({
               onAvailabilityClick={handleAvailabilityClick}
               onAppointmentUpdate={handleAppointmentDragUpdate}
               userTimeZone={validTimeZone}
-              clinicianTimeZone={clinicianTimeZone}
               isLoading={isLoading}
               error={error}
             />
