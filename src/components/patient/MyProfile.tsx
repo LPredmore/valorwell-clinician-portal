@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { X, Save, Edit } from 'lucide-react';
 import { Form } from '@/components/ui/form';
 import FormFieldWrapper from '@/components/ui/FormFieldWrapper';
+import { getTimezoneLabel } from '@/utils/timezoneOptions';
 
 interface MyProfileProps {
   clientData: any | null;
@@ -35,6 +36,19 @@ const MyProfile: React.FC<MyProfileProps> = ({
   stateOptions,
   timeZoneOptions
 }) => {
+  // Create display options for timezone dropdown
+  const timeZoneDisplayOptions = timeZoneOptions.map(tz => getTimezoneLabel(tz));
+
+  // Map timezone values to display labels and vice versa
+  const timezoneValueMapper = (displayLabel: string): string => {
+    const index = timeZoneDisplayOptions.indexOf(displayLabel);
+    return index !== -1 ? timeZoneOptions[index] : displayLabel;
+  };
+
+  const timezoneLabelMapper = (value: string): string => {
+    return getTimezoneLabel(value);
+  };
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -179,8 +193,10 @@ const MyProfile: React.FC<MyProfileProps> = ({
                   name="timeZone"
                   label="Time Zone"
                   type="select"
-                  options={timeZoneOptions}
+                  options={timeZoneDisplayOptions}
                   readOnly={!isEditing}
+                  valueMapper={timezoneValueMapper}
+                  labelMapper={timezoneLabelMapper}
                 />
               </div>
             </Form>

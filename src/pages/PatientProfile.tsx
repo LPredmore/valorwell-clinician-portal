@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import Layout from '@/components/layout/Layout';
 import { useForm } from 'react-hook-form';
@@ -7,6 +6,7 @@ import { getCurrentUser, getClientByUserId, updateClientProfile } from '@/integr
 import { useToast } from '@/components/ui/use-toast';
 import MyProfile from '@/components/patient/MyProfile';
 import { useUser } from '@/context/UserContext';
+import { timezoneOptions } from '@/utils/timezoneOptions';
 
 const PatientProfile: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
@@ -28,11 +28,9 @@ const PatientProfile: React.FC = () => {
     'Pennsylvania', 'Rhode Island', 'South Carolina', 'South Dakota', 'Tennessee', 'Texas',
     'Utah', 'Vermont', 'Virginia', 'Washington', 'West Virginia', 'Wisconsin', 'Wyoming'
   ];
-  const timeZoneOptions = [
-    'Eastern Standard Time (EST)', 'Central Standard Time (CST)',
-    'Mountain Standard Time (MST)', 'Pacific Standard Time (PST)', 'Alaska Standard Time (AKST)',
-    'Hawaii-Aleutian Standard Time (HST)', 'Atlantic Standard Time (AST)'
-  ];
+  
+  // Use the proper timezone options with IANA identifiers
+  const timeZoneOptionsForProfile = timezoneOptions.map(tz => tz.value);
 
   const form = useForm({
     defaultValues: {
@@ -101,7 +99,7 @@ const PatientProfile: React.FC = () => {
           gender: client.client_gender || '',
           genderIdentity: client.client_gender_identity || '',
           state: client.client_state || '',
-          timeZone: client.client_time_zone || ''
+          timeZone: client.client_time_zone || 'America/New_York' // Default to Eastern Time
         });
       } else {
         toast({
@@ -206,7 +204,7 @@ const PatientProfile: React.FC = () => {
           genderOptions={genderOptions}
           genderIdentityOptions={genderIdentityOptions}
           stateOptions={stateOptions}
-          timeZoneOptions={timeZoneOptions}
+          timeZoneOptions={timeZoneOptionsForProfile}
         />
       </div>
     </Layout>
