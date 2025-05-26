@@ -375,12 +375,23 @@ export const useWeekViewDataDebug = (props: UseWeekViewDataProps) => {
         
         appointmentBlocks.push({
           id: appointment.id,
+          appointmentId: appointment.id,
+          clientId: appointment.client_id,
+          clientName,
           start,
           end,
           day,
-          clientId: appointment.client_id,
-          clientName,
-          type: appointment.type
+          type: appointment.type,
+          status: appointment.status,
+          // Include all original appointment data for conversion
+          start_at: appointment.start_at,
+          end_at: appointment.end_at,
+          appointment_recurring: appointment.appointment_recurring,
+          recurring_group_id: appointment.recurring_group_id,
+          video_room_url: appointment.video_room_url,
+          notes: appointment.notes,
+          client: appointment.client,
+          appointment_timezone: appointment.appointment_timezone
         });
         
         DebugUtils.log(DEBUG_CONTEXT, 'Created appointment block', {
@@ -388,7 +399,8 @@ export const useWeekViewDataDebug = (props: UseWeekViewDataProps) => {
           clientName,
           start: start.toFormat('yyyy-MM-dd HH:mm'),
           end: end.toFormat('yyyy-MM-dd HH:mm'),
-          day: day.toFormat('yyyy-MM-dd')
+          day: day.toFormat('yyyy-MM-dd'),
+          appointment_timezone: appointment.appointment_timezone
         });
       } catch (error) {
         DebugUtils.error(DEBUG_CONTEXT, 'Error creating appointment block', {
