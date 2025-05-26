@@ -75,7 +75,6 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
   onAppointmentCreated
 }) => {
   const [clientId, setClientId] = useState<string>('');
-  const [appointmentType, setAppointmentType] = useState<string>('Initial Consultation');
   const [notes, setNotes] = useState<string>('');
   const [isRecurring, setIsRecurring] = useState<boolean>(false);
   const [recurringType, setRecurringType] = useState<string>('');
@@ -83,17 +82,19 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
   const [recurringCount, setRecurringCount] = useState<string>('');
   const [timeZone, setTimeZone] = useState<string>(getUserTimeZone());
   const [startTime, setStartTime] = useState<string>('');
-  const [endTime, setEndTime] = useState<string>('');
+  const [appointmentDate, setAppointmentDate] = useState<Date | undefined>(selectedDate);
   const { toast } = useToast();
 
   useEffect(() => {
     if (selectedDate && selectedTimeSlot) {
       const start = formatTimeFromMinutes(selectedTimeSlot.start);
-      const end = formatTimeFromMinutes(selectedTimeSlot.end);
       setStartTime(start);
-      setEndTime(end);
     }
   }, [selectedDate, selectedTimeSlot]);
+
+  useEffect(() => {
+    setAppointmentDate(selectedDate);
+  }, [selectedDate]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -107,10 +108,19 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
       return;
     }
 
-    if (!selectedDate) {
+    if (!appointmentDate) {
       toast({
         title: "Missing Date",
         description: "Please select a date for the appointment.",
+        variant: "destructive",
+      })
+      return;
+    }
+
+    if (!startTime) {
+      toast({
+        title: "Missing Time",
+        description: "Please select a start time for the appointment.",
         variant: "destructive",
       })
       return;
@@ -129,22 +139,13 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
       }
     }
 
-    const startDateTime = combineDateAndTime(selectedDate, startTime, clinicianTimezone);
-    const endDateTime = combineDateAndTime(selectedDate, endTime, clinicianTimezone);
+    const startDateTime = combineDateAndTime(appointmentDate, startTime, clinicianTimezone);
+    const endDateTime = new Date(startDateTime.getTime() + 60 * 60 * 1000); // Add 1 hour
 
     if (isNaN(startDateTime.getTime()) || isNaN(endDateTime.getTime())) {
       toast({
         title: "Invalid Date/Time",
         description: "Please enter a valid date and time.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (endDateTime <= startDateTime) {
-      toast({
-        title: "Invalid Time",
-        description: "End time must be after start time.",
         variant: "destructive",
       });
       return;
@@ -170,7 +171,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
         return;
       }
 
-      if (recurringEndDate && isBefore(recurringEndDate, selectedDate)) {
+      if (recurringEndDate && isBefore(recurringEndDate, appointmentDate)) {
         toast({
           title: "Invalid End Date",
           description: "The recurring end date must be after the start date.",
@@ -191,11 +192,11 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
       clinicianId: currentClinicianId,
       startAt: startDateTime.toISOString(),
       endAt: endDateTime.toISOString(),
-      type: appointmentType,
+      type: 'Therapy Session', // Always default to Therapy Session
       notes: notes,
       isRecurring: isRecurring,
       recurringData: recurringData,
-      appointment_timezone: clinicianTimezone, // Updated field name
+      appointment_timezone: clinicianTimezone,
     };
 
     if (onSave) {
@@ -229,33 +230,35 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <Label htmlFor="client">Client</Label>
-            <Select onValueChange={setClientId}>
+            <Select onValueChange={setClientId} value={clientId}>
               <SelectTrigger>
-                <SelectValue placeholder="Select a client" />
+                <SelectValue placeholder={loadingClients ? "Loading clients..." : "Select a client"} />
               </SelectTrigger>
               <SelectContent>
-                {clients.map((client) => (
-                  <SelectItem key={client.id} value={client.id}>
-                    {client.client_first_name} {client.client_last_name}
+                {clients && clients.length > 0 ? (
+                  clients.map((client) => (
+                    <SelectItem key={client.id} value={client.id}>
+                      {client.client_first_name} {client.client_last_name}
+                    </SelectItem>
+                  ))
+                ) : (
+                  <SelectItem value="" disabled>
+                    {loadingClients ? "Loading..." : "No clients available"}
                   </SelectItem>
-                ))}
+                )}
               </SelectContent>
             </Select>
           </div>
 
+          {/* Appointment Type - Read-only display */}
           <div>
             <Label htmlFor="appointmentType">Appointment Type</Label>
-            <Select onValueChange={setAppointmentType}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select appointment type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Initial Consultation">Initial Consultation</SelectItem>
-                <SelectItem value="Follow-up Session">Follow-up Session</SelectItem>
-                <SelectItem value="Therapy Session">Therapy Session</SelectItem>
-                <SelectItem value="Evaluation">Evaluation</SelectItem>
-              </SelectContent>
-            </Select>
+            <Input 
+              type="text" 
+              value="Therapy Session" 
+              readOnly 
+              className="bg-gray-100 text-gray-600"
+            />
           </div>
 
           <div>
@@ -266,12 +269,12 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
                   variant={"outline"}
                   className={cn(
                     "w-[240px] justify-start text-left font-normal",
-                    !selectedDate && "text-muted-foreground"
+                    !appointmentDate && "text-muted-foreground"
                   )}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
-                  {selectedDate ? (
-                    format(selectedDate, "PPP")
+                  {appointmentDate ? (
+                    format(appointmentDate, "PPP")
                   ) : (
                     <span>Pick a date</span>
                   )}
@@ -280,34 +283,24 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
               <PopoverContent className="w-auto p-0" align="start">
                 <Calendar
                   mode="single"
-                  selected={selectedDate}
-                  onSelect={() => {}} // This should be handled by parent component
+                  selected={appointmentDate}
+                  onSelect={setAppointmentDate}
                   disabled={{ before: new Date() }}
                   initialFocus
+                  className="p-3 pointer-events-auto"
                 />
               </PopoverContent>
             </Popover>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="startTime">Start Time</Label>
-              <Input
-                type="time"
-                id="startTime"
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="endTime">End Time</Label>
-              <Input
-                type="time"
-                id="endTime"
-                value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
-              />
-            </div>
+          <div>
+            <Label htmlFor="startTime">Start Time (1 hour appointment)</Label>
+            <Input
+              type="time"
+              id="startTime"
+              value={startTime}
+              onChange={(e) => setStartTime(e.target.value)}
+            />
           </div>
 
           <div>
@@ -370,8 +363,9 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
                         mode="single"
                         selected={recurringEndDate}
                         onSelect={setRecurringEndDate}
-                        disabled={{ before: addDays(selectedDate || new Date(), 1) }}
+                        disabled={{ before: addDays(appointmentDate || new Date(), 1) }}
                         initialFocus
+                        className="p-3 pointer-events-auto"
                       />
                     </PopoverContent>
                   </Popover>
@@ -401,4 +395,3 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
 };
 
 export default AppointmentDialog;
-

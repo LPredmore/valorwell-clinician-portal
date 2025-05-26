@@ -49,7 +49,6 @@ const EditAppointmentForm: React.FC<EditAppointmentFormProps> = ({
   // Schema for form validation
   const formSchema = z.object({
     start_at: z.string().min(1, 'Start time is required'),
-    type: z.string().min(1, 'Type is required'),
     status: z.string().min(1, 'Status is required'),
     notes: z.string().optional(),
   });
@@ -63,7 +62,6 @@ const EditAppointmentForm: React.FC<EditAppointmentFormProps> = ({
     resolver: zodResolver(formSchema),
     defaultValues: {
       start_at: defaultStartTime,
-      type: appointment.type || '',
       status: appointment.status || '',
       notes: appointment.notes || '',
     },
@@ -90,10 +88,10 @@ const EditAppointmentForm: React.FC<EditAppointmentFormProps> = ({
         .update({
           start_at: startUtc,
           end_at: endUtc,
-          type: values.type,
+          type: 'Therapy Session', // Always set to Therapy Session
           status: values.status,
           notes: values.notes,
-          appointments_timezone: clinicianTimeZone // Save the clinician's timezone
+          appointment_timezone: clinicianTimeZone // Correct column name
         })
         .eq('id', appointment.id);
 
@@ -148,19 +146,15 @@ const EditAppointmentForm: React.FC<EditAppointmentFormProps> = ({
           )}
         />
         
-        <FormField
-          control={form.control}
-          name="type"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Appointment Type</FormLabel>
-              <FormControl>
-                <Input {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        {/* Appointment Type - Read-only display */}
+        <div>
+          <FormLabel>Appointment Type</FormLabel>
+          <Input 
+            value="Therapy Session" 
+            readOnly 
+            className="bg-gray-100 text-gray-600"
+          />
+        </div>
         
         <FormField
           control={form.control}
