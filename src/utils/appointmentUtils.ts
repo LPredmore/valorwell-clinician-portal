@@ -35,54 +35,89 @@ export const convertAppointmentBlockToAppointment = (
   appointmentBlock: any,
   originalAppointments: Appointment[]
 ): Appointment => {
-  console.log('[convertAppointmentBlockToAppointment] Converting:', {
+  console.log('[convertAppointmentBlockToAppointment] Converting appointment block:', {
     blockId: appointmentBlock.id,
     hasStart: !!appointmentBlock.start,
     hasEnd: !!appointmentBlock.end,
     startType: typeof appointmentBlock.start,
-    endType: typeof appointmentBlock.end
+    endType: typeof appointmentBlock.end,
+    startValue: appointmentBlock.start,
+    endValue: appointmentBlock.end,
+    startIsLuxon: appointmentBlock.start && typeof appointmentBlock.start === 'object' && appointmentBlock.start.toISO,
+    endIsLuxon: appointmentBlock.end && typeof appointmentBlock.end === 'object' && appointmentBlock.end.toISO
   });
 
   // First, try to find the original appointment from the appointments array
   const originalAppointment = originalAppointments.find(a => a.id === appointmentBlock.id);
   if (originalAppointment) {
-    console.log('[convertAppointmentBlockToAppointment] Found original appointment, using it');
+    console.log('[convertAppointmentBlockToAppointment] Found original appointment, using it directly');
     return originalAppointment;
   }
 
-  // Convert DateTime objects to ISO strings
+  console.log('[convertAppointmentBlockToAppointment] No original appointment found, converting block');
+
+  // Convert DateTime objects to ISO strings with proper error handling
   let startAt: string;
   let endAt: string;
 
   try {
-    // Handle Luxon DateTime objects properly
-    if (appointmentBlock.start && typeof appointmentBlock.start === 'object' && appointmentBlock.start.toISO) {
-      startAt = appointmentBlock.start.toUTC().toISO();
-    } else if (typeof appointmentBlock.start === 'string') {
-      startAt = appointmentBlock.start;
+    // Handle start time
+    if (appointmentBlock.start) {
+      if (typeof appointmentBlock.start === 'string') {
+        startAt = appointmentBlock.start;
+        console.log('[convertAppointmentBlockToAppointment] Start is already string:', startAt);
+      } else if (appointmentBlock.start && typeof appointmentBlock.start === 'object' && appointmentBlock.start.toISO) {
+        // This is a Luxon DateTime object
+        startAt = appointmentBlock.start.toUTC().toISO();
+        console.log('[convertAppointmentBlockToAppointment] Converted Luxon start to ISO:', startAt);
+      } else {
+        throw new Error('Invalid start time format: ' + typeof appointmentBlock.start);
+      }
     } else {
-      throw new Error('Invalid start time format');
+      throw new Error('No start time provided');
     }
 
-    if (appointmentBlock.end && typeof appointmentBlock.end === 'object' && appointmentBlock.end.toISO) {
-      endAt = appointmentBlock.end.toUTC().toISO();
-    } else if (typeof appointmentBlock.end === 'string') {
-      endAt = appointmentBlock.end;
+    // Handle end time
+    if (appointmentBlock.end) {
+      if (typeof appointmentBlock.end === 'string') {
+        endAt = appointmentBlock.end;
+        console.log('[convertAppointmentBlockToAppointment] End is already string:', endAt);
+      } else if (appointmentBlock.end && typeof appointmentBlock.end === 'object' && appointmentBlock.end.toISO) {
+        // This is a Luxon DateTime object
+        endAt = appointmentBlock.end.toUTC().toISO();
+        console.log('[convertAppointmentBlockToAppointment] Converted Luxon end to ISO:', endAt);
+      } else {
+        throw new Error('Invalid end time format: ' + typeof appointmentBlock.end);
+      }
     } else {
-      throw new Error('Invalid end time format');
+      throw new Error('No end time provided');
     }
 
-    console.log('[convertAppointmentBlockToAppointment] Converted times:', {
+    // Validate that we got valid ISO strings
+    if (!startAt || !endAt) {
+      throw new Error('Failed to get valid start/end times');
+    }
+
+    console.log('[convertAppointmentBlockToAppointment] Successfully converted times:', {
       startAt,
       endAt
     });
 
   } catch (error) {
     console.error('[convertAppointmentBlockToAppointment] DateTime conversion error:', error);
-    // Fallback to current time if conversion fails
-    const now = new Date().toISOString();
-    startAt = now;
-    endAt = now;
+    console.error('[convertAppointmentBlockToAppointment] Failed appointment block:', appointmentBlock);
+    
+    // Instead of falling back to current time, try to preserve any existing time data
+    if (appointmentBlock.start_at && appointmentBlock.end_at) {
+      console.log('[convertAppointmentBlockToAppointment] Using fallback start_at/end_at fields');
+      startAt = appointmentBlock.start_at;
+      endAt = appointmentBlock.end_at;
+    } else {
+      console.error('[convertAppointmentBlockToAppointment] No fallback time data available, using current time');
+      const now = new Date().toISOString();
+      startAt = now;
+      endAt = now;
+    }
   }
 
   // Create the appointment object
@@ -94,14 +129,21 @@ export const convertAppointmentBlockToAppointment = (
     end_at: endAt,
     type: appointmentBlock.type || 'appointment',
     status: appointmentBlock.status || 'scheduled',
-    clientName: appointmentBlock.clientName || 'Unknown Client'
+    clientName: appointmentBlock.clientName || 'Unknown Client',
+    // Preserve any additional fields from the original block
+    appointment_recurring: appointmentBlock.appointment_recurring || null,
+    recurring_group_id: appointmentBlock.recurring_group_id || null,
+    video_room_url: appointmentBlock.video_room_url || null,
+    notes: appointmentBlock.notes || null,
+    client: appointmentBlock.client || null
   };
 
   console.log('[convertAppointmentBlockToAppointment] Created appointment:', {
     id: appointment.id,
     clientName: appointment.clientName,
     start_at: appointment.start_at,
-    end_at: appointment.end_at
+    end_at: appointment.end_at,
+    hasValidTimes: !!appointment.start_at && !!appointment.end_at
   });
 
   return appointment;
@@ -194,12 +236,37 @@ export const formatTimeDisplay = (time: string, timeZone?: string): string => {
  * Formats appointment date for display
  */
 export const formatAppointmentDate = (dateTimeString: string, timeZone: string): string => {
+  console.log('[formatAppointmentDate] Formatting date:', { dateTimeString, timeZone });
+  
   try {
+    if (!dateTimeString) {
+      console.warn('[formatAppointmentDate] No dateTimeString provided');
+      return 'No date available';
+    }
+    
+    if (!timeZone) {
+      console.warn('[formatAppointmentDate] No timeZone provided, using UTC');
+      timeZone = 'UTC';
+    }
+    
     const dateTime = DateTime.fromISO(dateTimeString).setZone(timeZone);
-    return dateTime.toFormat('MMM dd, yyyy');
+    
+    if (!dateTime.isValid) {
+      console.error('[formatAppointmentDate] Invalid DateTime:', {
+        dateTimeString,
+        timeZone,
+        invalidReason: dateTime.invalidReason,
+        invalidExplanation: dateTime.invalidExplanation
+      });
+      return 'Invalid date';
+    }
+    
+    const formatted = dateTime.toFormat('MMM dd, yyyy');
+    console.log('[formatAppointmentDate] Successfully formatted:', formatted);
+    return formatted;
   } catch (error) {
-    console.error('Error formatting appointment date:', error);
-    return 'No date available';
+    console.error('[formatAppointmentDate] Error formatting appointment date:', error);
+    return 'Error formatting date';
   }
 };
 
@@ -207,11 +274,36 @@ export const formatAppointmentDate = (dateTimeString: string, timeZone: string):
  * Formats appointment time for display
  */
 export const formatAppointmentTime = (dateTimeString: string, timeZone: string): string => {
+  console.log('[formatAppointmentTime] Formatting time:', { dateTimeString, timeZone });
+  
   try {
+    if (!dateTimeString) {
+      console.warn('[formatAppointmentTime] No dateTimeString provided');
+      return 'N/A';
+    }
+    
+    if (!timeZone) {
+      console.warn('[formatAppointmentTime] No timeZone provided, using UTC');
+      timeZone = 'UTC';
+    }
+    
     const dateTime = DateTime.fromISO(dateTimeString).setZone(timeZone);
-    return dateTime.toFormat('h:mm a');
+    
+    if (!dateTime.isValid) {
+      console.error('[formatAppointmentTime] Invalid DateTime:', {
+        dateTimeString,
+        timeZone,
+        invalidReason: dateTime.invalidReason,
+        invalidExplanation: dateTime.invalidExplanation
+      });
+      return 'Invalid time';
+    }
+    
+    const formatted = dateTime.toFormat('h:mm a');
+    console.log('[formatAppointmentTime] Successfully formatted:', formatted);
+    return formatted;
   } catch (error) {
-    console.error('Error formatting appointment time:', error);
-    return 'N/A';
+    console.error('[formatAppointmentTime] Error formatting appointment time:', error);
+    return 'Error formatting time';
   }
 };
