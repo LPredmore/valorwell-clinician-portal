@@ -22,6 +22,12 @@ interface WeekViewData {
   getAppointmentForTimeSlot: (day: Date, timeSlot: Date) => AppointmentBlock | undefined;
 }
 
+// Helper function to map JavaScript day index to database column day name
+const getDayNameFromIndex = (dayIndex: number): string => {
+  const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+  return dayNames[dayIndex];
+};
+
 export const useWeekViewData = (
   currentDateOrDays: Date | Date[],
   clinicianId: string | null,
@@ -82,18 +88,33 @@ export const useWeekViewData = (
     externalAppointments
   );
 
-  // Process availability data
+  // Process availability data with improved logging and correct day mapping
   const availabilityByDay = useMemo(() => {
     const availabilityMap = new Map<string, TimeBlock[]>();
     
-    if (!clinicianData) return availabilityMap;
+    if (!clinicianData) {
+      console.log('[useWeekViewData] No clinician data available');
+      return availabilityMap;
+    }
     
-    const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    console.log('[useWeekViewData] Processing availability for clinician:', clinicianData.id);
+    console.log('[useWeekViewData] Clinician data availability columns:', {
+      monday_1: clinicianData.clinician_availability_start_monday_1,
+      tuesday_1: clinicianData.clinician_availability_start_tuesday_1,
+      wednesday_1: clinicianData.clinician_availability_start_wednesday_1,
+      thursday_1: clinicianData.clinician_availability_start_thursday_1,
+      friday_1: clinicianData.clinician_availability_start_friday_1,
+      saturday_1: clinicianData.clinician_availability_start_saturday_1,
+      sunday_1: clinicianData.clinician_availability_start_sunday_1,
+    });
     
     weekDays.forEach((day, dayIndex) => {
       const dayKey = format(day, 'yyyy-MM-dd');
-      const dayName = days[dayIndex];
+      const jsDay = day.getDay(); // 0 = Sunday, 1 = Monday, etc.
+      const dayName = getDayNameFromIndex(jsDay);
       const blocks: TimeBlock[] = [];
+      
+      console.log(`[useWeekViewData] Processing day ${dayIndex}: ${dayKey}, JS day: ${jsDay}, dayName: ${dayName}`);
       
       for (let slot = 1; slot <= 3; slot++) {
         const startKey = `clinician_availability_start_${dayName}_${slot}`;
@@ -102,6 +123,8 @@ export const useWeekViewData = (
         const startTime = clinicianData[startKey];
         const endTime = clinicianData[endKey];
         
+        console.log(`[useWeekViewData] Checking slot ${slot} for ${dayName}: startKey=${startKey}, startTime=${startTime}, endTime=${endTime}`);
+        
         if (startTime && endTime) {
           const dayStart = DateTime.fromJSDate(day).setZone(userTimeZone);
           const [startHour, startMinute] = startTime.split(':').map(Number);
@@ -109,6 +132,8 @@ export const useWeekViewData = (
           
           const start = dayStart.set({ hour: startHour, minute: startMinute });
           const end = dayStart.set({ hour: endHour, minute: endMinute });
+          
+          console.log(`[useWeekViewData] Adding availability block for ${dayName}: ${start.toISO()} - ${end.toISO()}`);
           
           blocks.push({
             start,
@@ -121,9 +146,17 @@ export const useWeekViewData = (
         }
       }
       
+      console.log(`[useWeekViewData] Total blocks for ${dayName} (${dayKey}): ${blocks.length}`);
+      
       if (blocks.length > 0) {
         availabilityMap.set(dayKey, blocks);
       }
+    });
+    
+    console.log('[useWeekViewData] Final availability map:', {
+      totalDays: availabilityMap.size,
+      days: Array.from(availabilityMap.keys()),
+      blocksPerDay: Array.from(availabilityMap.entries()).map(([day, blocks]) => ({ day, count: blocks.length }))
     });
     
     return availabilityMap;

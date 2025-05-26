@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -43,7 +44,6 @@ import {
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { nanoid } from 'nanoid';
 import { ClientDetails } from '@/types/client';
 import { format } from 'date-fns';
 import { Link } from 'react-router-dom';
