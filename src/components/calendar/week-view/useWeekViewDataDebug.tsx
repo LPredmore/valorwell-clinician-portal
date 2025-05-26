@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { DateTime } from 'luxon';
@@ -15,11 +16,11 @@ const DEBUG_CONTEXT = 'useWeekViewDataDebug';
 // Use ClientDetails as Client for backward compatibility
 type Client = ClientDetails;
 
-// Input props interface for hook
+// PHASE 3: Updated input props interface for hook
 export interface UseWeekViewDataProps {
   currentDate: Date;
   clinicianId: string | null;
-  userTimeZone: string;
+  clinicianTimeZone: string;
   refreshTrigger?: number;
   appointments?: Appointment[];
   getClientName?: (clientId: string) => string;
@@ -34,17 +35,34 @@ export const useWeekViewDataDebug = (props: UseWeekViewDataProps) => {
   const {
     currentDate,
     clinicianId,
-    userTimeZone,
+    clinicianTimeZone,
     refreshTrigger = 0,
     appointments: externalAppointments = [],
     getClientName = (id: string) => `Client ${id}`
   } = props;
 
+  // PHASE 4: Validate clinician timezone with fallback
+  const validClinicianTimeZone = useMemo(() => {
+    if (!clinicianTimeZone) {
+      console.warn('[useWeekViewDataDebug] Missing clinicianTimeZone, falling back to UTC');
+      return 'UTC';
+    }
+    
+    try {
+      DateTime.now().setZone(clinicianTimeZone);
+      console.log('[useWeekViewDataDebug] Using validated clinician timezone:', clinicianTimeZone);
+      return clinicianTimeZone;
+    } catch (error) {
+      console.warn('[useWeekViewDataDebug] Invalid clinicianTimeZone, falling back to UTC:', error);
+      return 'UTC';
+    }
+  }, [clinicianTimeZone]);
+
   // Log hook initialization with parameters
   DebugUtils.log(DEBUG_CONTEXT, 'Hook initialized with parameters', {
     currentDate: currentDate?.toISOString(),
     clinicianId,
-    userTimeZone,
+    validClinicianTimeZone,
     refreshTrigger,
     externalAppointmentsCount: externalAppointments.length
   });
@@ -53,7 +71,7 @@ export const useWeekViewDataDebug = (props: UseWeekViewDataProps) => {
   CalendarDebugUtils.validateHookParameters(DEBUG_CONTEXT, {
     currentDate,
     clinicianId,
-    userTimeZone
+    userTimeZone: validClinicianTimeZone
   });
 
   // State hooks
@@ -65,14 +83,14 @@ export const useWeekViewDataDebug = (props: UseWeekViewDataProps) => {
   const [timeBlocks, setTimeBlocks] = useState<TimeBlock[]>([]);
   const [appointmentBlocks, setAppointmentBlocks] = useState<AppointmentBlock[]>([]);
 
-  // Ensure current date is in clinician's time zone
+  // PHASE 2: Ensure current date is in clinician's time zone
   const localDate = useMemo(() => {
     DebugUtils.log(DEBUG_CONTEXT, 'Converting currentDate to localDate', {
       currentDate: currentDate?.toISOString(),
-      userTimeZone
+      validClinicianTimeZone
     });
     
-    const result = TimeZoneService.fromJSDate(currentDate, userTimeZone);
+    const result = TimeZoneService.fromJSDate(currentDate, validClinicianTimeZone);
     
     DebugUtils.log(DEBUG_CONTEXT, 'Converted localDate result', {
       localDate: result.toISO(),
@@ -81,7 +99,7 @@ export const useWeekViewDataDebug = (props: UseWeekViewDataProps) => {
     });
     
     return result;
-  }, [currentDate, userTimeZone]);
+  }, [currentDate, validClinicianTimeZone]);
 
   // Generate days for the current week
   const weekDays = useMemo(() => {
@@ -127,7 +145,7 @@ export const useWeekViewDataDebug = (props: UseWeekViewDataProps) => {
       DebugUtils.log(DEBUG_CONTEXT, 'Initializing data', {
         clinicianId,
         refreshTrigger,
-        userTimeZone
+        validClinicianTimeZone
       });
       
       setLoading(true);
@@ -145,7 +163,7 @@ export const useWeekViewDataDebug = (props: UseWeekViewDataProps) => {
       }
 
       try {
-        // UTC date bounds for current week
+        // PHASE 2: UTC date bounds for current week using clinician timezone
         const utcStart = DateTime.utc(
           localDate.year,
           localDate.month,
@@ -162,7 +180,7 @@ export const useWeekViewDataDebug = (props: UseWeekViewDataProps) => {
           localStart: localDate.startOf('week').toISO(),
           utcStart,
           utcEnd,
-          timezone: userTimeZone
+          timezone: validClinicianTimeZone
         });
 
         // Fetch all required data in parallel
@@ -203,7 +221,7 @@ export const useWeekViewDataDebug = (props: UseWeekViewDataProps) => {
         DebugUtils.log(DEBUG_CONTEXT, 'Fetched appointments', {
           count: fetchedAppts.length,
           sample: fetchedAppts.length ? fetchedAppts[0] : null,
-          timezone: userTimeZone
+          timezone: validClinicianTimeZone
         });
 
         // Log each appointment for debugging
@@ -212,14 +230,14 @@ export const useWeekViewDataDebug = (props: UseWeekViewDataProps) => {
             CalendarDebugUtils.logAppointmentTransformation(
               'database-fetch',
               appt,
-              userTimeZone
+              validClinicianTimeZone
             );
             
             // Log timezone conversion
             CalendarDebugUtils.logTimezoneConversion(
               `appointment-${appt.id}`,
               appt.start_at,
-              userTimeZone
+              validClinicianTimeZone
             );
           }
         });
@@ -229,7 +247,7 @@ export const useWeekViewDataDebug = (props: UseWeekViewDataProps) => {
         DebugUtils.log(DEBUG_CONTEXT, 'Fetched availability blocks', {
           count: fetchedBlocks.length,
           sample: fetchedBlocks.length ? fetchedBlocks[0] : null,
-          timezone: userTimeZone
+          timezone: validClinicianTimeZone
         });
 
         // Log each availability block for debugging
@@ -238,7 +256,7 @@ export const useWeekViewDataDebug = (props: UseWeekViewDataProps) => {
             CalendarDebugUtils.logAvailabilityBlock(
               'database-fetch',
               block,
-              userTimeZone
+              validClinicianTimeZone
             );
           }
         });
@@ -278,9 +296,9 @@ export const useWeekViewDataDebug = (props: UseWeekViewDataProps) => {
     };
 
     initializeData();
-  }, [clinicianId, refreshTrigger, userTimeZone, localDate]);
+  }, [clinicianId, refreshTrigger, validClinicianTimeZone, localDate]);
 
-  // Process availability blocks into time blocks
+  // PHASE 2: Process availability blocks into time blocks using clinician timezone
   const processTimeBlocks = (blocks: AvailabilityBlock[], exceptions: AvailabilityException[]) => {
     DebugUtils.log(DEBUG_CONTEXT, 'Processing time blocks', {
       blocksCount: blocks.length,
@@ -301,8 +319,8 @@ export const useWeekViewDataDebug = (props: UseWeekViewDataProps) => {
       }
       
       try {
-        const start = DateTime.fromISO(block.start_at, { zone: 'UTC' }).setZone(userTimeZone);
-        const end = DateTime.fromISO(block.end_at, { zone: 'UTC' }).setZone(userTimeZone);
+        const start = DateTime.fromISO(block.start_at, { zone: 'UTC' }).setZone(validClinicianTimeZone);
+        const end = DateTime.fromISO(block.end_at, { zone: 'UTC' }).setZone(validClinicianTimeZone);
         const day = start.startOf('day');
         
         timeBlocks.push({
@@ -337,7 +355,7 @@ export const useWeekViewDataDebug = (props: UseWeekViewDataProps) => {
     });
   };
   
-  // Process appointments into appointment blocks
+  // PHASE 2: Process appointments into appointment blocks using clinician timezone
   const processAppointmentBlocks = (appts: Appointment[], clientMap: Map<string, Client>) => {
     DebugUtils.log(DEBUG_CONTEXT, 'Processing appointment blocks', {
       appointmentsCount: appts.length,
@@ -357,8 +375,8 @@ export const useWeekViewDataDebug = (props: UseWeekViewDataProps) => {
       }
       
       try {
-        const start = DateTime.fromISO(appointment.start_at, { zone: 'UTC' }).setZone(userTimeZone);
-        const end = DateTime.fromISO(appointment.end_at, { zone: 'UTC' }).setZone(userTimeZone);
+        const start = DateTime.fromISO(appointment.start_at, { zone: 'UTC' }).setZone(validClinicianTimeZone);
+        const end = DateTime.fromISO(appointment.end_at, { zone: 'UTC' }).setZone(validClinicianTimeZone);
         const day = start.startOf('day');
         
         // Get client name
@@ -434,15 +452,15 @@ export const useWeekViewDataDebug = (props: UseWeekViewDataProps) => {
       CalendarDebugUtils.logTimezoneConversion(
         'sample-appointment',
         sample,
-        userTimeZone
+        validClinicianTimeZone
       );
     }
     
-    // Map appointments to days
+    // PHASE 2: Map appointments to days using clinician timezone
     appointments.forEach(appointment => {
       try {
-        // UTC to local conversion
-        const slotTime = DateTime.fromISO(appointment.start_at).setZone(userTimeZone);
+        // UTC to clinician timezone conversion
+        const slotTime = DateTime.fromISO(appointment.start_at).setZone(validClinicianTimeZone);
         const dayStr = slotTime.toFormat('yyyy-MM-dd');
         
         DebugUtils.log(DEBUG_CONTEXT, 'Mapping appointment to day', {
@@ -483,9 +501,9 @@ export const useWeekViewDataDebug = (props: UseWeekViewDataProps) => {
     });
     
     return resultMap;
-  }, [appointments, dayKeys, userTimeZone, getClientName]);
+  }, [appointments, dayKeys, validClinicianTimeZone, getClientName]);
 
-  // Map availability by day with clinician time zone
+  // PHASE 2: Map availability by day with clinician time zone
   const dayAvailabilityMap = useMemo(() => {
     DebugUtils.log(DEBUG_CONTEXT, 'Building dayAvailabilityMap', {
       availabilityCount: availability.length,
@@ -500,9 +518,9 @@ export const useWeekViewDataDebug = (props: UseWeekViewDataProps) => {
     // Map availability blocks to days
     availability.forEach(block => {
       try {
-        // UTC to local conversion
+        // UTC to clinician timezone conversion
         const blockTime = block.start_at 
-          ? DateTime.fromISO(block.start_at).setZone(userTimeZone) 
+          ? DateTime.fromISO(block.start_at).setZone(validClinicianTimeZone) 
           : null;
           
         if (!blockTime) {
@@ -552,78 +570,82 @@ export const useWeekViewDataDebug = (props: UseWeekViewDataProps) => {
     });
     
     return resultMap;
-  }, [availability, dayKeys, userTimeZone]);
+  }, [availability, dayKeys, validClinicianTimeZone]);
 
-  // Utility function to check if a time slot is available
-  const isTimeSlotAvailable = (day: Date, timeSlot: Date): boolean => {
+  // PHASE 3: Utility function to check if a time slot is available - accepts Luxon DateTime
+  const isTimeSlotAvailable = (dayTimeSlot: DateTime): boolean => {
     DebugUtils.log(DEBUG_CONTEXT, 'Checking if time slot is available', {
-      day: day.toISOString(),
-      timeSlot: timeSlot.toISOString()
+      slot: dayTimeSlot.toFormat('yyyy-MM-dd HH:mm'),
+      timezone: dayTimeSlot.zoneName,
+      validTimezone: validClinicianTimeZone
     });
     
-    // Convert JS Date to DateTime
-    const dayDt = DateTime.fromJSDate(day, { zone: userTimeZone });
-    const timeSlotDt = DateTime.fromJSDate(timeSlot, { zone: userTimeZone });
-    
+    // PHASE 4: Validate timezone consistency
+    if (dayTimeSlot.zoneName !== validClinicianTimeZone) {
+      console.warn('[isTimeSlotAvailable] Timezone mismatch detected:', {
+        slotTimezone: dayTimeSlot.zoneName,
+        expectedTimezone: validClinicianTimeZone
+      });
+    }
+
     // Check if the time slot falls within any time block
     const isAvailable = timeBlocks.some(block => {
-      const isSameDay = block.day?.hasSame(dayDt, 'day') || false;
+      const isSameDay = block.day?.hasSame(dayTimeSlot, 'day') || false;
       if (!isSameDay) return false;
       
-      const slotTime = dayDt.set({
-        hour: timeSlotDt.hour,
-        minute: timeSlotDt.minute,
-        second: 0,
-        millisecond: 0
-      });
-      
-      return slotTime >= block.start && slotTime < block.end;
+      return dayTimeSlot >= block.start && dayTimeSlot < block.end;
     });
     
     return isAvailable;
   };
 
-  // Utility function to get the block for a time slot
-  const getBlockForTimeSlot = (day: Date, timeSlot: Date): TimeBlock | undefined => {
-    // Convert JS Date to DateTime
-    const dayDt = DateTime.fromJSDate(day, { zone: userTimeZone });
-    const timeSlotDt = DateTime.fromJSDate(timeSlot, { zone: userTimeZone });
+  // PHASE 3: Utility function to get the block for a time slot - accepts Luxon DateTime
+  const getBlockForTimeSlot = (dayTimeSlot: DateTime): TimeBlock | undefined => {
+    DebugUtils.log(DEBUG_CONTEXT, 'Looking for block at slot', {
+      slot: dayTimeSlot.toFormat('yyyy-MM-dd HH:mm'),
+      timezone: dayTimeSlot.zoneName,
+      validTimezone: validClinicianTimeZone
+    });
     
+    // PHASE 4: Validate timezone consistency
+    if (dayTimeSlot.zoneName !== validClinicianTimeZone) {
+      console.warn('[getBlockForTimeSlot] Timezone mismatch detected:', {
+        slotTimezone: dayTimeSlot.zoneName,
+        expectedTimezone: validClinicianTimeZone
+      });
+    }
+
     // Find the block that contains this time slot
     return timeBlocks.find(block => {
-      const isSameDay = block.day?.hasSame(dayDt, 'day') || false;
+      const isSameDay = block.day?.hasSame(dayTimeSlot, 'day') || false;
       if (!isSameDay) return false;
       
-      const slotTime = dayDt.set({
-        hour: timeSlotDt.hour,
-        minute: timeSlotDt.minute,
-        second: 0,
-        millisecond: 0
-      });
-      
-      return slotTime >= block.start && slotTime < block.end;
+      return dayTimeSlot >= block.start && dayTimeSlot < block.end;
     });
   };
 
-  // Utility function to get the appointment for a time slot
-  const getAppointmentForTimeSlot = (day: Date, timeSlot: Date): AppointmentBlock | undefined => {
-    // Convert JS Date to DateTime
-    const dayDt = DateTime.fromJSDate(day, { zone: userTimeZone });
-    const timeSlotDt = DateTime.fromJSDate(timeSlot, { zone: userTimeZone });
+  // PHASE 3: Utility function to get the appointment for a time slot - accepts Luxon DateTime
+  const getAppointmentForTimeSlot = (dayTimeSlot: DateTime): AppointmentBlock | undefined => {
+    DebugUtils.log(DEBUG_CONTEXT, 'Looking for appointment at slot', {
+      slot: dayTimeSlot.toFormat('yyyy-MM-dd HH:mm'),
+      timezone: dayTimeSlot.zoneName,
+      validTimezone: validClinicianTimeZone
+    });
     
+    // PHASE 4: Validate timezone consistency
+    if (dayTimeSlot.zoneName !== validClinicianTimeZone) {
+      console.warn('[getAppointmentForTimeSlot] Timezone mismatch detected:', {
+        slotTimezone: dayTimeSlot.zoneName,
+        expectedTimezone: validClinicianTimeZone
+      });
+    }
+
     // Find the appointment that contains this time slot
     return appointmentBlocks.find(appt => {
-      const isSameDay = appt.day?.hasSame(dayDt, 'day') || false;
+      const isSameDay = appt.day?.hasSame(dayTimeSlot, 'day') || false;
       if (!isSameDay) return false;
       
-      const slotTime = dayDt.set({
-        hour: timeSlotDt.hour,
-        minute: timeSlotDt.minute,
-        second: 0,
-        millisecond: 0
-      });
-      
-      return slotTime >= appt.start && slotTime < appt.end;
+      return dayTimeSlot >= appt.start && dayTimeSlot < appt.end;
     });
   };
 
