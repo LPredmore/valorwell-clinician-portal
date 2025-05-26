@@ -1,11 +1,10 @@
 import React from 'react';
 import { Calendar, Clock, User, MoreVertical, Edit, Trash } from 'lucide-react';
-import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import VideoLinkSection from './VideoLinkSection';
-import { formatClientName } from '@/utils/appointmentUtils';
+import { formatClientName, formatAppointmentDate, formatAppointmentTime } from '@/utils/appointmentUtils';
 import { Appointment } from '@/types/appointment';
 
 interface AppointmentDetailsProps {
@@ -14,6 +13,7 @@ interface AppointmentDetailsProps {
   onDeleteClick: () => void;
   onClose: () => void;
   onAppointmentUpdated: () => void;
+  userTimeZone: string;
 }
 
 const AppointmentDetails: React.FC<AppointmentDetailsProps> = ({
@@ -21,7 +21,8 @@ const AppointmentDetails: React.FC<AppointmentDetailsProps> = ({
   onEditClick,
   onDeleteClick,
   onClose,
-  onAppointmentUpdated
+  onAppointmentUpdated,
+  userTimeZone
 }) => {
   const isRecurring = !!appointment.recurring_group_id;
 
@@ -43,24 +44,12 @@ const AppointmentDetails: React.FC<AppointmentDetailsProps> = ({
 
   const getFormattedDate = () => {
     if (!appointment.start_at) return 'No date available';
-    try {
-      const date = new Date(appointment.start_at);
-      return format(date, 'EEEE, MMMM d, yyyy');
-    } catch (error) {
-      console.error('Error formatting start_at date:', error);
-      return 'Invalid date format';
-    }
+    return formatAppointmentDate(appointment.start_at, userTimeZone);
   };
 
   const getFormattedTime = (isoString: string | undefined) => {
     if (!isoString) return 'N/A';
-    try {
-      const date = new Date(isoString);
-      return format(date, 'h:mm a');
-    } catch (error) {
-      console.error('Error formatting time from ISO:', error);
-      return 'Invalid time format';
-    }
+    return formatAppointmentTime(isoString, userTimeZone);
   };
 
   const getRecurrenceText = () => {

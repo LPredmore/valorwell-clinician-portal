@@ -67,6 +67,7 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
               onDeleteClick={() => setIsDeleteDialogOpen(true)}
               onClose={onClose}
               onAppointmentUpdated={onAppointmentUpdated}
+              userTimeZone={userTimeZone}
             />
           )}
         </DialogContent>
