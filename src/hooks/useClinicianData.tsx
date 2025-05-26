@@ -61,7 +61,7 @@ export const getClinicianTimeZone = async (clinicianId: string): Promise<string>
     
     const { data, error } = await supabase
       .from('clinicians')
-      .select('clinician_timezone')
+      .select('clinician_time_zone')
       .eq('id', clinicianId)
       .single();
       
@@ -72,21 +72,14 @@ export const getClinicianTimeZone = async (clinicianId: string): Promise<string>
     
     console.log('[getClinicianTimeZone] Raw timezone data:', {
       data,
-      timezone: data?.clinician_timezone,
-      type: typeof data?.clinician_timezone,
-      isArray: Array.isArray(data?.clinician_timezone)
+      timezone: data?.clinician_time_zone,
+      type: typeof data?.clinician_time_zone
     });
     
-    // Ensure timezone is always a string
-    let timeZone = data?.clinician_timezone || 'America/Chicago';
+    // Use the string field which is now the source of truth
+    let timeZone = data?.clinician_time_zone || 'America/Chicago';
     
-    // Handle case where timezone might be an array
-    if (Array.isArray(timeZone)) {
-      console.warn('[getClinicianTimeZone] Timezone is unexpectedly an array:', timeZone);
-      timeZone = timeZone[0] || 'America/Chicago';
-    }
-    
-    // Ensure it's a string
+    // Ensure it's a string (should always be now)
     timeZone = String(timeZone);
     
     console.log('[getClinicianTimeZone] Final processed timezone:', {
