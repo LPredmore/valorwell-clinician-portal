@@ -74,7 +74,7 @@ const WeekView: React.FC<WeekViewProps> = ({
     userTimeZone
   );
 
-  // Handle click on an availability block
+  // Handle click on an availability block - use Date parameters
   const handleAvailabilityBlockClick = (day: Date, block: any) => {
     console.log('Availability block clicked:', {
       day: format(day, 'yyyy-MM-dd'),
@@ -160,12 +160,12 @@ const WeekView: React.FC<WeekViewProps> = ({
     }
   };
   
-  // Handle drag over a time slot
+  // Handle drag over a time slot - use Date parameters
   const handleAppointmentDragOver = (day: Date, timeSlot: Date, event: React.DragEvent) => {
     event.preventDefault(); // Allow drop
   };
   
-  // Handle drop on a time slot
+  // Handle drop on a time slot - use Date parameters
   const handleAppointmentDrop = (day: Date, timeSlot: Date, event: React.DragEvent) => {
     if (!draggedAppointmentId || !onAppointmentUpdate) return;
     
@@ -382,7 +382,7 @@ const WeekView: React.FC<WeekViewProps> = ({
                               ${i % 2 === 0 ? 'bg-gray-50' : 'bg-white'}`}
                 >
                   <TimeSlot
-                    day={dayDt.toJSDate()}
+                    day={day.toJSDate()}
                     timeSlot={timeSlot}
                     isAvailable={isAvailable}
                     currentBlock={currentBlock}

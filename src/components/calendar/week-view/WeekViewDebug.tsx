@@ -1,3 +1,4 @@
+
 import React, { useMemo, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
@@ -21,8 +22,8 @@ export interface WeekViewDebugProps {
   appointments?: Appointment[];
   getClientName?: (clientId: string) => string;
   onAppointmentClick?: (appointment: Appointment) => void;
-  onAvailabilityClick?: (date: DateTime, availabilityBlock: any) => void;
-  clinicianTimeZone: string; // Required, not optional
+  onAvailabilityClick?: (date: Date, availabilityBlock: any) => void;
+  userTimeZone: string; // Updated to use userTimeZone instead of clinicianTimeZone
 }
 
 const WeekViewDebug: React.FC<WeekViewDebugProps> = ({
@@ -33,24 +34,24 @@ const WeekViewDebug: React.FC<WeekViewDebugProps> = ({
   getClientName = () => "Unknown Client",
   onAppointmentClick,
   onAvailabilityClick,
-  clinicianTimeZone, // Required parameter
+  userTimeZone, // Updated to use userTimeZone
 }) => {
-  // Validate clinician timezone with fallback
-  const validClinicianTimeZone = useMemo(() => {
-    if (!clinicianTimeZone) {
-      console.warn('[WeekViewDebug] Missing clinicianTimeZone, falling back to UTC');
+  // Validate user timezone with fallback
+  const validUserTimeZone = useMemo(() => {
+    if (!userTimeZone) {
+      console.warn('[WeekViewDebug] Missing userTimeZone, falling back to UTC');
       return 'UTC';
     }
     
     try {
-      DateTime.now().setZone(clinicianTimeZone);
-      console.log('[WeekViewDebug] Using validated clinician timezone:', clinicianTimeZone);
-      return clinicianTimeZone;
+      DateTime.now().setZone(userTimeZone);
+      console.log('[WeekViewDebug] Using validated user timezone:', userTimeZone);
+      return userTimeZone;
     } catch (error) {
-      console.warn('[WeekViewDebug] Invalid clinicianTimeZone, falling back to UTC:', error);
+      console.warn('[WeekViewDebug] Invalid userTimeZone, falling back to UTC:', error);
       return 'UTC';
     }
-  }, [clinicianTimeZone]);
+  }, [userTimeZone]);
 
   // Log component initialization
   DebugUtils.log(DEBUG_CONTEXT, 'Component initialized with props', {
@@ -58,25 +59,25 @@ const WeekViewDebug: React.FC<WeekViewDebugProps> = ({
     clinicianId,
     refreshTrigger,
     appointmentsCount: appointments.length,
-    validClinicianTimeZone
+    validUserTimeZone
   });
 
   // Validate props
   CalendarDebugUtils.validateHookParameters(DEBUG_CONTEXT, {
     currentDate,
     clinicianId,
-    userTimeZone: validClinicianTimeZone
+    userTimeZone: validUserTimeZone
   });
 
   // Generate days and time slots using Luxon DateTime exclusively
   const { days, timeSlots } = useMemo(() => {
     DebugUtils.log(DEBUG_CONTEXT, "Generating days with currentDate", {
       jsDate: currentDate.toISOString(),
-      luxonDate: TimeZoneService.fromJSDate(currentDate, validClinicianTimeZone).toISO(),
+      luxonDate: TimeZoneService.fromJSDate(currentDate, validUserTimeZone).toISO(),
     });
 
-    // Use the TimeZoneService to generate days in the clinician's timezone
-    const today = TimeZoneService.fromJSDate(currentDate, validClinicianTimeZone);
+    // Use the TimeZoneService to generate days in the user's timezone
+    const today = TimeZoneService.fromJSDate(currentDate, validUserTimeZone);
     const weekStart = TimeZoneService.startOfWeek(today);
     const weekEnd = TimeZoneService.endOfWeek(today);
     const daysInWeek = TimeZoneService.eachDayOfInterval(
@@ -93,8 +94,8 @@ const WeekViewDebug: React.FC<WeekViewDebugProps> = ({
     // Generate time slots using Luxon DateTime from 8 AM to 6 PM in 30-minute increments
     const slots = Array.from({ length: 21 }, (_, i) => {
       const minutes = i * 30;
-      // Create a base date in clinician's timezone at 8:00 AM
-      const baseDate = DateTime.now().setZone(validClinicianTimeZone).set({
+      // Create a base date in user's timezone at 8:00 AM
+      const baseDate = DateTime.now().setZone(validUserTimeZone).set({
         hour: 8,
         minute: 0,
         second: 0,
@@ -107,17 +108,17 @@ const WeekViewDebug: React.FC<WeekViewDebugProps> = ({
       count: slots.length,
       first: slots[0].toFormat('HH:mm'),
       last: slots[slots.length - 1].toFormat('HH:mm'),
-      timezone: validClinicianTimeZone
+      timezone: validUserTimeZone
     });
 
     return { days: daysInWeek, timeSlots: slots };
-  }, [currentDate, validClinicianTimeZone]);
+  }, [currentDate, validUserTimeZone]);
 
   // Use the custom hook to get all the data and utility functions
   const hookProps = {
     currentDate,
     clinicianId,
-    clinicianTimeZone: validClinicianTimeZone,
+    clinicianTimeZone: validUserTimeZone, // Hook still expects clinicianTimeZone parameter
     refreshTrigger,
     appointments,
     getClientName
@@ -158,7 +159,7 @@ const WeekViewDebug: React.FC<WeekViewDebugProps> = ({
           id: app.id,
           start_at: app.start_at,
           dateFormatted: app.start_at
-            ? TimeZoneService.fromUTC(app.start_at, validClinicianTimeZone).toFormat(
+            ? TimeZoneService.fromUTC(app.start_at, validUserTimeZone).toFormat(
                 "yyyy-MM-dd"
               )
             : "Invalid",
@@ -171,7 +172,7 @@ const WeekViewDebug: React.FC<WeekViewDebugProps> = ({
       for (let i = 0; i < samplesToLog; i++) {
         const app = appointments[i];
         const startLocalDateTime = app.start_at
-          ? TimeZoneService.fromUTC(app.start_at, validClinicianTimeZone)
+          ? TimeZoneService.fromUTC(app.start_at, validUserTimeZone)
           : null;
 
         DebugUtils.log(
@@ -218,7 +219,7 @@ const WeekViewDebug: React.FC<WeekViewDebugProps> = ({
       "Days in view",
       days.map((d) => d.toFormat('yyyy-MM-dd'))
     );
-  }, [appointments, appointmentBlocks, getClientName, days, validClinicianTimeZone, timeBlocks]);
+  }, [appointments, appointmentBlocks, getClientName, days, validUserTimeZone, timeBlocks]);
 
   // Adapter function to convert AppointmentBlock to Appointment
   const handleAppointmentBlockClick = (appointmentBlock: AppointmentBlock) => {
@@ -253,10 +254,10 @@ const WeekViewDebug: React.FC<WeekViewDebugProps> = ({
     }
   };
 
-  // Handle click on availability block
-  const handleAvailabilityBlockClick = (day: DateTime, block: any) => {
+  // Handle click on availability block - use Date objects for compatibility
+  const handleAvailabilityBlockClick = (day: Date, block: any) => {
     DebugUtils.log(DEBUG_CONTEXT, 'Availability block clicked', {
-      day: day.toFormat('yyyy-MM-dd'),
+      day: day.toISOString().split('T')[0],
       block
     });
     
@@ -281,9 +282,10 @@ const WeekViewDebug: React.FC<WeekViewDebugProps> = ({
           exceptionId: exception.id
         });
         
+        const dayDt = TimeZoneService.fromJSDate(day, validUserTimeZone);
         const availabilityBlock = {
           id: exception.id,
-          day_of_week: day.toFormat('EEEE'),
+          day_of_week: dayDt.toFormat('EEEE'),
           start_time: exception.start_time || "",
           end_time: exception.end_time || "",
           clinician_id: exception.clinician_id,
@@ -343,7 +345,7 @@ const WeekViewDebug: React.FC<WeekViewDebugProps> = ({
               <div className="text-sm text-gray-400">{day.toFormat('EEE')}</div>
               <div
                 className={`text-lg ${
-                  day.toFormat('yyyy-MM-dd') === DateTime.now().setZone(validClinicianTimeZone).toFormat('yyyy-MM-dd')
+                  day.toFormat('yyyy-MM-dd') === DateTime.now().setZone(validUserTimeZone).toFormat('yyyy-MM-dd')
                     ? "bg-valorwell-500 text-white rounded-full w-8 h-8 flex items-center justify-center mx-auto"
                     : ""
                 }`}
@@ -375,7 +377,11 @@ const WeekViewDebug: React.FC<WeekViewDebugProps> = ({
                   millisecond: 0
                 });
 
-                // All utility functions now receive Luxon DateTime objects
+                // Convert to Date objects for TimeSlot component compatibility
+                const dayDate = day.toJSDate();
+                const timeSlotDate = timeSlot.toJSDate();
+
+                // All utility functions now receive Luxon DateTime objects internally
                 const isAvailable = isTimeSlotAvailable(slotStartTime);
                 const currentBlock = getBlockForTimeSlot(slotStartTime);
                 const appointment = getAppointmentForTimeSlot(slotStartTime);
@@ -392,8 +398,8 @@ const WeekViewDebug: React.FC<WeekViewDebugProps> = ({
                     className="col-span-1 min-h-[40px] border-t border-gray-50 p-0 group hover:bg-gray-50"
                   >
                     <TimeSlot
-                      day={day}
-                      timeSlot={timeSlot}
+                      day={dayDate}
+                      timeSlot={timeSlotDate}
                       isAvailable={isAvailable}
                       currentBlock={currentBlock}
                       appointment={appointment}

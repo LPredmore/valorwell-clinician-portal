@@ -48,16 +48,17 @@ export interface AvailabilityException {
   updated_at: string;
 }
 
+// Updated TimeSlotProps to use Date objects for external interface compatibility
 export interface TimeSlotProps {
-  day: DateTime;
-  timeSlot: DateTime;
+  day: Date;
+  timeSlot: Date;
   isAvailable: boolean;
   currentBlock?: TimeBlock;
   appointment?: AppointmentBlock;
   isStartOfBlock: boolean;
   isEndOfBlock: boolean;
   isStartOfAppointment: boolean;
-  handleAvailabilityBlockClick: (day: DateTime, block: TimeBlock) => void;
+  handleAvailabilityBlockClick: (day: Date, block: TimeBlock) => void;
   onAppointmentClick?: (appointment: any) => void;
   originalAppointments: any[];
 }

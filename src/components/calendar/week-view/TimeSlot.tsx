@@ -4,10 +4,11 @@ import { TimeBlock, AppointmentBlock } from './types';
 import { Appointment } from '@/types/appointment';
 import { DateTime } from 'luxon';
 import { convertAppointmentBlockToAppointment } from '@/utils/appointmentUtils';
+import { TimeZoneService } from '@/utils/timeZoneService';
 
 interface TimeSlotProps {
-  day: DateTime;
-  timeSlot: DateTime;
+  day: Date;
+  timeSlot: Date;
   isAvailable: boolean;
   currentBlock?: TimeBlock;
   appointment?: AppointmentBlock;
@@ -15,11 +16,11 @@ interface TimeSlotProps {
   isEndOfBlock: boolean;
   isStartOfAppointment: boolean;
   isEndOfAppointment?: boolean;
-  handleAvailabilityBlockClick: (day: DateTime, block: TimeBlock) => void;
+  handleAvailabilityBlockClick: (day: Date, block: TimeBlock) => void;
   onAppointmentClick?: (appointmentBlock: any) => void;
   onAppointmentDragStart?: (appointment: any, event: React.DragEvent) => void;
-  onAppointmentDragOver?: (day: DateTime, timeSlot: DateTime, event: React.DragEvent) => void;
-  onAppointmentDrop?: (day: DateTime, timeSlot: DateTime, event: React.DragEvent) => void;
+  onAppointmentDragOver?: (day: Date, timeSlot: Date, event: React.DragEvent) => void;
+  onAppointmentDrop?: (day: Date, timeSlot: Date, event: React.DragEvent) => void;
   originalAppointments: Appointment[];
 }
 
@@ -40,8 +41,12 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
   onAppointmentDrop,
   originalAppointments
 }) => {
-  const formattedDay = day.toFormat('yyyy-MM-dd');
-  const formattedTime = timeSlot.toFormat('HH:mm');
+  // Convert Date objects to DateTime internally when needed for formatting
+  const dayDt = TimeZoneService.fromJSDate(day, 'UTC');
+  const timeSlotDt = TimeZoneService.fromJSDate(timeSlot, 'UTC');
+  
+  const formattedDay = dayDt.toFormat('yyyy-MM-dd');
+  const formattedTime = timeSlotDt.toFormat('HH:mm');
 
   const handleDragOver = (e: React.DragEvent) => {
     if (onAppointmentDragOver) {
