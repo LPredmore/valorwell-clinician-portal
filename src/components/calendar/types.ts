@@ -3,8 +3,8 @@ import { DateTime } from 'luxon';
 import { Appointment } from '@/types/appointment';
 
 export interface TimeSlotProps {
-  day: DateTime;
-  timeSlot: DateTime;
+  day: Date;
+  timeSlot: Date;
   isAvailable: boolean;
   currentBlock?: any;
   appointment?: any;
@@ -12,11 +12,11 @@ export interface TimeSlotProps {
   isEndOfBlock: boolean;
   isStartOfAppointment: boolean;
   isEndOfAppointment?: boolean;
-  handleAvailabilityBlockClick: (day: DateTime, block: any) => void;
+  handleAvailabilityBlockClick: (day: Date, block: any) => void;
   onAppointmentClick?: (appointment: any) => void;
   onAppointmentDragStart?: (appointment: any, event: React.DragEvent) => void;
-  onAppointmentDragOver?: (day: DateTime, timeSlot: DateTime, event: React.DragEvent) => void;
-  onAppointmentDrop?: (day: DateTime, timeSlot: DateTime, event: React.DragEvent) => void;
+  onAppointmentDragOver?: (day: Date, timeSlot: Date, event: React.DragEvent) => void;
+  onAppointmentDrop?: (day: Date, timeSlot: Date, event: React.DragEvent) => void;
   originalAppointments: any[];
 }
 

@@ -19,7 +19,7 @@ const DEBUG_CONTEXT = 'CalendarDebugWrapper';
 interface CalendarDebugWrapperProps {
   clinicianId: string | null;
   initialAppointments?: Appointment[];
-  clinicianTimeZone: string; // Kept as clinicianTimeZone but will pass as userTimeZone to children
+  clinicianTimeZone: string;
 }
 
 /**
@@ -329,7 +329,7 @@ export const CalendarDebugWrapper: React.FC<CalendarDebugWrapperProps> = ({
             getClientName={getClientName}
             onAppointmentClick={handleAppointmentClick}
             onAvailabilityClick={handleAvailabilityClick}
-            userTimeZone={selectedTimezone}
+            clinicianTimeZone={selectedTimezone}
           />
         </CardContent>
       </Card>
