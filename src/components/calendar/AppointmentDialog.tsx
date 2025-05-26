@@ -55,12 +55,70 @@ const formatTimeFromMinutes = (minutes: number): string => {
   return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
 };
 
-// Helper function to combine date and time strings into a Date object
-const combineDateAndTime = (date: Date, timeStr: string, timezone: string): Date => {
+// Helper function to get and validate clinician timezone
+const getClinicianTimezone = async (clinicianId: string): Promise<string> => {
+  console.log('[AppointmentDialog] Fetching clinician timezone for ID:', clinicianId);
+  
+  const { data, error } = await supabase
+    .from('clinicians')
+    .select('clinician_time_zone')
+    .eq('id', clinicianId)
+    .single();
+    
+  if (error) {
+    console.error('[AppointmentDialog] Error fetching clinician timezone:', error);
+    throw new Error(`Failed to fetch clinician timezone: ${error.message}`);
+  }
+  
+  console.log('[AppointmentDialog] Raw clinician timezone data:', data);
+  
+  let timezone = data?.clinician_time_zone;
+  
+  if (!timezone) {
+    console.error('[AppointmentDialog] No timezone found for clinician');
+    throw new Error('Clinician timezone is not configured. Please contact an administrator.');
+  }
+  
+  // If timezone is an array, use the first value
+  if (Array.isArray(timezone)) {
+    console.log('[AppointmentDialog] Timezone is array, using first value:', timezone[0]);
+    timezone = timezone[0];
+  }
+  
+  // Ensure it's a string
+  timezone = String(timezone);
+  
+  if (!timezone || timezone.trim() === '') {
+    console.error('[AppointmentDialog] Empty timezone string');
+    throw new Error('Clinician timezone is empty. Please contact an administrator.');
+  }
+  
+  console.log('[AppointmentDialog] Final processed timezone:', timezone);
+  return timezone;
+};
+
+// Helper function to convert local date/time to UTC using specific timezone
+const convertLocalToUTC = (date: Date, timeStr: string, timezone: string): Date => {
+  console.log('[AppointmentDialog] Converting local time to UTC:', {
+    date: format(date, 'yyyy-MM-dd'),
+    timeStr,
+    timezone
+  });
+  
   const dateStr = format(date, 'yyyy-MM-dd');
   const dateTimeStr = `${dateStr}T${timeStr}`;
+  
+  // Create DateTime in the specified timezone
   const localDateTime = TimeZoneService.convertLocalToUTC(dateTimeStr, timezone);
-  return localDateTime.toJSDate();
+  const utcDate = localDateTime.toJSDate();
+  
+  console.log('[AppointmentDialog] Conversion result:', {
+    input: dateTimeStr,
+    timezone,
+    utcResult: utcDate.toISOString()
+  });
+  
+  return utcDate;
 };
 
 const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
@@ -196,68 +254,71 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
       return;
     }
 
-    // Get the clinician's timezone for saving with the appointment
     const currentClinicianId = clinicianId || selectedClinicianId;
-    let clinicianTimezone = timeZone;
-    
-    if (currentClinicianId) {
-      try {
-        clinicianTimezone = await getClinicianTimeZone(currentClinicianId);
-      } catch (error) {
-        console.error('Error fetching clinician timezone:', error);
-        // Fall back to current timezone if we can't get clinician's timezone
-      }
-    }
-
-    const startDateTime = combineDateAndTime(appointmentDate, startTime, clinicianTimezone);
-    const endDateTime = new Date(startDateTime.getTime() + 60 * 60 * 1000); // Add 1 hour
-
-    if (isNaN(startDateTime.getTime()) || isNaN(endDateTime.getTime())) {
+    if (!currentClinicianId) {
       toast({
-        title: "Invalid Date/Time",
-        description: "Please enter a valid date and time.",
+        title: "Missing Clinician",
+        description: "No clinician ID available for appointment creation.",
         variant: "destructive",
-      });
+      })
       return;
     }
 
-    let recurringData = null;
-    if (isRecurring) {
-      if (!recurringType) {
-        toast({
-          title: "Missing Recurrence Type",
-          description: "Please select a recurrence type.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      if (!recurringEndDate && !recurringCount) {
-        toast({
-          title: "Missing Recurrence End",
-          description: "Please select either an end date or a number of occurrences for the recurring appointment.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      if (recurringEndDate && isBefore(recurringEndDate, appointmentDate)) {
-        toast({
-          title: "Invalid End Date",
-          description: "The recurring end date must be after the start date.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      recurringData = {
-        recurringType: recurringType,
-        recurringEndDate: recurringEndDate ? recurringEndDate.toISOString() : null,
-        recurringCount: recurringCount,
-      };
-    }
-
     try {
+      // CRITICAL: Get the clinician's timezone first and validate it
+      const clinicianTimezone = await getClinicianTimezone(currentClinicianId);
+      
+      console.log('[AppointmentDialog] Using clinician timezone for appointment creation:', clinicianTimezone);
+      
+      // Convert the selected wall time to UTC using the clinician's timezone
+      const startDateTime = convertLocalToUTC(appointmentDate, startTime, clinicianTimezone);
+      const endDateTime = new Date(startDateTime.getTime() + 60 * 60 * 1000); // Add 1 hour
+
+      if (isNaN(startDateTime.getTime()) || isNaN(endDateTime.getTime())) {
+        toast({
+          title: "Invalid Date/Time",
+          description: "Please enter a valid date and time.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      let recurringData = null;
+      if (isRecurring) {
+        if (!recurringType) {
+          toast({
+            title: "Missing Recurrence Type",
+            description: "Please select a recurrence type.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        if (!recurringEndDate && !recurringCount) {
+          toast({
+            title: "Missing Recurrence End",
+            description: "Please select either an end date or a number of occurrences for the recurring appointment.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        if (recurringEndDate && isBefore(recurringEndDate, appointmentDate)) {
+          toast({
+            title: "Invalid End Date",
+            description: "The recurring end date must be after the start date.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        recurringData = {
+          recurringType: recurringType,
+          recurringEndDate: recurringEndDate ? recurringEndDate.toISOString() : null,
+          recurringCount: recurringCount,
+        };
+      }
+
       if (isRecurring && recurringData) {
         // Generate recurring appointments
         const recurringGroupId = uuidv4();
@@ -272,7 +333,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
 
         // Save each recurring appointment
         for (const date of recurringDates) {
-          const recurringStartDateTime = combineDateAndTime(date, startTime, clinicianTimezone);
+          const recurringStartDateTime = convertLocalToUTC(date, startTime, clinicianTimezone);
           const recurringEndDateTime = new Date(recurringStartDateTime.getTime() + 60 * 60 * 1000);
 
           const appointmentData = {
@@ -284,7 +345,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
             notes: notes,
             isRecurring: true,
             recurringData: recurringData,
-            appointment_timezone: clinicianTimezone,
+            appointment_timezone: clinicianTimezone, // Use clinician's timezone
             recurringGroupId: recurringGroupId,
           };
 
@@ -310,7 +371,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
           notes: notes,
           isRecurring: false,
           recurringData: null,
-          appointment_timezone: clinicianTimezone,
+          appointment_timezone: clinicianTimezone, // Use clinician's timezone
         };
 
         const result = await saveAppointment(appointmentData);
@@ -350,7 +411,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
       console.error('[AppointmentDialog] Error creating appointment:', error);
       toast({
         title: "Error",
-        description: "Failed to create appointment. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to create appointment. Please try again.",
         variant: "destructive",
       });
     }
