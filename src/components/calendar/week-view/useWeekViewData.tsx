@@ -7,6 +7,7 @@ import { TimeZoneService } from '@/utils/timeZoneService';
 import { Appointment } from '@/types/appointment';
 import { PartialClientDetails } from '@/types/client';
 import { TimeBlock, AppointmentBlock } from './types';
+import { supabase } from '@/integrations/supabase/client';
 
 interface WeekViewData {
   loading: boolean;
@@ -28,6 +29,17 @@ const getDayNameFromIndex = (dayIndex: number): string => {
   return dayNames[dayIndex];
 };
 
+// Helper function to validate and format time strings
+const validateTimeString = (timeStr: string): string | null => {
+  if (!timeStr || typeof timeStr !== 'string') return null;
+  const timeMatch = timeStr.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+  if (!timeMatch) return null;
+  const hour = parseInt(timeMatch[1], 10);
+  const minute = parseInt(timeMatch[2], 10);
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+  return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+};
+
 export const useWeekViewData = (
   currentDateOrDays: Date | Date[],
   clinicianId: string | null,
@@ -43,9 +55,10 @@ export const useWeekViewData = (
     }
     // Calculate week boundaries for single date
     const start = DateTime.fromJSDate(currentDate).setZone(userTimeZone).startOf('week');
-    return Array.from({ length: 7 }, (_, i) => 
+    const calculatedDays = Array.from({ length: 7 }, (_, i) => 
       start.plus({ days: i }).toJSDate()
     );
+    return calculatedDays;
   }, [currentDateOrDays, userTimeZone]);
 
   // Calculate week boundaries for data fetching
@@ -74,7 +87,64 @@ export const useWeekViewData = (
     return slots;
   }, [weekDays]);
 
-  // Fetch calendar data
+  // State for availability data from proper tables
+  const [availabilityData, setAvailabilityData] = useState<any[]>([]);
+  const [availabilityExceptions, setAvailabilityExceptions] = useState<any[]>([]);
+  const [availabilityLoading, setAvailabilityLoading] = useState(false);
+  const [availabilityError, setAvailabilityError] = useState<Error | null>(null);
+
+  // Fetch availability data from the correct tables
+  useEffect(() => {
+    const fetchAvailabilityData = async () => {
+      if (!clinicianId) {
+        return;
+      }
+
+      setAvailabilityLoading(true);
+      setAvailabilityError(null);
+
+      try {
+        // Fetch from availability table (recurring patterns)
+        const { data: availabilityBlocks, error: availabilityError } = await supabase
+          .from('availability')
+          .select('*')
+          .eq('clinician_id', clinicianId)
+          .eq('is_active', true)
+          .eq('is_deleted', false);
+
+        if (availabilityError) {
+          throw availabilityError;
+        }
+
+        // Fetch from availability_exceptions table (specific date overrides)
+        const { data: exceptions, error: exceptionsError } = await supabase
+          .from('availability_exceptions')
+          .select('*')
+          .eq('clinician_id', clinicianId)
+          .eq('is_active', true)
+          .eq('is_deleted', false)
+          .gte('specific_date', startOfWeek.toISODate())
+          .lte('specific_date', endOfWeek.toISODate());
+
+        if (exceptionsError) {
+          throw exceptionsError;
+        }
+
+        setAvailabilityData(availabilityBlocks || []);
+        setAvailabilityExceptions(exceptions || []);
+
+      } catch (error) {
+        console.error('[useWeekViewData] Error fetching availability data:', error);
+        setAvailabilityError(error instanceof Error ? error : new Error(String(error)));
+      } finally {
+        setAvailabilityLoading(false);
+      }
+    };
+
+    fetchAvailabilityData();
+  }, [clinicianId, startOfWeek, endOfWeek, refreshTrigger]);
+
+  // Fetch calendar data (appointments and clinician info)
   const {
     loading,
     appointments,
@@ -88,85 +158,100 @@ export const useWeekViewData = (
     externalAppointments
   );
 
-  // Process availability data with improved logging and correct day mapping
+  // Process availability data from the correct tables
   const availabilityByDay = useMemo(() => {
     const availabilityMap = new Map<string, TimeBlock[]>();
     
-    if (!clinicianData) {
-      console.log('[useWeekViewData] No clinician data available');
-      return availabilityMap;
-    }
-    
-    console.log('[useWeekViewData] Processing availability for clinician:', clinicianData.id);
-    console.log('[useWeekViewData] Clinician data availability columns:', {
-      monday_1: clinicianData.clinician_availability_start_monday_1,
-      tuesday_1: clinicianData.clinician_availability_start_tuesday_1,
-      wednesday_1: clinicianData.clinician_availability_start_wednesday_1,
-      thursday_1: clinicianData.clinician_availability_start_thursday_1,
-      friday_1: clinicianData.clinician_availability_start_friday_1,
-      saturday_1: clinicianData.clinician_availability_start_saturday_1,
-      sunday_1: clinicianData.clinician_availability_start_sunday_1,
-    });
-    
-    weekDays.forEach((day, dayIndex) => {
+    weekDays.forEach((day, weekIndex) => {
       const dayKey = format(day, 'yyyy-MM-dd');
-      const jsDay = day.getDay(); // 0 = Sunday, 1 = Monday, etc.
+      const jsDay = day.getDay();
       const dayName = getDayNameFromIndex(jsDay);
       const blocks: TimeBlock[] = [];
       
-      console.log(`[useWeekViewData] Processing day ${dayIndex}: ${dayKey}, JS day: ${jsDay}, dayName: ${dayName}`);
+      // Process recurring availability patterns
+      const dayAvailabilityBlocks = availabilityData.filter(block => 
+        block.day_of_week === dayName
+      );
       
-      for (let slot = 1; slot <= 3; slot++) {
-        const startKey = `clinician_availability_start_${dayName}_${slot}`;
-        const endKey = `clinician_availability_end_${dayName}_${slot}`;
-        
-        const startTime = clinicianData[startKey];
-        const endTime = clinicianData[endKey];
-        
-        console.log(`[useWeekViewData] Checking slot ${slot} for ${dayName}: startKey=${startKey}, startTime=${startTime}, endTime=${endTime}`);
-        
-        if (startTime && endTime) {
-          const dayStart = DateTime.fromJSDate(day).setZone(userTimeZone);
-          const [startHour, startMinute] = startTime.split(':').map(Number);
-          const [endHour, endMinute] = endTime.split(':').map(Number);
+      dayAvailabilityBlocks.forEach((block, blockIndex) => {
+        try {
+          const startTime = validateTimeString(block.start_at);
+          const endTime = validateTimeString(block.end_at);
           
-          const start = dayStart.set({ hour: startHour, minute: startMinute });
-          const end = dayStart.set({ hour: endHour, minute: endMinute });
-          
-          console.log(`[useWeekViewData] Adding availability block for ${dayName}: ${start.toISO()} - ${end.toISO()}`);
-          
-          blocks.push({
-            start,
-            end,
-            day: dayStart,
-            availabilityIds: [`${clinicianData.id}-${dayName}-${slot}`],
-            isException: false,
-            isStandalone: false
-          });
+          if (startTime && endTime) {
+            const dayStart = DateTime.fromJSDate(day).setZone(userTimeZone);
+            const [startHour, startMinute] = startTime.split(':').map(Number);
+            const [endHour, endMinute] = endTime.split(':').map(Number);
+            
+            const start = dayStart.set({ hour: startHour, minute: startMinute });
+            const end = dayStart.set({ hour: endHour, minute: endMinute });
+            
+            if (start.isValid && end.isValid) {
+              const timeBlock: TimeBlock = {
+                start,
+                end,
+                day: dayStart,
+                availabilityIds: [block.id],
+                isException: false,
+                isStandalone: false
+              };
+              
+              blocks.push(timeBlock);
+            }
+          }
+        } catch (error) {
+          console.error(`[useWeekViewData] Error processing recurring block ${block.id}:`, error);
         }
-      }
+      });
       
-      console.log(`[useWeekViewData] Total blocks for ${dayName} (${dayKey}): ${blocks.length}`);
+      // Process specific date exceptions for this day
+      const dayExceptions = availabilityExceptions.filter(exception => 
+        exception.specific_date === dayKey
+      );
+      
+      dayExceptions.forEach((exception, exceptionIndex) => {
+        try {
+          const startTime = validateTimeString(exception.start_time);
+          const endTime = validateTimeString(exception.end_time);
+          
+          if (startTime && endTime) {
+            const dayStart = DateTime.fromJSDate(day).setZone(userTimeZone);
+            const [startHour, startMinute] = startTime.split(':').map(Number);
+            const [endHour, endMinute] = endTime.split(':').map(Number);
+            
+            const start = dayStart.set({ hour: startHour, minute: startMinute });
+            const end = dayStart.set({ hour: endHour, minute: endMinute });
+            
+            if (start.isValid && end.isValid) {
+              const timeBlock: TimeBlock = {
+                start,
+                end,
+                day: dayStart,
+                availabilityIds: [exception.id],
+                isException: true,
+                isStandalone: true
+              };
+              
+              blocks.push(timeBlock);
+            }
+          }
+        } catch (error) {
+          console.error(`[useWeekViewData] Error processing exception ${exception.id}:`, error);
+        }
+      });
       
       if (blocks.length > 0) {
         availabilityMap.set(dayKey, blocks);
       }
     });
     
-    console.log('[useWeekViewData] Final availability map:', {
-      totalDays: availabilityMap.size,
-      days: Array.from(availabilityMap.keys()),
-      blocksPerDay: Array.from(availabilityMap.entries()).map(([day, blocks]) => ({ day, count: blocks.length }))
-    });
-    
     return availabilityMap;
-  }, [clinicianData, weekDays, userTimeZone]);
+  }, [availabilityData, availabilityExceptions, weekDays, userTimeZone]);
 
   // Process appointment data
   const appointmentsByDay = useMemo(() => {
     const appointmentMap = new Map<string, AppointmentBlock[]>();
     
-    // Use external appointments if provided, otherwise use fetched appointments
     const appointmentsToProcess = externalAppointments.length > 0 ? externalAppointments : appointments;
     
     appointmentsToProcess.forEach(appointment => {
@@ -178,7 +263,6 @@ export const useWeekViewData = (
         const day = start.startOf('day');
         const dayKey = day.toFormat('yyyy-MM-dd');
         
-        // Get client name from clients map or appointment data
         let clientName = appointment.clientName || 'Unknown Client';
         if (!clientName && appointment.client_id && clients.has(appointment.client_id)) {
           const client = clients.get(appointment.client_id);
@@ -254,9 +338,13 @@ export const useWeekViewData = (
     );
   };
 
+  // Combine loading states
+  const combinedLoading = loading || availabilityLoading;
+  const combinedError = error || availabilityError;
+
   return {
-    loading,
-    error,
+    loading: combinedLoading,
+    error: combinedError,
     weekDays,
     timeSlots,
     availabilityByDay,
