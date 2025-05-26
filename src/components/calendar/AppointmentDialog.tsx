@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -32,7 +31,7 @@ import {
 import { CalendarIcon } from "lucide-react"
 import { addDays, isBefore } from 'date-fns';
 import { getUserTimeZone } from '@/utils/timeZoneUtils';
-import { getClinicianTimeZone } from '@/integrations/supabase/client';
+import { getClinicianTimeZone } from '@/hooks/useClinicianData';
 
 interface AppointmentDialogProps {
   isOpen: boolean;
