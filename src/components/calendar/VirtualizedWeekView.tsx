@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { format } from 'date-fns';
 import { useWeekViewData } from './week-view/useWeekViewData';
@@ -72,7 +73,7 @@ const VirtualizedWeekView: React.FC<VirtualizedWeekViewProps> = ({
   const [isAppointmentDetailsOpen, setIsAppointmentDetailsOpen] = useState(false);
   const [scrollPosition, setScrollPosition] = useState(0);
   
-  // Get calendar data from the hook
+  // Get calendar data from the hook - fix parameter count
   const {
     loading,
     weekDays,
@@ -86,7 +87,6 @@ const VirtualizedWeekView: React.FC<VirtualizedWeekViewProps> = ({
     selectedClinicianId,
     refreshTrigger,
     appointments,
-    (id: string) => `Client ${id}`,
     userTimeZone
   );
 
@@ -332,11 +332,11 @@ const VirtualizedWeekView: React.FC<VirtualizedWeekViewProps> = ({
           {/* Day headers - use exact same width as the day columns below */}
           {weekDays.map(day => (
             <div 
-              key={day.toISO()} 
+              key={day.toISOString()} 
               className="w-24 flex-1 px-2 py-1 font-semibold text-center border-r last:border-r-0"
             >
-              <div className="text-sm">{day.toFormat('EEE')}</div>
-              <div className="text-xs">{day.toFormat('MMM d')}</div>
+              <div className="text-sm">{format(day, 'EEE')}</div>
+              <div className="text-xs">{format(day, 'MMM d')}</div>
             </div>
           ))}
         </div>
@@ -394,30 +394,30 @@ const VirtualizedWeekView: React.FC<VirtualizedWeekViewProps> = ({
             >
               <div className="flex" style={{ position: 'absolute', top: 0, left: 0, width: '100%' }}>
                 {weekDays.map(day => (
-                  <div key={day.toISO() || ''} className="flex-1 border-r last:border-r-0">
+                  <div key={format(day, 'yyyy-MM-dd')} className="flex-1 border-r last:border-r-0">
                     {rowVirtualizer.getVirtualItems().map(virtualRow => {
                       const timeSlot = TIME_SLOTS[virtualRow.index];
                       
                       // Convert JS Date to DateTime objects for consistent checking
-                      const dayDt = TimeZoneService.fromJSDate(day.toJSDate(), userTimeZone);
+                      const dayDt = TimeZoneService.fromJSDate(day, userTimeZone);
                       const timeSlotDt = TimeZoneService.fromJSDate(timeSlot, userTimeZone);
                       
                       // Perform availability checks and get relevant blocks
                       const isAvailable = showAvailability && isTimeSlotAvailable(
-                        dayDt.toJSDate(), 
-                        timeSlotDt.toJSDate()
+                        day, 
+                        timeSlot
                       );
                       
                       // Get the corresponding block if available
                       const currentBlock = isAvailable ? getBlockForTimeSlot(
-                        dayDt.toJSDate(), 
-                        timeSlotDt.toJSDate()
+                        day, 
+                        timeSlot
                       ) : undefined;
                       
                       // Get any appointment for this time slot
                       const appointment = getAppointmentForTimeSlot(
-                        dayDt.toJSDate(), 
-                        timeSlotDt.toJSDate()
+                        day, 
+                        timeSlot
                       );
                       
                       // Determine if this is the start or end of a block
@@ -452,7 +452,7 @@ const VirtualizedWeekView: React.FC<VirtualizedWeekViewProps> = ({
                           }}
                         >
                           <TimeSlot
-                            day={dayDt.toJSDate()}
+                            day={day}
                             timeSlot={timeSlot}
                             isAvailable={isAvailable}
                             currentBlock={currentBlock}

@@ -46,7 +46,13 @@ const formSchema = z.object({
   client_diagnosis: z.array(z.string()).optional(),
 });
 
-const PersonalInfoTab: React.FC<TabProps> = ({ clientData, isEditing, onSave, onCancel, form }) => {
+const PersonalInfoTab: React.FC<TabProps> = ({ 
+  clientData, 
+  isEditing, 
+  onSave = () => {}, 
+  onCancel = () => {}, 
+  form 
+}) => {
   const [newDiagnosis, setNewDiagnosis] = React.useState('');
 
   const formMethods = useForm<z.infer<typeof formSchema>>({
@@ -65,8 +71,8 @@ const PersonalInfoTab: React.FC<TabProps> = ({ clientData, isEditing, onSave, on
       client_state: clientData?.client_state || '',
       client_zipcode: clientData?.client_zipcode || '',
       client_self_goal: clientData?.client_self_goal || '',
-      client_minor: clientData?.client_minor || false,
-      client_is_profile_complete: clientData?.client_is_profile_complete || false,
+      client_minor: Boolean(clientData?.client_minor),
+      client_is_profile_complete: Boolean(clientData?.client_is_profile_complete),
       client_assigned_therapist: clientData?.client_assigned_therapist || '',
       client_diagnosis: clientData?.client_diagnosis || [],
     },
@@ -249,10 +255,10 @@ const PersonalInfoTab: React.FC<TabProps> = ({ clientData, isEditing, onSave, on
         <Checkbox
           id="client_minor"
           disabled={!isEditing}
-          defaultChecked={clientData?.client_minor}
+          defaultChecked={Boolean(clientData?.client_minor)}
           onCheckedChange={(checked) => {
             if (isEditing) {
-              onSave({ client_minor: checked });
+              onSave({ client_minor: Boolean(checked) });
             }
           }}
           {...register("client_minor")}
@@ -328,7 +334,7 @@ const PersonalInfoTab: React.FC<TabProps> = ({ clientData, isEditing, onSave, on
           <Button type="button" variant="ghost" onClick={onCancel}>
             Cancel
           </Button>
-          <Button type="submit" variant="primary">
+          <Button type="submit" variant="default">
             Save
           </Button>
         </div>

@@ -109,6 +109,9 @@ export interface ClientDetails {
   client_is_profile_complete?: boolean;
   created_at?: string;
   updated_at?: string;
+  
+  // Add missing field for ClinicianDashboard
+  client_currentsymptoms?: string;
 
   // Additional fields for session notes and treatment plans
   client_diagnosis?: string[];

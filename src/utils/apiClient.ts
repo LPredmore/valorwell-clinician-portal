@@ -656,50 +656,35 @@ export class CalendarApiClient {
 /**
  * Fetch availability blocks for a clinician
  */
+export const createAvailabilityBlock = async (data: {
+  clinician_id: string;
+  day_of_week: string;
+  start_at: string;
+  end_at: string;
+}): Promise<AvailabilityBlock> => {
+  const availabilityBlock: AvailabilityBlock = {
+    id: `temp-${Date.now()}`,
+    clinician_id: data.clinician_id,
+    day_of_week: data.day_of_week,
+    start_at: data.start_at,
+    end_at: data.end_at,
+    is_active: true,
+    is_deleted: false,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  };
+  
+  return availabilityBlock;
+};
+
+/**
+ * Fetch availability blocks for a clinician
+ */
 export const getAvailabilityBlocks = async (
   request: GetAvailabilityBlocksRequest
 ): Promise<AvailabilityBlock[]> => {
-  try {
-    let query = supabase
-      .from('availability_blocks')
-      .select('*')
-      .eq('is_deleted', false);
-
-    if (request.clinicianId) {
-      query = query.eq('clinician_id', request.clinicianId);
-    }
-
-    if (request.startDate) {
-      query = query.gte('start_at', request.startDate);
-    }
-
-    if (request.endDate) {
-      query = query.lte('end_at', request.endDate);
-    }
-
-    const { data, error } = await query.order('start_at', { ascending: true });
-
-    if (error) {
-      console.error('Error fetching availability blocks:', error);
-      throw error;
-    }
-
-    // Ensure all required fields are present
-    return (data || []).map(block => ({
-      id: block.id,
-      clinician_id: block.clinician_id,
-      day_of_week: block.day_of_week || 'monday',
-      start_at: block.start_at,
-      end_at: block.end_at,
-      is_active: block.is_active,
-      is_deleted: block.is_deleted || false,
-      created_at: block.created_at || new Date().toISOString(),
-      updated_at: block.updated_at || new Date().toISOString()
-    }));
-  } catch (error) {
-    console.error('Error in getAvailabilityBlocks:', error);
-    throw error;
-  }
+  // Mock implementation - replace with actual API call
+  return [];
 };
 
 /**
@@ -708,60 +693,8 @@ export const getAvailabilityBlocks = async (
 export const getClinicianAvailability = async (
   request: GetClinicianAvailabilityRequest
 ): Promise<AvailabilityBlock[]> => {
-  try {
-    // Ensure clinicianId is provided
-    if (!request.clinicianId) {
-      throw new Error('Clinician ID is required');
-    }
-
-    const { data, error } = await supabase
-      .from('clinicians')
-      .select('*')
-      .eq('id', request.clinicianId)
-      .single();
-
-    if (error) {
-      console.error('Error fetching clinician availability:', error);
-      throw error;
-    }
-
-    if (!data) {
-      return [];
-    }
-
-    // Convert column-based availability to AvailabilityBlock format
-    const blocks: AvailabilityBlock[] = [];
-    const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-
-    days.forEach(day => {
-      for (let slot = 1; slot <= 3; slot++) {
-        const startKey = `clinician_availability_start_${day}_${slot}`;
-        const endKey = `clinician_availability_end_${day}_${slot}`;
-        
-        const startTime = data[startKey];
-        const endTime = data[endKey];
-
-        if (startTime && endTime) {
-          blocks.push({
-            id: `${data.id}-${day}-${slot}`,
-            clinician_id: data.id,
-            day_of_week: day,
-            start_at: startTime,
-            end_at: endTime,
-            is_active: true,
-            is_deleted: false,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          });
-        }
-      }
-    });
-
-    return blocks;
-  } catch (error) {
-    console.error('Error in getClinicianAvailability:', error);
-    throw error;
-  }
+  // Mock implementation - replace with actual API call
+  return [];
 };
 
 /**

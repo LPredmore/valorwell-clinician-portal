@@ -1,4 +1,3 @@
-
 /**
  * Availability Status Enum
  * Defines all possible availability statuses
@@ -119,7 +118,7 @@ export interface AvailabilityBlock {
   is_deleted: boolean;
   created_at: string;
   updated_at: string;
-  recurring_pattern?: WeeklyAvailabilityPattern;
+  recurring_pattern?: WeeklyAvailabilityPattern | null;
 }
 
 /**

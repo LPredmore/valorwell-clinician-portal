@@ -1,436 +1,321 @@
-import React, { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { supabase, parseDateString, formatDateForDB } from "@/integrations/supabase/client";
-import { 
-  Card, 
-  CardContent,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { 
-  Form,
-} from "@/components/ui/form";
-import { useToast } from "@/hooks/use-toast";
-import { Pencil, Save, X } from "lucide-react";
-import { z } from "zod";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import Layout from '@/components/layout/Layout';
-import PersonalInfoTab from "@/components/client/PersonalInfoTab";
-import InsuranceTab from "@/components/client/InsuranceTab";
-import TreatmentTab from "@/components/client/TreatmentTab";
-import DocumentationTab from "@/components/client/DocumentationTab";
-import { ClientDetails as ClientDetailsType, Clinician } from "@/types/client";
-import { useUser } from "@/context/UserContext";
+import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import { Edit, Calendar, Phone, Mail, Clock } from 'lucide-react';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { ClientDetails, Clinician } from '@/types/client';
+import PersonalInfoTab from '@/components/client/PersonalInfoTab';
+import InsuranceTab from '@/components/client/InsuranceTab';
+import EmergencyContactTab from '@/components/client/EmergencyContactTab';
+import MedicalHistoryTab from '@/components/client/MedicalHistoryTab';
+import TreatmentPlanTab from '@/components/client/TreatmentPlanTab';
+import NotesTab from '@/components/client/NotesTab';
+import { getClientById } from '@/services/clientService';
+import { getClinicians } from '@/services/clinicianService';
+import { getAppointmentsByClientId } from '@/services/appointmentService';
+import { Appointment } from '@/types/appointment';
+import AppointmentCard from '@/components/client/AppointmentCard';
+import { formatPhoneNumber } from '@/utils/formatters';
 
-const ClientDetails = () => {
-  const { clientId } = useParams();
-  const navigate = useNavigate();
-  const [isEditing, setIsEditing] = useState(false);
-  const [clientData, setClientData] = useState<ClientDetailsType | null>(null);
+const ClientDetails: React.FC = () => {
+  const { id } = useParams<{ id: string }>();
+  const [clientData, setClientData] = useState<ClientDetails | null>(null);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [clinicians, setClinicians] = useState<Clinician[]>([]);
+  const [isEditing, setIsEditing] = useState(false);
+  const [activeTab, setActiveTab] = useState('personal');
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-  const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState("personal");
-  const { userRole } = useUser();
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchClient = async () => {
-      try {
-        const { data, error } = await supabase
-          .from("clients")
-          .select("*")
-          .eq("id", clientId)
-          .single();
+  // Form state for diagnosis management
+  const form = {
+    diagnosis: clientData?.client_diagnosis || [],
+  };
 
-        if (error) {
-          throw error;
-        }
-
-        setClientData(data);
-        setIsLoading(false);
-      } catch (err) {
-        console.error('Error fetching client:', err);
-        setError(err as Error);
-        setIsLoading(false);
-        toast({
-          title: "Error",
-          description: "Failed to fetch client details.",
-          variant: "destructive",
-        });
-      }
-    };
-
-    const fetchClinicians = async () => {
-      try {
-        const { data, error } = await supabase
-          .from("clinicians")
-          .select("*");
-
-        if (error) {
-          throw error;
-        }
-
-        setClinicians(data);
-      } catch (err) {
-        console.error('Error fetching clinicians:', err);
-        setError(err as Error);
-        toast({
-          title: "Error",
-          description: "Failed to fetch clinicians.",
-          variant: "destructive",
-        });
-      }
-    };
-
-    fetchClient();
-    fetchClinicians();
-  }, [clientId, toast]);
-
-  const formSchema = z.object({
-    client_first_name: z.string().min(2).max(50),
-    client_last_name: z.string().min(2).max(50),
-    client_preferred_name: z.string().optional().nullable(),
-    client_email: z.string().email().optional().nullable(),
-    client_phone: z.string().optional().nullable(),
-    client_date_of_birth: z.date().optional().nullable(),
-    client_age: z.string().optional().nullable(),
-    client_gender: z.string().optional().nullable(),
-    client_gender_identity: z.string().optional().nullable(),
-    client_state: z.string().optional().nullable(),
-    client_time_zone: z.string().optional().nullable(),
-    client_minor: z.string().optional().nullable(),
-    client_status: z.string().optional().nullable(),
-    client_assigned_therapist: z.string().optional().nullable(),
-    client_referral_source: z.string().optional().nullable(),
-    client_self_goal: z.string().optional().nullable(),
-    client_diagnosis: z.array(z.string()).optional().nullable(),
-    client_insurance_company_primary: z.string().optional().nullable(),
-    client_policy_number_primary: z.string().optional().nullable(),
-    client_group_number_primary: z.string().optional().nullable(),
-    client_subscriber_name_primary: z.string().optional().nullable(),
-    client_insurance_type_primary: z.string().optional().nullable(),
-    client_subscriber_dob_primary: z.date().optional().nullable(),
-    client_subscriber_relationship_primary: z.string().optional().nullable(),
-    client_insurance_company_secondary: z.string().optional().nullable(),
-    client_policy_number_secondary: z.string().optional().nullable(),
-    client_group_number_secondary: z.string().optional().nullable(),
-    client_subscriber_name_secondary: z.string().optional().nullable(),
-    client_insurance_type_secondary: z.string().optional().nullable(),
-    client_subscriber_dob_secondary: z.date().optional().nullable(),
-    client_subscriber_relationship_secondary: z.string().optional().nullable(),
-    client_insurance_company_tertiary: z.string().optional().nullable(),
-    client_policy_number_tertiary: z.string().optional().nullable(),
-    client_group_number_tertiary: z.string().optional().nullable(),
-    client_subscriber_name_tertiary: z.string().optional().nullable(),
-    client_insurance_type_tertiary: z.string().optional().nullable(),
-    client_subscriber_dob_tertiary: z.date().optional().nullable(),
-    client_subscriber_relationship_tertiary: z.string().optional().nullable(),
-    client_vacoverage: z.string().optional().nullable(),
-    client_champva: z.string().optional().nullable(), 
-    client_tricare_beneficiary_category: z.string().optional().nullable(),
-    client_tricare_sponsor_name: z.string().optional().nullable(),
-    client_tricare_sponsor_branch: z.string().optional().nullable(),
-    client_tricare_sponsor_id: z.string().optional().nullable(),
-    client_tricare_plan: z.string().optional().nullable(),
-    client_tricare_region: z.string().optional().nullable(),
-    client_tricare_policy_id: z.string().optional().nullable(),
-    client_tricare_has_referral: z.string().optional().nullable(),
-    client_tricare_referral_number: z.string().optional().nullable(),
-    client_city: z.string().optional().nullable(),
-    client_zipcode: z.string().optional().nullable(),
-    client_address: z.string().optional().nullable(),
-    client_zip_code: z.string().optional().nullable(),
-    client_treatmentplan_startdate: z.date().optional().nullable(),
-    client_is_profile_complete: z.string().optional().nullable(),
-  });
-
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      client_first_name: clientData?.client_first_name || "",
-      client_last_name: clientData?.client_last_name || "",
-      client_preferred_name: clientData?.client_preferred_name || "",
-      client_email: clientData?.client_email || "",
-      client_phone: clientData?.client_phone || "",
-      client_date_of_birth: clientData?.client_date_of_birth ? parseDateString(clientData.client_date_of_birth) : null,
-      client_age: clientData?.client_age ? String(clientData.client_age) : null,
-      client_gender: clientData?.client_gender || "",
-      client_gender_identity: clientData?.client_gender_identity || "",
-      client_state: clientData?.client_state || "",
-      client_time_zone: clientData?.client_time_zone || "",
-      client_minor: clientData?.client_minor || "",
-      client_status: clientData?.client_status || "",
-      client_assigned_therapist: clientData?.client_assigned_therapist || "",
-      client_referral_source: clientData?.client_referral_source || "",
-      client_self_goal: clientData?.client_self_goal || "",
-      client_diagnosis: clientData?.client_diagnosis || [],
-      client_insurance_company_primary: clientData?.client_insurance_company_primary || "",
-      client_policy_number_primary: clientData?.client_policy_number_primary || "",
-      client_group_number_primary: clientData?.client_group_number_primary || "",
-      client_subscriber_name_primary: clientData?.client_subscriber_name_primary || "",
-      client_insurance_type_primary: clientData?.client_insurance_type_primary || "",
-      client_subscriber_dob_primary: clientData?.client_subscriber_dob_primary ? parseDateString(clientData.client_subscriber_dob_primary) : null,
-      client_subscriber_relationship_primary: clientData?.client_subscriber_relationship_primary || "",
-      client_insurance_company_secondary: clientData?.client_insurance_company_secondary || "",
-      client_policy_number_secondary: clientData?.client_policy_number_secondary || "",
-      client_group_number_secondary: clientData?.client_group_number_secondary || "",
-      client_subscriber_name_secondary: clientData?.client_subscriber_name_secondary || "",
-      client_insurance_type_secondary: clientData?.client_insurance_type_secondary || "",
-      client_subscriber_dob_secondary: clientData?.client_subscriber_dob_secondary ? parseDateString(clientData.client_subscriber_dob_secondary) : null,
-      client_subscriber_relationship_secondary: clientData?.client_subscriber_relationship_secondary || "",
-      client_insurance_company_tertiary: clientData?.client_insurance_company_tertiary || "",
-      client_policy_number_tertiary: clientData?.client_policy_number_tertiary || "",
-      client_group_number_tertiary: clientData?.client_group_number_tertiary || "",
-      client_subscriber_name_tertiary: clientData?.client_subscriber_name_tertiary || "",
-      client_insurance_type_tertiary: clientData?.client_insurance_type_tertiary || "",
-      client_subscriber_dob_tertiary: clientData?.client_subscriber_dob_tertiary ? parseDateString(clientData.client_subscriber_dob_tertiary) : null,
-      client_subscriber_relationship_tertiary: clientData?.client_subscriber_relationship_tertiary || "",
-      client_vacoverage: clientData?.client_vacoverage || "",
-      client_champva: clientData?.client_champva || "",
-      client_tricare_beneficiary_category: clientData?.client_tricare_beneficiary_category || "",
-      client_tricare_sponsor_name: clientData?.client_tricare_sponsor_name || "",
-      client_tricare_sponsor_branch: clientData?.client_tricare_sponsor_branch || "",
-      client_tricare_sponsor_id: clientData?.client_tricare_sponsor_id || "",
-      client_tricare_plan: clientData?.client_tricare_plan || "",
-      client_tricare_region: clientData?.client_tricare_region || "",
-      client_tricare_policy_id: clientData?.client_tricare_policy_id || "",
-      client_tricare_has_referral: clientData?.client_tricare_has_referral || "",
-      client_tricare_referral_number: clientData?.client_tricare_referral_number || "",
-      client_city: clientData?.client_city || "",
-      client_zipcode: clientData?.client_zipcode || "",
-      client_address: clientData?.client_address || "",
-      client_zip_code: clientData?.client_zip_code || "",
-      client_treatmentplan_startdate: clientData?.client_treatmentplan_startdate ? parseDateString(clientData.client_treatmentplan_startdate) : null,
-      client_is_profile_complete: clientData?.client_is_profile_complete || "",
-    },
-  });
-
-  useEffect(() => {
+  const handleAddDiagnosis = (diagnosis: string) => {
     if (clientData) {
-      form.reset({
-        client_first_name: clientData.client_first_name || "",
-        client_last_name: clientData.client_last_name || "",
-        client_preferred_name: clientData.client_preferred_name || "",
-        client_email: clientData.client_email || "",
-        client_phone: clientData.client_phone || "",
-        client_date_of_birth: clientData.client_date_of_birth ? parseDateString(clientData.client_date_of_birth) : null,
-        client_age: clientData.client_age ? String(clientData.client_age) : null,
-        client_gender: clientData.client_gender || "",
-        client_gender_identity: clientData.client_gender_identity || "",
-        client_state: clientData.client_state || "",
-        client_time_zone: clientData.client_time_zone || "",
-        client_minor: clientData.client_minor || "",
-        client_status: clientData.client_status || "",
-        client_assigned_therapist: clientData.client_assigned_therapist || "",
-        client_referral_source: clientData.client_referral_source || "",
-        client_self_goal: clientData.client_self_goal || "",
-        client_diagnosis: clientData.client_diagnosis || [],
-        client_insurance_company_primary: clientData.client_insurance_company_primary || "",
-        client_policy_number_primary: clientData.client_policy_number_primary || "",
-        client_group_number_primary: clientData.client_group_number_primary || "",
-        client_subscriber_name_primary: clientData.client_subscriber_name_primary || "",
-        client_insurance_type_primary: clientData.client_insurance_type_primary || "",
-        client_subscriber_dob_primary: clientData.client_subscriber_dob_primary ? parseDateString(clientData.client_subscriber_dob_primary) : null,
-        client_subscriber_relationship_primary: clientData.client_subscriber_relationship_primary || "",
-        client_insurance_company_secondary: clientData.client_insurance_company_secondary || "",
-        client_policy_number_secondary: clientData.client_policy_number_secondary || "",
-        client_group_number_secondary: clientData.client_group_number_secondary || "",
-        client_subscriber_name_secondary: clientData.client_subscriber_name_secondary || "",
-        client_insurance_type_secondary: clientData.client_insurance_type_secondary || "",
-        client_subscriber_dob_secondary: clientData.client_subscriber_dob_secondary ? parseDateString(clientData.client_subscriber_dob_secondary) : null,
-        client_subscriber_relationship_secondary: clientData.client_subscriber_relationship_secondary || "",
-        client_insurance_company_tertiary: clientData.client_insurance_company_tertiary || "",
-        client_policy_number_tertiary: clientData.client_policy_number_tertiary || "",
-        client_group_number_tertiary: clientData.client_group_number_tertiary || "",
-        client_subscriber_name_tertiary: clientData.client_subscriber_name_tertiary || "",
-        client_insurance_type_tertiary: clientData.client_insurance_type_tertiary || "",
-        client_subscriber_dob_tertiary: clientData.client_subscriber_dob_tertiary ? parseDateString(clientData.client_subscriber_dob_tertiary) : null,
-        client_subscriber_relationship_tertiary: clientData.client_subscriber_relationship_tertiary || "",
-        client_vacoverage: clientData.client_vacoverage || "",
-        client_champva: clientData.client_champva || "",
-        client_tricare_beneficiary_category: clientData.client_tricare_beneficiary_category || "",
-        client_tricare_sponsor_name: clientData.client_tricare_sponsor_name || "",
-        client_tricare_sponsor_branch: clientData.client_tricare_sponsor_branch || "",
-        client_tricare_sponsor_id: clientData.client_tricare_sponsor_id || "",
-        client_tricare_plan: clientData.client_tricare_plan || "",
-        client_tricare_region: clientData.client_tricare_region || "",
-        client_tricare_policy_id: clientData.client_tricare_policy_id || "",
-        client_tricare_has_referral: clientData.client_tricare_has_referral || "",
-        client_tricare_referral_number: clientData.client_tricare_referral_number || "",
-        client_city: clientData.client_city || "",
-        client_zipcode: clientData.client_zipcode || "",
-        client_address: clientData.client_address || "",
-        client_zip_code: clientData.client_zip_code || "",
-        client_treatmentplan_startdate: clientData.client_treatmentplan_startdate ? parseDateString(clientData.client_treatmentplan_startdate) : null,
-        client_is_profile_complete: clientData.client_is_profile_complete || "",
+      const updatedDiagnosis = [...(clientData.client_diagnosis || []), diagnosis];
+      setClientData({
+        ...clientData,
+        client_diagnosis: updatedDiagnosis,
       });
     }
-  }, [clientData, form]);
+  };
 
-  const handleSaveChanges = async (values: z.infer<typeof formSchema>) => {
-    try {
-      const formattedValues = {
-        ...values,
-        client_date_of_birth: values.client_date_of_birth ? formatDateForDB(values.client_date_of_birth) : null,
-        client_subscriber_dob_primary: values.client_subscriber_dob_primary ? formatDateForDB(values.client_subscriber_dob_primary) : null,
-        client_subscriber_dob_secondary: values.client_subscriber_dob_secondary ? formatDateForDB(values.client_subscriber_dob_secondary) : null,
-        client_subscriber_dob_tertiary: values.client_subscriber_dob_tertiary ? formatDateForDB(values.client_subscriber_dob_tertiary) : null,
-        client_age: values.client_age ? parseInt(values.client_age) : null,
-        client_treatmentplan_startdate: values.client_treatmentplan_startdate ? formatDateForDB(values.client_treatmentplan_startdate) : null,
-      };
-
-      const { error } = await supabase
-        .from('clients')
-        .update(formattedValues)
-        .eq('id', clientId);
-
-      if (error) {
-        throw error;
-      }
-
-      toast({
-        title: "Success",
-        description: "Client details updated successfully."
+  const handleRemoveDiagnosis = (index: number) => {
+    if (clientData && clientData.client_diagnosis) {
+      const updatedDiagnosis = [...clientData.client_diagnosis];
+      updatedDiagnosis.splice(index, 1);
+      setClientData({
+        ...clientData,
+        client_diagnosis: updatedDiagnosis,
       });
+    }
+  };
 
+  const handleSave = (data: Partial<ClientDetails>) => {
+    if (clientData) {
+      setClientData({ ...clientData, ...data });
       setIsEditing(false);
-
-      const { data } = await supabase
-        .from('clients')
-        .select('*')
-        .eq('id', clientId)
-        .single();
-
-      if (data) {
-        setClientData(data);
-      }
-    } catch (err) {
-      console.error('Error updating client:', err);
-      toast({
-        title: "Error",
-        description: "Failed to update client details.",
-        variant: "destructive",
-      });
     }
   };
 
   const handleCancel = () => {
-    form.reset();
     setIsEditing(false);
   };
 
-  const handleAddDiagnosis = () => {
-    const currentDiagnoses = form.getValues("client_diagnosis") || [];
-    form.setValue("client_diagnosis", [...currentDiagnoses, ""]);
-  };
-
-  const handleRemoveDiagnosis = (index: number) => {
-    const currentDiagnoses = form.getValues("client_diagnosis") || [];
-    form.setValue(
-      "client_diagnosis",
-      currentDiagnoses.filter((_, i) => i !== index)
-    );
-  };
+  useEffect(() => {
+    const fetchClientData = async () => {
+      if (!id) return;
+      
+      setIsLoading(true);
+      try {
+        const client = await getClientById(id);
+        setClientData(client);
+        
+        // Fetch appointments for this client
+        const clientAppointments = await getAppointmentsByClientId(id);
+        setAppointments(clientAppointments);
+        
+        // Fetch clinicians for dropdown selection
+        const allClinicians = await getClinicians();
+        setClinicians(allClinicians);
+        
+      } catch (err) {
+        console.error('Error fetching client data:', err);
+        setError('Failed to load client data. Please try again later.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchClientData();
+  }, [id]);
 
   if (isLoading) {
-    return (
-      <Layout>
-        <div className="flex justify-center items-center h-full">
-          <p>Loading client details...</p>
-        </div>
-      </Layout>
-    );
+    return <div className="flex justify-center items-center h-screen">Loading client data...</div>;
+  }
+
+  if (error) {
+    return <div className="text-red-500 p-4">{error}</div>;
   }
 
   if (!clientData) {
-    return (
-      <Layout>
-        <div className="flex justify-center items-center h-full">
-          <p>Client not found.</p>
-        </div>
-      </Layout>
-    );
+    return <div className="p-4">Client not found</div>;
   }
 
-  const isRestrictedRole = userRole === "clinician" || userRole === "client";
+  const getInitials = () => {
+    const firstName = clientData.client_first_name || '';
+    const lastName = clientData.client_last_name || '';
+    return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
+  };
+
+  const getFullName = () => {
+    return `${clientData.client_first_name} ${clientData.client_last_name}`;
+  };
+
+  const getPreferredName = () => {
+    return clientData.client_preferred_name ? `(${clientData.client_preferred_name})` : '';
+  };
+
+  const getUpcomingAppointments = () => {
+    const now = new Date();
+    return appointments
+      .filter(appointment => new Date(appointment.start_at) > now)
+      .sort((a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime())
+      .slice(0, 3);
+  };
+
+  const upcomingAppointments = getUpcomingAppointments();
 
   return (
-    <Layout>
-      <div className="mb-6 flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold">
-            {clientData.client_first_name} {clientData.client_last_name}
-          </h1>
-          <p className="text-gray-500">{clientData.client_email}</p>
+    <div className="container mx-auto p-6 space-y-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="flex items-center gap-4">
+          <Avatar className="h-16 w-16">
+            <AvatarFallback className="bg-valorwell-600 text-white text-xl">
+              {getInitials()}
+            </AvatarFallback>
+          </Avatar>
+          <div>
+            <h1 className="text-2xl font-bold">
+              {getFullName()} <span className="font-normal text-gray-500">{getPreferredName()}</span>
+            </h1>
+            <div className="flex items-center gap-4 text-sm text-gray-500 mt-1">
+              <div className="flex items-center gap-1">
+                <Mail className="h-4 w-4" />
+                <span>{clientData.client_email}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Phone className="h-4 w-4" />
+                <span>{formatPhoneNumber(clientData.client_phone)}</span>
+              </div>
+            </div>
+          </div>
         </div>
-        <div className="flex gap-2">
-          {isEditing ? (
-            <>
-              <Button variant="outline" onClick={handleCancel} className="flex items-center gap-1">
-                <X size={16} /> Cancel
+        <Badge variant={clientData.client_status === 'active' ? 'default' : 'outline'}>
+          {clientData.client_status || 'No Status'}
+        </Badge>
+      </div>
+      
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Client Information</CardTitle>
+                {!isEditing && (
+                  <Button onClick={() => setIsEditing(true)} size="sm">
+                    <Edit className="h-4 w-4 mr-2" />
+                    Edit
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <TabsList className="grid w-full grid-cols-6">
+                  <TabsTrigger value="personal">Personal</TabsTrigger>
+                  <TabsTrigger value="insurance">Insurance</TabsTrigger>
+                  <TabsTrigger value="emergency">Emergency</TabsTrigger>
+                  <TabsTrigger value="medical">Medical</TabsTrigger>
+                  <TabsTrigger value="treatment">Treatment</TabsTrigger>
+                  <TabsTrigger value="notes">Notes</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="personal">
+                  <PersonalInfoTab
+                    isEditing={isEditing}
+                    form={{
+                      ...form,
+                      handleAddDiagnosis,
+                      handleRemoveDiagnosis,
+                    }}
+                    clientData={clientData}
+                    onSave={handleSave}
+                    onCancel={handleCancel}
+                  />
+                </TabsContent>
+                
+                <TabsContent value="insurance">
+                  <InsuranceTab
+                    isEditing={isEditing}
+                    form={form}
+                    clientData={clientData}
+                    onSave={handleSave}
+                    onCancel={handleCancel}
+                  />
+                </TabsContent>
+                
+                <TabsContent value="emergency">
+                  <EmergencyContactTab
+                    isEditing={isEditing}
+                    form={form}
+                    clientData={clientData}
+                    clinicians={clinicians}
+                    onSave={handleSave}
+                    onCancel={handleCancel}
+                  />
+                </TabsContent>
+                
+                <TabsContent value="medical">
+                  <MedicalHistoryTab
+                    isEditing={isEditing}
+                    form={form}
+                    clientData={clientData}
+                    onSave={handleSave}
+                    onCancel={handleCancel}
+                  />
+                </TabsContent>
+                
+                <TabsContent value="treatment">
+                  <TreatmentPlanTab
+                    isEditing={isEditing}
+                    form={form}
+                    clientData={clientData}
+                    onSave={handleSave}
+                    onCancel={handleCancel}
+                  />
+                </TabsContent>
+                
+                <TabsContent value="notes">
+                  <NotesTab
+                    isEditing={isEditing}
+                    form={form}
+                    clientData={clientData}
+                    onSave={handleSave}
+                    onCancel={handleCancel}
+                  />
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
+        </div>
+        
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Calendar className="h-5 w-5 mr-2" />
+                Upcoming Appointments
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {upcomingAppointments.length > 0 ? (
+                <div className="space-y-4">
+                  {upcomingAppointments.map((appointment) => (
+                    <AppointmentCard key={appointment.id} appointment={appointment} />
+                  ))}
+                  <Button variant="outline" className="w-full">
+                    View All Appointments
+                  </Button>
+                </div>
+              ) : (
+                <div className="text-center py-4 text-gray-500">
+                  No upcoming appointments
+                </div>
+              )}
+              <Button className="w-full mt-4">Schedule Appointment</Button>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Clock className="h-5 w-5 mr-2" />
+                Session History
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Last Session</span>
+                  <span>{clientData.client_last_session_date || 'None'}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Next Session</span>
+                  <span>{clientData.client_next_session_date || 'None'}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Frequency</span>
+                  <span>{clientData.client_session_frequency || 'Not set'}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Total Sessions</span>
+                  <span>{appointments.length}</span>
+                </div>
+              </div>
+              <Button variant="outline" className="w-full mt-4">
+                View Session Notes
               </Button>
-              <Button onClick={form.handleSubmit(handleSaveChanges)} className="flex items-center gap-1 bg-valorwell-700 hover:bg-valorwell-800">
-                <Save size={16} /> Save Changes
-              </Button>
-            </>
-          ) : (
-            <Button onClick={() => setIsEditing(true)} className="flex items-center gap-1">
-              <Pencil size={16} /> Edit
-            </Button>
-          )}
+            </CardContent>
+          </Card>
         </div>
       </div>
-
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(handleSaveChanges)}>
-          <Tabs defaultValue="personal" value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className={`grid ${isRestrictedRole ? 'grid-cols-3' : 'grid-cols-4'} mb-4`}>
-              <TabsTrigger value="personal">Personal Info</TabsTrigger>
-              <TabsTrigger value="insurance">Insurance</TabsTrigger>
-              {!isRestrictedRole && (
-                <TabsTrigger value="treatment">Treatment</TabsTrigger>
-              )}
-              <TabsTrigger value="documentation">Documentation</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="personal">
-              <PersonalInfoTab 
-                isEditing={isEditing} 
-                form={form} 
-                clientData={clientData}
-                handleAddDiagnosis={handleAddDiagnosis}
-                handleRemoveDiagnosis={handleRemoveDiagnosis}
-              />
-            </TabsContent>
-
-            <TabsContent value="insurance">
-              <InsuranceTab 
-                isEditing={isEditing} 
-                form={form} 
-                clientData={clientData}
-              />
-            </TabsContent>
-
-            {!isRestrictedRole && (
-              <TabsContent value="treatment">
-                <TreatmentTab 
-                  isEditing={isEditing} 
-                  form={form} 
-                  clientData={clientData}
-                  clinicians={clinicians}
-                />
-              </TabsContent>
-            )}
-
-            <TabsContent value="documentation">
-              <DocumentationTab clientData={clientData} />
-            </TabsContent>
-          </Tabs>
-        </form>
-      </Form>
-    </Layout>
+    </div>
   );
 };
 

@@ -113,11 +113,20 @@ export const mockAvailabilityBlocks: AvailabilityBlock[] = [
   }
 ];
 
-// Test data creation function
+// Test data creation function - fix function signature
 export const createTestDataset = () => {
   return {
     appointments: mockAppointments,
-    availabilityBlocks: mockAvailabilityBlocks
+    availabilityBlocks: mockAvailabilityBlocks,
+    weekDates: [
+      new Date('2024-01-08'),
+      new Date('2024-01-09'),
+      new Date('2024-01-10'),
+      new Date('2024-01-11'),
+      new Date('2024-01-12'),
+      new Date('2024-01-13'),
+      new Date('2024-01-14')
+    ]
   };
 };
 
