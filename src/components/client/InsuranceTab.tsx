@@ -1,509 +1,337 @@
-
-import React from "react";
-import { format } from "date-fns";
+import React from 'react';
 import {
   Card,
   CardContent,
+  CardDescription,
   CardHeader,
   CardTitle
-} from "@/components/ui/card";
-import {
-  FormField,
-  FormItem,
-  FormLabel,
-  FormControl,
-  FormMessage
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { CalendarIcon } from "lucide-react";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { cn } from "@/lib/utils";
-import { TabProps, insuranceTypeOptions, relationshipOptions } from "@/types/client";
+} from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { insuranceTypeOptions, TabProps } from '@/types/client';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-const InsuranceTab: React.FC<TabProps> = ({ isEditing, form, clientData }) => {
+const InsuranceTab: React.FC<TabProps> = ({ clientData, isEditing, onSave }) => {
   return (
-    <>
-      <Card>
-        <CardHeader>
-          <CardTitle>Primary Insurance</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 gap-4">
-            <FormField
-              control={form.control}
-              name="client_insurance_company_primary"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Insurance Company</FormLabel>
-                  <FormControl>
-                    <Input {...field} readOnly={!isEditing} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="client_insurance_type_primary"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Insurance Type</FormLabel>
-                  <Select
-                    disabled={!isEditing}
-                    onValueChange={field.onChange}
-                    defaultValue={field.value || ""}
-                    value={field.value || ""}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select type" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {insuranceTypeOptions.map((type) => (
-                        <SelectItem key={type} value={type}>
-                          {type}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="client_policy_number_primary"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Policy Number</FormLabel>
-                  <FormControl>
-                    <Input {...field} readOnly={!isEditing} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="client_group_number_primary"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Group Number</FormLabel>
-                  <FormControl>
-                    <Input {...field} readOnly={!isEditing} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="client_subscriber_name_primary"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Subscriber Name</FormLabel>
-                  <FormControl>
-                    <Input {...field} readOnly={!isEditing} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="client_subscriber_relationship_primary"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Subscriber Relationship</FormLabel>
-                  <Select
-                    disabled={!isEditing}
-                    onValueChange={field.onChange}
-                    defaultValue={field.value || ""}
-                    value={field.value || ""}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select relationship" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {relationshipOptions.map((relation) => (
-                        <SelectItem key={relation} value={relation}>
-                          {relation}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="client_subscriber_dob_primary"
-              render={({ field }) => (
-                <FormItem className="flex flex-col">
-                  <FormLabel>Subscriber Date of Birth</FormLabel>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <FormControl>
-                        <Button
-                          variant={"outline"}
-                          className={cn(
-                            "w-full pl-3 text-left font-normal",
-                            !field.value && "text-muted-foreground"
-                          )}
-                          disabled={!isEditing}
-                        >
-                          {field.value ? (
-                            format(field.value, "PPP")
-                          ) : (
-                            <span>Pick a date</span>
-                          )}
-                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                        </Button>
-                      </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={field.value || undefined}
-                        onSelect={field.onChange}
-                        disabled={date =>
-                          date > new Date() || date < new Date("1900-01-01")
-                        }
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  <FormMessage />
-                </FormItem>
-              )}
+    <Card>
+      <CardHeader>
+        <CardTitle>Insurance Information</CardTitle>
+        <CardDescription>
+          Enter the client's insurance details.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Primary Insurance */}
+          <div>
+            <Label htmlFor="insurance_company_primary">Primary Insurance Company</Label>
+            <Input
+              id="insurance_company_primary"
+              value={clientData?.client_insurance_company_primary || ''}
+              onChange={(e) => {
+                if (isEditing) {
+                  onSave({ client_insurance_company_primary: e.target.value });
+                }
+              }}
+              disabled={!isEditing}
             />
           </div>
-        </CardContent>
-      </Card>
+          <div>
+            <Label htmlFor="policy_number_primary">Primary Policy Number</Label>
+            <Input
+              id="policy_number_primary"
+              value={clientData?.client_policy_number_primary || ''}
+              onChange={(e) => {
+                if (isEditing) {
+                  onSave({ client_policy_number_primary: e.target.value });
+                }
+              }}
+              disabled={!isEditing}
+            />
+          </div>
+          <div>
+            <Label htmlFor="group_number_primary">Primary Group Number</Label>
+            <Input
+              id="group_number_primary"
+              value={clientData?.client_group_number_primary || ''}
+              onChange={(e) => {
+                if (isEditing) {
+                  onSave({ client_group_number_primary: e.target.value });
+                }
+              }}
+              disabled={!isEditing}
+            />
+          </div>
+          <div>
+            <Label htmlFor="subscriber_name_primary">Primary Subscriber Name</Label>
+            <Input
+              id="subscriber_name_primary"
+              value={clientData?.client_subscriber_name_primary || ''}
+              onChange={(e) => {
+                if (isEditing) {
+                  onSave({ client_subscriber_name_primary: e.target.value });
+                }
+              }}
+              disabled={!isEditing}
+            />
+          </div>
+          <div>
+            <Label htmlFor="insurance_type_primary">Primary Insurance Type</Label>
+            <Select
+              onValueChange={(value) => {
+                if (isEditing) {
+                  onSave({ client_insurance_type_primary: value });
+                }
+              }}
+              defaultValue={clientData?.client_insurance_type_primary || ''}
+              disabled={!isEditing}
+            >
+              <SelectTrigger id="insurance_type_primary">
+                <SelectValue placeholder="Select insurance type" />
+              </SelectTrigger>
+              <SelectContent>
+                {insuranceTypeOptions.map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="subscriber_dob_primary">Primary Subscriber Date of Birth</Label>
+            <Input
+              type="date"
+              id="subscriber_dob_primary"
+              value={clientData?.client_subscriber_dob_primary || ''}
+              onChange={(e) => {
+                if (isEditing) {
+                  onSave({ client_subscriber_dob_primary: e.target.value });
+                }
+              }}
+              disabled={!isEditing}
+            />
+          </div>
+        </div>
 
-      {clientData?.client_vacoverage && (
-        <Card className="mt-4">
-          <CardHeader>
-            <CardTitle>VA Insurance</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {clientData.client_vacoverage === "CHAMPVA" && (
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="client_champva"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>CHAMPVA #</FormLabel>
-                      <FormControl>
-                        <Input {...field} readOnly={!isEditing} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <div className="col-span-2">
-                  <p className="text-sm text-gray-500 italic">
-                    We understand that this is your SSN. And although we do not necessarily agree with them using this as their patient identifier, we do have to follow their process. The only way to verify your coverage is to have this.
-                  </p>
-                </div>
-              </div>
-            )}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Secondary Insurance */}
+          <div>
+            <Label htmlFor="insurance_company_secondary">Secondary Insurance Company</Label>
+            <Input
+              id="insurance_company_secondary"
+              value={clientData?.client_insurance_company_secondary || ''}
+              onChange={(e) => {
+                if (isEditing) {
+                  onSave({ client_insurance_company_secondary: e.target.value });
+                }
+              }}
+              disabled={!isEditing}
+            />
+          </div>
+          <div>
+            <Label htmlFor="policy_number_secondary">Secondary Policy Number</Label>
+            <Input
+              id="policy_number_secondary"
+              value={clientData?.client_policy_number_secondary || ''}
+              onChange={(e) => {
+                if (isEditing) {
+                  onSave({ client_policy_number_secondary: e.target.value });
+                }
+              }}
+              disabled={!isEditing}
+            />
+          </div>
+          <div>
+            <Label htmlFor="group_number_secondary">Secondary Group Number</Label>
+            <Input
+              id="group_number_secondary"
+              value={clientData?.client_group_number_secondary || ''}
+              onChange={(e) => {
+                if (isEditing) {
+                  onSave({ client_group_number_secondary: e.target.value });
+                }
+              }}
+              disabled={!isEditing}
+            />
+          </div>
+          <div>
+            <Label htmlFor="subscriber_name_secondary">Secondary Subscriber Name</Label>
+            <Input
+              id="subscriber_name_secondary"
+              value={clientData?.client_subscriber_name_secondary || ''}
+              onChange={(e) => {
+                if (isEditing) {
+                  onSave({ client_subscriber_name_secondary: e.target.value });
+                }
+              }}
+              disabled={!isEditing}
+            />
+          </div>
+          <div>
+            <Label htmlFor="insurance_type_secondary">Secondary Insurance Type</Label>
+            <Select
+              onValueChange={(value) => {
+                if (isEditing) {
+                  onSave({ client_insurance_type_secondary: value });
+                }
+              }}
+              defaultValue={clientData?.client_insurance_type_secondary || ''}
+              disabled={!isEditing}
+            >
+              <SelectTrigger id="insurance_type_secondary">
+                <SelectValue placeholder="Select insurance type" />
+              </SelectTrigger>
+              <SelectContent>
+                {insuranceTypeOptions.map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="subscriber_dob_secondary">Secondary Subscriber Date of Birth</Label>
+            <Input
+              type="date"
+              id="subscriber_dob_secondary"
+              value={clientData?.client_subscriber_dob_secondary || ''}
+              onChange={(e) => {
+                if (isEditing) {
+                  onSave({ client_subscriber_dob_secondary: e.target.value });
+                }
+              }}
+              disabled={!isEditing}
+            />
+          </div>
+        </div>
 
-            {clientData.client_vacoverage === "TRICARE" && (
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="client_tricare_beneficiary_category"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>TRICARE Beneficiary Category</FormLabel>
-                      <Select
-                        disabled={!isEditing}
-                        onValueChange={field.onChange}
-                        defaultValue={field.value || ""}
-                        value={field.value || ""}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select category" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {[
-                            "Active Duty Service Member",
-                            "Active Duty Family Member",
-                            "Retired Service Member",
-                            "Retired Family Member",
-                            "Guard/Reserve Service Member",
-                            "Guard/Reserve Family Member",
-                            "Surviving Family Member",
-                            "Medal of Honor Recipient",
-                            "TRICARE For Life",
-                            "TRICARE Young Adult",
-                            "Former Spouse",
-                            "Children with Disabilities"
-                          ].map((category) => (
-                            <SelectItem key={category} value={category}>
-                              {category}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="client_tricare_sponsor_name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>TRICARE Sponsor's Name</FormLabel>
-                      <FormControl>
-                        <Input {...field} readOnly={!isEditing} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="client_tricare_sponsor_branch"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>TRICARE Sponsor's Branch of Service</FormLabel>
-                      <Select
-                        disabled={!isEditing}
-                        onValueChange={field.onChange}
-                        defaultValue={field.value || ""}
-                        value={field.value || ""}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select branch" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {[
-                            "Air Force",
-                            "Army",
-                            "Coast Guard",
-                            "Marine Corps",
-                            "Navy",
-                            "NOAA Corps",
-                            "Space Force",
-                            "USPHS"
-                          ].map((branch) => (
-                            <SelectItem key={branch} value={branch}>
-                              {branch}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="client_tricare_sponsor_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>TRICARE Sponsor's SSN or DOD ID Number</FormLabel>
-                      <FormControl>
-                        <Input {...field} readOnly={!isEditing} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="client_tricare_plan"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>TRICARE Plan</FormLabel>
-                      <Select
-                        disabled={!isEditing}
-                        onValueChange={field.onChange}
-                        defaultValue={field.value || ""}
-                        value={field.value || ""}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select plan" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {[
-                            "TRICARE Prime",
-                            "TRICARE Prime Remote",
-                            "TRICARE Prime Option",
-                            "TRICARE Prime Overseas",
-                            "TRICARE Remote Overseas",
-                            "TRICARE Select",
-                            "TRICARE Select Overseas",
-                            "TRICARE For Life",
-                            "TRICARE Reserve Select",
-                            "TRICARE Retired Reserve",
-                            "TRICARE Young Adult"
-                          ].map((plan) => (
-                            <SelectItem key={plan} value={plan}>
-                              {plan}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="client_tricare_region"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>TRICARE Region</FormLabel>
-                      <Select
-                        disabled={!isEditing}
-                        onValueChange={field.onChange}
-                        defaultValue={field.value || ""}
-                        value={field.value || ""}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select region" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {[
-                            "TRICARE East",
-                            "TRICARE West",
-                            "TRICARE Overseas"
-                          ].map((region) => (
-                            <SelectItem key={region} value={region}>
-                              {region}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="client_tricare_policy_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Policy #/Plan ID</FormLabel>
-                      <FormControl>
-                        <Input {...field} readOnly={!isEditing} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="client_tricare_has_referral"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Do you have a Referral Number?</FormLabel>
-                      <Select
-                        disabled={!isEditing}
-                        onValueChange={field.onChange}
-                        defaultValue={field.value || ""}
-                        value={field.value || ""}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {["Yes", "No"].map((option) => (
-                            <SelectItem key={option} value={option}>
-                              {option}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                {clientData.client_tricare_has_referral === "Yes" && (
-                  <FormField
-                    control={form.control}
-                    name="client_tricare_referral_number"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Referral Number</FormLabel>
-                        <FormControl>
-                          <Input {...field} readOnly={!isEditing} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
-              </div>
-            )}
-            
-            {clientData.client_vacoverage === "VA Community Care" && (
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="mentalHealthReferral"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Have you requested a referral from Mental Health?</FormLabel>
-                      <Select
-                        disabled={!isEditing}
-                        onValueChange={field.onChange}
-                        defaultValue={field.value || ""}
-                        value={field.value || ""}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {["Yes", "No"].map((option) => (
-                            <SelectItem key={option} value={option}>
-                              {option}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-    </>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Tertiary Insurance */}
+          <div>
+            <Label htmlFor="insurance_company_tertiary">Tertiary Insurance Company</Label>
+            <Input
+              id="insurance_company_tertiary"
+              value={clientData?.client_insurance_company_tertiary || ''}
+              onChange={(e) => {
+                if (isEditing) {
+                  onSave({ client_insurance_company_tertiary: e.target.value });
+                }
+              }}
+              disabled={!isEditing}
+            />
+          </div>
+          <div>
+            <Label htmlFor="policy_number_tertiary">Tertiary Policy Number</Label>
+            <Input
+              id="policy_number_tertiary"
+              value={clientData?.client_policy_number_tertiary || ''}
+              onChange={(e) => {
+                if (isEditing) {
+                  onSave({ client_policy_number_tertiary: e.target.value });
+                }
+              }}
+              disabled={!isEditing}
+            />
+          </div>
+          <div>
+            <Label htmlFor="group_number_tertiary">Tertiary Group Number</Label>
+            <Input
+              id="group_number_tertiary"
+              value={clientData?.client_group_number_tertiary || ''}
+              onChange={(e) => {
+                if (isEditing) {
+                  onSave({ client_group_number_tertiary: e.target.value });
+                }
+              }}
+              disabled={!isEditing}
+            />
+          </div>
+          <div>
+            <Label htmlFor="subscriber_name_tertiary">Tertiary Subscriber Name</Label>
+            <Input
+              id="subscriber_name_tertiary"
+              value={clientData?.client_subscriber_name_tertiary || ''}
+              onChange={(e) => {
+                if (isEditing) {
+                  onSave({ client_subscriber_name_tertiary: e.target.value });
+                }
+              }}
+              disabled={!isEditing}
+            />
+          </div>
+          <div>
+            <Label htmlFor="insurance_type_tertiary">Tertiary Insurance Type</Label>
+            <Select
+              onValueChange={(value) => {
+                if (isEditing) {
+                  onSave({ client_insurance_type_tertiary: value });
+                }
+              }}
+              defaultValue={clientData?.client_insurance_type_tertiary || ''}
+              disabled={!isEditing}
+            >
+              <SelectTrigger id="insurance_type_tertiary">
+                <SelectValue placeholder="Select insurance type" />
+              </SelectTrigger>
+              <SelectContent>
+                {insuranceTypeOptions.map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="subscriber_dob_tertiary">Tertiary Subscriber Date of Birth</Label>
+            <Input
+              type="date"
+              id="subscriber_dob_tertiary"
+              value={clientData?.client_subscriber_dob_tertiary || ''}
+              onChange={(e) => {
+                if (isEditing) {
+                  onSave({ client_subscriber_dob_tertiary: e.target.value });
+                }
+              }}
+              disabled={!isEditing}
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Government Insurance */}
+          <div>
+            <Label htmlFor="vacoverage">VA Coverage</Label>
+            <Input
+              id="vacoverage"
+              value={clientData?.client_vacoverage || ''}
+              onChange={(e) => {
+                if (isEditing) {
+                  onSave({ client_vacoverage: e.target.value });
+                }
+              }}
+              disabled={!isEditing}
+            />
+          </div>
+          <div>
+            <Label htmlFor="tricare_has_referral">Tricare Referral Required</Label>
+            <Checkbox
+              id="tricare_has_referral"
+              checked={Boolean(clientData?.client_tricare_has_referral)}
+              onCheckedChange={(checked) => {
+                if (isEditing) {
+                  onSave({ client_tricare_has_referral: Boolean(checked) });
+                }
+              }}
+              disabled={!isEditing}
+            />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 

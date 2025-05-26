@@ -21,6 +21,7 @@ export interface ClientDetails {
   client_city?: string;
   client_state?: string;
   client_zipcode?: string;
+  client_zip_code?: string; // Alternative name used in some components
   client_assigned_therapist?: string;
   client_emergency_contact_name?: string;
   client_emergency_contact_phone?: string;
@@ -28,14 +29,47 @@ export interface ClientDetails {
   client_insurance_provider?: string;
   client_insurance_id?: string;
   client_insurance_group?: string;
+  
+  // Primary insurance fields
   client_insurance_company_primary?: string;
   client_policy_number_primary?: string;
   client_group_number_primary?: string;
   client_subscriber_name_primary?: string;
   client_insurance_type_primary?: string;
   client_subscriber_dob_primary?: string;
+  client_subscriber_relationship_primary?: string;
+  
+  // Secondary insurance fields
+  client_insurance_company_secondary?: string;
+  client_policy_number_secondary?: string;
+  client_group_number_secondary?: string;
+  client_subscriber_name_secondary?: string;
+  client_insurance_type_secondary?: string;
+  client_subscriber_dob_secondary?: string;
+  client_subscriber_relationship_secondary?: string;
+  
+  // Tertiary insurance fields
+  client_insurance_company_tertiary?: string;
+  client_policy_number_tertiary?: string;
+  client_group_number_tertiary?: string;
+  client_subscriber_name_tertiary?: string;
+  client_insurance_type_tertiary?: string;
+  client_subscriber_dob_tertiary?: string;
+  client_subscriber_relationship_tertiary?: string;
+  
+  // Government insurance fields
   client_vacoverage?: string;
+  client_champva?: string;
   client_tricare_has_referral?: boolean;
+  client_tricare_beneficiary_category?: string;
+  client_tricare_sponsor_name?: string;
+  client_tricare_sponsor_branch?: string;
+  client_tricare_sponsor_id?: string;
+  client_tricare_plan?: string;
+  client_tricare_region?: string;
+  client_tricare_policy_id?: string;
+  client_tricare_referral_number?: string;
+  
   client_copay?: number;
   client_deductible?: number;
   client_notes?: string;
@@ -58,6 +92,7 @@ export interface ClientDetails {
   client_suicide_risk_assessment?: string;
   client_violence_risk_assessment?: string;
   client_treatment_plan?: string;
+  client_treatmentplan_startdate?: string;
   client_progress_notes?: string;
   client_discharge_summary?: string;
   client_referral_source?: string;
@@ -71,6 +106,7 @@ export interface ClientDetails {
   client_billing_state?: string;
   client_billing_zipcode?: string;
   client_self_goal?: string;
+  client_is_profile_complete?: boolean;
   created_at?: string;
   updated_at?: string;
 

@@ -23,28 +23,34 @@ interface WeekViewData {
 }
 
 export const useWeekViewData = (
-  currentDate: Date,
+  currentDateOrDays: Date | Date[],
   clinicianId: string | null,
   refreshTrigger: number = 0,
   externalAppointments: Appointment[] = [],
   userTimeZone: string = 'America/Chicago'
 ): WeekViewData => {
-  // Calculate week boundaries
-  const { startOfWeek, endOfWeek } = useMemo(() => {
+  // Handle both single date and array of days
+  const currentDate = Array.isArray(currentDateOrDays) ? currentDateOrDays[0] : currentDateOrDays;
+  const weekDays = useMemo(() => {
+    if (Array.isArray(currentDateOrDays)) {
+      return currentDateOrDays;
+    }
+    // Calculate week boundaries for single date
     const start = DateTime.fromJSDate(currentDate).setZone(userTimeZone).startOf('week');
-    const end = start.endOf('week');
+    return Array.from({ length: 7 }, (_, i) => 
+      start.plus({ days: i }).toJSDate()
+    );
+  }, [currentDateOrDays, userTimeZone]);
+
+  // Calculate week boundaries for data fetching
+  const { startOfWeek, endOfWeek } = useMemo(() => {
+    const start = DateTime.fromJSDate(weekDays[0]).setZone(userTimeZone).startOf('day');
+    const end = DateTime.fromJSDate(weekDays[6]).setZone(userTimeZone).endOf('day');
     return {
       startOfWeek: start,
       endOfWeek: end
     };
-  }, [currentDate, userTimeZone]);
-
-  // Generate week days
-  const weekDays = useMemo(() => {
-    return Array.from({ length: 7 }, (_, i) => 
-      startOfWeek.plus({ days: i }).toJSDate()
-    );
-  }, [startOfWeek]);
+  }, [weekDays, userTimeZone]);
 
   // Generate time slots (15-minute intervals from 6 AM to 10 PM)
   const timeSlots = useMemo(() => {
@@ -54,13 +60,13 @@ export const useWeekViewData = (
     
     for (let hour = startHour; hour <= endHour; hour++) {
       for (let minute = 0; minute < 60; minute += 15) {
-        const slot = startOfWeek.set({ hour, minute }).toJSDate();
+        const slot = DateTime.fromJSDate(weekDays[0]).set({ hour, minute }).toJSDate();
         slots.push(slot);
       }
     }
     
     return slots;
-  }, [startOfWeek]);
+  }, [weekDays]);
 
   // Fetch calendar data
   const {

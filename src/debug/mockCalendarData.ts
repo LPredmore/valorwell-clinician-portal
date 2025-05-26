@@ -1,3 +1,4 @@
+
 import { Appointment } from '@/types/appointment';
 import { AvailabilityBlock } from '@/types/availability';
 
@@ -110,4 +111,21 @@ export const mockAvailabilityBlocks: AvailabilityBlock[] = [
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z'
   }
+];
+
+// Test data creation function
+export const createTestDataset = () => {
+  return {
+    appointments: mockAppointments,
+    availabilityBlocks: mockAvailabilityBlocks
+  };
+};
+
+// Test timezone configurations
+export const testTimezones = [
+  'America/New_York',
+  'America/Chicago', 
+  'America/Denver',
+  'America/Los_Angeles',
+  'UTC'
 ];
