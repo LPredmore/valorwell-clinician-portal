@@ -1,215 +1,295 @@
 
 import { useState, useEffect, useMemo } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { DateTime } from 'luxon';
+import { Appointment } from '@/types/appointment';
+import { AvailabilityBlock } from '@/types/availability';
+import { ClientDetails } from '@/types/client';
 import { TimeZoneService } from '@/utils/timeZoneService';
 import { TimeBlock, AppointmentBlock } from './types';
+
+type Client = ClientDetails;
 
 export const useWeekViewDataSimplified = (
   days: Date[],
   selectedClinicianId: string | null,
   refreshTrigger: number,
-  appointments: any[],
-  getClientName: (id: string) => string,
+  appointments: Appointment[],
+  getClientName: (clientId: string) => string,
   userTimeZone: string
 ) => {
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [availability, setAvailability] = useState<AvailabilityBlock[]>([]);
+  const [timeBlocks, setTimeBlocks] = useState<TimeBlock[]>([]);
+  const [appointmentBlocks, setAppointmentBlocks] = useState<AppointmentBlock[]>([]);
 
-  // Convert days to DateTime objects with error handling
+  // Generate week days from the provided days array
   const weekDays = useMemo(() => {
-    try {
-      const safeTimeZone = TimeZoneService.ensureIANATimeZone(userTimeZone);
-      return days.map(day => TimeZoneService.fromJSDate(day, safeTimeZone));
-    } catch (err) {
-      console.error('[useWeekViewDataSimplified] Error converting days:', err);
-      setError('Error processing calendar days');
+    if (!days || days.length === 0) {
       return [];
     }
+    
+    return days.map(day => TimeZoneService.fromJSDate(day, userTimeZone));
   }, [days, userTimeZone]);
 
-  // Process appointments with error handling and proper timezone usage
-  const appointmentBlocks = useMemo(() => {
-    console.log('[useWeekViewDataSimplified] Processing appointments:', {
-      appointmentsCount: appointments?.length || 0,
-      sampleAppointment: appointments?.[0] || null,
-      userTimeZone
-    });
-    
-    try {
-      if (!Array.isArray(appointments)) {
-        console.warn('[useWeekViewDataSimplified] Appointments is not an array:', appointments);
-        return [];
+  // Fetch availability data
+  useEffect(() => {
+    const fetchAvailability = async () => {
+      if (!selectedClinicianId || !days || days.length === 0) {
+        setAvailability([]);
+        setTimeBlocks([]);
+        return;
       }
 
-      return appointments.map((appointment, index) => {
-        console.log(`[useWeekViewDataSimplified] Processing appointment ${index}:`, {
+      try {
+        const startDate = DateTime.fromJSDate(days[0], { zone: userTimeZone }).startOf('day').toUTC();
+        const endDate = DateTime.fromJSDate(days[days.length - 1], { zone: userTimeZone }).endOf('day').toUTC();
+
+        const { data: availabilityData, error: availabilityError } = await supabase
+          .from('availability_blocks')
+          .select('*')
+          .eq('clinician_id', selectedClinicianId)
+          .gte('start_at', startDate.toISO())
+          .lte('end_at', endDate.toISO())
+          .eq('is_active', true);
+
+        if (availabilityError) {
+          console.error('[useWeekViewDataSimplified] Error fetching availability:', availabilityError);
+          setError(availabilityError.message);
+          return;
+        }
+
+        const blocks = availabilityData || [];
+        setAvailability(blocks);
+
+        // Process time blocks
+        const processedTimeBlocks: TimeBlock[] = [];
+        blocks.forEach(block => {
+          if (!block.start_at || !block.end_at) return;
+
+          try {
+            const start = DateTime.fromISO(block.start_at, { zone: 'UTC' }).setZone(userTimeZone);
+            const end = DateTime.fromISO(block.end_at, { zone: 'UTC' }).setZone(userTimeZone);
+            const day = start.startOf('day');
+
+            processedTimeBlocks.push({
+              start,
+              end,
+              day,
+              availabilityIds: [block.id],
+              isException: false,
+              isStandalone: false
+            });
+          } catch (error) {
+            console.error('[useWeekViewDataSimplified] Error processing time block:', error);
+          }
+        });
+
+        setTimeBlocks(processedTimeBlocks);
+      } catch (error) {
+        console.error('[useWeekViewDataSimplified] Unexpected error:', error);
+        setError(error instanceof Error ? error.message : 'Unknown error');
+      }
+    };
+
+    fetchAvailability();
+  }, [selectedClinicianId, days, userTimeZone, refreshTrigger]);
+
+  // Process appointments into appointment blocks
+  useEffect(() => {
+    console.log('[useWeekViewDataSimplified] Processing appointments:', {
+      appointmentsCount: appointments.length,
+      userTimeZone,
+      sampleAppointment: appointments[0] ? {
+        id: appointments[0].id,
+        start_at: appointments[0].start_at,
+        appointment_timezone: appointments[0].appointment_timezone
+      } : null
+    });
+
+    const processedAppointmentBlocks: AppointmentBlock[] = [];
+
+    appointments.forEach(appointment => {
+      if (!appointment.start_at || !appointment.end_at) {
+        console.warn('[useWeekViewDataSimplified] Invalid appointment times:', {
+          appointmentId: appointment.id,
+          start_at: appointment.start_at,
+          end_at: appointment.end_at
+        });
+        return;
+      }
+
+      try {
+        // CRITICAL FIX: Use the appointment's original timezone for positioning
+        // If appointment_timezone is available, use it; otherwise fall back to userTimeZone
+        const appointmentTimeZone = appointment.appointment_timezone || userTimeZone;
+        
+        console.log('[useWeekViewDataSimplified] Converting appointment times:', {
+          appointmentId: appointment.id,
+          originalStart: appointment.start_at,
+          appointmentTimeZone,
+          userTimeZone
+        });
+
+        // Convert UTC times to the appointment's timezone for positioning
+        const start = DateTime.fromISO(appointment.start_at, { zone: 'UTC' }).setZone(appointmentTimeZone);
+        const end = DateTime.fromISO(appointment.end_at, { zone: 'UTC' }).setZone(appointmentTimeZone);
+        const day = start.startOf('day');
+
+        // Get client name
+        let clientName = appointment.clientName;
+        if (!clientName && appointment.client) {
+          clientName = appointment.client.client_preferred_name || 
+                      `${appointment.client.client_first_name} ${appointment.client.client_last_name}`;
+        }
+        if (!clientName) {
+          clientName = getClientName(appointment.client_id);
+        }
+
+        const appointmentBlock: AppointmentBlock = {
           id: appointment.id,
+          appointmentId: appointment.id,
+          clientId: appointment.client_id,
+          clientName,
+          start,
+          end,
+          day,
+          type: appointment.type,
+          status: appointment.status,
           start_at: appointment.start_at,
           end_at: appointment.end_at,
-          appointment_timezone: appointment.appointment_timezone,
-          start_at_type: typeof appointment.start_at,
-          end_at_type: typeof appointment.end_at
+          appointment_recurring: appointment.appointment_recurring,
+          recurring_group_id: appointment.recurring_group_id,
+          video_room_url: appointment.video_room_url,
+          notes: appointment.notes,
+          client: appointment.client,
+          appointment_timezone: appointmentTimeZone
+        };
+
+        processedAppointmentBlocks.push(appointmentBlock);
+
+        console.log('[useWeekViewDataSimplified] Created appointment block:', {
+          appointmentId: appointment.id,
+          clientName,
+          originalStart: appointment.start_at,
+          convertedStart: start.toFormat('yyyy-MM-dd HH:mm'),
+          convertedEnd: end.toFormat('yyyy-MM-dd HH:mm'),
+          day: day.toFormat('yyyy-MM-dd'),
+          appointmentTimeZone,
+          userTimeZone
         });
-        
-        // Validate that we have the required time fields
-        if (!appointment.start_at || !appointment.end_at) {
-          console.error(`[useWeekViewDataSimplified] Missing time data for appointment ${appointment.id}:`, {
-            start_at: appointment.start_at,
-            end_at: appointment.end_at
-          });
-          return null;
-        }
-        
-        try {
-          // Use the appointment's saved timezone if available, otherwise fall back to userTimeZone
-          const appointmentTimeZone = appointment.appointment_timezone || userTimeZone;
-          
-          console.log(`[useWeekViewDataSimplified] Using timezone for appointment ${appointment.id}:`, {
-            appointmentTimeZone,
-            hasAppointmentTimezone: !!appointment.appointment_timezone,
-            userTimeZone
-          });
-          
-          // Parse the appointment times in UTC first
-          const startDateTimeUTC = DateTime.fromISO(appointment.start_at);
-          const endDateTimeUTC = DateTime.fromISO(appointment.end_at);
-          
-          if (!startDateTimeUTC.isValid) {
-            console.error(`[useWeekViewDataSimplified] Invalid start time for appointment ${appointment.id}:`, {
-              start_at: appointment.start_at,
-              invalidReason: startDateTimeUTC.invalidReason,
-              invalidExplanation: startDateTimeUTC.invalidExplanation
-            });
-            return null;
-          }
-          
-          if (!endDateTimeUTC.isValid) {
-            console.error(`[useWeekViewDataSimplified] Invalid end time for appointment ${appointment.id}:`, {
-              end_at: appointment.end_at,
-              invalidReason: endDateTimeUTC.invalidReason,
-              invalidExplanation: endDateTimeUTC.invalidExplanation
-            });
-            return null;
-          }
-          
-          // Convert to the appointment's timezone for proper positioning
-          const startDateTime = startDateTimeUTC.setZone(appointmentTimeZone);
-          const endDateTime = endDateTimeUTC.setZone(appointmentTimeZone);
-          
-          console.log(`[useWeekViewDataSimplified] Timezone conversion for appointment ${appointment.id}:`, {
-            original_start_utc: startDateTimeUTC.toISO(),
-            original_end_utc: endDateTimeUTC.toISO(),
-            converted_start: startDateTime.toISO(),
-            converted_end: endDateTime.toISO(),
-            timezone_used: appointmentTimeZone
-          });
-          
-          const appointmentBlock = {
-            id: appointment.id,
-            appointmentId: appointment.id,
-            clientId: appointment.client_id,
-            clientName: appointment.clientName || getClientName(appointment.client_id),
-            start: startDateTime,
-            end: endDateTime,
-            day: startDateTime, // Add the required day property
-            type: appointment.type || 'appointment',
-            status: appointment.status || 'scheduled',
-            // Include all original appointment data for conversion
-            start_at: appointment.start_at,
-            end_at: appointment.end_at,
-            appointment_recurring: appointment.appointment_recurring,
-            recurring_group_id: appointment.recurring_group_id,
-            video_room_url: appointment.video_room_url,
-            notes: appointment.notes,
-            client: appointment.client,
-            appointment_timezone: appointmentTimeZone // Store the timezone used
-          };
-          
-          console.log(`[useWeekViewDataSimplified] Successfully created appointment block ${index}:`, {
-            id: appointmentBlock.id,
-            clientName: appointmentBlock.clientName,
-            start: appointmentBlock.start.toISO(),
-            end: appointmentBlock.end.toISO(),
-            timezone: appointmentBlock.appointment_timezone,
-            hasOriginalData: !!(appointmentBlock.start_at && appointmentBlock.end_at)
-          });
-          
-          return appointmentBlock;
-        } catch (err) {
-          console.error(`[useWeekViewDataSimplified] Error processing appointment ${appointment.id}:`, err);
-          return null;
-        }
-      }).filter(Boolean); // Remove any null entries
-    } catch (err) {
-      console.error('[useWeekViewDataSimplified] Error processing appointments:', err);
-      setError('Error processing appointments');
-      return [];
-    }
-  }, [appointments, getClientName, userTimeZone]);
-
-  // Simplified time blocks (empty for now to prevent crashes)
-  const timeBlocks: TimeBlock[] = [];
-
-  // Simple availability check
-  const isTimeSlotAvailable = (day: Date, timeSlot: Date): boolean => {
-    return false; // Simplified - no availability checking to prevent crashes
-  };
-
-  const getBlockForTimeSlot = (day: Date, timeSlot: Date): TimeBlock | undefined => {
-    return undefined; // Simplified
-  };
-
-  const getAppointmentForTimeSlot = (day: Date, timeSlot: Date): AppointmentBlock | undefined => {
-    try {
-      // Use userTimeZone for the time slot comparison since the calendar grid is in user's timezone
-      const dayDateTime = TimeZoneService.fromJSDate(day, userTimeZone);
-      const timeSlotDateTime = TimeZoneService.fromJSDate(timeSlot, userTimeZone);
-      
-      const foundAppointment = appointmentBlocks.find(appointment => {
-        if (!appointment.start || !appointment.end) return false;
-        
-        // Convert appointment times to user's timezone for comparison with the grid
-        const appointmentTimeZone = appointment.appointment_timezone || userTimeZone;
-        const appointmentStartInUserTZ = appointment.start.setZone(userTimeZone);
-        const appointmentEndInUserTZ = appointment.end.setZone(userTimeZone);
-        
-        const isSameDay = appointmentStartInUserTZ.hasSame(dayDateTime, 'day');
-        const isInTimeSlot = timeSlotDateTime >= appointmentStartInUserTZ && 
-                            timeSlotDateTime < appointmentEndInUserTZ;
-        
-        if (isSameDay && isInTimeSlot) {
-          console.log(`[useWeekViewDataSimplified] Found appointment for time slot:`, {
-            appointmentId: appointment.id,
-            appointmentTimeZone,
-            day: dayDateTime.toFormat('yyyy-MM-dd'),
-            timeSlot: timeSlotDateTime.toFormat('HH:mm'),
-            appointmentStartOriginal: appointment.start.toFormat('yyyy-MM-dd HH:mm'),
-            appointmentStartInUserTZ: appointmentStartInUserTZ.toFormat('yyyy-MM-dd HH:mm'),
-            appointmentEndOriginal: appointment.end.toFormat('yyyy-MM-dd HH:mm'),
-            appointmentEndInUserTZ: appointmentEndInUserTZ.toFormat('yyyy-MM-dd HH:mm')
-          });
-        }
-        
-        return isSameDay && isInTimeSlot;
-      });
-      
-      return foundAppointment;
-    } catch (err) {
-      console.error('[useWeekViewDataSimplified] Error in getAppointmentForTimeSlot:', err);
-      return undefined;
-    }
-  };
-
-  useEffect(() => {
-    console.log('[useWeekViewDataSimplified] Initialized with:', {
-      daysCount: days.length,
-      appointmentsCount: appointments?.length || 0,
-      appointmentBlocksCount: appointmentBlocks.length,
-      clinicianId: selectedClinicianId,
-      timeZone: userTimeZone,
-      refreshTrigger
+      } catch (error) {
+        console.error('[useWeekViewDataSimplified] Error creating appointment block:', {
+          appointmentId: appointment.id,
+          error
+        });
+      }
     });
-  }, [days.length, appointments?.length, appointmentBlocks.length, selectedClinicianId, userTimeZone, refreshTrigger]);
+
+    setAppointmentBlocks(processedAppointmentBlocks);
+    setLoading(false);
+  }, [appointments, userTimeZone, getClientName]);
+
+  // Utility function to check if a time slot is available
+  const isTimeSlotAvailable = (day: Date, timeSlot: Date): boolean => {
+    const dayDt = DateTime.fromJSDate(day, { zone: userTimeZone });
+    const timeSlotDt = DateTime.fromJSDate(timeSlot, { zone: userTimeZone });
+
+    return timeBlocks.some(block => {
+      const isSameDay = block.day?.hasSame(dayDt, 'day') || false;
+      if (!isSameDay) return false;
+
+      const slotTime = dayDt.set({
+        hour: timeSlotDt.hour,
+        minute: timeSlotDt.minute,
+        second: 0,
+        millisecond: 0
+      });
+
+      return slotTime >= block.start && slotTime < block.end;
+    });
+  };
+
+  // Utility function to get the block for a time slot
+  const getBlockForTimeSlot = (day: Date, timeSlot: Date): TimeBlock | undefined => {
+    const dayDt = DateTime.fromJSDate(day, { zone: userTimeZone });
+    const timeSlotDt = DateTime.fromJSDate(timeSlot, { zone: userTimeZone });
+
+    return timeBlocks.find(block => {
+      const isSameDay = block.day?.hasSame(dayDt, 'day') || false;
+      if (!isSameDay) return false;
+
+      const slotTime = dayDt.set({
+        hour: timeSlotDt.hour,
+        minute: timeSlotDt.minute,
+        second: 0,
+        millisecond: 0
+      });
+
+      return slotTime >= block.start && slotTime < block.end;
+    });
+  };
+
+  // CRITICAL FIX: Updated utility function to get appointment for a time slot
+  // This function now properly handles appointment timezone conversion
+  const getAppointmentForTimeSlot = (day: Date, timeSlot: Date): AppointmentBlock | undefined => {
+    const dayDt = DateTime.fromJSDate(day, { zone: userTimeZone });
+    const timeSlotDt = DateTime.fromJSDate(timeSlot, { zone: userTimeZone });
+
+    const result = appointmentBlocks.find(appt => {
+      // Check if it's the same day
+      const isSameDay = appt.day?.hasSame(dayDt, 'day') || false;
+      if (!isSameDay) return false;
+
+      // CRITICAL: Convert the time slot to the appointment's timezone for comparison
+      const appointmentTimeZone = appt.appointment_timezone || userTimeZone;
+      
+      // Convert the time slot from user timezone to appointment timezone
+      let slotTimeInApptTz: DateTime;
+      if (appointmentTimeZone === userTimeZone) {
+        // Same timezone, no conversion needed
+        slotTimeInApptTz = dayDt.set({
+          hour: timeSlotDt.hour,
+          minute: timeSlotDt.minute,
+          second: 0,
+          millisecond: 0
+        });
+      } else {
+        // Convert to UTC first, then to appointment timezone
+        const slotTimeUTC = dayDt.set({
+          hour: timeSlotDt.hour,
+          minute: timeSlotDt.minute,
+          second: 0,
+          millisecond: 0
+        }).toUTC();
+        slotTimeInApptTz = slotTimeUTC.setZone(appointmentTimeZone);
+      }
+
+      const isInRange = slotTimeInApptTz >= appt.start && slotTimeInApptTz < appt.end;
+      
+      // Debug logging for the problematic appointment
+      if (appt.clientName?.includes('Luke') || appt.clientName?.includes('zzVilla')) {
+        console.log('[getAppointmentForTimeSlot] Checking Luke appointment:', {
+          appointmentId: appt.id,
+          dayCheck: isSameDay,
+          slotDay: dayDt.toFormat('yyyy-MM-dd'),
+          apptDay: appt.day?.toFormat('yyyy-MM-dd'),
+          slotTime: timeSlotDt.toFormat('HH:mm'),
+          slotTimeInApptTz: slotTimeInApptTz.toFormat('HH:mm'),
+          apptStart: appt.start.toFormat('HH:mm'),
+          apptEnd: appt.end.toFormat('HH:mm'),
+          appointmentTimeZone,
+          userTimeZone,
+          isInRange
+        });
+      }
+
+      return isInRange;
+    });
+
+    return result;
+  };
 
   return {
     loading,
