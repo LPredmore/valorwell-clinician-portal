@@ -120,7 +120,8 @@ const WeekView: React.FC<WeekViewProps> = ({
       id: appointment.id,
       clientName: appointment.clientName,
       start_at: appointment.start_at,
-      end_at: appointment.end_at
+      end_at: appointment.end_at,
+      appointment_timezone: appointment.appointment_timezone
     });
     
     const originalAppointment = appointments?.find(a => a.id === appointment.id);
@@ -223,6 +224,17 @@ const WeekView: React.FC<WeekViewProps> = ({
                   timeSlotDt.toJSDate()
                 );
 
+                // Debug logging for appointment positioning
+                if (appointment) {
+                  console.log(`[WeekView] Appointment found at ${dayDt.toFormat('yyyy-MM-dd')} ${timeSlotDt.toFormat('HH:mm')}:`, {
+                    appointmentId: appointment.id,
+                    appointmentTimezone: appointment.appointment_timezone,
+                    originalStart: appointment.start_at,
+                    convertedStart: appointment.start.toFormat('yyyy-MM-dd HH:mm'),
+                    userTimeZone
+                  });
+                }
+
                 return (
                   <div
                     key={i}
@@ -261,6 +273,16 @@ const WeekView: React.FC<WeekViewProps> = ({
             <p>Time Blocks: {timeBlocks.length}</p>
             <p>Appointments: {appointmentBlocks.length}</p>
             <p>User Timezone: {userTimeZone}</p>
+            {appointmentBlocks.length > 0 && (
+              <div className="mt-2">
+                <p className="font-medium">Appointment Timezones:</p>
+                {appointmentBlocks.slice(0, 3).map(apt => (
+                  <p key={apt.id} className="text-sm">
+                    {apt.clientName}: {apt.appointment_timezone || 'No timezone saved'}
+                  </p>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

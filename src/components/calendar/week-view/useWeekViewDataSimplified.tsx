@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useMemo } from 'react';
 import { DateTime } from 'luxon';
 import { TimeZoneService } from '@/utils/timeZoneService';
@@ -26,7 +27,7 @@ export const useWeekViewDataSimplified = (
     }
   }, [days, userTimeZone]);
 
-  // Process appointments with error handling and better debugging
+  // Process appointments with error handling and proper timezone usage
   const appointmentBlocks = useMemo(() => {
     console.log('[useWeekViewDataSimplified] Processing appointments:', {
       appointmentsCount: appointments?.length || 0,
@@ -45,6 +46,7 @@ export const useWeekViewDataSimplified = (
           id: appointment.id,
           start_at: appointment.start_at,
           end_at: appointment.end_at,
+          appointment_timezone: appointment.appointment_timezone,
           start_at_type: typeof appointment.start_at,
           end_at_type: typeof appointment.end_at
         });
@@ -59,26 +61,48 @@ export const useWeekViewDataSimplified = (
         }
         
         try {
-          const startDateTime = DateTime.fromISO(appointment.start_at);
-          const endDateTime = DateTime.fromISO(appointment.end_at);
+          // Use the appointment's saved timezone if available, otherwise fall back to userTimeZone
+          const appointmentTimeZone = appointment.appointment_timezone || userTimeZone;
           
-          if (!startDateTime.isValid) {
+          console.log(`[useWeekViewDataSimplified] Using timezone for appointment ${appointment.id}:`, {
+            appointmentTimeZone,
+            hasAppointmentTimezone: !!appointment.appointment_timezone,
+            userTimeZone
+          });
+          
+          // Parse the appointment times in UTC first
+          const startDateTimeUTC = DateTime.fromISO(appointment.start_at);
+          const endDateTimeUTC = DateTime.fromISO(appointment.end_at);
+          
+          if (!startDateTimeUTC.isValid) {
             console.error(`[useWeekViewDataSimplified] Invalid start time for appointment ${appointment.id}:`, {
               start_at: appointment.start_at,
-              invalidReason: startDateTime.invalidReason,
-              invalidExplanation: startDateTime.invalidExplanation
+              invalidReason: startDateTimeUTC.invalidReason,
+              invalidExplanation: startDateTimeUTC.invalidExplanation
             });
             return null;
           }
           
-          if (!endDateTime.isValid) {
+          if (!endDateTimeUTC.isValid) {
             console.error(`[useWeekViewDataSimplified] Invalid end time for appointment ${appointment.id}:`, {
               end_at: appointment.end_at,
-              invalidReason: endDateTime.invalidReason,
-              invalidExplanation: endDateTime.invalidExplanation
+              invalidReason: endDateTimeUTC.invalidReason,
+              invalidExplanation: endDateTimeUTC.invalidExplanation
             });
             return null;
           }
+          
+          // Convert to the appointment's timezone for proper positioning
+          const startDateTime = startDateTimeUTC.setZone(appointmentTimeZone);
+          const endDateTime = endDateTimeUTC.setZone(appointmentTimeZone);
+          
+          console.log(`[useWeekViewDataSimplified] Timezone conversion for appointment ${appointment.id}:`, {
+            original_start_utc: startDateTimeUTC.toISO(),
+            original_end_utc: endDateTimeUTC.toISO(),
+            converted_start: startDateTime.toISO(),
+            converted_end: endDateTime.toISO(),
+            timezone_used: appointmentTimeZone
+          });
           
           const appointmentBlock = {
             id: appointment.id,
@@ -97,7 +121,8 @@ export const useWeekViewDataSimplified = (
             recurring_group_id: appointment.recurring_group_id,
             video_room_url: appointment.video_room_url,
             notes: appointment.notes,
-            client: appointment.client
+            client: appointment.client,
+            appointment_timezone: appointmentTimeZone // Store the timezone used
           };
           
           console.log(`[useWeekViewDataSimplified] Successfully created appointment block ${index}:`, {
@@ -105,6 +130,7 @@ export const useWeekViewDataSimplified = (
             clientName: appointmentBlock.clientName,
             start: appointmentBlock.start.toISO(),
             end: appointmentBlock.end.toISO(),
+            timezone: appointmentBlock.appointment_timezone,
             hasOriginalData: !!(appointmentBlock.start_at && appointmentBlock.end_at)
           });
           
@@ -135,28 +161,37 @@ export const useWeekViewDataSimplified = (
 
   const getAppointmentForTimeSlot = (day: Date, timeSlot: Date): AppointmentBlock | undefined => {
     try {
+      // Use userTimeZone for the time slot comparison since the calendar grid is in user's timezone
       const dayDateTime = TimeZoneService.fromJSDate(day, userTimeZone);
       const timeSlotDateTime = TimeZoneService.fromJSDate(timeSlot, userTimeZone);
       
       const foundAppointment = appointmentBlocks.find(appointment => {
         if (!appointment.start || !appointment.end) return false;
         
-        const isSameDay = appointment.start.hasSame(dayDateTime, 'day');
-        const isInTimeSlot = timeSlotDateTime >= appointment.start && 
-                            timeSlotDateTime < appointment.end;
+        // Convert appointment times to user's timezone for comparison with the grid
+        const appointmentTimeZone = appointment.appointment_timezone || userTimeZone;
+        const appointmentStartInUserTZ = appointment.start.setZone(userTimeZone);
+        const appointmentEndInUserTZ = appointment.end.setZone(userTimeZone);
+        
+        const isSameDay = appointmentStartInUserTZ.hasSame(dayDateTime, 'day');
+        const isInTimeSlot = timeSlotDateTime >= appointmentStartInUserTZ && 
+                            timeSlotDateTime < appointmentEndInUserTZ;
+        
+        if (isSameDay && isInTimeSlot) {
+          console.log(`[useWeekViewDataSimplified] Found appointment for time slot:`, {
+            appointmentId: appointment.id,
+            appointmentTimeZone,
+            day: dayDateTime.toFormat('yyyy-MM-dd'),
+            timeSlot: timeSlotDateTime.toFormat('HH:mm'),
+            appointmentStartOriginal: appointment.start.toFormat('yyyy-MM-dd HH:mm'),
+            appointmentStartInUserTZ: appointmentStartInUserTZ.toFormat('yyyy-MM-dd HH:mm'),
+            appointmentEndOriginal: appointment.end.toFormat('yyyy-MM-dd HH:mm'),
+            appointmentEndInUserTZ: appointmentEndInUserTZ.toFormat('yyyy-MM-dd HH:mm')
+          });
+        }
         
         return isSameDay && isInTimeSlot;
       });
-      
-      if (foundAppointment) {
-        console.log('[useWeekViewDataSimplified] Found appointment for time slot:', {
-          appointmentId: foundAppointment.id,
-          day: dayDateTime.toFormat('yyyy-MM-dd'),
-          timeSlot: timeSlotDateTime.toFormat('HH:mm'),
-          appointmentStart: foundAppointment.start.toFormat('yyyy-MM-dd HH:mm'),
-          appointmentEnd: foundAppointment.end.toFormat('yyyy-MM-dd HH:mm')
-        });
-      }
       
       return foundAppointment;
     } catch (err) {
