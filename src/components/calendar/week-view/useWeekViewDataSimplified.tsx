@@ -121,20 +121,18 @@ export const useWeekViewDataSimplified = (
       }
 
       try {
-        // CRITICAL FIX: Use the appointment's original timezone for positioning
-        // If appointment_timezone is available, use it; otherwise fall back to userTimeZone
-        const appointmentTimeZone = appointment.appointment_timezone || userTimeZone;
-        
-        console.log('[useWeekViewDataSimplified] Converting appointment times:', {
+        // CRITICAL FIX: Always use userTimeZone for positioning consistency
+        // The user's timezone is the reference for all grid positioning
+        console.log('[useWeekViewDataSimplified] Converting appointment times to userTimeZone:', {
           appointmentId: appointment.id,
           originalStart: appointment.start_at,
-          appointmentTimeZone,
-          userTimeZone
+          originalTimezone: appointment.appointment_timezone,
+          targetTimezone: userTimeZone
         });
 
-        // Convert UTC times to the appointment's timezone for positioning
-        const start = DateTime.fromISO(appointment.start_at, { zone: 'UTC' }).setZone(appointmentTimeZone);
-        const end = DateTime.fromISO(appointment.end_at, { zone: 'UTC' }).setZone(appointmentTimeZone);
+        // Convert UTC times to the user's timezone for consistent positioning
+        const start = DateTime.fromISO(appointment.start_at, { zone: 'UTC' }).setZone(userTimeZone);
+        const end = DateTime.fromISO(appointment.end_at, { zone: 'UTC' }).setZone(userTimeZone);
         const day = start.startOf('day');
 
         // Get client name
@@ -164,7 +162,7 @@ export const useWeekViewDataSimplified = (
           video_room_url: appointment.video_room_url,
           notes: appointment.notes,
           client: appointment.client,
-          appointment_timezone: appointmentTimeZone
+          appointment_timezone: appointment.appointment_timezone
         };
 
         processedAppointmentBlocks.push(appointmentBlock);
@@ -176,8 +174,8 @@ export const useWeekViewDataSimplified = (
           convertedStart: start.toFormat('yyyy-MM-dd HH:mm'),
           convertedEnd: end.toFormat('yyyy-MM-dd HH:mm'),
           day: day.toFormat('yyyy-MM-dd'),
-          appointmentTimeZone,
-          userTimeZone
+          originalTimezone: appointment.appointment_timezone,
+          positioningTimezone: userTimeZone
         });
       } catch (error) {
         console.error('[useWeekViewDataSimplified] Error creating appointment block:', {
@@ -231,8 +229,7 @@ export const useWeekViewDataSimplified = (
     });
   };
 
-  // CRITICAL FIX: Updated utility function to get appointment for a time slot
-  // This function now properly handles appointment timezone conversion
+  // CRITICAL FIX: Simplified appointment slot matching using consistent timezone
   const getAppointmentForTimeSlot = (day: Date, timeSlot: Date): AppointmentBlock | undefined => {
     const dayDt = DateTime.fromJSDate(day, { zone: userTimeZone });
     const timeSlotDt = DateTime.fromJSDate(timeSlot, { zone: userTimeZone });
@@ -242,48 +239,29 @@ export const useWeekViewDataSimplified = (
       const isSameDay = appt.day?.hasSame(dayDt, 'day') || false;
       if (!isSameDay) return false;
 
-      // CRITICAL: Convert the time slot to the appointment's timezone for comparison
-      const appointmentTimeZone = appt.appointment_timezone || userTimeZone;
-      
-      // Convert the time slot from user timezone to appointment timezone
-      let slotTimeInApptTz: DateTime;
-      if (appointmentTimeZone === userTimeZone) {
-        // Same timezone, no conversion needed
-        slotTimeInApptTz = dayDt.set({
-          hour: timeSlotDt.hour,
-          minute: timeSlotDt.minute,
-          second: 0,
-          millisecond: 0
-        });
-      } else {
-        // Convert to UTC first, then to appointment timezone
-        const slotTimeUTC = dayDt.set({
-          hour: timeSlotDt.hour,
-          minute: timeSlotDt.minute,
-          second: 0,
-          millisecond: 0
-        }).toUTC();
-        slotTimeInApptTz = slotTimeUTC.setZone(appointmentTimeZone);
-      }
+      // CRITICAL FIX: Simplified comparison - both appointment and slot are now in userTimeZone
+      const slotTime = dayDt.set({
+        hour: timeSlotDt.hour,
+        minute: timeSlotDt.minute,
+        second: 0,
+        millisecond: 0
+      });
 
-      const isInRange = slotTimeInApptTz >= appt.start && slotTimeInApptTz < appt.end;
+      const isInRange = slotTime >= appt.start && slotTime < appt.end;
       
-      // Debug logging for the problematic appointment
-      if (appt.clientName?.includes('Luke') || appt.clientName?.includes('zzVilla')) {
-        console.log('[getAppointmentForTimeSlot] Checking Luke appointment:', {
-          appointmentId: appt.id,
-          dayCheck: isSameDay,
-          slotDay: dayDt.toFormat('yyyy-MM-dd'),
-          apptDay: appt.day?.toFormat('yyyy-MM-dd'),
-          slotTime: timeSlotDt.toFormat('HH:mm'),
-          slotTimeInApptTz: slotTimeInApptTz.toFormat('HH:mm'),
-          apptStart: appt.start.toFormat('HH:mm'),
-          apptEnd: appt.end.toFormat('HH:mm'),
-          appointmentTimeZone,
-          userTimeZone,
-          isInRange
-        });
-      }
+      // Enhanced logging for debugging
+      console.log(`[getAppointmentForTimeSlot] Checking appointment ${appt.id}:`, {
+        appointmentId: appt.id,
+        clientName: appt.clientName,
+        dayCheck: isSameDay,
+        slotDay: dayDt.toFormat('yyyy-MM-dd'),
+        apptDay: appt.day?.toFormat('yyyy-MM-dd'),
+        slotTime: slotTime.toFormat('HH:mm'),
+        apptStart: appt.start.toFormat('HH:mm'),
+        apptEnd: appt.end.toFormat('HH:mm'),
+        userTimeZone,
+        isInRange
+      });
 
       return isInRange;
     });

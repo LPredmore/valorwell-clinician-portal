@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { format } from 'date-fns';
 import { useWeekViewDataSimplified } from './week-view/useWeekViewDataSimplified';
 import { TimeBlock, AppointmentBlock } from './week-view/types';
@@ -29,22 +29,10 @@ interface WeekViewProps {
   onAppointmentDelete?: (appointmentId: string) => void;
 }
 
-// Generate time slots for the day (30-minute intervals)
+// Generate timezone-aware time slots for the day (30-minute intervals)
 const START_HOUR = 7; // 7 AM
 const END_HOUR = 19; // 7 PM
 const INTERVAL_MINUTES = 30;
-
-const TIME_SLOTS: Date[] = [];
-const baseDate = new Date();
-baseDate.setHours(0, 0, 0, 0); // Reset to midnight
-
-for (let hour = START_HOUR; hour < END_HOUR; hour++) {
-  for (let minute = 0; minute < 60; minute += INTERVAL_MINUTES) {
-    const timeSlot = new Date(baseDate);
-    timeSlot.setHours(hour, minute, 0, 0);
-    TIME_SLOTS.push(timeSlot);
-  }
-}
 
 const WeekView: React.FC<WeekViewProps> = ({
   days,
@@ -73,6 +61,32 @@ const WeekView: React.FC<WeekViewProps> = ({
     isLoading,
     hasError: !!error
   });
+
+  // CRITICAL FIX: Generate timezone-aware TIME_SLOTS
+  const TIME_SLOTS = useMemo(() => {
+    console.log('[WeekView] Generating timezone-aware TIME_SLOTS for userTimeZone:', userTimeZone);
+    
+    const slots: DateTime[] = [];
+    // Create a base date in the user's timezone (today at midnight)
+    const baseDate = DateTime.now().setZone(userTimeZone).startOf('day');
+    
+    for (let hour = START_HOUR; hour < END_HOUR; hour++) {
+      for (let minute = 0; minute < 60; minute += INTERVAL_MINUTES) {
+        const slot = baseDate.set({ hour, minute, second: 0, millisecond: 0 });
+        slots.push(slot);
+      }
+    }
+    
+    console.log('[WeekView] Generated timezone-aware TIME_SLOTS:', {
+      count: slots.length,
+      timezone: userTimeZone,
+      firstSlot: slots[0]?.toFormat('HH:mm'),
+      lastSlot: slots[slots.length - 1]?.toFormat('HH:mm'),
+      sampleSlot: slots[10]?.toISO() // 10:00 AM slot for reference
+    });
+    
+    return slots;
+  }, [userTimeZone]);
 
   const {
     loading: hookLoading,
@@ -140,8 +154,8 @@ const WeekView: React.FC<WeekViewProps> = ({
   };
 
   // Get a formatted time string for display
-  const formatTime = (date: Date) => {
-    return format(date, 'h:mm a');
+  const formatTime = (timeSlot: DateTime) => {
+    return timeSlot.toFormat('h:mm a');
   };
 
   if (hookLoading || isLoading) {
@@ -206,32 +220,49 @@ const WeekView: React.FC<WeekViewProps> = ({
           {weekDays.map(day => (
             <div key={day.toISO() || ''} className="flex-1 border-r last:border-r-0">
               {TIME_SLOTS.map((timeSlot, i) => {
-                const dayDt = TimeZoneService.fromJSDate(day.toJSDate(), userTimeZone);
-                const timeSlotDt = TimeZoneService.fromJSDate(timeSlot, userTimeZone);
+                // CRITICAL FIX: Use consistent timezone-aware DateTime objects
+                const dayDt = day; // weekDays are already timezone-aware DateTime objects
+                const timeSlotDt = timeSlot; // TIME_SLOTS are now timezone-aware DateTime objects
+                
+                // Create the specific time slot for this day by combining day and time
+                const dayTimeSlot = dayDt.set({
+                  hour: timeSlotDt.hour,
+                  minute: timeSlotDt.minute,
+                  second: 0,
+                  millisecond: 0
+                });
+                
+                console.log(`[WeekView] Processing slot ${dayDt.toFormat('yyyy-MM-dd')} ${timeSlotDt.toFormat('HH:mm')}:`, {
+                  dayDt: dayDt.toISO(),
+                  timeSlotDt: timeSlotDt.toISO(),
+                  combinedDayTimeSlot: dayTimeSlot.toISO(),
+                  userTimeZone
+                });
                 
                 const isAvailable = showAvailability && isTimeSlotAvailable(
-                  dayDt.toJSDate(), 
+                  dayTimeSlot.toJSDate(), 
                   timeSlotDt.toJSDate()
                 );
                 
                 const currentBlock = isAvailable ? getBlockForTimeSlot(
-                  dayDt.toJSDate(), 
+                  dayTimeSlot.toJSDate(), 
                   timeSlotDt.toJSDate()
                 ) : undefined;
                 
                 const appointment = getAppointmentForTimeSlot(
-                  dayDt.toJSDate(), 
+                  dayTimeSlot.toJSDate(), 
                   timeSlotDt.toJSDate()
                 );
 
-                // Debug logging for appointment positioning
+                // Enhanced debug logging for appointment positioning
                 if (appointment) {
                   console.log(`[WeekView] Appointment found at ${dayDt.toFormat('yyyy-MM-dd')} ${timeSlotDt.toFormat('HH:mm')}:`, {
                     appointmentId: appointment.id,
                     appointmentTimezone: appointment.appointment_timezone,
                     originalStart: appointment.start_at,
                     convertedStart: appointment.start.toFormat('yyyy-MM-dd HH:mm'),
-                    userTimeZone
+                    userTimeZone,
+                    slotTime: dayTimeSlot.toFormat('yyyy-MM-dd HH:mm')
                   });
                 }
 
@@ -242,8 +273,8 @@ const WeekView: React.FC<WeekViewProps> = ({
                                 ${i % 2 === 0 ? 'bg-gray-50' : 'bg-white'}`}
                   >
                     <TimeSlot
-                      day={dayDt.toJSDate()}
-                      timeSlot={timeSlot}
+                      day={dayTimeSlot.toJSDate()}
+                      timeSlot={timeSlotDt.toJSDate()}
                       isAvailable={isAvailable}
                       currentBlock={currentBlock}
                       appointment={appointment}
@@ -273,6 +304,7 @@ const WeekView: React.FC<WeekViewProps> = ({
             <p>Time Blocks: {timeBlocks.length}</p>
             <p>Appointments: {appointmentBlocks.length}</p>
             <p>User Timezone: {userTimeZone}</p>
+            <p>TIME_SLOTS Generated: {TIME_SLOTS.length}</p>
             {appointmentBlocks.length > 0 && (
               <div className="mt-2">
                 <p className="font-medium">Appointment Timezones:</p>
