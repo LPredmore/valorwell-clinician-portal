@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useMemo } from 'react';
 import { DateTime } from 'luxon';
 import { TimeZoneService } from '@/utils/timeZoneService';
@@ -35,16 +34,22 @@ export const useWeekViewDataSimplified = (
         return [];
       }
 
-      return appointments.map(appointment => ({
-        id: appointment.id,
-        appointmentId: appointment.id,
-        clientId: appointment.client_id,
-        clientName: appointment.clientName || getClientName(appointment.client_id),
-        start: DateTime.fromISO(appointment.start_at),
-        end: DateTime.fromISO(appointment.end_at),
-        type: appointment.type || 'appointment',
-        status: appointment.status || 'scheduled'
-      }));
+      return appointments.map(appointment => {
+        const startDateTime = DateTime.fromISO(appointment.start_at);
+        const endDateTime = DateTime.fromISO(appointment.end_at);
+        
+        return {
+          id: appointment.id,
+          appointmentId: appointment.id,
+          clientId: appointment.client_id,
+          clientName: appointment.clientName || getClientName(appointment.client_id),
+          start: startDateTime,
+          end: endDateTime,
+          day: startDateTime, // Add the required day property
+          type: appointment.type || 'appointment',
+          status: appointment.status || 'scheduled'
+        };
+      });
     } catch (err) {
       console.error('[useWeekViewDataSimplified] Error processing appointments:', err);
       setError('Error processing appointments');
