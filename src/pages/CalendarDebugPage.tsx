@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/calendar/Calendar';
 import CalendarDataFlow from '@/debug/CalendarDataFlow';
 import WeekViewDataTest from '@/debug/WeekViewDataTest';
+import AvailabilityDebugger from '@/debug/AvailabilityDebugger';
 import { useWeekViewData } from '@/components/calendar/week-view/useWeekViewData';
 import { TimeZoneService } from '@/utils/timeZoneService';
 
@@ -67,6 +68,16 @@ const CalendarDebugPage: React.FC = () => {
           </div>
           
           <Button onClick={handleRefresh}>Refresh</Button>
+        </CardContent>
+      </Card>
+      
+      {/* NEW: Availability Debugging Tool */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Availability Debugging Analysis</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <AvailabilityDebugger clinicianEmail="info@valorwellfoundation.org" />
         </CardContent>
       </Card>
       
