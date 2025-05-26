@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -97,10 +98,12 @@ export const CalendarDebugWrapper: React.FC<CalendarDebugWrapperProps> = ({
     AppointmentDebugUtils.analyzeAppointment(appointment, selectedTimezone);
   };
   
-  // Handle availability click
-  const handleAvailabilityClick = (date: DateTime, availabilityBlock: any) => {
+  // Handle availability click - now accepts Date object
+  const handleAvailabilityClick = (date: Date, availabilityBlock: any) => {
+    // Convert Date to DateTime internally for logging
+    const dateDt = TimeZoneService.fromJSDate(date, selectedTimezone);
     DebugUtils.log(DEBUG_CONTEXT, 'Availability clicked', {
-      date: date.toISO(),
+      date: dateDt.toISO(),
       blockId: availabilityBlock.id
     });
   };

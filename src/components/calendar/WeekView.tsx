@@ -124,10 +124,12 @@ const WeekView: React.FC<WeekViewProps> = ({
     validUserTimeZone
   );
 
-  // Handle click on an availability block - convert DateTime to Date for compatibility
-  const handleAvailabilityBlockClick = (day: DateTime, block: TimeBlock) => {
+  // Handle click on an availability block - now accepts Date object
+  const handleAvailabilityBlockClick = (day: Date, block: TimeBlock) => {
+    // Convert Date to DateTime internally for processing
+    const dayDt = TimeZoneService.fromJSDate(day, validUserTimeZone);
     console.log('[WeekView] Availability block clicked:', {
-      day: day.toFormat('yyyy-MM-dd'),
+      day: dayDt.toFormat('yyyy-MM-dd'),
       start: block.start.toFormat('HH:mm'),
       end: block.end.toFormat('HH:mm'),
     });
@@ -142,7 +144,7 @@ const WeekView: React.FC<WeekViewProps> = ({
         is_active: true
       };
       
-      onAvailabilityClick(day.toJSDate(), availabilityBlock);
+      onAvailabilityClick(dayDt.toJSDate(), availabilityBlock);
     }
   };
 
@@ -285,8 +287,8 @@ const WeekView: React.FC<WeekViewProps> = ({
                                 ${i % 2 === 0 ? 'bg-gray-50' : 'bg-white'}`}
                   >
                     <TimeSlot
-                      day={dayTimeSlot}
-                      timeSlot={timeSlotDt}
+                      day={dayTimeSlot.toJSDate()}
+                      timeSlot={timeSlotDt.toJSDate()}
                       isAvailable={isAvailable}
                       currentBlock={currentBlock}
                       appointment={appointment}
