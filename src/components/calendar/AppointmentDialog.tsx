@@ -1,10 +1,11 @@
+
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
 import { supabase, getOrCreateVideoRoom } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { getClinicianById } from '@/hooks/useClinicianData';
+import { getClinicianById, getClinicianTimeZone } from '@/hooks/useClinicianData';
 import { 
   Dialog, DialogContent, DialogHeader, DialogTitle, 
   DialogFooter, DialogClose 
@@ -58,6 +59,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurrenceType, setRecurrenceType] = useState<string>('weekly');
   const [databaseClinicianId, setDatabaseClinicianId] = useState<string | null>(null);
+  const [clinicianTimeZone, setClinicianTimeZone] = useState<string | null>(null);
   const [fetchingClinicianId, setFetchingClinicianId] = useState(false);
   const [appointmentCreationAttempts, setAppointmentCreationAttempts] = useState(0);
   const [lastError, setLastError] = useState<any>(null);
@@ -88,41 +90,22 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
     checkAuth();
   }, []);
   
-  // Fetch the database-formatted clinician ID when the dialog opens or clinician changes
-  // Debug effect to track state changes
-  useEffectDebug(() => {
-    logAppointmentDebug('State updated', {
-      selectedClientId,
-      selectedDate,
-      startTime,
-      isRecurring,
-      recurrenceType,
-      databaseClinicianId,
-      formattedClinicianId,
-      appointmentCreationAttempts,
-      authStatus,
-      lastError: lastError ? {
-        message: lastError.message,
-        code: lastError.code
-      } : null
-    });
-  }, [selectedClientId, selectedDate, startTime, isRecurring, recurrenceType,
-      databaseClinicianId, formattedClinicianId, appointmentCreationAttempts, lastError, authStatus]);
-  
+  // Fetch the database-formatted clinician ID and timezone when the dialog opens or clinician changes
   useEffect(() => {
-    const fetchDatabaseClinicianId = async () => {
+    const fetchClinicianData = async () => {
       if (!formattedClinicianId) {
         logAppointmentDebug('No clinician ID provided');
         return;
       }
       
-      logAppointmentDebug('Fetching database clinician ID', {
+      logAppointmentDebug('Fetching database clinician ID and timezone', {
         formattedClinicianId,
         idType: typeof formattedClinicianId
       });
       
       setFetchingClinicianId(true);
       try {
+        // Fetch clinician record
         const clinicianRecord = await getClinicianById(formattedClinicianId);
         logAppointmentDebug('Clinician record returned', {
           found: !!clinicianRecord,
@@ -130,31 +113,29 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
         });
         
         if (clinicianRecord) {
-          logAppointmentDebug('Database-retrieved clinician details', {
-            id: clinicianRecord.id,
-            idType: typeof clinicianRecord.id,
-            email: clinicianRecord.clinician_email,
-            name: clinicianRecord.clinician_professional_name
-          });
           setDatabaseClinicianId(clinicianRecord.id);
         } else {
-          logAppointmentDebug('Could not find clinician with ID - falling back to formatted ID', {
-            attemptedId: formattedClinicianId
-          });
           setDatabaseClinicianId(formattedClinicianId); // Fallback to formatted ID
         }
+        
+        // Fetch clinician timezone
+        const timeZone = await getClinicianTimeZone(formattedClinicianId);
+        logAppointmentDebug('Fetched clinician timezone', { timeZone });
+        setClinicianTimeZone(timeZone);
+        
       } catch (error) {
-        logAppointmentDebug('Error fetching clinician record - falling back to formatted ID', {
+        logAppointmentDebug('Error fetching clinician data - falling back to formatted ID', {
           error: error instanceof Error ? error.message : String(error),
           attemptedId: formattedClinicianId
         });
         setDatabaseClinicianId(formattedClinicianId); // Fallback to formatted ID
+        setClinicianTimeZone('America/Chicago'); // Default timezone fallback
       } finally {
         setFetchingClinicianId(false);
       }
     };
     
-    fetchDatabaseClinicianId();
+    fetchClinicianData();
   }, [formattedClinicianId]);
 
   // Reset form when dialog opens
@@ -208,16 +189,17 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
     // Use the database-retrieved clinician ID or fall back to the formatted ID
     const clinicianIdToUse = databaseClinicianId || formattedClinicianId;
     
-    if (!clinicianIdToUse) {
-      logAppointmentDebug('Missing clinician ID', {
+    if (!clinicianIdToUse || !clinicianTimeZone) {
+      logAppointmentDebug('Missing clinician ID or timezone', {
         databaseClinicianId,
         formattedClinicianId,
-        selectedClinicianId
+        selectedClinicianId,
+        clinicianTimeZone
       });
       
       toast({
-        title: "Missing Clinician",
-        description: "No clinician selected. Please try again.",
+        title: "Missing Information",
+        description: "Clinician information not available. Please try again.",
         variant: "destructive"
       });
       return;
@@ -226,9 +208,8 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
     logAppointmentDebug('Creating appointment', {
       attempt: appointmentCreationAttempts + 1,
       clinicianIdToUse,
-      clinicianIdType: typeof clinicianIdToUse,
+      clinicianTimeZone,
       selectedClientId,
-      clientIdType: typeof selectedClientId,
       date: selectedDate ? format(selectedDate, 'yyyy-MM-dd') : null,
       startTime,
       isRecurring,
@@ -307,7 +288,8 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
             status: 'scheduled',
             appointment_recurring: recurrenceType,
             recurring_group_id: recurringGroupId,
-            video_room_url: videoRoomUrl // Add the video room URL to each appointment
+            video_room_url: videoRoomUrl,
+            appointments_timezone: clinicianTimeZone // Save the clinician's timezone
           };
         });
 
@@ -407,7 +389,8 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
           end_at: utcEndAtISO,
           type: "Therapy Session",
           status: 'scheduled',
-          video_room_url: videoRoomUrl // Add the video room URL
+          video_room_url: videoRoomUrl,
+          appointments_timezone: clinicianTimeZone // Save the clinician's timezone
         };
 
         logAppointmentDebug('Creating single appointment', {
@@ -531,87 +514,75 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
                 "Debug info: No clients found for this clinician" :
                 `Debug info: Found ${clients.length} clients`}
             </div>
-            <div className="text-xs text-muted-foreground">
-              Clinician ID: {databaseClinicianId || formattedClinicianId || 'None'}
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="date">Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    id="date"
+                    variant={"outline"}
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !selectedDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {selectedDate ? format(selectedDate, "PPP") : <span>Pick a date</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <CalendarComponent
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={setSelectedDate}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
-            {lastError && (
-              <div className="text-xs text-red-500 mt-1">
-                Last error: {lastError.message || JSON.stringify(lastError)}
-              </div>
-            )}
+
+            <div className="grid gap-2">
+              <Label htmlFor="time">Start Time</Label>
+              <Select value={startTime} onValueChange={setStartTime}>
+                <SelectTrigger id="time">
+                  <SelectValue placeholder="Select time" />
+                </SelectTrigger>
+                <SelectContent>
+                  {timeOptions.map((time) => (
+                    <SelectItem key={time} value={time}>
+                      {formatTimeDisplay(time, userTimeZone)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
-          <div className="grid gap-2">
-            <Label htmlFor="date">Date</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !selectedDate && "text-muted-foreground"
-                  )}
-                  id="date"
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {selectedDate ? format(selectedDate, 'PPP') : <span>Pick a date</span>}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <CalendarComponent
-                  mode="single"
-                  selected={selectedDate}
-                  onSelect={(date) => {
-                    setSelectedDate(date);
-                  }}
-                  initialFocus
-                  className="p-3 pointer-events-auto"
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-
-          <div className="grid gap-2">
-            <Label htmlFor="time">Start Time</Label>
-            <Select value={startTime} onValueChange={setStartTime}>
-              <SelectTrigger id="time">
-                <SelectValue placeholder="Select start time" />
-              </SelectTrigger>
-              <SelectContent>
-                {timeOptions.map((time) => (
-                  <SelectItem key={time} value={time}>
-                    {formatTimeDisplay(time, userTimeZone)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex items-center space-x-2 pt-2">
-            <Checkbox 
-              id="recurring" 
-              checked={isRecurring} 
-              onCheckedChange={(checked) => setIsRecurring(checked === true)}
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="recurring"
+              checked={isRecurring}
+              onCheckedChange={setIsRecurring}
             />
-            <Label htmlFor="recurring">Recurring appointment</Label>
+            <Label htmlFor="recurring">Make this a recurring appointment</Label>
           </div>
 
           {isRecurring && (
-            <div className="grid gap-2 pl-6">
-              <Label htmlFor="recurrenceType">Recurrence Pattern</Label>
+            <div className="grid gap-2">
+              <Label htmlFor="recurrence">Recurrence Pattern</Label>
               <Select value={recurrenceType} onValueChange={setRecurrenceType}>
-                <SelectTrigger id="recurrenceType">
-                  <SelectValue placeholder="Select recurrence pattern" />
+                <SelectTrigger id="recurrence">
+                  <SelectValue placeholder="Select pattern" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="weekly">Weekly</SelectItem>
-                  <SelectItem value="biweekly">Every 2 weeks</SelectItem>
-                  <SelectItem value="monthly">Every 4 weeks</SelectItem>
+                  <SelectItem value="biweekly">Bi-weekly</SelectItem>
+                  <SelectItem value="monthly">Monthly</SelectItem>
                 </SelectContent>
               </Select>
-              <div className="text-xs text-muted-foreground mt-1">
-                This will create appointments for the next 6 months following this pattern.
-              </div>
             </div>
           )}
         </div>
@@ -619,8 +590,15 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
           <DialogClose asChild>
             <Button variant="outline">Cancel</Button>
           </DialogClose>
-          <Button type="button" onClick={handleCreateAppointment}>
-            {isRecurring ? "Create Recurring Appointments" : "Create Appointment"}
+          <Button onClick={handleCreateAppointment} disabled={fetchingClinicianId}>
+            {fetchingClinicianId ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Loading...
+              </>
+            ) : (
+              `Create ${isRecurring ? 'Recurring ' : ''}Appointment${isRecurring ? 's' : ''}`
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

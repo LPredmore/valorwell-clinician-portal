@@ -1,4 +1,3 @@
-
 import { Appointment } from '@/types/appointment';
 import { DateTime } from 'luxon';
 import { addWeeks, addMonths, format } from 'date-fns';
@@ -233,10 +232,15 @@ export const formatTimeDisplay = (time: string, timeZone?: string): string => {
 };
 
 /**
- * Formats appointment date for display
+ * Formats appointment date for display using the appointment's saved timezone
  */
-export const formatAppointmentDate = (dateTimeString: string, timeZone: string | string[]): string => {
-  console.log('[formatAppointmentDate] Formatting date:', { dateTimeString, timeZone, timeZoneType: typeof timeZone, isArray: Array.isArray(timeZone) });
+export const formatAppointmentDate = (dateTimeString: string, appointmentTimeZone?: string): string => {
+  console.log('[formatAppointmentDate] Formatting date:', { 
+    dateTimeString, 
+    appointmentTimeZone, 
+    timeZoneType: typeof appointmentTimeZone, 
+    isArray: Array.isArray(appointmentTimeZone) 
+  });
   
   try {
     if (!dateTimeString) {
@@ -244,13 +248,13 @@ export const formatAppointmentDate = (dateTimeString: string, timeZone: string |
       return 'No date available';
     }
     
-    // Handle timezone being an array
+    // Use appointment's saved timezone or fall back to UTC
     let safeTimeZone: string;
-    if (Array.isArray(timeZone)) {
-      console.warn('[formatAppointmentDate] TimeZone is an array, using first element:', timeZone);
-      safeTimeZone = timeZone[0] || 'UTC';
+    if (Array.isArray(appointmentTimeZone)) {
+      console.warn('[formatAppointmentDate] TimeZone is an array, using first element:', appointmentTimeZone);
+      safeTimeZone = appointmentTimeZone[0] || 'UTC';
     } else {
-      safeTimeZone = timeZone || 'UTC';
+      safeTimeZone = appointmentTimeZone || 'UTC';
     }
     
     console.log('[formatAppointmentDate] Using safe timezone:', safeTimeZone);
@@ -277,10 +281,15 @@ export const formatAppointmentDate = (dateTimeString: string, timeZone: string |
 };
 
 /**
- * Formats appointment time for display
+ * Formats appointment time for display using the appointment's saved timezone
  */
-export const formatAppointmentTime = (dateTimeString: string, timeZone: string | string[]): string => {
-  console.log('[formatAppointmentTime] Formatting time:', { dateTimeString, timeZone, timeZoneType: typeof timeZone, isArray: Array.isArray(timeZone) });
+export const formatAppointmentTime = (dateTimeString: string, appointmentTimeZone?: string): string => {
+  console.log('[formatAppointmentTime] Formatting time:', { 
+    dateTimeString, 
+    appointmentTimeZone, 
+    timeZoneType: typeof appointmentTimeZone, 
+    isArray: Array.isArray(appointmentTimeZone) 
+  });
   
   try {
     if (!dateTimeString) {
@@ -288,13 +297,13 @@ export const formatAppointmentTime = (dateTimeString: string, timeZone: string |
       return 'N/A';
     }
     
-    // Handle timezone being an array
+    // Use appointment's saved timezone or fall back to UTC
     let safeTimeZone: string;
-    if (Array.isArray(timeZone)) {
-      console.warn('[formatAppointmentTime] TimeZone is an array, using first element:', timeZone);
-      safeTimeZone = timeZone[0] || 'UTC';
+    if (Array.isArray(appointmentTimeZone)) {
+      console.warn('[formatAppointmentTime] TimeZone is an array, using first element:', appointmentTimeZone);
+      safeTimeZone = appointmentTimeZone[0] || 'UTC';
     } else {
-      safeTimeZone = timeZone || 'UTC';
+      safeTimeZone = appointmentTimeZone || 'UTC';
     }
     
     console.log('[formatAppointmentTime] Using safe timezone:', safeTimeZone);

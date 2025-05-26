@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Appointment } from '@/types/appointment';
 import { formatAppointmentDate, formatAppointmentTime } from '@/utils/appointmentUtils';
+import { TimeZoneService } from '@/utils/timeZoneService';
 
 export interface AppointmentCardProps {
   appointment: Appointment;
@@ -25,6 +26,12 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
   onDocumentSession,
   onSessionDidNotOccur
 }) => {
+  // Use the appointment's saved timezone if available, otherwise fall back to user timezone
+  const appointmentTimeZone = appointment.appointments_timezone || userTimeZone;
+  const appointmentTimeZoneDisplay = appointment.appointments_timezone 
+    ? TimeZoneService.getTimeZoneDisplayName(appointment.appointments_timezone)
+    : timeZoneDisplay;
+
   if (onDocumentSession) {
     return (
       <Card key={appointment.id} className="mb-3">
@@ -35,14 +42,14 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
           </CardTitle>
           <CardDescription className="flex items-center">
             <Calendar className="h-4 w-4 mr-2" />
-            {formatAppointmentDate(appointment.start_at, userTimeZone)}
+            {formatAppointmentDate(appointment.start_at, appointmentTimeZone)}
           </CardDescription>
         </CardHeader>
         <CardContent className="pb-2">
           <div className="flex items-center">
             <Clock className="h-4 w-4 mr-2" />
             <span className="text-sm">
-              {formatAppointmentTime(appointment.start_at, userTimeZone)} - {formatAppointmentTime(appointment.end_at, userTimeZone)}
+              {formatAppointmentTime(appointment.start_at, appointmentTimeZone)} - {formatAppointmentTime(appointment.end_at, appointmentTimeZone)}
             </span>
           </div>
           <div className="text-sm mt-1">{appointment.type}</div>
@@ -79,12 +86,12 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
       <CardHeader className="pb-2">
         <CardTitle className="text-base font-semibold flex items-center">
           <Clock className="h-4 w-4 mr-2" />
-          {formatAppointmentTime(appointment.start_at, userTimeZone)} - {formatAppointmentTime(appointment.end_at, userTimeZone)} 
-          <span className="text-xs text-gray-500 ml-1">({timeZoneDisplay})</span>
+          {formatAppointmentTime(appointment.start_at, appointmentTimeZone)} - {formatAppointmentTime(appointment.end_at, appointmentTimeZone)} 
+          <span className="text-xs text-gray-500 ml-1">({appointmentTimeZoneDisplay})</span>
         </CardTitle>
         <CardDescription className="flex items-center">
           <Calendar className="h-4 w-4 mr-2" />
-          {formatAppointmentDate(appointment.start_at, userTimeZone)}
+          {formatAppointmentDate(appointment.start_at, appointmentTimeZone)}
         </CardDescription>
       </CardHeader>
       <CardContent className="pb-2">

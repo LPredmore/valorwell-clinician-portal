@@ -181,7 +181,7 @@ export const useAppointments = (
       let query = supabase
         .from("appointments")
         .select(
-          `id, client_id, clinician_id, start_at, end_at, type, status, appointment_recurring, recurring_group_id, video_room_url, notes, clients (client_first_name, client_last_name, client_preferred_name, client_email, client_phone, client_status, client_date_of_birth, client_gender, client_address, client_city, client_state, client_zipcode)`
+          `id, client_id, clinician_id, start_at, end_at, type, status, appointment_recurring, recurring_group_id, video_room_url, notes, appointments_timezone, clients (client_first_name, client_last_name, client_preferred_name, client_email, client_phone, client_status, client_date_of_birth, client_gender, client_address, client_city, client_state, client_zipcode)`
         )
         .eq("clinician_id", formattedClinicianId)
         .eq("status", "scheduled");
@@ -218,6 +218,7 @@ export const useAppointments = (
         clientsFieldType: rawDataAny?.[0]?.clients ? typeof rawDataAny[0].clients : "undefined",
         clientFieldKeys: rawDataAny?.[0]?.clients ? Object.keys(rawDataAny[0].clients) : [],
         rawStartAtFormat: rawDataAny?.[0]?.start_at || "N/A",
+        appointmentsTimezone: rawDataAny?.[0]?.appointments_timezone || "N/A",
         clinicianIdUsed: formattedClinicianId
       });
 
@@ -284,6 +285,7 @@ export const useAppointments = (
           recurring_group_id: rawAppt.recurring_group_id,
           video_room_url: rawAppt.video_room_url,
           notes: rawAppt.notes,
+          appointments_timezone: rawAppt.appointments_timezone, // Include the saved timezone
           client: clientData,
           clientName: clientName,
         };
@@ -336,10 +338,10 @@ export const useAppointments = (
     if (!appointment.start_at) return false;
 
     try {
-      const now = DateTime.now().setZone(safeUserTimeZone);
-      const apptDateTime = DateTime.fromISO(appointment.start_at).setZone(
-        safeUserTimeZone
-      );
+      // Use the appointment's saved timezone if available, otherwise fall back to user timezone
+      const appointmentTimeZone = appointment.appointments_timezone || safeUserTimeZone;
+      const now = DateTime.now().setZone(appointmentTimeZone);
+      const apptDateTime = DateTime.fromISO(appointment.start_at).setZone(appointmentTimeZone);
 
       return now.hasSame(apptDateTime, "day");
     } catch (e) {
@@ -348,11 +350,13 @@ export const useAppointments = (
     }
   };
 
-  // Memoized formatted appointments
+  // Memoized formatted appointments - now using each appointment's saved timezone
   const appointmentsWithDisplayFormatting = useMemo(() => {
-    return fetchedAppointments.map((appt) =>
-      addDisplayFormattingToAppointment(appt, safeUserTimeZone)
-    );
+    return fetchedAppointments.map((appt) => {
+      // Use the appointment's saved timezone if available, otherwise fall back to user timezone
+      const appointmentTimeZone = appt.appointments_timezone || safeUserTimeZone;
+      return addDisplayFormattingToAppointment(appt, appointmentTimeZone);
+    });
   }, [fetchedAppointments, safeUserTimeZone]);
   
 
@@ -362,15 +366,15 @@ export const useAppointments = (
   }, [appointmentsWithDisplayFormatting]);
 
   const upcomingAppointments = useMemo(() => {
-    const now = DateTime.now().setZone(safeUserTimeZone);
-
     return appointmentsWithDisplayFormatting.filter((appt) => {
       if (!appt.start_at) return false;
 
       try {
-        const apptDateTime = DateTime.fromISO(appt.start_at).setZone(
-          safeUserTimeZone
-        );
+        // Use the appointment's saved timezone if available, otherwise fall back to user timezone
+        const appointmentTimeZone = appt.appointments_timezone || safeUserTimeZone;
+        const now = DateTime.now().setZone(appointmentTimeZone);
+        const apptDateTime = DateTime.fromISO(appt.start_at).setZone(appointmentTimeZone);
+        
         // Upcoming means: not today and in the future
         return apptDateTime > now && !now.hasSame(apptDateTime, "day");
       } catch (e) {
@@ -381,15 +385,15 @@ export const useAppointments = (
   }, [appointmentsWithDisplayFormatting, safeUserTimeZone]);
 
   const pastAppointments = useMemo(() => {
-    const now = DateTime.now().setZone(safeUserTimeZone);
-
     return appointmentsWithDisplayFormatting.filter((appt) => {
       if (!appt.start_at) return false;
 
       try {
-        const apptDateTime = DateTime.fromISO(appt.start_at).setZone(
-          safeUserTimeZone
-        );
+        // Use the appointment's saved timezone if available, otherwise fall back to user timezone
+        const appointmentTimeZone = appt.appointments_timezone || safeUserTimeZone;
+        const now = DateTime.now().setZone(appointmentTimeZone);
+        const apptDateTime = DateTime.fromISO(appt.start_at).setZone(appointmentTimeZone);
+        
         // Past means: before now
         return apptDateTime < now;
       } catch (e) {

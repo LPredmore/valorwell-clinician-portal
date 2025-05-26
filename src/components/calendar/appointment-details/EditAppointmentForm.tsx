@@ -17,6 +17,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { getClinicianTimeZone } from '@/hooks/useClinicianData';
 
 interface EditAppointmentFormProps {
   appointment: {
@@ -25,6 +26,7 @@ interface EditAppointmentFormProps {
     type: string;
     status: string;
     notes?: string;
+    clinician_id: string;
     client?: {
       client_first_name: string;
       client_last_name: string;
@@ -80,6 +82,9 @@ const EditAppointmentForm: React.FC<EditAppointmentFormProps> = ({
       const startUtc = startDateTime.toUTC().toISO();
       const endUtc = endDateTime.toUTC().toISO();
 
+      // Fetch the clinician's current timezone to save with the appointment
+      const clinicianTimeZone = await getClinicianTimeZone(appointment.clinician_id);
+
       const { error } = await supabase
         .from('appointments')
         .update({
@@ -87,7 +92,8 @@ const EditAppointmentForm: React.FC<EditAppointmentFormProps> = ({
           end_at: endUtc,
           type: values.type,
           status: values.status,
-          notes: values.notes
+          notes: values.notes,
+          appointments_timezone: clinicianTimeZone // Save the clinician's timezone
         })
         .eq('id', appointment.id);
 
