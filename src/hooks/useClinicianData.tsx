@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Clinician } from "@/types/client";
@@ -56,6 +57,8 @@ export const getClinicianById = async (clinicianId: string) => {
 
 export const getClinicianTimeZone = async (clinicianId: string): Promise<string> => {
   try {
+    console.log('[getClinicianTimeZone] Fetching timezone for clinician:', clinicianId);
+    
     const { data, error } = await supabase
       .from('clinicians')
       .select('clinician_timezone')
@@ -67,8 +70,32 @@ export const getClinicianTimeZone = async (clinicianId: string): Promise<string>
       return 'America/Chicago'; // Default to Central Time
     }
     
-    // Return the timezone or a default if not set
-    return data?.clinician_timezone || 'America/Chicago';
+    console.log('[getClinicianTimeZone] Raw timezone data:', {
+      data,
+      timezone: data?.clinician_timezone,
+      type: typeof data?.clinician_timezone,
+      isArray: Array.isArray(data?.clinician_timezone)
+    });
+    
+    // Ensure timezone is always a string
+    let timeZone = data?.clinician_timezone || 'America/Chicago';
+    
+    // Handle case where timezone might be an array
+    if (Array.isArray(timeZone)) {
+      console.warn('[getClinicianTimeZone] Timezone is unexpectedly an array:', timeZone);
+      timeZone = timeZone[0] || 'America/Chicago';
+    }
+    
+    // Ensure it's a string
+    timeZone = String(timeZone);
+    
+    console.log('[getClinicianTimeZone] Final processed timezone:', {
+      timeZone,
+      type: typeof timeZone,
+      isString: typeof timeZone === 'string'
+    });
+    
+    return timeZone;
   } catch (error) {
     console.error('Error fetching clinician timezone:', error);
     return 'America/Chicago'; // Default to Central Time

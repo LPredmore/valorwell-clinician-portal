@@ -235,8 +235,8 @@ export const formatTimeDisplay = (time: string, timeZone?: string): string => {
 /**
  * Formats appointment date for display
  */
-export const formatAppointmentDate = (dateTimeString: string, timeZone: string): string => {
-  console.log('[formatAppointmentDate] Formatting date:', { dateTimeString, timeZone });
+export const formatAppointmentDate = (dateTimeString: string, timeZone: string | string[]): string => {
+  console.log('[formatAppointmentDate] Formatting date:', { dateTimeString, timeZone, timeZoneType: typeof timeZone, isArray: Array.isArray(timeZone) });
   
   try {
     if (!dateTimeString) {
@@ -244,17 +244,23 @@ export const formatAppointmentDate = (dateTimeString: string, timeZone: string):
       return 'No date available';
     }
     
-    if (!timeZone) {
-      console.warn('[formatAppointmentDate] No timeZone provided, using UTC');
-      timeZone = 'UTC';
+    // Handle timezone being an array
+    let safeTimeZone: string;
+    if (Array.isArray(timeZone)) {
+      console.warn('[formatAppointmentDate] TimeZone is an array, using first element:', timeZone);
+      safeTimeZone = timeZone[0] || 'UTC';
+    } else {
+      safeTimeZone = timeZone || 'UTC';
     }
     
-    const dateTime = DateTime.fromISO(dateTimeString).setZone(timeZone);
+    console.log('[formatAppointmentDate] Using safe timezone:', safeTimeZone);
+    
+    const dateTime = DateTime.fromISO(dateTimeString).setZone(safeTimeZone);
     
     if (!dateTime.isValid) {
       console.error('[formatAppointmentDate] Invalid DateTime:', {
         dateTimeString,
-        timeZone,
+        timeZone: safeTimeZone,
         invalidReason: dateTime.invalidReason,
         invalidExplanation: dateTime.invalidExplanation
       });
@@ -273,8 +279,8 @@ export const formatAppointmentDate = (dateTimeString: string, timeZone: string):
 /**
  * Formats appointment time for display
  */
-export const formatAppointmentTime = (dateTimeString: string, timeZone: string): string => {
-  console.log('[formatAppointmentTime] Formatting time:', { dateTimeString, timeZone });
+export const formatAppointmentTime = (dateTimeString: string, timeZone: string | string[]): string => {
+  console.log('[formatAppointmentTime] Formatting time:', { dateTimeString, timeZone, timeZoneType: typeof timeZone, isArray: Array.isArray(timeZone) });
   
   try {
     if (!dateTimeString) {
@@ -282,17 +288,23 @@ export const formatAppointmentTime = (dateTimeString: string, timeZone: string):
       return 'N/A';
     }
     
-    if (!timeZone) {
-      console.warn('[formatAppointmentTime] No timeZone provided, using UTC');
-      timeZone = 'UTC';
+    // Handle timezone being an array
+    let safeTimeZone: string;
+    if (Array.isArray(timeZone)) {
+      console.warn('[formatAppointmentTime] TimeZone is an array, using first element:', timeZone);
+      safeTimeZone = timeZone[0] || 'UTC';
+    } else {
+      safeTimeZone = timeZone || 'UTC';
     }
     
-    const dateTime = DateTime.fromISO(dateTimeString).setZone(timeZone);
+    console.log('[formatAppointmentTime] Using safe timezone:', safeTimeZone);
+    
+    const dateTime = DateTime.fromISO(dateTimeString).setZone(safeTimeZone);
     
     if (!dateTime.isValid) {
       console.error('[formatAppointmentTime] Invalid DateTime:', {
         dateTimeString,
-        timeZone,
+        timeZone: safeTimeZone,
         invalidReason: dateTime.invalidReason,
         invalidExplanation: dateTime.invalidExplanation
       });

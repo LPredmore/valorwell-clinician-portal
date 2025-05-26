@@ -18,7 +18,11 @@ const ClinicianDashboard = () => {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [clinicianTimeZone, setClinicianTimeZone] = useState<string>(TimeZoneService.DEFAULT_TIMEZONE);
   const [isLoadingTimeZone, setIsLoadingTimeZone] = useState(true);
-  const timeZoneDisplay = TimeZoneService.getTimeZoneDisplayName(clinicianTimeZone);
+  
+  // Ensure timezone is always a string
+  const safeClinicianTimeZone = Array.isArray(clinicianTimeZone) ? clinicianTimeZone[0] : clinicianTimeZone;
+  const timeZoneDisplay = TimeZoneService.getTimeZoneDisplayName(safeClinicianTimeZone);
+  
   const [showSessionDidNotOccurDialog, setShowSessionDidNotOccurDialog] = useState(false);
   const [selectedAppointmentForNoShow, setSelectedAppointmentForNoShow] = useState<Appointment | null>(null);
 
@@ -40,8 +44,13 @@ const ClinicianDashboard = () => {
         setIsLoadingTimeZone(true);
         try {
           const timeZone = await getClinicianTimeZone(currentUserId);
-          console.log("Fetched clinician timezone:", timeZone);
-          setClinicianTimeZone(timeZone);
+          console.log("[ClinicianDashboard] Fetched clinician timezone:", { timeZone, type: typeof timeZone, isArray: Array.isArray(timeZone) });
+          
+          // Ensure timezone is a string
+          const safeTimeZone = Array.isArray(timeZone) ? timeZone[0] : timeZone;
+          console.log("[ClinicianDashboard] Safe timezone after conversion:", { safeTimeZone, type: typeof safeTimeZone });
+          
+          setClinicianTimeZone(safeTimeZone);
         } catch (error) {
           console.error("Error fetching clinician timezone:", error);
           // Fallback to system timezone
@@ -204,6 +213,14 @@ const ClinicianDashboard = () => {
     };
   };
 
+  console.log("[ClinicianDashboard] Rendering with timezone data:", {
+    clinicianTimeZone,
+    safeClinicianTimeZone,
+    timeZoneDisplay,
+    type: typeof safeClinicianTimeZone,
+    isArray: Array.isArray(clinicianTimeZone)
+  });
+
   if (showSessionTemplate && currentAppointment) {
     return (
       <Layout>
@@ -233,7 +250,7 @@ const ClinicianDashboard = () => {
               error={error}
               emptyMessage="No appointments scheduled for today."
               timeZoneDisplay={timeZoneDisplay}
-              userTimeZone={clinicianTimeZone}
+              userTimeZone={safeClinicianTimeZone}
               showStartButton={true}
               onStartSession={startVideoSession}
             />
@@ -249,7 +266,7 @@ const ClinicianDashboard = () => {
               error={error}
               emptyMessage="No outstanding documentation."
               timeZoneDisplay={timeZoneDisplay}
-              userTimeZone={clinicianTimeZone}
+              userTimeZone={safeClinicianTimeZone}
               onDocumentSession={openSessionTemplate}
               onSessionDidNotOccur={handleSessionDidNotOccur}
             />
@@ -265,7 +282,7 @@ const ClinicianDashboard = () => {
               error={error}
               emptyMessage="No upcoming appointments scheduled."
               timeZoneDisplay={timeZoneDisplay}
-              userTimeZone={clinicianTimeZone}
+              userTimeZone={safeClinicianTimeZone}
               showViewAllButton={true}
             />
           </div>
