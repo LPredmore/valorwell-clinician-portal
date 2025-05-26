@@ -85,6 +85,16 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
   const [appointmentDate, setAppointmentDate] = useState<Date | undefined>(selectedDate);
   const { toast } = useToast();
 
+  // Debug logging for client data
+  useEffect(() => {
+    console.log('[AppointmentDialog] Client data received:', {
+      clients,
+      clientsLength: clients?.length,
+      loadingClients,
+      sampleClient: clients?.[0]
+    });
+  }, [clients, loadingClients]);
+
   useEffect(() => {
     if (selectedDate && selectedTimeSlot) {
       const start = formatTimeFromMinutes(selectedTimeSlot.start);
@@ -238,7 +248,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
                 {clients && clients.length > 0 ? (
                   clients.map((client) => (
                     <SelectItem key={client.id} value={client.id}>
-                      {client.client_first_name} {client.client_last_name}
+                      {client.displayName}
                     </SelectItem>
                   ))
                 ) : (
@@ -287,7 +297,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
                   onSelect={setAppointmentDate}
                   disabled={{ before: new Date() }}
                   initialFocus
-                  className="p-3 pointer-events-auto"
+                  className="p-3"
                 />
               </PopoverContent>
             </Popover>
@@ -365,7 +375,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
                         onSelect={setRecurringEndDate}
                         disabled={{ before: addDays(appointmentDate || new Date(), 1) }}
                         initialFocus
-                        className="p-3 pointer-events-auto"
+                        className="p-3"
                       />
                     </PopoverContent>
                   </Popover>
