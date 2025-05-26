@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -30,16 +31,36 @@ import {
 } from "@/components/ui/popover"
 import { CalendarIcon } from "lucide-react"
 import { addDays, isBefore } from 'date-fns';
+import { getUserTimeZone } from '@/utils/timeZoneUtils';
+import { getClinicianTimeZone } from '@/integrations/supabase/client';
 
 interface AppointmentDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (data: any) => void;
-  selectedDate: Date | undefined;
-  selectedTimeSlot: { start: number, end: number } | undefined;
+  onSave?: (data: any) => void;
+  selectedDate?: Date | undefined;
+  selectedTimeSlot?: { start: number, end: number } | undefined;
   clients: any[];
-  clinicianId: string;
+  loadingClients?: boolean;
+  clinicianId?: string;
+  selectedClinicianId?: string;
+  onAppointmentCreated?: () => void;
 }
+
+// Helper function to format time from minutes (0-1439)
+const formatTimeFromMinutes = (minutes: number): string => {
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+};
+
+// Helper function to combine date and time strings into a Date object
+const combineDateAndTime = (date: Date, timeStr: string, timezone: string): Date => {
+  const dateStr = format(date, 'yyyy-MM-dd');
+  const dateTimeStr = `${dateStr}T${timeStr}`;
+  const localDateTime = TimeZoneService.convertLocalToUTC(dateTimeStr, timezone);
+  return localDateTime.toJSDate();
+};
 
 const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
   isOpen,
@@ -48,7 +69,10 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
   selectedDate,
   selectedTimeSlot,
   clients,
-  clinicianId
+  loadingClients = false,
+  clinicianId,
+  selectedClinicianId,
+  onAppointmentCreated
 }) => {
   const [clientId, setClientId] = useState<string>('');
   const [appointmentType, setAppointmentType] = useState<string>('Initial Consultation');
@@ -57,21 +81,21 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
   const [recurringType, setRecurringType] = useState<string>('');
   const [recurringEndDate, setRecurringEndDate] = useState<Date | undefined>(undefined);
   const [recurringCount, setRecurringCount] = useState<string>('');
-  const [timeZone, setTimeZone] = useState<string>(TimeZoneService.getBrowserTimeZone());
+  const [timeZone, setTimeZone] = useState<string>(getUserTimeZone());
   const [startTime, setStartTime] = useState<string>('');
   const [endTime, setEndTime] = useState<string>('');
   const { toast } = useToast();
 
   useEffect(() => {
     if (selectedDate && selectedTimeSlot) {
-      const start = TimeZoneService.formatTimeFromMinutes(selectedTimeSlot.start);
-      const end = TimeZoneService.formatTimeFromMinutes(selectedTimeSlot.end);
+      const start = formatTimeFromMinutes(selectedTimeSlot.start);
+      const end = formatTimeFromMinutes(selectedTimeSlot.end);
       setStartTime(start);
       setEndTime(end);
     }
   }, [selectedDate, selectedTimeSlot]);
 
-  const handleSubmit = (event: React.FormEvent) => {
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
 
     if (!clientId) {
@@ -92,8 +116,21 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
       return;
     }
 
-    const startDateTime = TimeZoneService.combineDateAndTime(selectedDate, startTime, timeZone);
-    const endDateTime = TimeZoneService.combineDateAndTime(selectedDate, endTime, timeZone);
+    // Get the clinician's timezone for saving with the appointment
+    const currentClinicianId = clinicianId || selectedClinicianId;
+    let clinicianTimezone = timeZone;
+    
+    if (currentClinicianId) {
+      try {
+        clinicianTimezone = await getClinicianTimeZone(currentClinicianId);
+      } catch (error) {
+        console.error('Error fetching clinician timezone:', error);
+        // Fall back to current timezone if we can't get clinician's timezone
+      }
+    }
+
+    const startDateTime = combineDateAndTime(selectedDate, startTime, clinicianTimezone);
+    const endDateTime = combineDateAndTime(selectedDate, endTime, clinicianTimezone);
 
     if (isNaN(startDateTime.getTime()) || isNaN(endDateTime.getTime())) {
       toast({
@@ -151,27 +188,33 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
 
     const appointmentData = {
       clientId: clientId,
-      clinicianId: clinicianId,
+      clinicianId: currentClinicianId,
       startAt: startDateTime.toISOString(),
       endAt: endDateTime.toISOString(),
       type: appointmentType,
       notes: notes,
       isRecurring: isRecurring,
       recurringData: recurringData,
-      timeZone: timeZone,
+      timeZone: clinicianTimezone, // Save the clinician's timezone
     };
 
-    onSave(appointmentData);
+    if (onSave) {
+      onSave(appointmentData);
+    }
+    
+    if (onAppointmentCreated) {
+      onAppointmentCreated();
+    }
+    
     onClose();
   };
 
   const handleRecurringChange = (checked: boolean | "indeterminate") => {
-    // Convert CheckedState to boolean
     const isChecked = checked === true;
     setIsRecurring(isChecked);
     if (!isChecked) {
       setRecurringType('');
-      setRecurringEndDate('');
+      setRecurringEndDate(undefined);
       setRecurringCount('');
     }
   };
@@ -238,7 +281,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
                 <Calendar
                   mode="single"
                   selected={selectedDate}
-                  onSelect={onSave}
+                  onSelect={() => {}} // This should be handled by parent component
                   disabled={{ before: new Date() }}
                   initialFocus
                 />

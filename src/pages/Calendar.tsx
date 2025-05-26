@@ -1,4 +1,3 @@
-
 import React, { useEffect } from "react";
 import Layout from "../components/layout/Layout";
 import CalendarView from "../components/calendar/CalendarView";
@@ -166,7 +165,6 @@ const CalendarPage = () => {
           isOpen={isDialogOpen}
           onClose={() => setIsDialogOpen(false)}
           clients={clients}
-          loadingClients={loadingClients}
           selectedClinicianId={selectedClinicianId}
           onAppointmentCreated={handleDataChanged}
         />
