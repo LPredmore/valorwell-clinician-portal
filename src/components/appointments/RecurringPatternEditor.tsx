@@ -87,22 +87,9 @@ export const RecurringPatternEditor: React.FC<RecurringPatternEditorProps> = ({
     },
   });
 
-  // Form values type
-  interface FormValues {
-    frequency: RecurringPattern["frequency"];
-    interval: number;
-    daysOfWeek?: number[];
-    dayOfMonth?: number;
-    weekOfMonth?: number;
-    dayOfWeekMonth?: number;
-    monthOfYear?: number;
-    endAfterOccurrences?: number;
-    endDate?: Date;
-  }
-
   // Update pattern when form values change
   const updatePattern = useCallback(
-    (values: FormValues) => {
+    (values: any) => {
       const updatedPattern: RecurringPattern = {
         ...pattern,
         frequency: values.frequency,
@@ -148,11 +135,11 @@ export const RecurringPatternEditor: React.FC<RecurringPatternEditorProps> = ({
       setPattern(updatedPattern);
       onChange(updatedPattern);
     },
-    [pattern, timezone, endType, onChange],
+    [pattern, timezone, endType, onChange]
   );
 
   // Handle form submission
-  const onSubmit = (values: FormValues) => {
+  const onSubmit = (values: any) => {
     updatePattern(values);
   };
 
@@ -203,7 +190,7 @@ export const RecurringPatternEditor: React.FC<RecurringPatternEditorProps> = ({
     });
 
     return () => subscription.unsubscribe();
-  }, [form, form.watch, updatePattern, DateTime]);
+  }, [form, updatePattern]);
 
   // Days of week options
   const daysOfWeek = [

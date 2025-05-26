@@ -15,6 +15,7 @@ import { useAppointments } from "@/hooks/useAppointments";
 import { useRealTimeCalendar } from "@/hooks/useRealTimeCalendar";
 import { CalendarDebugUtils } from "@/utils/calendarDebugUtils";
 import { Appointment } from "@/types/appointment";
+import { Button } from "@/components/ui/button";
 
 // Component name for logging
 const COMPONENT_NAME = 'Calendar';
@@ -30,14 +31,10 @@ const CalendarPage = () => {
 
   // Log component mount
   useEffect(() => {
-    CalendarDebugUtils.logLifecycle(COMPONENT_NAME, 'mount', { userId });
-    
-    // Log render time on mount
-    const mountTime = performance.now() - renderStartTime.current;
-    CalendarDebugUtils.logPerformance(COMPONENT_NAME, 'initial-render', mountTime);
+    console.log(`[${COMPONENT_NAME}] Calendar page mounted with userId:`, userId);
     
     return () => {
-      CalendarDebugUtils.logLifecycle(COMPONENT_NAME, 'unmount');
+      console.log(`[${COMPONENT_NAME}] Calendar page unmounted`);
     };
   }, [userId]);
 
@@ -61,7 +58,7 @@ const CalendarPage = () => {
   
   // Log calendar state initialization
   useEffect(() => {
-    CalendarDebugUtils.logDataLoading(COMPONENT_NAME, 'calendar-state-initialized', {
+    console.log(`[${COMPONENT_NAME}] Calendar state initialized:`, {
       selectedClinicianId,
       userTimeZone,
       isLoadingTimeZone,
@@ -77,7 +74,7 @@ const CalendarPage = () => {
   useEffect(() => {
     if (selectedClinicianId && userTimeZone) {
       dataLoadStartTime.current = performance.now();
-      CalendarDebugUtils.logDataLoading(COMPONENT_NAME, 'appointments-fetch-start', {
+      console.log(`[${COMPONENT_NAME}] Starting appointment fetch with params:`, {
         clinicianId: selectedClinicianId,
         timeZone: userTimeZone,
         startDate: subWeeks(currentDate, 4).toISOString(),
@@ -106,28 +103,19 @@ const CalendarPage = () => {
   // Initialize real-time calendar updates
   const { isConnected: isRealTimeConnected } = useRealTimeCalendar({
     onAppointmentCreated: (appointment: Appointment) => {
-      CalendarDebugUtils.log(COMPONENT_NAME, 'Real-time appointment created', {
-        appointmentId: appointment.id,
-        clientName: appointment.clientName
-      });
+      console.log(`[${COMPONENT_NAME}] Real-time appointment created:`, appointment.id);
       handleDataChanged();
     },
     onAppointmentUpdated: (appointment: Appointment) => {
-      CalendarDebugUtils.log(COMPONENT_NAME, 'Real-time appointment updated', {
-        appointmentId: appointment.id,
-        clientName: appointment.clientName
-      });
+      console.log(`[${COMPONENT_NAME}] Real-time appointment updated:`, appointment.id);
       handleDataChanged();
     },
     onAppointmentDeleted: (appointment: Appointment) => {
-      CalendarDebugUtils.log(COMPONENT_NAME, 'Real-time appointment deleted', {
-        appointmentId: appointment.id,
-        clientName: appointment.clientName
-      });
+      console.log(`[${COMPONENT_NAME}] Real-time appointment deleted:`, appointment.id);
       handleDataChanged();
     },
     onConnectionChange: (status: string) => {
-      CalendarDebugUtils.log(COMPONENT_NAME, 'Real-time connection status changed', { status });
+      console.log(`[${COMPONENT_NAME}] Real-time connection status:`, status);
     }
   });
 
@@ -135,70 +123,42 @@ const CalendarPage = () => {
   useEffect(() => {
     if (!isLoadingAppointments && dataLoadStartTime.current > 0) {
       const loadTime = performance.now() - dataLoadStartTime.current;
-      CalendarDebugUtils.logPerformance(COMPONENT_NAME, 'appointments-load', loadTime, {
+      console.log(`[${COMPONENT_NAME}] Appointments load completed:`, {
+        loadTime: `${loadTime.toFixed(2)}ms`,
         appointmentsCount: appointments?.length || 0,
-        hasError: !!appointmentsError
+        hasError: !!appointmentsError,
+        errorMessage: appointmentsError?.message
       });
       
       // Reset the timer
       dataLoadStartTime.current = 0;
-      
-      // Log detailed appointment data
-      if (appointments && appointments.length > 0) {
-        CalendarDebugUtils.logDataLoading(COMPONENT_NAME, 'appointments-loaded', {
-          count: appointments.length,
-          samples: appointments.slice(0, 3).map(a => ({
-            id: a.id,
-            clientName: a.clientName,
-            start_at: a.start_at,
-            end_at: a.end_at,
-            type: a.type,
-            status: a.status
-          }))
-        });
-      } else {
-        CalendarDebugUtils.logDataLoading(COMPONENT_NAME, 'no-appointments-loaded', {
-          clinicianId: selectedClinicianId,
-          timeZone: userTimeZone
-        });
-      }
     }
-  }, [isLoadingAppointments, appointments, appointmentsError, selectedClinicianId, userTimeZone]);
+  }, [isLoadingAppointments, appointments, appointmentsError]);
 
   // Add detailed error logging
   useEffect(() => {
     if (appointmentsError) {
-      CalendarDebugUtils.error(COMPONENT_NAME, 'Appointments fetch error', appointmentsError);
+      console.error(`[${COMPONENT_NAME}] Appointments error:`, appointmentsError);
       setCalendarError(appointmentsError);
+    } else {
+      setCalendarError(null);
     }
   }, [appointmentsError]);
 
   const navigatePrevious = () => {
-    CalendarDebugUtils.log(COMPONENT_NAME, 'Navigating to previous week', {
-      from: currentDate.toISOString(),
-      to: subWeeks(currentDate, 1).toISOString()
-    });
     setCurrentDate(subWeeks(currentDate, 1));
   };
 
   const navigateNext = () => {
-    CalendarDebugUtils.log(COMPONENT_NAME, 'Navigating to next week', {
-      from: currentDate.toISOString(),
-      to: addWeeks(currentDate, 1).toISOString()
-    });
     setCurrentDate(addWeeks(currentDate, 1));
   };
 
   const navigateToday = () => {
-    CalendarDebugUtils.log(COMPONENT_NAME, 'Navigating to today', {
-      from: currentDate.toISOString(),
-      to: new Date().toISOString()
-    });
     setCurrentDate(new Date());
   };
 
   const toggleAvailability = () => {
-    CalendarDebugUtils.log(COMPONENT_NAME, 'Toggling availability display', {
+    console.log(`[${COMPONENT_NAME}] Toggling availability display:`, {
       current: showAvailability,
       new: !showAvailability
     });
@@ -207,10 +167,7 @@ const CalendarPage = () => {
 
   // Central function to handle any data changes that should trigger a refresh
   const handleDataChanged = () => {
-    CalendarDebugUtils.logDataLoading(COMPONENT_NAME, 'data-changed-refresh-triggered', {
-      currentRefreshTrigger: appointmentRefreshTrigger,
-      newRefreshTrigger: appointmentRefreshTrigger + 1
-    });
+    console.log(`[${COMPONENT_NAME}] Data changed, triggering refresh`);
     refetchAppointments();
     setAppointmentRefreshTrigger();
   };
@@ -245,6 +202,66 @@ const CalendarPage = () => {
             onNavigateToday={navigateToday}
           />
 
+          {/* Debug Information Panel */}
+          {calendarError && (
+            <div className="p-4 border border-red-300 bg-red-50 rounded-md">
+              <h3 className="text-lg font-medium text-red-800 mb-2">Calendar Data Error</h3>
+              <p className="text-red-600 mb-2">
+                Error loading calendar data: {calendarError.message}
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => {
+                    console.log(`[${COMPONENT_NAME}] User clicked retry`);
+                    setCalendarError(null);
+                    refetchAppointments();
+                  }}
+                  variant="outline"
+                  size="sm"
+                >
+                  Retry
+                </Button>
+                <Button
+                  onClick={() => {
+                    console.log(`[${COMPONENT_NAME}] User requested debug info`);
+                    console.log('Debug Info:', {
+                      selectedClinicianId,
+                      userTimeZone,
+                      appointmentRefreshTrigger,
+                      appointmentsCount: appointments?.length || 0,
+                      isLoadingAppointments,
+                      calendarError: calendarError?.message
+                    });
+                  }}
+                  variant="ghost"
+                  size="sm"
+                >
+                  Show Debug Info
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Current State Debug Panel (development only) */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="p-3 bg-gray-100 rounded text-xs">
+              <details>
+                <summary className="cursor-pointer font-medium">Debug Info</summary>
+                <pre className="mt-2 text-xs">
+                  {JSON.stringify({
+                    selectedClinicianId,
+                    userTimeZone,
+                    appointmentsCount: appointments?.length || 0,
+                    isLoadingAppointments,
+                    showAvailability,
+                    hasError: !!calendarError,
+                    errorMessage: calendarError?.message
+                  }, null, 2)}
+                </pre>
+              </details>
+            </div>
+          )}
+
           <ErrorBoundary
             componentName="CalendarView"
             fallback={
@@ -262,35 +279,17 @@ const CalendarPage = () => {
               </div>
             }
           >
-            {calendarError ? (
-              <div className="p-4 border border-red-300 bg-red-50 rounded-md">
-                <h3 className="text-lg font-medium text-red-800 mb-2">Calendar Error</h3>
-                <p className="text-red-600 mb-2">
-                  There was an error loading the calendar: {calendarError.message}
-                </p>
-                <button
-                  className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-                  onClick={() => {
-                    setCalendarError(null);
-                    refetchAppointments();
-                  }}
-                >
-                  Retry
-                </button>
-              </div>
-            ) : (
-              <CalendarView
-                view="week"
-                showAvailability={showAvailability}
-                clinicianId={selectedClinicianId}
-                currentDate={currentDate}
-                userTimeZone={userTimeZone}
-                refreshTrigger={appointmentRefreshTrigger}
-                appointments={appointments}
-                isLoading={isLoadingAppointments}
-                error={appointmentsError}
-              />
-            )}
+            <CalendarView
+              view="week"
+              showAvailability={showAvailability}
+              clinicianId={selectedClinicianId}
+              currentDate={currentDate}
+              userTimeZone={userTimeZone}
+              refreshTrigger={appointmentRefreshTrigger}
+              appointments={appointments}
+              isLoading={isLoadingAppointments}
+              error={appointmentsError}
+            />
           </ErrorBoundary>
           
           {/* Full real-time indicator at the bottom of the calendar */}

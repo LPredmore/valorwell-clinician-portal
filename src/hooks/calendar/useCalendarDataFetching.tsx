@@ -1,3 +1,4 @@
+
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { DateTime } from 'luxon';
@@ -30,120 +31,43 @@ export const useCalendarDataFetching = (
   const [clinicianData, setClinicianData] = useState<ClinicianColumnData | null>(null);
   const [error, setError] = useState<Error | null>(null);
 
+  // Add detailed logging for each fetch operation
+  console.log(`[${COMPONENT_NAME}] Hook initialized with:`, {
+    clinicianId,
+    dateRange: {
+      start: dateRange.start.toISO(),
+      end: dateRange.end.toISO()
+    },
+    refreshTrigger,
+    externalAppointmentsCount: externalAppointments.length
+  });
+
   // Fetch clinician data for availability
   const fetchClinicianData = useCallback(async (clinicianId: string): Promise<ClinicianColumnData | null> => {
+    console.log(`[${COMPONENT_NAME}] Fetching clinician data for ID:`, clinicianId);
+    
     try {
-      // Use proper Supabase select syntax without column aliasing
       const { data, error } = await supabase
         .from('clinicians')
-        .select(`
-          id,
-          clinician_first_name,
-          clinician_last_name,
-          clinician_professional_name,
-          clinician_email,
-          clinician_time_zone,
-          clinician_bio,
-          clinician_image_url,
-          clinician_availability_start_monday_1,
-          clinician_availability_end_monday_1,
-          clinician_availability_timezone_monday_1,
-          clinician_availability_start_monday_2,
-          clinician_availability_end_monday_2,
-          clinician_availability_timezone_monday_2,
-          clinician_availability_start_monday_3,
-          clinician_availability_end_monday_3,
-          clinician_availability_timezone_monday_3,
-          clinician_availability_start_tuesday_1,
-          clinician_availability_end_tuesday_1,
-          clinician_availability_timezone_tuesday_1,
-          clinician_availability_start_tuesday_2,
-          clinician_availability_end_tuesday_2,
-          clinician_availability_timezone_tuesday_2,
-          clinician_availability_start_tuesday_3,
-          clinician_availability_end_tuesday_3,
-          clinician_availability_timezone_tuesday_3,
-          clinician_availability_start_wednesday_1,
-          clinician_availability_end_wednesday_1,
-          clinician_availability_timezone_wednesday_1,
-          clinician_availability_start_wednesday_2,
-          clinician_availability_end_wednesday_2,
-          clinician_availability_timezone_wednesday_2,
-          clinician_availability_start_wednesday_3,
-          clinician_availability_end_wednesday_3,
-          clinician_availability_timezone_wednesday_3,
-          clinician_availability_start_thursday_1,
-          clinician_availability_end_thursday_1,
-          clinician_availability_timezone_thursday_1,
-          clinician_availability_start_thursday_2,
-          clinician_availability_end_thursday_2,
-          clinician_availability_timezone_thursday_2,
-          clinician_availability_start_thursday_3,
-          clinician_availability_end_thursday_3,
-          clinician_availability_timezone_thursday_3,
-          clinician_availability_start_friday_1,
-          clinician_availability_end_friday_1,
-          clinician_availability_timezone_friday_1,
-          clinician_availability_start_friday_2,
-          clinician_availability_end_friday_2,
-          clinician_availability_timezone_friday_2,
-          clinician_availability_start_friday_3,
-          clinician_availability_end_friday_3,
-          clinician_availability_timezone_friday_3,
-          clinician_availability_start_saturday_1,
-          clinician_availability_end_saturday_1,
-          clinician_availability_timezone_saturday_1,
-          clinician_availability_start_saturday_2,
-          clinician_availability_end_saturday_2,
-          clinician_availability_timezone_saturday_2,
-          clinician_availability_start_saturday_3,
-          clinician_availability_end_saturday_3,
-          clinician_availability_timezone_saturday_3,
-          clinician_availability_start_sunday_1,
-          clinician_availability_end_sunday_1,
-          clinician_availability_timezone_sunday_1,
-          clinician_availability_start_sunday_2,
-          clinician_availability_end_sunday_2,
-          clinician_availability_timezone_sunday_2,
-          clinician_availability_start_sunday_3,
-          clinician_availability_end_sunday_3,
-          clinician_availability_timezone_sunday_3
-        `)
+        .select('*')
         .eq('id', clinicianId)
         .single();
         
       if (error) {
-        CalendarDebugUtils.error(COMPONENT_NAME, 'Error fetching clinician data:', error);
-        return null;
+        console.error(`[${COMPONENT_NAME}] Clinician query error:`, error);
+        throw error;
       }
       
-      CalendarDebugUtils.log(COMPONENT_NAME, 'Fetched clinician data for availability', {
-        clinicianId,
-        hasData: !!data,
-        timezone: data?.clinician_time_zone
+      console.log(`[${COMPONENT_NAME}] Clinician data fetched successfully:`, {
+        id: data?.id,
+        email: data?.clinician_email,
+        timezone: data?.clinician_time_zone,
+        hasAvailabilityData: !!(data?.clinician_availability_start_monday_1 || data?.clinician_availability_start_tuesday_1)
       });
-      
-      // Validate timezone format before returning
-      if (data?.clinician_time_zone) {
-        try {
-          DateTime.local().setZone(data.clinician_time_zone);
-        } catch (err) {
-          CalendarDebugUtils.error(COMPONENT_NAME, 'Invalid timezone format in clinician data', {
-            clinicianId,
-            timezone: data.clinician_time_zone
-          });
-          data.clinician_time_zone = 'America/Chicago';
-        }
-      } else {
-        // Set default timezone if missing
-        if (data) {
-          data.clinician_time_zone = 'America/Chicago';
-        }
-      }
       
       return data;
     } catch (error) {
-      CalendarDebugUtils.error(COMPONENT_NAME, 'Unexpected error fetching clinician data:', error);
+      console.error(`[${COMPONENT_NAME}] Error fetching clinician data:`, error);
       return null;
     }
   }, []);
@@ -151,26 +75,13 @@ export const useCalendarDataFetching = (
   // Fetch all calendar data
   useEffect(() => {
     const fetchData = async () => {
-      // Performance tracking
-      const fetchStartTime = performance.now();
-      
-      CalendarDebugUtils.logDataLoading(COMPONENT_NAME, 'data-fetch-start', {
-        clinicianId,
-        refreshTrigger,
-        dateRange: {
-          start: dateRange.start.toISO(),
-          end: dateRange.end.toISO()
-        }
-      });
+      console.log(`[${COMPONENT_NAME}] Starting data fetch...`);
       
       setLoading(true);
       setError(null);
       
       if (!clinicianId) {
-        CalendarDebugUtils.logDataLoading(COMPONENT_NAME, 'no-clinician-id-provided', {
-          clearingData: true
-        });
-        
+        console.log(`[${COMPONENT_NAME}] No clinician ID provided, clearing data`);
         setAppointments([]);
         setClients(new Map());
         setClinicianData(null);
@@ -183,115 +94,89 @@ export const useCalendarDataFetching = (
         const utcStart = dateRange.start.toUTC().toISO();
         const utcEnd = dateRange.end.toUTC().toISO();
 
-        CalendarDebugUtils.logDataLoading(COMPONENT_NAME, 'date-range-calculation', {
-          localStart: dateRange.start.toISO(),
-          localEnd: dateRange.end.toISO(),
+        console.log(`[${COMPONENT_NAME}] Fetching data with date range:`, {
           utcStart,
-          utcEnd
+          utcEnd,
+          clinicianId
         });
         
-        // Create cache keys for this data request
-        const appointmentsCacheKey = `clinician:${clinicianId}:range:${utcStart}:${utcEnd}:refresh:${refreshTrigger}`;
-        const clientsCacheKey = `clinician:${clinicianId}:clients`;
-        
-        // Check if we have cached data
-        const cachedAppointments = externalAppointments.length === 0 ?
-          appointmentsCache.get(appointmentsCacheKey) : null;
-        const cachedClients = clientsCache.get(clientsCacheKey);
-        
-        // Fetch clinician data for availability
+        // 1. Fetch clinician data first
+        console.log(`[${COMPONENT_NAME}] Step 1: Fetching clinician data...`);
         const fetchedClinicianData = await fetchClinicianData(clinicianId);
         setClinicianData(fetchedClinicianData);
         
-        // Prepare fetch promises based on cache status
-        const fetchPromises = [];
-        let appointmentData;
-        let clientData;
-        
-        // 1. Appointments fetch (if needed)
-        if (externalAppointments.length === 0 && !cachedAppointments) {
-          fetchPromises.push(
-            supabase
-              .from('appointments')
-              .select('*')
-              .eq('clinician_id', clinicianId)
-              .gte('start_at', utcStart)
-              .lt('end_at', utcEnd)
-              .order('start_at', { ascending: true })
-              .then(result => {
-                appointmentData = result;
-                return result;
-              })
-          );
-        } else {
-          fetchPromises.push(Promise.resolve({ data: [], error: null }));
+        if (!fetchedClinicianData) {
+          throw new Error('Failed to fetch clinician data - clinician may not exist');
         }
         
-        // 2. Clients fetch (if needed)
-        if (!cachedClients) {
-          fetchPromises.push(
-            supabase
-              .from('clients')
-              .select('id, client_first_name, client_last_name, client_preferred_name')
-              .eq('client_assigned_therapist', clinicianId.toString())
-              .then(result => {
-                clientData = result;
-                return result;
-              })
-          );
-        } else {
-          fetchPromises.push(Promise.resolve({ data: [], error: null }));
-        }
-        
-        // Execute all fetch promises in parallel
-        const results = await Promise.all(fetchPromises);
-        
-        // Process appointments
-        if (externalAppointments.length > 0) {
-          // Use external appointments if provided
-          setAppointments(externalAppointments);
-        } else if (cachedAppointments) {
-          // Use cached appointments
-          setAppointments(cachedAppointments);
-        } else if (appointmentData?.data) {
-          // Use fetched appointments
-          appointmentsCache.set(appointmentsCacheKey, appointmentData.data);
-          setAppointments(appointmentData.data);
-        } else {
-          // Default to empty array
-          setAppointments([]);
-        }
-        
-        // Process clients
-        const clientMap = new Map<string, Client>();
-        
-        if (cachedClients) {
-          // Use cached clients
-          cachedClients.forEach(client => {
-            clientMap.set(client.id, client);
-          });
-        } else if (clientData?.data) {
-          // Use fetched clients
-          (clientData.data || []).forEach(client => {
-            clientMap.set(client.id, client);
-          });
+        // 2. Fetch appointments if not using external ones
+        let appointmentData: any[] = [];
+        if (externalAppointments.length === 0) {
+          console.log(`[${COMPONENT_NAME}] Step 2: Fetching appointments...`);
           
-          // Cache the client data
-          clientsCache.set(clientsCacheKey, clientData.data);
+          const { data: appointmentsResult, error: appointmentsError } = await supabase
+            .from('appointments')
+            .select('*')
+            .eq('clinician_id', clinicianId)
+            .gte('start_at', utcStart)
+            .lt('end_at', utcEnd)
+            .order('start_at', { ascending: true });
+
+          if (appointmentsError) {
+            console.error(`[${COMPONENT_NAME}] Appointments query error:`, appointmentsError);
+            throw appointmentsError;
+          }
+          
+          appointmentData = appointmentsResult || [];
+          console.log(`[${COMPONENT_NAME}] Appointments fetched:`, {
+            count: appointmentData.length,
+            samples: appointmentData.slice(0, 3).map(a => ({ id: a.id, start_at: a.start_at, client_id: a.client_id }))
+          });
+        } else {
+          console.log(`[${COMPONENT_NAME}] Using external appointments:`, {
+            count: externalAppointments.length
+          });
+          appointmentData = externalAppointments;
         }
         
+        // 3. Fetch clients
+        console.log(`[${COMPONENT_NAME}] Step 3: Fetching clients...`);
+        
+        const { data: clientsResult, error: clientsError } = await supabase
+          .from('clients')
+          .select('id, client_first_name, client_last_name, client_preferred_name')
+          .eq('client_assigned_therapist', clinicianId.toString());
+
+        if (clientsError) {
+          console.error(`[${COMPONENT_NAME}] Clients query error:`, clientsError);
+          // Don't throw here - clients might be optional
+          console.warn(`[${COMPONENT_NAME}] Continuing without client data`);
+        }
+        
+        const clientData = clientsResult || [];
+        console.log(`[${COMPONENT_NAME}] Clients fetched:`, {
+          count: clientData.length,
+          samples: clientData.slice(0, 3).map(c => ({ id: c.id, name: `${c.client_first_name} ${c.client_last_name}` }))
+        });
+        
+        // Process and set data
+        setAppointments(appointmentData);
+        
+        const clientMap = new Map<string, Client>();
+        clientData.forEach(client => {
+          clientMap.set(client.id, client);
+        });
         setClients(clientMap);
         
-        // Log fetch performance
-        const fetchDuration = performance.now() - fetchStartTime;
-        CalendarDebugUtils.logPerformance(COMPONENT_NAME, 'data-fetch-complete', fetchDuration, {
-          appointmentsCount: appointments.length,
+        console.log(`[${COMPONENT_NAME}] Data fetch completed successfully:`, {
+          appointmentsCount: appointmentData.length,
           clientsCount: clientMap.size,
           hasClinicianData: !!fetchedClinicianData
         });
+        
       } catch (err) {
         const error = err instanceof Error ? err : new Error(String(err));
-        CalendarDebugUtils.error(COMPONENT_NAME, 'Error fetching calendar data', error);
+        console.error(`[${COMPONENT_NAME}] Critical error during data fetch:`, error);
         setError(error);
       } finally {
         setLoading(false);
@@ -300,6 +185,18 @@ export const useCalendarDataFetching = (
 
     fetchData();
   }, [clinicianId, dateRange.start, dateRange.end, refreshTrigger, externalAppointments, fetchClinicianData]);
+
+  // Log final state
+  useEffect(() => {
+    console.log(`[${COMPONENT_NAME}] Final state:`, {
+      loading,
+      appointmentsCount: appointments.length,
+      clientsCount: clients.size,
+      hasClinicianData: !!clinicianData,
+      hasError: !!error,
+      errorMessage: error?.message
+    });
+  }, [loading, appointments, clients, clinicianData, error]);
 
   return {
     loading,
