@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -70,7 +71,9 @@ const ClinicianDashboard = () => {
   const [clients, setClients] = useState<ClientDetails[]>([]);
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const { user, logout } = useUser();
+  const { user, logout, authInitialized } = useUser();
+
+  console.log('[ClinicianDashboard] Component rendered with user:', user?.email);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -83,16 +86,25 @@ const ClinicianDashboard = () => {
   });
 
   function onSubmit(data: z.infer<typeof formSchema>) {
-    console.log(data);
+    console.log('[ClinicianDashboard] Form submitted:', data);
   }
 
   useEffect(() => {
+    console.log('[ClinicianDashboard] useEffect triggered:', { user: user?.email, authInitialized });
+    
+    if (!authInitialized) {
+      console.log('[ClinicianDashboard] Auth not initialized yet, waiting...');
+      return;
+    }
+
     if (!user) {
+      console.log('[ClinicianDashboard] No user found, redirecting to login');
       navigate('/login');
       return;
     }
 
     const fetchClients = async () => {
+      console.log('[ClinicianDashboard] Starting to fetch clients');
       setIsLoading(true);
       try {
         const { data: clientsData, error } = await supabase
@@ -100,17 +112,18 @@ const ClinicianDashboard = () => {
           .select('*');
 
         if (error) {
-          console.error("Error fetching clients:", error);
+          console.error("[ClinicianDashboard] Error fetching clients:", error);
           toast({
             title: "Error",
             description: "Failed to fetch clients.",
             variant: "destructive",
           });
         } else {
+          console.log('[ClinicianDashboard] Successfully fetched clients:', clientsData?.length || 0);
           setClients(clientsData || []);
         }
       } catch (error) {
-        console.error("Unexpected error fetching clients:", error);
+        console.error("[ClinicianDashboard] Unexpected error fetching clients:", error);
         toast({
           title: "Error",
           description: "An unexpected error occurred while fetching clients.",
@@ -122,7 +135,7 @@ const ClinicianDashboard = () => {
     };
 
     fetchClients();
-  }, [user, navigate, toast]);
+  }, [user, authInitialized, navigate, toast]);
 
   const addClient = async (formData: z.infer<typeof formSchema>) => {
     try {
@@ -171,15 +184,29 @@ const ClinicianDashboard = () => {
     }
   };
 
-  if (isLoading) {
+  // Show loading state while auth is initializing or user data is loading
+  if (!authInitialized || isLoading) {
+    console.log('[ClinicianDashboard] Showing loading state');
     return (
       <Layout>
         <div className="flex justify-center items-center h-full">
-          <p>Loading clients...</p>
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p>Loading dashboard...</p>
+          </div>
         </div>
       </Layout>
     );
   }
+
+  // If we get here, auth is initialized but no user - redirect
+  if (!user) {
+    console.log('[ClinicianDashboard] No user after auth initialized, redirecting');
+    navigate('/login');
+    return null;
+  }
+
+  console.log('[ClinicianDashboard] Rendering dashboard for user:', user.email);
 
   return (
     <Layout>
