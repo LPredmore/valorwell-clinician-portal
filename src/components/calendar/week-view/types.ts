@@ -16,12 +16,23 @@ export interface TimeBlock {
 
 export interface AppointmentBlock {
   id: string;
+  appointmentId: string;
+  clientId: string;
+  clientName: string;
   start: DateTime;
   end: DateTime;
   day: DateTime;
-  clientId: string;
-  clientName: string;
   type?: string;
+  status?: string;
+  // Include all original appointment data for conversion
+  start_at: string;
+  end_at: string;
+  appointment_recurring?: string | null;
+  recurring_group_id?: string | null;
+  video_room_url?: string | null;
+  notes?: string | null;
+  client?: any;
+  appointment_timezone?: string; // Store the timezone used
 }
 
 export interface AvailabilityException {
