@@ -1,10 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useWeekViewData } from '@/components/calendar/week-view/useWeekViewData';
 import { DateTime } from 'luxon';
+import { CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 
 interface AvailabilityDebuggerProps {
   clinicianEmail?: string;
@@ -193,6 +193,12 @@ const AvailabilityDebugger: React.FC<AvailabilityDebuggerProps> = ({
           newSystemTotal: availabilityBlocks?.length || 0,
           exceptionsTotal: availabilityExceptions?.length || 0,
           hookProcessedTotal: hookData.timeBlocks.length
+        },
+        verificationResults: {
+          dataSourceFixed: (availabilityBlocks?.length || 0) > 0 && hookData.timeBlocks.length > 0,
+          dataFlowWorking: hookData.timeBlocks.length === (availabilityBlocks?.length || 0),
+          allDaysProcessed: hookData.availabilityByDay.size > 0,
+          calendarReadyForDisplay: hookData.timeBlocks.length > 0 && !hookData.loading && !hookData.error
         }
       });
 
@@ -340,6 +346,60 @@ const AvailabilityDebugger: React.FC<AvailabilityDebuggerProps> = ({
                     </div>
                   )}
                 </div>
+
+                {/* NEW: Verification Results Panel */}
+                {debugData.verificationResults && (
+                  <div className="p-4 bg-green-50 border border-green-200 rounded">
+                    <h3 className="font-medium mb-2 flex items-center gap-2">
+                      🔍 FIX VERIFICATION RESULTS
+                    </h3>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex items-center gap-2">
+                        {debugData.verificationResults.dataSourceFixed ? 
+                          <CheckCircle className="h-4 w-4 text-green-600" /> : 
+                          <XCircle className="h-4 w-4 text-red-600" />
+                        }
+                        <span className={debugData.verificationResults.dataSourceFixed ? 'text-green-700' : 'text-red-700'}>
+                          Data Source Fix: {debugData.verificationResults.dataSourceFixed ? 'SUCCESS' : 'FAILED'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {debugData.verificationResults.dataFlowWorking ? 
+                          <CheckCircle className="h-4 w-4 text-green-600" /> : 
+                          <AlertCircle className="h-4 w-4 text-yellow-600" />
+                        }
+                        <span className={debugData.verificationResults.dataFlowWorking ? 'text-green-700' : 'text-yellow-700'}>
+                          Data Flow: {debugData.verificationResults.dataFlowWorking ? 'PERFECT' : 'PARTIAL'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {debugData.verificationResults.allDaysProcessed ? 
+                          <CheckCircle className="h-4 w-4 text-green-600" /> : 
+                          <XCircle className="h-4 w-4 text-red-600" />
+                        }
+                        <span className={debugData.verificationResults.allDaysProcessed ? 'text-green-700' : 'text-red-700'}>
+                          Days Processing: {debugData.verificationResults.allDaysProcessed ? 'SUCCESS' : 'FAILED'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {debugData.verificationResults.calendarReadyForDisplay ? 
+                          <CheckCircle className="h-4 w-4 text-green-600" /> : 
+                          <XCircle className="h-4 w-4 text-red-600" />
+                        }
+                        <span className={debugData.verificationResults.calendarReadyForDisplay ? 'text-green-700' : 'text-red-700'}>
+                          Calendar Display Ready: {debugData.verificationResults.calendarReadyForDisplay ? 'YES' : 'NO'}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    {debugData.verificationResults.calendarReadyForDisplay && (
+                      <div className="mt-3 p-2 bg-green-100 rounded">
+                        <p className="text-green-800 font-medium">✅ FIX VERIFIED: Calendar should now display all availability correctly!</p>
+                        <p className="text-green-700 text-sm mt-1">Navigate to the Calendar page to see your availability.</p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </>
             )}
           </div>

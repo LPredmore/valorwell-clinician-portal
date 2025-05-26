@@ -1,9 +1,8 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from "@/hooks/use-toast";
-import { Plus, UserPlus, Users, ClipboardList, Calendar, Settings, LogOut } from 'lucide-react';
+import { Plus, UserPlus, Users, ClipboardList, Calendar, Settings, LogOut, Bug } from 'lucide-react';
 import {
   Card,
   CardContent,
@@ -189,10 +188,41 @@ const ClinicianDashboard = () => {
           <h1 className="text-3xl font-bold">
             Welcome to Your Dashboard, {user?.email}
           </h1>
-          <Button onClick={handleSignOut} className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
-            <LogOut className="mr-2" size={16} />
-            Sign Out
-          </Button>
+          <div className="flex gap-2">
+            <Link to="/calendar-debug" className="inline-flex items-center">
+              <Button variant="outline" className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                <Bug className="mr-2" size={16} />
+                Debug Calendar
+              </Button>
+            </Link>
+            <Button onClick={handleSignOut} className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
+              <LogOut className="mr-2" size={16} />
+              Sign Out
+            </Button>
+          </div>
+        </div>
+
+        {/* Verification Status Panel */}
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <h2 className="text-lg font-semibold mb-2 text-blue-800">📋 Availability Fix Verification Steps</h2>
+          <div className="space-y-2 text-sm">
+            <div className="flex items-center gap-2">
+              <span className="w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs">1</span>
+              <span>Click "Debug Calendar" above to access verification tools</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs">2</span>
+              <span>Run "Comprehensive Analysis" to verify data sources</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs">3</span>
+              <span>Check that NEW SYSTEM shows your availability data</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs">4</span>
+              <span>Navigate to Calendar page to verify all days display correctly</span>
+            </div>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
