@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -33,6 +32,8 @@ import { CalendarIcon } from "lucide-react"
 import { addDays, isBefore } from 'date-fns';
 import { getUserTimeZone } from '@/utils/timeZoneUtils';
 import { getClinicianTimeZone } from '@/hooks/useClinicianData';
+import { supabase } from '@/integrations/supabase/client';
+import { v4 as uuidv4 } from 'uuid';
 
 interface AppointmentDialogProps {
   isOpen: boolean;
@@ -105,6 +106,65 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
   useEffect(() => {
     setAppointmentDate(selectedDate);
   }, [selectedDate]);
+
+  const saveAppointment = async (appointmentData: any) => {
+    try {
+      console.log('[AppointmentDialog] Saving appointment:', appointmentData);
+      
+      const { error } = await supabase
+        .from('appointments')
+        .insert([{
+          client_id: appointmentData.clientId,
+          clinician_id: appointmentData.clinicianId,
+          start_at: appointmentData.startAt,
+          end_at: appointmentData.endAt,
+          type: appointmentData.type,
+          status: 'scheduled',
+          notes: appointmentData.notes,
+          appointment_timezone: appointmentData.appointment_timezone,
+          appointment_recurring: appointmentData.isRecurring ? appointmentData.recurringData?.recurringType : null,
+          recurring_group_id: appointmentData.recurringGroupId || null
+        }]);
+
+      if (error) {
+        console.error('[AppointmentDialog] Error saving appointment:', error);
+        throw error;
+      }
+
+      console.log('[AppointmentDialog] Appointment saved successfully');
+      return { success: true };
+    } catch (error) {
+      console.error('[AppointmentDialog] Save error:', error);
+      return { success: false, error };
+    }
+  };
+
+  const generateRecurringDates = (startDate: Date, recurringType: string, endDate?: Date, count?: string) => {
+    const dates = [];
+    let currentDate = new Date(startDate);
+    const maxCount = count ? parseInt(count) : 52; // Default max of 52 occurrences
+    const actualEndDate = endDate || addDays(startDate, 365); // Default to 1 year if no end date
+
+    for (let i = 0; i < maxCount && currentDate <= actualEndDate; i++) {
+      dates.push(new Date(currentDate));
+      
+      switch (recurringType) {
+        case 'daily':
+          currentDate.setDate(currentDate.getDate() + 1);
+          break;
+        case 'weekly':
+          currentDate.setDate(currentDate.getDate() + 7);
+          break;
+        case 'monthly':
+          currentDate.setMonth(currentDate.getMonth() + 1);
+          break;
+        default:
+          break;
+      }
+    }
+
+    return dates;
+  };
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -197,27 +257,103 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
       };
     }
 
-    const appointmentData = {
-      clientId: clientId,
-      clinicianId: currentClinicianId,
-      startAt: startDateTime.toISOString(),
-      endAt: endDateTime.toISOString(),
-      type: 'Therapy Session', // Always default to Therapy Session
-      notes: notes,
-      isRecurring: isRecurring,
-      recurringData: recurringData,
-      appointment_timezone: clinicianTimezone,
-    };
+    try {
+      if (isRecurring && recurringData) {
+        // Generate recurring appointments
+        const recurringGroupId = uuidv4();
+        const recurringDates = generateRecurringDates(
+          appointmentDate,
+          recurringData.recurringType,
+          recurringEndDate,
+          recurringCount
+        );
 
-    if (onSave) {
-      onSave(appointmentData);
+        console.log('[AppointmentDialog] Creating recurring appointments:', recurringDates.length);
+
+        // Save each recurring appointment
+        for (const date of recurringDates) {
+          const recurringStartDateTime = combineDateAndTime(date, startTime, clinicianTimezone);
+          const recurringEndDateTime = new Date(recurringStartDateTime.getTime() + 60 * 60 * 1000);
+
+          const appointmentData = {
+            clientId: clientId,
+            clinicianId: currentClinicianId,
+            startAt: recurringStartDateTime.toISOString(),
+            endAt: recurringEndDateTime.toISOString(),
+            type: 'Therapy Session',
+            notes: notes,
+            isRecurring: true,
+            recurringData: recurringData,
+            appointment_timezone: clinicianTimezone,
+            recurringGroupId: recurringGroupId,
+          };
+
+          const result = await saveAppointment(appointmentData);
+          if (!result.success) {
+            throw new Error(`Failed to save recurring appointment for ${date.toISOString()}`);
+          }
+        }
+
+        toast({
+          title: "Success",
+          description: `${recurringDates.length} recurring appointments created successfully.`,
+          variant: "success",
+        });
+      } else {
+        // Save single appointment
+        const appointmentData = {
+          clientId: clientId,
+          clinicianId: currentClinicianId,
+          startAt: startDateTime.toISOString(),
+          endAt: endDateTime.toISOString(),
+          type: 'Therapy Session',
+          notes: notes,
+          isRecurring: false,
+          recurringData: null,
+          appointment_timezone: clinicianTimezone,
+        };
+
+        const result = await saveAppointment(appointmentData);
+        if (!result.success) {
+          throw new Error('Failed to save appointment');
+        }
+
+        toast({
+          title: "Success",
+          description: "Appointment created successfully.",
+          variant: "success",
+        });
+      }
+
+      // Call the legacy onSave prop if provided (for backward compatibility)
+      if (onSave) {
+        const legacyData = {
+          clientId: clientId,
+          clinicianId: currentClinicianId,
+          startAt: startDateTime.toISOString(),
+          endAt: endDateTime.toISOString(),
+          type: 'Therapy Session',
+          notes: notes,
+          isRecurring: isRecurring,
+          recurringData: recurringData,
+          appointment_timezone: clinicianTimezone,
+        };
+        onSave(legacyData);
+      }
+      
+      if (onAppointmentCreated) {
+        onAppointmentCreated();
+      }
+      
+      onClose();
+    } catch (error) {
+      console.error('[AppointmentDialog] Error creating appointment:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create appointment. Please try again.",
+        variant: "destructive",
+      });
     }
-    
-    if (onAppointmentCreated) {
-      onAppointmentCreated();
-    }
-    
-    onClose();
   };
 
   const handleRecurringChange = (checked: boolean | "indeterminate") => {
