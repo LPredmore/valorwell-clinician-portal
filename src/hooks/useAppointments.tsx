@@ -1,15 +1,11 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase, getOrCreateVideoRoom } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import * as TimeZoneUtils from "@/utils/timeZoneUtils";
+import { TimeZoneService } from "@/utils/timeZoneService";
 import { DateTime } from "luxon";
 import { Appointment } from "@/types/appointment";
 import { formatClientName } from "@/utils/appointmentUtils";
-import { CalendarDebugUtils } from "@/utils/calendarDebugUtils";
-
-// Component name for logging
-const COMPONENT_NAME = 'useAppointments';
 
 // Interface for the raw Supabase response
 interface RawSupabaseAppointment {
@@ -87,11 +83,6 @@ export const useAppointments = (
   timeZone?: string,
   refreshTrigger: number = 0 // Add the refreshTrigger parameter with default value
 ) => {
-  // Performance tracking
-  const hookStartTime = useRef(performance.now());
-  const queryStartTime = useRef(0);
-  const processingStartTime = useRef(0);
-  
   const { toast } = useToast();
   const [currentAppointment, setCurrentAppointment] =
     useState<Appointment | null>(null);
@@ -105,99 +96,68 @@ export const useAppointments = (
     useState(false);
 
   const formattedClinicianId = clinicianId ? clinicianId : null;
-  const safeUserTimeZone = TimeZoneUtils.ensureIANATimeZone(
-    timeZone || "America/Chicago"
+  const safeUserTimeZone = TimeZoneService.ensureIANATimeZone(
+    timeZone || TimeZoneService.DEFAULT_TIMEZONE
   );
   
-  // Log hook initialization
-  useEffect(() => {
-    CalendarDebugUtils.logLifecycle(COMPONENT_NAME, 'hook-initialized', {
-      clinicianId,
-      formattedClinicianId,
-      fromDate: fromDate?.toISOString(),
-      toDate: toDate?.toISOString(),
-      timeZone: safeUserTimeZone,
-      refreshTrigger
-    });
-    
-    // Log UUID format validation
-    const isUUIDFormat = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(clinicianId || "");
-    if (clinicianId && !isUUIDFormat) {
-      CalendarDebugUtils.warn(COMPONENT_NAME, 'Clinician ID is not in UUID format', {
-        clinicianId,
-        format: 'non-UUID'
-      });
-    }
-  }, [clinicianId, formattedClinicianId, fromDate, toDate, safeUserTimeZone, refreshTrigger]);
+  // Log clinician ID handling for debugging
+  console.log("[useAppointments] Clinician ID handling:", {
+    rawClinicianId: clinicianId,
+    formattedClinicianId,
+    isUUIDFormat: /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(clinicianId || ""),
+    fromTimeZone: safeUserTimeZone
+  });
 
   const { fromUTCISO, toUTCISO } = useMemo(() => {
     let fromISO: string | undefined;
     let toISO: string | undefined;
-    
-    // Start tracking date calculation time
-    const dateCalcStart = performance.now();
-    
     try {
       if (fromDate) {
-        const fromDateTime = TimeZoneUtils.fromJSDate(fromDate, safeUserTimeZone)
-          .startOf('day');
-        fromISO = fromDateTime.toUTC().toISO();
+        fromISO = 
+          DateTime.fromJSDate(fromDate)
+            .setZone(safeUserTimeZone)
+            .startOf('day') 
+            .toUTC()
+            .toISO();
         
         // Add 6 days to create a proper week window (since our view has 7 days)
-        const weekEnd = fromDateTime
+        const weekEnd = DateTime.fromJSDate(fromDate)
+          .setZone(safeUserTimeZone)
+          .startOf('day')
           .plus({ days: 6 })
           .endOf('day')
           .toUTC()
           .toISO();
           
         toISO = weekEnd;
-        
-        CalendarDebugUtils.log(COMPONENT_NAME, 'Date range calculated from fromDate', {
-          fromDate: fromDate.toISOString(),
-          fromISO,
-          toISO,
-          timezone: safeUserTimeZone
-        });
       } else if (toDate) {
         // If only toDate exists, calculate a week window ending on toDate
-        const toDateTime = TimeZoneUtils.fromJSDate(toDate, safeUserTimeZone)
-          .endOf('day');
-        toISO = toDateTime.toUTC().toISO();
+        toISO = 
+          DateTime.fromJSDate(toDate)
+            .setZone(safeUserTimeZone)
+            .endOf('day')
+            .toUTC()
+            .toISO();
             
-        const weekStart = toDateTime
+        const weekStart = DateTime.fromJSDate(toDate)
+          .setZone(safeUserTimeZone)
+          .endOf('day')
           .minus({ days: 6 })
           .startOf('day')
           .toUTC()
           .toISO();
           
         fromISO = weekStart;
-        
-        CalendarDebugUtils.log(COMPONENT_NAME, 'Date range calculated from toDate', {
-          toDate: toDate.toISOString(),
-          fromISO,
-          toISO,
-          timezone: safeUserTimeZone
-        });
       } else {
         // If neither from/to dates exist, fetch current UTC week
         const now = DateTime.utc();
         fromISO = now.startOf('week').toISO();
         toISO = now.endOf('week').toISO();
-        
-        CalendarDebugUtils.log(COMPONENT_NAME, 'Date range calculated from current week', {
-          now: now.toISO(),
-          fromISO,
-          toISO
-        });
       }
-      
-      // Log date calculation performance
-      const dateCalcTime = performance.now() - dateCalcStart;
-      CalendarDebugUtils.logPerformance(COMPONENT_NAME, 'date-range-calculation', dateCalcTime);
       
       return { fromUTCISO: fromISO, toUTCISO: toISO };
     } catch (e) {
-      CalendarDebugUtils.error(COMPONENT_NAME, 'Error converting date range', e);
+      console.error("Error converting date range:", e);
       return {};
     }
   }, [fromDate, toDate, safeUserTimeZone]);
@@ -211,23 +171,12 @@ export const useAppointments = (
     // Include refreshTrigger in the queryKey to force refresh when it changes
     queryKey: ["appointments", formattedClinicianId, fromUTCISO, toUTCISO, refreshTrigger],
     queryFn: async (): Promise<Appointment[]> => {
-      if (!formattedClinicianId) {
-        CalendarDebugUtils.log(COMPONENT_NAME, 'Query aborted - no clinician ID', {
-          formattedClinicianId
-        });
-        return [];
-      }
-      
-      // Start tracking query execution time
-      queryStartTime.current = performance.now();
-      
-      CalendarDebugUtils.logApiRequest(COMPONENT_NAME, 'appointments-fetch', {
-        clinicianId: formattedClinicianId,
-        from: fromUTCISO,
-        to: toUTCISO,
-        refreshTrigger,
-        timezone: safeUserTimeZone
-      });
+      if (!formattedClinicianId) return [];
+      console.log(
+        "[useAppointments] Fetching for clinician:",
+        formattedClinicianId,
+        { from: fromUTCISO, to: toUTCISO, refreshTrigger }
+      );
 
       let query = supabase
         .from("appointments")
@@ -238,7 +187,7 @@ export const useAppointments = (
         .eq("status", "scheduled");
 
       // Use more robust timezone-aware filtering
-      CalendarDebugUtils.log(COMPONENT_NAME, 'Applying UTC date filters', {
+      console.log("[useAppointments] Applying robust UTC filter:", {
         fromUTCISO,
         toUTCISO,
         clinicianTZ: safeUserTimeZone
@@ -251,126 +200,46 @@ export const useAppointments = (
       query = query
         .order("start_at", { ascending: true });
         
-      // Log query details
-      CalendarDebugUtils.logApiRequest(COMPONENT_NAME, 'appointments-query-details', {
+      // Log debug info
+      console.log("[useAppointments] Final query details:", {
         clinician_id: formattedClinicianId,
         start_at: fromUTCISO ? `>= ${fromUTCISO}` : 'any',
-        end_at: toUTCISO ? `<= ${toUTCISO}` : 'any',
-        status: 'scheduled'
+        end_at: toUTCISO ? `<= ${toUTCISO}` : 'any'
       });
       
       const { data: rawDataAny, error: queryError } = await query;
 
-      // Log query execution time
-      const queryExecutionTime = performance.now() - queryStartTime.current;
-      CalendarDebugUtils.logPerformance(COMPONENT_NAME, 'query-execution', queryExecutionTime, {
-        success: !queryError,
-        recordCount: rawDataAny?.length || 0
-      });
-
-      // Start tracking data processing time
-      processingStartTime.current = performance.now();
-
-      // Log raw Supabase response structure with more context
-      CalendarDebugUtils.logApiResponse(COMPONENT_NAME, 'appointments-fetch', !queryError, {
+      // Debugging: Log raw Supabase response structure with more context
+      console.log('[useAppointments] Raw Supabase response structure:', {
         hasData: !!rawDataAny,
         recordCount: rawDataAny?.length || 0,
-        sampleRecord: rawDataAny?.[0] ? {
-          id: rawDataAny[0].id,
-          start_at: rawDataAny[0].start_at,
-          end_at: rawDataAny[0].end_at
-        } : null,
+        sampleRecord: rawDataAny?.[0] || null,
         hasClientsField: rawDataAny?.[0] ? 'clients' in rawDataAny[0] : false,
         clientsFieldType: rawDataAny?.[0]?.clients ? typeof rawDataAny[0].clients : "undefined",
         clientFieldKeys: rawDataAny?.[0]?.clients ? Object.keys(rawDataAny[0].clients) : [],
         rawStartAtFormat: rawDataAny?.[0]?.start_at || "N/A",
-        clinicianIdUsed: formattedClinicianId,
-        error: queryError ? queryError.message : null
+        clinicianIdUsed: formattedClinicianId
       });
 
       if (queryError) {
-        CalendarDebugUtils.error(COMPONENT_NAME, 'Error fetching appointments', queryError);
+        console.error(
+          "[useAppointments] Error fetching appointments:",
+          queryError
+        );
         throw new Error(queryError.message);
       }
 
       // Cast the raw data while ensuring proper validation
       if (!rawDataAny) {
-        CalendarDebugUtils.warn(COMPONENT_NAME, 'No data returned from Supabase', {
-          clinicianId: formattedClinicianId,
-          fromUTCISO,
-          toUTCISO
-        });
+        console.warn("[useAppointments] No data returned from Supabase");
         return [];
       }
 
-      CalendarDebugUtils.logDataLoading(COMPONENT_NAME, 'appointments-fetched', {
-        count: rawDataAny.length || 0,
-        timeRange: {
-          from: fromUTCISO,
-          to: toUTCISO
-        }
-      });
+      console.log(
+        `[useAppointments] Fetched ${rawDataAny.length || 0} raw appointments.`
+      );
 
       // Safely process the data with standardized client name formatting using our shared function
-      return rawDataAny.map((rawAppt: any): Appointment => {
-        // Process client data, ensure we handle nested objects correctly
-        const rawClientData = rawAppt.clients;
-        let clientData: Appointment["client"] | undefined;
-
-        if (rawClientData) {
-          // Handle both object and array structures (depending on Supabase's response format)
-          const clientInfo = Array.isArray(rawClientData)
-            ? rawClientData[0]
-            : rawClientData;
-
-          if (clientInfo && typeof clientInfo === "object") {
-            clientData = {
-              client_first_name: clientInfo.client_first_name || "",
-              client_last_name: clientInfo.client_last_name || "",
-              client_preferred_name: clientInfo.client_preferred_name || "",
-              client_email: clientInfo.client_email || "",
-              client_phone: clientInfo.client_phone || "",
-              client_status: clientInfo.client_status || null,
-              client_date_of_birth: clientInfo.client_date_of_birth || null,
-              client_gender: clientInfo.client_gender || null,
-              client_address: clientInfo.client_address || null,
-              client_city: clientInfo.client_city || null,
-              client_state: clientInfo.client_state || null,
-              client_zipcode: clientInfo.client_zipcode || null
-            };
-          }
-        }
-
-        // Use our standardized client name formatting function
-        const clientName = formatClientName(clientData);
-
-        return {
-          id: rawAppt.id,
-          client_id: rawAppt.client_id,
-          clinician_id: rawAppt.clinician_id,
-          start_at: rawAppt.start_at,
-          end_at: rawAppt.end_at,
-          type: rawAppt.type,
-          status: rawAppt.status,
-          appointment_recurring: rawAppt.appointment_recurring,
-          recurring_group_id: rawAppt.recurring_group_id,
-          video_room_url: rawAppt.video_room_url,
-          notes: rawAppt.notes,
-          client: clientData,
-          clientName: clientName,
-        };
-      });
-      
-      // Log data processing time
-      const dataProcessingTime = performance.now() - processingStartTime.current;
-      CalendarDebugUtils.logPerformance(COMPONENT_NAME, 'data-processing', dataProcessingTime, {
-        appointmentsCount: rawDataAny.length || 0
-      });
-      
-      // Log total hook execution time
-      const totalHookTime = performance.now() - hookStartTime.current;
-      CalendarDebugUtils.logPerformance(COMPONENT_NAME, 'hook-execution-complete', totalHookTime);
-      
       return rawDataAny.map((rawAppt: any): Appointment => {
         // Process client data, ensure we handle nested objects correctly
         const rawClientData = rawAppt.clients;
@@ -428,17 +297,17 @@ export const useAppointments = (
     appointment: Appointment,
     displayTimeZone: string
   ): FormattedAppointment => {
-    const safeDisplayZone = TimeZoneUtils.ensureIANATimeZone(displayTimeZone);
+    const safeDisplayZone = TimeZoneService.ensureIANATimeZone(displayTimeZone);
     const result: FormattedAppointment = { ...appointment };
 
     if (appointment.start_at) {
       try {
-        const startDateTime = TimeZoneUtils.fromUTC(
+        const startDateTime = TimeZoneService.fromUTC(
           appointment.start_at,
           safeDisplayZone
         );
-        result.formattedStartTime = TimeZoneUtils.formatTime(startDateTime);
-        result.formattedDate = TimeZoneUtils.formatDate(
+        result.formattedStartTime = TimeZoneService.formatTime(startDateTime);
+        result.formattedDate = TimeZoneService.formatDate(
           startDateTime,
           "yyyy-MM-dd"
         );
@@ -449,11 +318,11 @@ export const useAppointments = (
 
     if (appointment.end_at) {
       try {
-        const endDateTime = TimeZoneUtils.fromUTC(
+        const endDateTime = TimeZoneService.fromUTC(
           appointment.end_at,
           safeDisplayZone
         );
-        result.formattedEndTime = TimeZoneUtils.formatTime(endDateTime);
+        result.formattedEndTime = TimeZoneService.formatTime(endDateTime);
       } catch (e) {
         console.error("Error formatting end_at", e);
       }
@@ -467,8 +336,10 @@ export const useAppointments = (
     if (!appointment.start_at) return false;
 
     try {
-      const now = TimeZoneUtils.now(safeUserTimeZone);
-      const apptDateTime = TimeZoneUtils.fromUTC(appointment.start_at, safeUserTimeZone);
+      const now = DateTime.now().setZone(safeUserTimeZone);
+      const apptDateTime = DateTime.fromISO(appointment.start_at).setZone(
+        safeUserTimeZone
+      );
 
       return now.hasSame(apptDateTime, "day");
     } catch (e) {
@@ -491,13 +362,15 @@ export const useAppointments = (
   }, [appointmentsWithDisplayFormatting]);
 
   const upcomingAppointments = useMemo(() => {
-    const now = TimeZoneUtils.now(safeUserTimeZone);
+    const now = DateTime.now().setZone(safeUserTimeZone);
 
     return appointmentsWithDisplayFormatting.filter((appt) => {
       if (!appt.start_at) return false;
 
       try {
-        const apptDateTime = TimeZoneUtils.fromUTC(appt.start_at, safeUserTimeZone);
+        const apptDateTime = DateTime.fromISO(appt.start_at).setZone(
+          safeUserTimeZone
+        );
         // Upcoming means: not today and in the future
         return apptDateTime > now && !now.hasSame(apptDateTime, "day");
       } catch (e) {
@@ -508,13 +381,15 @@ export const useAppointments = (
   }, [appointmentsWithDisplayFormatting, safeUserTimeZone]);
 
   const pastAppointments = useMemo(() => {
-    const now = TimeZoneUtils.now(safeUserTimeZone);
+    const now = DateTime.now().setZone(safeUserTimeZone);
 
     return appointmentsWithDisplayFormatting.filter((appt) => {
       if (!appt.start_at) return false;
 
       try {
-        const apptDateTime = TimeZoneUtils.fromUTC(appt.start_at, safeUserTimeZone);
+        const apptDateTime = DateTime.fromISO(appt.start_at).setZone(
+          safeUserTimeZone
+        );
         // Past means: before now
         return apptDateTime < now;
       } catch (e) {

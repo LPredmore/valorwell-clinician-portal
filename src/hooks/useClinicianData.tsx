@@ -58,7 +58,7 @@ export const getClinicianTimeZone = async (clinicianId: string): Promise<string>
   try {
     const { data, error } = await supabase
       .from('clinicians')
-      .select('clinician_time_zone')
+      .select('clinician_timezone')
       .eq('id', clinicianId)
       .single();
       
@@ -68,7 +68,7 @@ export const getClinicianTimeZone = async (clinicianId: string): Promise<string>
     }
     
     // Return the timezone or a default if not set
-    return data?.clinician_time_zone || 'America/Chicago';
+    return data?.clinician_timezone || 'America/Chicago';
   } catch (error) {
     console.error('Error fetching clinician timezone:', error);
     return 'America/Chicago'; // Default to Central Time

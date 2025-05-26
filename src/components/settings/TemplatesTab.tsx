@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Plus, Pencil, Trash } from 'lucide-react';
 import { Button } from "@/components/ui/button";
@@ -47,11 +48,7 @@ const TemplatesTab = () => {
       {showTreatmentPlanTemplate ? (
         <TreatmentPlanTemplate onClose={() => setShowTreatmentPlanTemplate(false)} />
       ) : showSessionNoteTemplate ? (
-        <SessionNoteTemplate
-          clientData={null}
-          clinicianName="Sample Clinician"
-          onClose={() => setShowSessionNoteTemplate(false)}
-        />
+        <SessionNoteTemplate onClose={() => setShowSessionNoteTemplate(false)} />
       ) : showPHQ9Template ? (
         <PHQ9Template onClose={() => setShowPHQ9Template(false)} clinicianName="" />
       ) : showGAD7Template ? (

@@ -78,6 +78,7 @@ const WeekView: React.FC<WeekViewProps> = ({
     selectedClinicianId,
     refreshTrigger,
     appointments,
+    (id: string) => `Client ${id}`,
     userTimeZone
   );
 
@@ -96,13 +97,9 @@ const WeekView: React.FC<WeekViewProps> = ({
       const availabilityBlock: AvailabilityBlock = {
         id: block.availabilityIds[0] || 'unknown',
         clinician_id: selectedClinicianId || '',
-        day_of_week: format(day, 'EEEE').toLowerCase(),
         start_at: block.start.toUTC().toISO(),
         end_at: block.end.toUTC().toISO(),
-        is_active: true,
-        is_deleted: false,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        is_active: true
       };
       
       onAvailabilityClick(day, availabilityBlock);
@@ -303,11 +300,10 @@ const WeekView: React.FC<WeekViewProps> = ({
   }
 
   // Check if we have the day we're looking for (Thursday, May 15, 2025)
-  const debugDay = weekDays.find(day => format(day, 'yyyy-MM-dd') === '2025-05-15');
+  const debugDay = weekDays.find(day => day.toFormat('yyyy-MM-dd') === '2025-05-15');
   if (debugDay) {
     console.log('[WeekView] Found debug day 2025-05-15, showing blocks:');
-    const debugDayDateTime = DateTime.fromJSDate(debugDay);
-    debugBlocksForDay(debugDayDateTime);
+    debugBlocksForDay(debugDay);
   }
 
   return (
@@ -331,11 +327,11 @@ const WeekView: React.FC<WeekViewProps> = ({
         {/* Day headers - use exact same width as the day columns below */}
         {weekDays.map(day => (
           <div 
-            key={day.toISOString()} 
+            key={day.toISO()} 
             className="w-24 flex-1 px-2 py-1 font-semibold text-center border-r last:border-r-0"
           >
-            <div className="text-sm">{format(day, 'EEE')}</div>
-            <div className="text-xs">{format(day, 'MMM d')}</div>
+            <div className="text-sm">{day.toFormat('EEE')}</div>
+            <div className="text-xs">{day.toFormat('MMM d')}</div>
           </div>
         ))}
       </div>
@@ -353,10 +349,10 @@ const WeekView: React.FC<WeekViewProps> = ({
 
         {/* Days columns */}
         {weekDays.map(day => (
-          <div key={day.toISOString()} className="flex-1 border-r last:border-r-0">
+          <div key={day.toISO() || ''} className="flex-1 border-r last:border-r-0">
             {TIME_SLOTS.map((timeSlot, i) => {
               // Convert JS Date to DateTime objects for consistent checking
-              const dayDt = TimeZoneService.fromJSDate(day, userTimeZone);
+              const dayDt = TimeZoneService.fromJSDate(day.toJSDate(), userTimeZone);
               const timeSlotDt = TimeZoneService.fromJSDate(timeSlot, userTimeZone);
               
               // Get formatted day and hour for debugging logs
@@ -366,8 +362,8 @@ const WeekView: React.FC<WeekViewProps> = ({
               
               // Perform availability checks and get relevant blocks
               const isAvailable = showAvailability && isTimeSlotAvailable(
-                day, 
-                timeSlot
+                dayDt.toJSDate(), 
+                timeSlotDt.toJSDate()
               );
               
               // Get the corresponding block if available - this may be undefined
@@ -446,7 +442,7 @@ const WeekView: React.FC<WeekViewProps> = ({
       </div>
 
       {/* Debug section */}
-      {import.meta.env.MODE === 'development' && (
+      {process.env.NODE_ENV !== 'production' && (
         <div className="mt-4 p-4 bg-gray-100 rounded">
           <h3 className="text-lg font-semibold">Debug Info</h3>
           <p>Clinician ID: {selectedClinicianId || 'None'}</p>

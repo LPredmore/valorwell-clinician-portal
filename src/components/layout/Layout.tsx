@@ -21,10 +21,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   useEffect(() => {
     console.log("[Layout] Initializing layout, userContextLoading:", userContextLoading, "authInitialized:", authInitialized);
     
-    // Redirect to login immediately if we know there's no user and auth is initialized
-    if (authInitialized && !userId) {
-      console.log("[Layout] No authenticated user found, redirecting to login");
-      navigate('/login');
+    if (authInitialized) {
+      if (!userId) {
+        console.log("[Layout] No authenticated user found, redirecting to login");
+        navigate('/login');
+      }
     }
   }, [navigate, userContextLoading, userId, authInitialized]);
 
@@ -35,9 +36,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     if (userContextLoading && !authInitialized) {
       console.log("[Layout] Starting loading timeout check");
       timeoutId = setTimeout(() => {
-        console.log("[Layout] Loading timeout reached after 5 seconds");
+        console.log("[Layout] Loading timeout reached after 10 seconds");
         setLoadingTimeout(true);
-      }, 5000); // Reduced from 10 to 5 seconds
+      }, 10000); // 10 seconds timeout
     }
     
     return () => {
@@ -62,7 +63,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   return (
     <div className="flex min-h-screen bg-gray-50">
       {/* Add AuthStateMonitor for development environment */}
-      {import.meta.env.MODE === 'development' && <AuthStateMonitor visible={true} />}
+      {process.env.NODE_ENV === 'development' && <AuthStateMonitor visible={true} />}
       <Sidebar />
       <div className="flex-1 flex flex-col">
         <Header />

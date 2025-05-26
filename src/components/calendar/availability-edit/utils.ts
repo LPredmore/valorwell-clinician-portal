@@ -1,30 +1,21 @@
 
-/**
- * Generate time options for availability editing
- * Returns an array of time strings in HH:MM format
- */
-export const generateTimeOptions = (): string[] => {
-  const options: string[] = [];
+import { DateTime } from 'luxon';
+
+// Generate time options for the select dropdown
+export const generateTimeOptions = () => {
+  const options = [];
   for (let hour = 0; hour < 24; hour++) {
     for (let minute = 0; minute < 60; minute += 15) {
-      const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-      options.push(timeString);
+      const formattedHour = hour.toString().padStart(2, '0');
+      const formattedMinute = minute.toString().padStart(2, '0');
+      options.push(`${formattedHour}:${formattedMinute}`);
     }
   }
   return options;
 };
 
-/**
- * Format time for display in availability components
- * @param time Time string in HH:MM format
- * @returns Formatted time string for display
- */
-export const formatDisplayTime = (time: string): string => {
-  if (!time) return '';
-  
-  const [hours, minutes] = time.split(':').map(Number);
-  const period = hours >= 12 ? 'PM' : 'AM';
-  const displayHours = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
-  
-  return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
+// Format time for display
+export const formatDisplayTime = (time: string) => {
+  const dt = DateTime.fromFormat(`2023-01-01T${time}`, "yyyy-MM-dd'T'HH:mm");
+  return dt.toFormat('h:mm a');
 };

@@ -227,10 +227,6 @@ export type Database = {
           },
         ]
       }
-      /**
-       * @deprecated These tables don't exist in the database
-       * Kept for backward compatibility with existing code
-       */
       availability_blocks: {
         Row: {
           clinician_id: string
@@ -262,12 +258,16 @@ export type Database = {
           start_at?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "availability_blocks_clinician_id_fkey"
+            columns: ["clinician_id"]
+            isOneToOne: false
+            referencedRelation: "clinicians"
+            referencedColumns: ["id"]
+          },
+        ]
       }
-      /**
-       * @deprecated These tables don't exist in the database
-       * Kept for backward compatibility with existing code
-       */
       availability_exceptions: {
         Row: {
           clinician_id: string

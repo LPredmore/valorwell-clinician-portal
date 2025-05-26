@@ -2,6 +2,7 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useUser } from '@/context/UserContext';
+import { supabase } from '@/integrations/supabase/client';
 import { useEffect, useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -28,7 +29,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     if ((isLoading || !authInitialized || isCheckingUser) && !loadingError) {
       console.log("[ProtectedRoute] Starting loading timeout check");
       timeoutId = setTimeout(() => {
-        console.log("[ProtectedRoute] Loading timeout reached after 10 seconds");
+        console.log("[ProtectedRoute] Loading timeout reached after 15 seconds");
         setLoadingTimeout(true);
         setLoadingError("Loading is taking longer than expected. Please refresh the page.");
         toast({
@@ -36,7 +37,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
           description: "Authentication is taking longer than expected. Please refresh the page.",
           variant: "destructive"
         });
-      }, 10000); // Reduced from 15 to 10 seconds
+      }, 15000); // 15 seconds timeout
     }
     
     return () => {

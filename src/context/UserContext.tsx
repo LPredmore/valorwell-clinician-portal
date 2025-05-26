@@ -1,3 +1,4 @@
+
 import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { AuthChangeEvent, Session, User as SupabaseUser } from '@supabase/supabase-js';
@@ -29,7 +30,7 @@ interface UserContextType {
 }
 
 // Environment-based logging control
-const isDev = import.meta.env.MODE === 'development';
+const isDev = process.env.NODE_ENV === 'development';
 const logInfo = isDev ? console.log : () => {};
 const logError = console.error;
 
@@ -50,17 +51,17 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     // Independent safety timeout that doesn't depend on authInitialized state
     const safetyTimeoutId = setTimeout(() => {
-      logInfo("[UserContext] Safety timeout reached (1s) - forcing authInitialized to true");
+      logInfo("[UserContext] Safety timeout reached (3s) - forcing authInitialized to true");
       setAuthInitialized(true);
       setIsLoading(false);
-    }, 1000); // Reduced from 3s to 1s for faster initialization
+    }, 3000); 
     
     // Secondary extended timeout for extra protection
     const extendedTimeoutId = setTimeout(() => {
-      logInfo("[UserContext] Extended safety timeout reached (2s) - double-checking authInitialized is true");
+      logInfo("[UserContext] Extended safety timeout reached (5s) - double-checking authInitialized is true");
       setAuthInitialized(true);
       setIsLoading(false);
-    }, 2000); // Reduced from 5s to 2s for faster initialization
+    }, 5000);
     
     return () => {
       clearTimeout(safetyTimeoutId);
