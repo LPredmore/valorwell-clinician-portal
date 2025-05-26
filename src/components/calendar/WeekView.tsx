@@ -97,9 +97,13 @@ const WeekView: React.FC<WeekViewProps> = ({
       const availabilityBlock: AvailabilityBlock = {
         id: block.availabilityIds[0] || 'unknown',
         clinician_id: selectedClinicianId || '',
+        day_of_week: format(day, 'EEEE').toLowerCase(),
         start_at: block.start.toUTC().toISO(),
         end_at: block.end.toUTC().toISO(),
-        is_active: true
+        is_active: true,
+        is_deleted: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       };
       
       onAvailabilityClick(day, availabilityBlock);

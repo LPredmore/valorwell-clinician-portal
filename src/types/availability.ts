@@ -34,6 +34,36 @@ export interface TimeSlot {
 }
 
 /**
+ * Column-based Time Slot Interface
+ * Represents time slots from clinician table columns
+ */
+export interface ColumnBasedTimeSlot {
+  startTime: string;
+  endTime: string;
+  timezone?: string;
+  slotNumber: number; // 1, 2, or 3
+}
+
+/**
+ * Clinician Availability Slot Interface
+ * Represents individual availability slots from clinician columns
+ */
+export interface ClinicianAvailabilitySlot {
+  day: string; // monday, tuesday, etc.
+  slots: ColumnBasedTimeSlot[];
+}
+
+/**
+ * Column-based Availability Interface
+ * Represents availability data directly from clinician table columns
+ */
+export interface ColumnBasedAvailability {
+  clinicianId: string;
+  timezone: string;
+  slots: ClinicianAvailabilitySlot[];
+}
+
+/**
  * Day Availability Interface
  * Represents availability for a specific day of the week
  */
@@ -41,6 +71,20 @@ export interface DayAvailability {
   dayOfWeek: DayOfWeek | string;
   isAvailable: boolean;
   timeSlots: TimeSlot[];
+}
+
+/**
+ * Weekly Availability Pattern Interface
+ * Represents a complete week's availability pattern
+ */
+export interface WeeklyAvailabilityPattern {
+  [DayOfWeek.MONDAY]: DayAvailability;
+  [DayOfWeek.TUESDAY]: DayAvailability;
+  [DayOfWeek.WEDNESDAY]: DayAvailability;
+  [DayOfWeek.THURSDAY]: DayAvailability;
+  [DayOfWeek.FRIDAY]: DayAvailability;
+  [DayOfWeek.SATURDAY]: DayAvailability;
+  [DayOfWeek.SUNDAY]: DayAvailability;
 }
 
 /**
@@ -63,6 +107,7 @@ export interface AvailabilityException {
 /**
  * Availability Block Interface
  * Represents a block of availability for a clinician
+ * Updated to support both legacy and column-based systems
  */
 export interface AvailabilityBlock {
   id: string;
@@ -74,6 +119,7 @@ export interface AvailabilityBlock {
   is_deleted: boolean;
   created_at: string;
   updated_at: string;
+  recurring_pattern?: WeeklyAvailabilityPattern;
 }
 
 /**

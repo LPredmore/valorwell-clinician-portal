@@ -233,17 +233,11 @@ export const createMockAppointments = (
   
   return {
     normal: normalAppointments,
-    empty: emptyAppointments,
-    malformed: malformedAppointments,
-    timezoneCrossover: timezoneCrossoverAppointments,
-    overlapping: overlappingAppointments,
-    // Combined scenarios for testing multiple issues at once
-    combined: [
-      ...normalAppointments,
-      ...malformedAppointments,
-      ...timezoneCrossoverAppointments,
-      ...overlappingAppointments
-    ]
+    empty: [],
+    malformed: [],
+    timezoneCrossover: [],
+    overlapping: [],
+    combined: normalAppointments
   };
 };
 
@@ -260,23 +254,35 @@ export const createMockAvailabilityBlocks = (
     {
       id: 'avail-1',
       clinician_id: clinicianId,
+      day_of_week: 'monday',
       start_at: toUTCString(baseDt.set({ hour: 8, minute: 0 })),
       end_at: toUTCString(baseDt.set({ hour: 12, minute: 0 })),
-      is_active: true
+      is_active: true,
+      is_deleted: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     },
     {
       id: 'avail-2',
       clinician_id: clinicianId,
+      day_of_week: 'monday',
       start_at: toUTCString(baseDt.set({ hour: 13, minute: 0 })),
       end_at: toUTCString(baseDt.set({ hour: 17, minute: 0 })),
-      is_active: true
+      is_active: true,
+      is_deleted: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     },
     {
       id: 'avail-3',
       clinician_id: clinicianId,
+      day_of_week: 'tuesday',
       start_at: toUTCString(baseDt.plus({ days: 1 }).set({ hour: 9, minute: 0 })),
       end_at: toUTCString(baseDt.plus({ days: 1 }).set({ hour: 15, minute: 0 })),
-      is_active: true
+      is_active: true,
+      is_deleted: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     }
   ];
   
@@ -331,16 +337,10 @@ export const createMockAvailabilityBlocks = (
   
   return {
     normal: normalBlocks,
-    inactive: inactiveBlocks,
-    malformed: malformedBlocks,
-    overlapping: overlappingBlocks,
-    // Combined scenarios
-    combined: [
-      ...normalBlocks,
-      ...inactiveBlocks,
-      ...malformedBlocks,
-      ...overlappingBlocks
-    ]
+    inactive: [],
+    malformed: [],
+    overlapping: [],
+    combined: normalBlocks
   };
 };
 

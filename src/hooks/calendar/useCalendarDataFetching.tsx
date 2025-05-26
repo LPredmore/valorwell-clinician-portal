@@ -4,15 +4,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { DateTime } from 'luxon';
 import { Appointment } from '@/types/appointment';
 import { ClinicianColumnData } from '@/types/availability';
-import { ClientDetails } from '@/types/client';
+import { PartialClientDetails } from '@/types/client';
 import { CalendarDebugUtils } from '@/utils/calendarDebugUtils';
 import { appointmentsCache, clientsCache } from '@/utils/cacheUtils';
 
 // Component name for logging
 const COMPONENT_NAME = 'useCalendarDataFetching';
-
-// Use ClientDetails as Client for backward compatibility
-type Client = ClientDetails;
 
 /**
  * Hook for fetching calendar data (appointments, clients, and clinician availability)
@@ -27,7 +24,7 @@ export const useCalendarDataFetching = (
   // State variables
   const [loading, setLoading] = useState(true);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [clients, setClients] = useState<Map<string, Client>>(new Map());
+  const [clients, setClients] = useState<Map<string, PartialClientDetails>>(new Map());
   const [clinicianData, setClinicianData] = useState<ClinicianColumnData | null>(null);
   const [error, setError] = useState<Error | null>(null);
 
@@ -139,7 +136,7 @@ export const useCalendarDataFetching = (
           appointmentData = externalAppointments;
         }
         
-        // 3. Fetch clients
+        // 3. Fetch clients - only basic fields needed
         console.log(`[${COMPONENT_NAME}] Step 3: Fetching clients...`);
         
         const { data: clientsResult, error: clientsError } = await supabase
@@ -162,9 +159,14 @@ export const useCalendarDataFetching = (
         // Process and set data
         setAppointments(appointmentData);
         
-        const clientMap = new Map<string, Client>();
+        const clientMap = new Map<string, PartialClientDetails>();
         clientData.forEach(client => {
-          clientMap.set(client.id, client);
+          clientMap.set(client.id, {
+            id: client.id,
+            client_first_name: client.client_first_name,
+            client_last_name: client.client_last_name,
+            client_preferred_name: client.client_preferred_name
+          });
         });
         setClients(clientMap);
         

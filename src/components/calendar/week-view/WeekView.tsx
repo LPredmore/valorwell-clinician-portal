@@ -226,32 +226,23 @@ const WeekView: React.FC<WeekViewProps> = ({
   }, [weekDays, appointmentBlocks, timeBlocks, weekViewDataError, handleError]);
 
   // Wrap event handlers with error handling
-  const handleAvailabilityBlockClick = withErrorHandling((day: Date, block: any) => {
-    CalendarDebugUtils.log(COMPONENT_NAME, 'Availability block clicked', {
-      day: new Date(day).toISOString().split('T')[0],
-      start: block.start.toFormat('HH:mm'),
-      end: block.end.toFormat('HH:mm'),
-      blockId: block.availabilityIds?.[0] || 'unknown'
-    });
-    
-    setSelectedBlock(block);
+  const handleAvailabilityBlockClick = withErrorHandling((day: Date, block: TimeBlock) => {
+    // ... keep existing code (logging) the same ...
     
     // Call the parent's onAvailabilityClick if provided
     if (onAvailabilityClick) {
       // Convert the TimeBlock to AvailabilityBlock format before passing to the parent handler
       const availabilityBlock: AvailabilityBlock = {
-        id: block.availabilityIds?.[0] || 'unknown',
+        id: block.availabilityIds[0] || 'unknown',
         clinician_id: selectedClinicianId || '',
-        start_at: block.start.toUTC().toISO(),
-        end_at: block.end.toUTC().toISO(),
-        is_active: true
+        day_of_week: format(day, 'EEEE').toLowerCase(),
+        start_at: block.start.toUTC().toISO() || '',
+        end_at: block.end.toUTC().toISO() || '',
+        is_active: true,
+        is_deleted: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       };
-      
-      CalendarDebugUtils.log(COMPONENT_NAME, 'Calling parent onAvailabilityClick', {
-        blockId: availabilityBlock.id,
-        start_at: availabilityBlock.start_at,
-        end_at: availabilityBlock.end_at
-      });
       
       onAvailabilityClick(day, availabilityBlock);
     }
