@@ -32,7 +32,6 @@ const getDayNameFromIndex = (dayIndex: number): string => {
 // Helper function to validate and format time strings
 const validateTimeString = (timeStr: string): string | null => {
   if (!timeStr || typeof timeStr !== 'string') return null;
-  // Handle both "HH:MM:SS" and "HH:MM" formats
   const timeMatch = timeStr.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
   if (!timeMatch) return null;
   const hour = parseInt(timeMatch[1], 10);
@@ -48,19 +47,10 @@ export const useWeekViewData = (
   externalAppointments: Appointment[] = [],
   userTimeZone: string = 'America/Chicago'
 ): WeekViewData => {
-  console.log('[useWeekViewData] Hook called with:', {
-    currentDateOrDays: Array.isArray(currentDateOrDays) ? 'array of dates' : currentDateOrDays,
-    clinicianId,
-    refreshTrigger,
-    externalAppointmentsCount: externalAppointments.length,
-    userTimeZone
-  });
-
   // Handle both single date and array of days
   const currentDate = Array.isArray(currentDateOrDays) ? currentDateOrDays[0] : currentDateOrDays;
   const weekDays = useMemo(() => {
     if (Array.isArray(currentDateOrDays)) {
-      console.log('[useWeekViewData] Using provided array of days:', currentDateOrDays.length);
       return currentDateOrDays;
     }
     // Calculate week boundaries for single date
@@ -68,7 +58,6 @@ export const useWeekViewData = (
     const calculatedDays = Array.from({ length: 7 }, (_, i) => 
       start.plus({ days: i }).toJSDate()
     );
-    console.log('[useWeekViewData] Calculated week days from single date:', calculatedDays.length);
     return calculatedDays;
   }, [currentDateOrDays, userTimeZone]);
 
@@ -76,10 +65,6 @@ export const useWeekViewData = (
   const { startOfWeek, endOfWeek } = useMemo(() => {
     const start = DateTime.fromJSDate(weekDays[0]).setZone(userTimeZone).startOf('day');
     const end = DateTime.fromJSDate(weekDays[6]).setZone(userTimeZone).endOf('day');
-    console.log('[useWeekViewData] Week boundaries:', {
-      start: start.toISO(),
-      end: end.toISO()
-    });
     return {
       startOfWeek: start,
       endOfWeek: end
@@ -99,7 +84,6 @@ export const useWeekViewData = (
       }
     }
     
-    console.log('[useWeekViewData] Generated time slots:', slots.length);
     return slots;
   }, [weekDays]);
 
@@ -113,17 +97,14 @@ export const useWeekViewData = (
   useEffect(() => {
     const fetchAvailabilityData = async () => {
       if (!clinicianId) {
-        console.log('[useWeekViewData] No clinician ID, skipping availability fetch');
         return;
       }
 
-      console.log('[useWeekViewData] ===== FETCHING AVAILABILITY FROM CORRECT TABLES =====');
       setAvailabilityLoading(true);
       setAvailabilityError(null);
 
       try {
         // Fetch from availability table (recurring patterns)
-        console.log('[useWeekViewData] Fetching from availability table for clinician:', clinicianId);
         const { data: availabilityBlocks, error: availabilityError } = await supabase
           .from('availability')
           .select('*')
@@ -132,15 +113,10 @@ export const useWeekViewData = (
           .eq('is_deleted', false);
 
         if (availabilityError) {
-          console.error('[useWeekViewData] Error fetching availability blocks:', availabilityError);
           throw availabilityError;
         }
 
-        console.log('[useWeekViewData] Found availability blocks:', availabilityBlocks?.length || 0);
-        console.log('[useWeekViewData] Availability blocks data:', availabilityBlocks);
-
         // Fetch from availability_exceptions table (specific date overrides)
-        console.log('[useWeekViewData] Fetching from availability_exceptions table for clinician:', clinicianId);
         const { data: exceptions, error: exceptionsError } = await supabase
           .from('availability_exceptions')
           .select('*')
@@ -151,12 +127,8 @@ export const useWeekViewData = (
           .lte('specific_date', endOfWeek.toISODate());
 
         if (exceptionsError) {
-          console.error('[useWeekViewData] Error fetching availability exceptions:', exceptionsError);
           throw exceptionsError;
         }
-
-        console.log('[useWeekViewData] Found availability exceptions:', exceptions?.length || 0);
-        console.log('[useWeekViewData] Availability exceptions data:', exceptions);
 
         setAvailabilityData(availabilityBlocks || []);
         setAvailabilityExceptions(exceptions || []);
@@ -188,41 +160,21 @@ export const useWeekViewData = (
 
   // Process availability data from the correct tables
   const availabilityByDay = useMemo(() => {
-    console.log('[useWeekViewData] ===== PROCESSING AVAILABILITY FROM CORRECT TABLES =====');
     const availabilityMap = new Map<string, TimeBlock[]>();
-    
-    console.log('[useWeekViewData] Processing availability data:', {
-      availabilityBlocksCount: availabilityData.length,
-      exceptionsCount: availabilityExceptions.length,
-      weekDaysCount: weekDays.length
-    });
     
     weekDays.forEach((day, weekIndex) => {
       const dayKey = format(day, 'yyyy-MM-dd');
-      const jsDay = day.getDay(); // 0 = Sunday, 1 = Monday, etc.
+      const jsDay = day.getDay();
       const dayName = getDayNameFromIndex(jsDay);
       const blocks: TimeBlock[] = [];
-      
-      console.log(`[useWeekViewData] === Processing day ${weekIndex}: ${dayKey} (${dayName}) ===`);
       
       // Process recurring availability patterns
       const dayAvailabilityBlocks = availabilityData.filter(block => 
         block.day_of_week === dayName
       );
       
-      console.log(`[useWeekViewData] Found ${dayAvailabilityBlocks.length} recurring blocks for ${dayName}`);
-      
       dayAvailabilityBlocks.forEach((block, blockIndex) => {
-        console.log(`[useWeekViewData] Processing recurring block ${blockIndex + 1}:`, {
-          id: block.id,
-          dayOfWeek: block.day_of_week,
-          startAt: block.start_at,
-          endAt: block.end_at,
-          isActive: block.is_active
-        });
-        
         try {
-          // Parse time strings and create DateTime objects
           const startTime = validateTimeString(block.start_at);
           const endTime = validateTimeString(block.end_at);
           
@@ -245,12 +197,7 @@ export const useWeekViewData = (
               };
               
               blocks.push(timeBlock);
-              console.log(`[useWeekViewData] ✓ Added recurring block: ${start.toFormat('HH:mm')} - ${end.toFormat('HH:mm')}`);
-            } else {
-              console.error(`[useWeekViewData] Invalid DateTime objects for block ${block.id}`);
             }
-          } else {
-            console.log(`[useWeekViewData] Invalid time format for block ${block.id}: ${block.start_at} - ${block.end_at}`);
           }
         } catch (error) {
           console.error(`[useWeekViewData] Error processing recurring block ${block.id}:`, error);
@@ -262,17 +209,7 @@ export const useWeekViewData = (
         exception.specific_date === dayKey
       );
       
-      console.log(`[useWeekViewData] Found ${dayExceptions.length} exceptions for ${dayKey}`);
-      
       dayExceptions.forEach((exception, exceptionIndex) => {
-        console.log(`[useWeekViewData] Processing exception ${exceptionIndex + 1}:`, {
-          id: exception.id,
-          specificDate: exception.specific_date,
-          startTime: exception.start_time,
-          endTime: exception.end_time,
-          isActive: exception.is_active
-        });
-        
         try {
           const startTime = validateTimeString(exception.start_time);
           const endTime = validateTimeString(exception.end_time);
@@ -296,37 +233,16 @@ export const useWeekViewData = (
               };
               
               blocks.push(timeBlock);
-              console.log(`[useWeekViewData] ✓ Added exception block: ${start.toFormat('HH:mm')} - ${end.toFormat('HH:mm')}`);
-            } else {
-              console.error(`[useWeekViewData] Invalid DateTime objects for exception ${exception.id}`);
             }
-          } else {
-            console.log(`[useWeekViewData] Invalid time format for exception ${exception.id}: ${exception.start_time} - ${exception.end_time}`);
           }
         } catch (error) {
           console.error(`[useWeekViewData] Error processing exception ${exception.id}:`, error);
         }
       });
       
-      console.log(`[useWeekViewData] Total blocks created for ${dayName} (${dayKey}): ${blocks.length}`);
-      
       if (blocks.length > 0) {
         availabilityMap.set(dayKey, blocks);
-        console.log(`[useWeekViewData] ✓ Added ${blocks.length} blocks to availability map for ${dayKey}`);
-      } else {
-        console.log(`[useWeekViewData] ✗ No blocks added for ${dayKey}`);
       }
-    });
-    
-    console.log('[useWeekViewData] ===== FINAL AVAILABILITY MAP FROM CORRECT TABLES =====');
-    console.log('[useWeekViewData] Total days with availability:', availabilityMap.size);
-    console.log('[useWeekViewData] Days in map:', Array.from(availabilityMap.keys()));
-    
-    Array.from(availabilityMap.entries()).forEach(([dayKey, blocks]) => {
-      console.log(`[useWeekViewData] ${dayKey}: ${blocks.length} blocks`);
-      blocks.forEach((block, index) => {
-        console.log(`  Block ${index + 1}: ${block.start.toFormat('HH:mm')} - ${block.end.toFormat('HH:mm')} (${block.isException ? 'exception' : 'recurring'})`);
-      });
     });
     
     return availabilityMap;
@@ -336,7 +252,6 @@ export const useWeekViewData = (
   const appointmentsByDay = useMemo(() => {
     const appointmentMap = new Map<string, AppointmentBlock[]>();
     
-    // Use external appointments if provided, otherwise use fetched appointments
     const appointmentsToProcess = externalAppointments.length > 0 ? externalAppointments : appointments;
     
     appointmentsToProcess.forEach(appointment => {
@@ -348,7 +263,6 @@ export const useWeekViewData = (
         const day = start.startOf('day');
         const dayKey = day.toFormat('yyyy-MM-dd');
         
-        // Get client name from clients map or appointment data
         let clientName = appointment.clientName || 'Unknown Client';
         if (!clientName && appointment.client_id && clients.has(appointment.client_id)) {
           const client = clients.get(appointment.client_id);
