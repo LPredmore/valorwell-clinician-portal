@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { CalendarDebugUtils } from './calendarDebugUtils';
 import { validateAppointmentData, validateAvailabilityBlockData, validateAvailabilityExceptionData } from './validationUtils';
@@ -374,11 +375,6 @@ export class CalendarApiClient {
   }
   
   /**
-   * Fetches availability blocks for a clinician
-   * @param request The request parameters
-   * @returns A promise that resolves to the availability blocks response
-   */
-  /**
    * Fetches clinician availability data directly from the clinicians table
    * @param request The request parameters
    * @returns A promise that resolves to the availability response
@@ -524,7 +520,6 @@ export class CalendarApiClient {
       for (let slotNum = 1; slotNum <= 3; slotNum++) {
         const startTimeKey = `clinician_availability_start_${day}_${slotNum}`;
         const endTimeKey = `clinician_availability_end_${day}_${slotNum}`;
-        const timezoneKey = `clinician_availability_timezone_${day}_${slotNum}`;
         
         // Only add slots that have both start and end times
         if (clinicianData[startTimeKey] && clinicianData[endTimeKey]) {
@@ -535,9 +530,11 @@ export class CalendarApiClient {
           availabilityBlocks.push({
             id,
             clinician_id: clinicianData.id,
+            day_of_week: day,
             start_at: '', // This would be calculated based on the specific date
             end_at: '',   // This would be calculated based on the specific date
             is_active: true,
+            is_deleted: false,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           });
@@ -555,6 +552,14 @@ export class CalendarApiClient {
   public static async getAvailabilityBlocks(
     request: ApiTypes.GetAvailabilityBlocksRequest
   ): Promise<ApiTypes.GetAvailabilityBlocksResponse> {
+    if (!request.clinicianId) {
+      return {
+        data: null,
+        error: { code: 'MISSING_CLINICIAN_ID', message: 'Clinician ID is required' },
+        status: 400,
+        success: false
+      };
+    }
     return this.getClinicianAvailability(request);
   }
   
@@ -681,7 +686,7 @@ export const createAvailabilityBlock = async (data: {
  * Fetch availability blocks for a clinician
  */
 export const getAvailabilityBlocks = async (
-  request: GetAvailabilityBlocksRequest
+  request: ApiTypes.GetAvailabilityBlocksRequest
 ): Promise<AvailabilityBlock[]> => {
   // Mock implementation - replace with actual API call
   return [];
@@ -691,7 +696,7 @@ export const getAvailabilityBlocks = async (
  * Fetch clinician availability from column-based data
  */
 export const getClinicianAvailability = async (
-  request: GetClinicianAvailabilityRequest
+  request: ApiTypes.GetClinicianAvailabilityRequest
 ): Promise<AvailabilityBlock[]> => {
   // Mock implementation - replace with actual API call
   return [];
@@ -701,7 +706,7 @@ export const getClinicianAvailability = async (
  * Fetch availability exceptions for a clinician
  */
 export const getAvailabilityExceptions = async (
-  request: GetAvailabilityBlocksRequest
+  request: ApiTypes.GetAvailabilityBlocksRequest
 ): Promise<AvailabilityException[]> => {
   try {
     let query = supabase

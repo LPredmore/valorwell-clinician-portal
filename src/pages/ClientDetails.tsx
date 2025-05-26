@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,29 +7,38 @@ import { Button } from '@/components/ui/button';
 import { Edit, Calendar, Phone, Mail, Clock } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { ClientDetails, Clinician } from '@/types/client';
+import type { ClientDetails, Clinician } from '@/types/client';
 import PersonalInfoTab from '@/components/client/PersonalInfoTab';
 import InsuranceTab from '@/components/client/InsuranceTab';
-import EmergencyContactTab from '@/components/client/EmergencyContactTab';
-import MedicalHistoryTab from '@/components/client/MedicalHistoryTab';
-import TreatmentPlanTab from '@/components/client/TreatmentPlanTab';
-import NotesTab from '@/components/client/NotesTab';
-import { getClientById } from '@/services/clientService';
-import { getClinicians } from '@/services/clinicianService';
-import { getAppointmentsByClientId } from '@/services/appointmentService';
-import { Appointment } from '@/types/appointment';
-import AppointmentCard from '@/components/client/AppointmentCard';
-import { formatPhoneNumber } from '@/utils/formatters';
 
 const ClientDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [clientData, setClientData] = useState<ClientDetails | null>(null);
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [appointments, setAppointments] = useState<any[]>([]);
   const [clinicians, setClinicians] = useState<Clinician[]>([]);
   const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState('personal');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Mock data for demonstration
+  useEffect(() => {
+    if (id) {
+      // Simulate API call
+      setTimeout(() => {
+        const mockClient: ClientDetails = {
+          id: id,
+          client_first_name: 'John',
+          client_last_name: 'Doe',
+          client_email: 'john.doe@example.com',
+          client_phone: '555-123-4567',
+          client_status: 'active'
+        };
+        setClientData(mockClient);
+        setIsLoading(false);
+      }, 1000);
+    }
+  }, [id]);
 
   // Form state for diagnosis management
   const form = {
@@ -67,33 +77,15 @@ const ClientDetails: React.FC = () => {
     setIsEditing(false);
   };
 
-  useEffect(() => {
-    const fetchClientData = async () => {
-      if (!id) return;
-      
-      setIsLoading(true);
-      try {
-        const client = await getClientById(id);
-        setClientData(client);
-        
-        // Fetch appointments for this client
-        const clientAppointments = await getAppointmentsByClientId(id);
-        setAppointments(clientAppointments);
-        
-        // Fetch clinicians for dropdown selection
-        const allClinicians = await getClinicians();
-        setClinicians(allClinicians);
-        
-      } catch (err) {
-        console.error('Error fetching client data:', err);
-        setError('Failed to load client data. Please try again later.');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    fetchClientData();
-  }, [id]);
+  const formatPhoneNumber = (phone: string) => {
+    // Simple phone number formatting
+    const cleaned = phone.replace(/\D/g, '');
+    const match = cleaned.match(/^(\d{3})(\d{3})(\d{4})$/);
+    if (match) {
+      return `(${match[1]}) ${match[2]}-${match[3]}`;
+    }
+    return phone;
+  };
 
   if (isLoading) {
     return <div className="flex justify-center items-center h-screen">Loading client data...</div>;
@@ -121,15 +113,7 @@ const ClientDetails: React.FC = () => {
     return clientData.client_preferred_name ? `(${clientData.client_preferred_name})` : '';
   };
 
-  const getUpcomingAppointments = () => {
-    const now = new Date();
-    return appointments
-      .filter(appointment => new Date(appointment.start_at) > now)
-      .sort((a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime())
-      .slice(0, 3);
-  };
-
-  const upcomingAppointments = getUpcomingAppointments();
+  const upcomingAppointments = appointments.slice(0, 3);
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -177,13 +161,9 @@ const ClientDetails: React.FC = () => {
             </CardHeader>
             <CardContent>
               <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="grid w-full grid-cols-6">
+                <TabsList className="grid w-full grid-cols-2">
                   <TabsTrigger value="personal">Personal</TabsTrigger>
                   <TabsTrigger value="insurance">Insurance</TabsTrigger>
-                  <TabsTrigger value="emergency">Emergency</TabsTrigger>
-                  <TabsTrigger value="medical">Medical</TabsTrigger>
-                  <TabsTrigger value="treatment">Treatment</TabsTrigger>
-                  <TabsTrigger value="notes">Notes</TabsTrigger>
                 </TabsList>
                 
                 <TabsContent value="personal">
@@ -209,47 +189,6 @@ const ClientDetails: React.FC = () => {
                     onCancel={handleCancel}
                   />
                 </TabsContent>
-                
-                <TabsContent value="emergency">
-                  <EmergencyContactTab
-                    isEditing={isEditing}
-                    form={form}
-                    clientData={clientData}
-                    clinicians={clinicians}
-                    onSave={handleSave}
-                    onCancel={handleCancel}
-                  />
-                </TabsContent>
-                
-                <TabsContent value="medical">
-                  <MedicalHistoryTab
-                    isEditing={isEditing}
-                    form={form}
-                    clientData={clientData}
-                    onSave={handleSave}
-                    onCancel={handleCancel}
-                  />
-                </TabsContent>
-                
-                <TabsContent value="treatment">
-                  <TreatmentPlanTab
-                    isEditing={isEditing}
-                    form={form}
-                    clientData={clientData}
-                    onSave={handleSave}
-                    onCancel={handleCancel}
-                  />
-                </TabsContent>
-                
-                <TabsContent value="notes">
-                  <NotesTab
-                    isEditing={isEditing}
-                    form={form}
-                    clientData={clientData}
-                    onSave={handleSave}
-                    onCancel={handleCancel}
-                  />
-                </TabsContent>
               </Tabs>
             </CardContent>
           </Card>
@@ -266,8 +205,11 @@ const ClientDetails: React.FC = () => {
             <CardContent>
               {upcomingAppointments.length > 0 ? (
                 <div className="space-y-4">
-                  {upcomingAppointments.map((appointment) => (
-                    <AppointmentCard key={appointment.id} appointment={appointment} />
+                  {upcomingAppointments.map((appointment, index) => (
+                    <div key={index} className="p-3 border rounded">
+                      <p className="font-medium">Appointment {index + 1}</p>
+                      <p className="text-sm text-gray-500">Details coming soon</p>
+                    </div>
                   ))}
                   <Button variant="outline" className="w-full">
                     View All Appointments

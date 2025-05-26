@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useWeekViewData } from '@/components/calendar/week-view/useWeekViewData';
 import { TimeZoneService } from '@/utils/timeZoneService';
@@ -35,7 +36,6 @@ const WeekViewDataTest: React.FC = () => {
         clinicianId,
         0,
         [],
-        (id) => `Test Client ${id}`,
         userTimeZone
       );
     }

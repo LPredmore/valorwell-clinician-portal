@@ -1,295 +1,360 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, AlertCircle } from 'lucide-react';
-import { useUser } from '@/context/UserContext';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import Layout from '@/components/layout/Layout';
-import VideoChat from '@/components/video/VideoChat';
-import { TimeZoneService } from '@/utils/timeZoneService';
-import { AppointmentsList } from '@/components/dashboard/AppointmentsList';
-import SessionNoteTemplate from '@/components/templates/SessionNoteTemplate';
-import { useAppointments } from '@/hooks/useAppointments';
-import { getClinicianTimeZone } from '@/hooks/useClinicianData';
-import { SessionDidNotOccurDialog } from '@/components/dashboard/SessionDidNotOccurDialog';
-import { Appointment } from '@/types/appointment';
+import { useToast } from "@/hooks/use-toast";
+import { Plus, UserPlus, Users, ClipboardList, Calendar, Settings, LogOut } from 'lucide-react';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { nanoid } from 'nanoid';
 import { ClientDetails } from '@/types/client';
+import { format } from 'date-fns';
+import { Link } from 'react-router-dom';
+import { useUser } from '@/context/UserContext';
+import Layout from '@/components/layout/Layout';
+
+const formSchema = z.object({
+  client_first_name: z.string().min(2, {
+    message: "First name must be at least 2 characters.",
+  }),
+  client_last_name: z.string().min(2, {
+    message: "Last name must be at least 2 characters.",
+  }),
+  client_email: z.string().email({
+    message: "Invalid email address.",
+  }),
+  client_phone: z.string().min(10, {
+    message: "Phone number must be at least 10 digits.",
+  }),
+});
 
 const ClinicianDashboard = () => {
-  const { userRole, userId } = useUser();
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [clinicianTimeZone, setClinicianTimeZone] = useState<string>(TimeZoneService.DEFAULT_TIMEZONE);
-  const [isLoadingTimeZone, setIsLoadingTimeZone] = useState(true);
-  const timeZoneDisplay = TimeZoneService.getTimeZoneDisplayName(clinicianTimeZone);
-  const [showSessionDidNotOccurDialog, setShowSessionDidNotOccurDialog] = useState(false);
-  const [selectedAppointmentForNoShow, setSelectedAppointmentForNoShow] = useState<Appointment | null>(null);
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [clients, setClients] = useState<ClientDetails[]>([]);
+  const [open, setOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const { user, signOut } = useUser();
+
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      client_first_name: "",
+      client_last_name: "",
+      client_email: "",
+      client_phone: "",
+    },
+  });
+
+  function onSubmit(data: z.infer<typeof formSchema>) {
+    console.log(data);
+  }
 
   useEffect(() => {
-    const fetchUserId = async () => {
-      const { data } = await supabase.auth.getUser();
-      if (data?.user) {
-        setCurrentUserId(data.user.id);
-      }
-    };
-    
-    fetchUserId();
-  }, []);
+    if (!user) {
+      navigate('/login');
+      return;
+    }
 
-  // Fetch clinician's timezone
-  useEffect(() => {
-    const fetchClinicianTimeZone = async () => {
-      if (currentUserId) {
-        setIsLoadingTimeZone(true);
-        try {
-          const timeZone = await getClinicianTimeZone(currentUserId);
-          console.log("Fetched clinician timezone:", timeZone);
-          setClinicianTimeZone(timeZone);
-        } catch (error) {
-          console.error("Error fetching clinician timezone:", error);
-          // Fallback to system timezone
-          setClinicianTimeZone(TimeZoneService.DEFAULT_TIMEZONE);
-        } finally {
-          setIsLoadingTimeZone(false);
+    const fetchClients = async () => {
+      setIsLoading(true);
+      try {
+        const { data: clientsData, error } = await supabase
+          .from('clients')
+          .select('*');
+
+        if (error) {
+          console.error("Error fetching clients:", error);
+          toast({
+            title: "Error",
+            description: "Failed to fetch clients.",
+            variant: "destructive",
+          });
+        } else {
+          setClients(clientsData || []);
         }
+      } catch (error) {
+        console.error("Unexpected error fetching clients:", error);
+        toast({
+          title: "Error",
+          description: "An unexpected error occurred while fetching clients.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
       }
     };
-    
-    fetchClinicianTimeZone();
-  }, [currentUserId]);
 
-  const {
-    appointments,
-    todayAppointments,
-    upcomingAppointments,
-    pastAppointments,
-    isLoading,
-    error,
-    refetch,
-    currentAppointment,
-    isVideoOpen,
-    currentVideoUrl,
-    showSessionTemplate,
-    clientData,
-    isLoadingClientData,
-    startVideoSession,
-    openSessionTemplate,
-    closeSessionTemplate,
-    closeVideoSession
-  } = useAppointments(currentUserId);
+    fetchClients();
+  }, [user, navigate, toast]);
 
-  const handleSessionDidNotOccur = (appointment: Appointment) => {
-    setSelectedAppointmentForNoShow(appointment);
-    setShowSessionDidNotOccurDialog(true);
+  const addClient = async (formData: z.infer<typeof formSchema>) => {
+    try {
+      const newClientData: ClientDetails = {
+        id: nanoid(),
+        client_first_name: formData.client_first_name,
+        client_last_name: formData.client_last_name,
+        client_email: formData.client_email,
+        client_phone: formData.client_phone,
+        client_status: 'active',
+        client_intake_date: new Date().toISOString(),
+        // Remove client_recentdischarge property as it doesn't exist in ClientDetails interface
+      };
+
+      setClients(prevClients => [...prevClients, newClientData]);
+      setOpen(false);
+
+      toast({
+        title: "Success",
+        description: "Client added successfully.",
+      });
+    } catch (error) {
+      console.error("Error adding client:", error);
+      toast({
+        title: "Error",
+        description: "Failed to add client.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const closeSessionDidNotOccurDialog = () => {
-    setShowSessionDidNotOccurDialog(false);
-    setSelectedAppointmentForNoShow(null);
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      navigate('/login');
+      toast({
+        title: "Success",
+        description: "Signed out successfully.",
+      });
+    } catch (error) {
+      console.error("Error signing out:", error);
+      toast({
+        title: "Error",
+        description: "Failed to sign out.",
+        variant: "destructive",
+      });
+    }
   };
 
-  // Create a type adapter function to ensure clientData is handled properly by SessionNoteTemplate
-  const prepareClientDataForTemplate = (): ClientDetails | null => {
-    if (!clientData) return null;
-    
-    // Create a ClientDetails object with the available data
-    // Only include fields that we can safely access from clientData
-    // Add null defaults for all properties required by ClientDetails
-    return {
-      id: currentAppointment?.client_id || '',
-      client_first_name: clientData.client_first_name || null,
-      client_last_name: clientData.client_last_name || null,
-      client_preferred_name: clientData.client_preferred_name || null,
-      client_email: null,
-      client_phone: null,
-      client_date_of_birth: null,
-      client_age: null,
-      client_gender: null,
-      client_gender_identity: null,
-      client_state: null,
-      client_time_zone: null,
-      client_minor: null,
-      client_status: null,
-      client_assigned_therapist: null,
-      client_referral_source: null,
-      client_self_goal: null,
-      client_diagnosis: null,
-      client_insurance_company_primary: null,
-      client_policy_number_primary: null,
-      client_group_number_primary: null,
-      client_subscriber_name_primary: null,
-      client_insurance_type_primary: null,
-      client_subscriber_dob_primary: null,
-      client_subscriber_relationship_primary: null,
-      client_insurance_company_secondary: null,
-      client_policy_number_secondary: null,
-      client_group_number_secondary: null,
-      client_subscriber_name_secondary: null,
-      client_insurance_type_secondary: null,
-      client_subscriber_dob_secondary: null,
-      client_subscriber_relationship_secondary: null,
-      client_insurance_company_tertiary: null,
-      client_policy_number_tertiary: null,
-      client_group_number_tertiary: null,
-      client_subscriber_name_tertiary: null,
-      client_insurance_type_tertiary: null,
-      client_subscriber_dob_tertiary: null,
-      client_subscriber_relationship_tertiary: null,
-      client_planlength: null,
-      client_treatmentfrequency: null,
-      client_problem: null,
-      client_treatmentgoal: null,
-      client_primaryobjective: null,
-      client_secondaryobjective: null,
-      client_tertiaryobjective: null,
-      client_intervention1: null,
-      client_intervention2: null,
-      client_intervention3: null,
-      client_intervention4: null,
-      client_intervention5: null,
-      client_intervention6: null,
-      client_nexttreatmentplanupdate: null,
-      client_privatenote: null,
-      client_appearance: null,
-      client_attitude: null,
-      client_behavior: null,
-      client_speech: null,
-      client_affect: null,
-      client_thoughtprocess: null,
-      client_perception: null,
-      client_orientation: null,
-      client_memoryconcentration: null,
-      client_insightjudgement: null,
-      client_mood: null,
-      client_substanceabuserisk: null,
-      client_suicidalideation: null,
-      client_homicidalideation: null,
-      client_functioning: null,
-      client_prognosis: null,
-      client_progress: null,
-      client_sessionnarrative: null,
-      client_medications: null,
-      client_personsinattendance: null,
-      client_currentsymptoms: null,
-      client_vacoverage: null,
-      client_champva: null,
-      client_tricare_beneficiary_category: null,
-      client_tricare_sponsor_name: null,
-      client_tricare_sponsor_branch: null,
-      client_tricare_sponsor_id: null,
-      client_tricare_plan: null,
-      client_tricare_region: null,
-      client_tricare_policy_id: null,
-      client_tricare_has_referral: null,
-      client_tricare_referral_number: null,
-      client_recentdischarge: null,
-      client_branchOS: null,
-      client_disabilityrating: null,
-      client_relationship: null,
-      client_is_profile_complete: null,
-      client_treatmentplan_startdate: null,
-      client_temppassword: null,
-      client_primary_payer_id: null,
-      client_secondary_payer_id: null,
-      client_tertiary_payer_id: null,
-      eligibility_status_primary: null,
-      eligibility_last_checked_primary: null,
-      eligibility_claimmd_id_primary: null,
-      eligibility_response_details_primary_json: null,
-      eligibility_copay_primary: null,
-      eligibility_deductible_primary: null,
-      eligibility_coinsurance_primary_percent: null,
-      stripe_customer_id: null,
-      client_city: null,
-      client_zipcode: null,
-      client_address: null,
-      client_zip_code: null
-    };
-  };
-
-  if (showSessionTemplate && currentAppointment) {
+  if (isLoading) {
     return (
       <Layout>
-        <SessionNoteTemplate 
-          onClose={closeSessionTemplate}
-          appointment={currentAppointment}
-          clinicianName={userId}
-          clientData={prepareClientDataForTemplate()}
-        />
+        <div className="flex justify-center items-center h-full">
+          <p>Loading clients...</p>
+        </div>
       </Layout>
     );
   }
 
   return (
     <Layout>
-      <div className="container mx-auto">
-        <h1 className="text-2xl font-bold mb-6">Clinician Dashboard</h1>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* Today's Appointments */}
-          <div>
-            <AppointmentsList
-              title="Today's Appointments"
-              icon={<Calendar className="h-5 w-5 mr-2" />}
-              appointments={todayAppointments}
-              isLoading={isLoading || isLoadingTimeZone}
-              error={error}
-              emptyMessage="No appointments scheduled for today."
-              timeZoneDisplay={timeZoneDisplay}
-              userTimeZone={clinicianTimeZone}
-              showStartButton={true}
-              onStartSession={startVideoSession}
-            />
-          </div>
-          
-          {/* Outstanding Documentation */}
-          <div>
-            <AppointmentsList
-              title="Outstanding Documentation"
-              icon={<AlertCircle className="h-5 w-5 mr-2" />}
-              appointments={pastAppointments}
-              isLoading={isLoading || isLoadingTimeZone || isLoadingClientData}
-              error={error}
-              emptyMessage="No outstanding documentation."
-              timeZoneDisplay={timeZoneDisplay}
-              userTimeZone={clinicianTimeZone}
-              onDocumentSession={openSessionTemplate}
-              onSessionDidNotOccur={handleSessionDidNotOccur}
-            />
-          </div>
-          
-          {/* Upcoming Appointments */}
-          <div>
-            <AppointmentsList
-              title="Upcoming Appointments"
-              icon={<Calendar className="h-5 w-5 mr-2" />}
-              appointments={upcomingAppointments}
-              isLoading={isLoading || isLoadingTimeZone}
-              error={error}
-              emptyMessage="No upcoming appointments scheduled."
-              timeZoneDisplay={timeZoneDisplay}
-              userTimeZone={clinicianTimeZone}
-              showViewAllButton={true}
-            />
-          </div>
+      <div className="container mx-auto py-10">
+        <div className="mb-8 flex justify-between items-center">
+          <h1 className="text-3xl font-bold">
+            Welcome to Your Dashboard, {user?.email}
+          </h1>
+          <Button onClick={handleSignOut} className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
+            <LogOut className="mr-2" size={16} />
+            Sign Out
+          </Button>
         </div>
-      </div>
-      
-      {/* Video Chat Component */}
-      {isVideoOpen && (
-        <VideoChat
-          roomUrl={currentVideoUrl}
-          isOpen={isVideoOpen}
-          onClose={closeVideoSession}
-        />
-      )}
 
-      {/* Session Did Not Occur Dialog */}
-      {showSessionDidNotOccurDialog && selectedAppointmentForNoShow && (
-        <SessionDidNotOccurDialog
-          isOpen={showSessionDidNotOccurDialog}
-          onClose={closeSessionDidNotOccurDialog}
-          appointmentId={selectedAppointmentForNoShow.id}
-          onStatusUpdate={refetch}
-        />
-      )}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+          <Card className="bg-blue-50 hover:bg-blue-100 transition-colors duration-200">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Clients</CardTitle>
+              <Users className="h-4 w-4 text-gray-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{clients.length}</div>
+              <p className="text-xs text-gray-500">+20% from last month</p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-green-50 hover:bg-green-100 transition-colors duration-200">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                Upcoming Appointments
+              </CardTitle>
+              <Calendar className="h-4 w-4 text-gray-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">7</div>
+              <p className="text-xs text-gray-500">+10% from last month</p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-yellow-50 hover:bg-yellow-100 transition-colors duration-200">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Tasks Due</CardTitle>
+              <ClipboardList className="h-4 w-4 text-gray-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">3</div>
+              <p className="text-xs text-gray-500">-5% from last month</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Client List</CardTitle>
+            <CardDescription>
+              Here you can manage all of your clients.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="overflow-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[100px]">Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Phone</TableHead>
+                  <TableHead>Intake Date</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {clients.map((client) => (
+                  <TableRow key={client.id}>
+                    <TableCell className="font-medium">
+                      <Link to={`/client-details/${client.id}`}>
+                        {client.client_first_name} {client.client_last_name}
+                      </Link>
+                    </TableCell>
+                    <TableCell>{client.client_email}</TableCell>
+                    <TableCell>{client.client_phone}</TableCell>
+                    <TableCell>
+                      {client.client_intake_date
+                        ? format(new Date(client.client_intake_date), 'MM/dd/yyyy')
+                        : 'N/A'}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+          <CardFooter className="flex justify-between items-center">
+            <p className="text-sm text-gray-500">
+              {clients.length} total clients
+            </p>
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="ml-auto">
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  Add Client
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>Add Client</DialogTitle>
+                  <DialogDescription>
+                    Add a new client to your list.
+                  </DialogDescription>
+                </DialogHeader>
+                <Form {...form}>
+                  <form
+                    onSubmit={form.handleSubmit((values) => {
+                      onSubmit(values);
+                      addClient(values);
+                    })}
+                    className="space-y-4"
+                  >
+                    <FormField
+                      control={form.control}
+                      name="client_first_name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>First Name</FormLabel>
+                          <FormControl>
+                            <Input placeholder="John" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="client_last_name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Last Name</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Doe" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="client_email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Email</FormLabel>
+                          <FormControl>
+                            <Input placeholder="john.doe@example.com" type="email" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="client_phone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Phone</FormLabel>
+                          <FormControl>
+                            <Input placeholder="555-123-4567" type="tel" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <Button type="submit">Add Client</Button>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
+          </CardFooter>
+        </Card>
+      </div>
     </Layout>
   );
 };
