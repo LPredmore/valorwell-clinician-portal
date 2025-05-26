@@ -1,4 +1,3 @@
-
 /**
  * Unified Appointment interface for all components.
  * UTC timestamps (start_at, end_at) are the sole source of truth for appointment timing.
@@ -16,7 +15,7 @@ export interface Appointment {
   notes?: string | null;
   appointment_recurring?: string | null;
   recurring_group_id?: string | null;
-  appointments_timezone?: string | null; // The timezone that was active when the appointment was created
+  appointment_timezone?: string | null; // The timezone that was active when the appointment was created
   
   // Client information, structured as an object.
   // This is populated by useAppointments.tsx from the Supabase 'clients' join.

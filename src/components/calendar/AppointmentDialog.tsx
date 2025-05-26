@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -194,7 +195,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
       notes: notes,
       isRecurring: isRecurring,
       recurringData: recurringData,
-      timeZone: clinicianTimezone, // Save the clinician's timezone
+      appointment_timezone: clinicianTimezone, // Updated field name
     };
 
     if (onSave) {
@@ -400,3 +401,4 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
 };
 
 export default AppointmentDialog;
+

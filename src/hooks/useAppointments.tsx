@@ -181,7 +181,7 @@ export const useAppointments = (
       let query = supabase
         .from("appointments")
         .select(
-          `id, client_id, clinician_id, start_at, end_at, type, status, appointment_recurring, recurring_group_id, video_room_url, notes, appointments_timezone, clients (client_first_name, client_last_name, client_preferred_name, client_email, client_phone, client_status, client_date_of_birth, client_gender, client_address, client_city, client_state, client_zipcode)`
+          `id, client_id, clinician_id, start_at, end_at, type, status, appointment_recurring, recurring_group_id, video_room_url, notes, appointment_timezone, clients (client_first_name, client_last_name, client_preferred_name, client_email, client_phone, client_status, client_date_of_birth, client_gender, client_address, client_city, client_state, client_zipcode)`
         )
         .eq("clinician_id", formattedClinicianId)
         .eq("status", "scheduled");
@@ -218,7 +218,7 @@ export const useAppointments = (
         clientsFieldType: rawDataAny?.[0]?.clients ? typeof rawDataAny[0].clients : "undefined",
         clientFieldKeys: rawDataAny?.[0]?.clients ? Object.keys(rawDataAny[0].clients) : [],
         rawStartAtFormat: rawDataAny?.[0]?.start_at || "N/A",
-        appointmentsTimezone: rawDataAny?.[0]?.appointments_timezone || "N/A",
+        appointmentsTimezone: rawDataAny?.[0]?.appointment_timezone || "N/A",
         clinicianIdUsed: formattedClinicianId
       });
 
@@ -285,7 +285,7 @@ export const useAppointments = (
           recurring_group_id: rawAppt.recurring_group_id,
           video_room_url: rawAppt.video_room_url,
           notes: rawAppt.notes,
-          appointments_timezone: rawAppt.appointments_timezone, // Include the saved timezone
+          appointment_timezone: rawAppt.appointment_timezone, // Updated column name
           client: clientData,
           clientName: clientName,
         };
@@ -339,7 +339,7 @@ export const useAppointments = (
 
     try {
       // Use the appointment's saved timezone if available, otherwise fall back to user timezone
-      const appointmentTimeZone = appointment.appointments_timezone || safeUserTimeZone;
+      const appointmentTimeZone = appointment.appointment_timezone || safeUserTimeZone;
       const now = DateTime.now().setZone(appointmentTimeZone);
       const apptDateTime = DateTime.fromISO(appointment.start_at).setZone(appointmentTimeZone);
 
@@ -354,7 +354,7 @@ export const useAppointments = (
   const appointmentsWithDisplayFormatting = useMemo(() => {
     return fetchedAppointments.map((appt) => {
       // Use the appointment's saved timezone if available, otherwise fall back to user timezone
-      const appointmentTimeZone = appt.appointments_timezone || safeUserTimeZone;
+      const appointmentTimeZone = appt.appointment_timezone || safeUserTimeZone;
       return addDisplayFormattingToAppointment(appt, appointmentTimeZone);
     });
   }, [fetchedAppointments, safeUserTimeZone]);
@@ -371,7 +371,7 @@ export const useAppointments = (
 
       try {
         // Use the appointment's saved timezone if available, otherwise fall back to user timezone
-        const appointmentTimeZone = appt.appointments_timezone || safeUserTimeZone;
+        const appointmentTimeZone = appt.appointment_timezone || safeUserTimeZone;
         const now = DateTime.now().setZone(appointmentTimeZone);
         const apptDateTime = DateTime.fromISO(appt.start_at).setZone(appointmentTimeZone);
         
@@ -390,7 +390,7 @@ export const useAppointments = (
 
       try {
         // Use the appointment's saved timezone if available, otherwise fall back to user timezone
-        const appointmentTimeZone = appt.appointments_timezone || safeUserTimeZone;
+        const appointmentTimeZone = appt.appointment_timezone || safeUserTimeZone;
         const now = DateTime.now().setZone(appointmentTimeZone);
         const apptDateTime = DateTime.fromISO(appt.start_at).setZone(appointmentTimeZone);
         

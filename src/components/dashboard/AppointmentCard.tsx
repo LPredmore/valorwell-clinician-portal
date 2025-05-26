@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Calendar, Clock, UserCircle, Video, FileText, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -27,9 +26,9 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
   onSessionDidNotOccur
 }) => {
   // Use the appointment's saved timezone if available, otherwise fall back to user timezone
-  const appointmentTimeZone = appointment.appointments_timezone || userTimeZone;
-  const appointmentTimeZoneDisplay = appointment.appointments_timezone 
-    ? TimeZoneService.getTimeZoneDisplayName(appointment.appointments_timezone)
+  const appointmentTimeZone = appointment.appointment_timezone || userTimeZone;
+  const appointmentTimeZoneDisplay = appointment.appointment_timezone 
+    ? TimeZoneService.getTimeZoneDisplayName(appointment.appointment_timezone)
     : timeZoneDisplay;
 
   if (onDocumentSession) {
