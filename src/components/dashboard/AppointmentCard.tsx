@@ -26,11 +26,19 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
   onDocumentSession,
   onSessionDidNotOccur
 }) => {
-  // Use the appointment's saved timezone if available, otherwise fall back to user timezone
-  const appointmentTimeZone = appointment.appointment_timezone || userTimeZone;
-  const appointmentTimeZoneDisplay = appointment.appointment_timezone 
-    ? TimeZoneService.getTimeZoneDisplayName(appointment.appointment_timezone)
-    : timeZoneDisplay;
+  // CRITICAL: Always use appointment's saved timezone for display
+  const getDisplayTimezone = () => {
+    if (appointment.appointment_timezone) {
+      return appointment.appointment_timezone;
+    }
+    
+    // Fallback to user timezone with warning
+    console.warn(`[AppointmentCard] Missing appointment_timezone for appointment ${appointment.id}, falling back to user timezone`);
+    return userTimeZone;
+  };
+
+  const displayTimeZone = getDisplayTimezone();
+  const displayTimeZoneLabel = TimeZoneService.getTimeZoneDisplayName(displayTimeZone);
 
   if (onDocumentSession) {
     return (
@@ -42,14 +50,14 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
           </CardTitle>
           <CardDescription className="flex items-center">
             <Calendar className="h-4 w-4 mr-2" />
-            {formatAppointmentDate(appointment.start_at, appointmentTimeZone)}
+            {formatAppointmentDate(appointment.start_at, displayTimeZone)}
           </CardDescription>
         </CardHeader>
         <CardContent className="pb-2">
           <div className="flex items-center">
             <Clock className="h-4 w-4 mr-2" />
             <span className="text-sm">
-              {formatAppointmentTime(appointment.start_at, appointmentTimeZone)} - {formatAppointmentTime(appointment.end_at, appointmentTimeZone)}
+              {formatAppointmentTime(appointment.start_at, displayTimeZone)} - {formatAppointmentTime(appointment.end_at, displayTimeZone)}
             </span>
           </div>
           <div className="text-sm mt-1">{appointment.type}</div>
@@ -86,12 +94,12 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
       <CardHeader className="pb-2">
         <CardTitle className="text-base font-semibold flex items-center">
           <Clock className="h-4 w-4 mr-2" />
-          {formatAppointmentTime(appointment.start_at, appointmentTimeZone)} - {formatAppointmentTime(appointment.end_at, appointmentTimeZone)} 
-          <span className="text-xs text-gray-500 ml-1">({appointmentTimeZoneDisplay})</span>
+          {formatAppointmentTime(appointment.start_at, displayTimeZone)} - {formatAppointmentTime(appointment.end_at, displayTimeZone)} 
+          <span className="text-xs text-gray-500 ml-1">({displayTimeZoneLabel})</span>
         </CardTitle>
         <CardDescription className="flex items-center">
           <Calendar className="h-4 w-4 mr-2" />
-          {formatAppointmentDate(appointment.start_at, appointmentTimeZone)}
+          {formatAppointmentDate(appointment.start_at, displayTimeZone)}
         </CardDescription>
       </CardHeader>
       <CardContent className="pb-2">

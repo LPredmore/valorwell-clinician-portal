@@ -27,8 +27,18 @@ const AppointmentDetails: React.FC<AppointmentDetailsProps> = ({
 }) => {
   const isRecurring = !!appointment.recurring_group_id;
 
-  // Use the appointment's saved timezone, fall back to user timezone
-  const displayTimeZone = appointment.appointment_timezone || userTimeZone;
+  // CRITICAL: Always use appointment's saved timezone for display
+  const getDisplayTimezone = () => {
+    if (appointment.appointment_timezone) {
+      return appointment.appointment_timezone;
+    }
+    
+    // Fallback to user timezone with warning
+    console.warn(`[AppointmentDetails] Missing appointment_timezone for appointment ${appointment.id}, falling back to user timezone`);
+    return userTimeZone;
+  };
+
+  const displayTimeZone = getDisplayTimezone();
 
   const getClientName = () => {
     // If we have a complete client object with the fields we need

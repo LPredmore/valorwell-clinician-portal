@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { getClinicianTimeZone } from '@/hooks/useClinicianData';
+import { TimeZoneService } from '@/utils/timeZoneService';
 
 interface EditAppointmentFormProps {
   appointment: {
@@ -47,8 +48,18 @@ const EditAppointmentForm: React.FC<EditAppointmentFormProps> = ({
   const [isLoading, setIsLoading] = React.useState(false);
   const { toast } = useToast();
 
-  // Use the appointment's saved timezone, fall back to user timezone
-  const displayTimeZone = appointment.appointment_timezone || userTimeZone;
+  // CRITICAL: Always use appointment's saved timezone for editing
+  const getDisplayTimezone = () => {
+    if (appointment.appointment_timezone) {
+      return appointment.appointment_timezone;
+    }
+    
+    // Fallback to user timezone with warning
+    console.warn(`[EditAppointmentForm] Missing appointment_timezone for appointment ${appointment.id}, falling back to user timezone`);
+    return userTimeZone;
+  };
+
+  const displayTimeZone = getDisplayTimezone();
 
   // Schema for form validation
   const formSchema = z.object({
@@ -57,15 +68,25 @@ const EditAppointmentForm: React.FC<EditAppointmentFormProps> = ({
     notes: z.string().optional(),
   });
 
-  // Format start_at for the datetime-local input using the appointment's timezone
-  const defaultStartTime = appointment.start_at 
-    ? DateTime.fromISO(appointment.start_at).setZone(displayTimeZone).toFormat('yyyy-MM-dd\'T\'HH:mm')
-    : '';
+  // CRITICAL: Convert UTC start_at to appointment's timezone for form display
+  const getDefaultStartTime = () => {
+    if (!appointment.start_at) return '';
+    
+    try {
+      // Convert UTC time to appointment's timezone
+      const utcDateTime = DateTime.fromISO(appointment.start_at, { zone: 'UTC' });
+      const localDateTime = utcDateTime.setZone(displayTimeZone);
+      return localDateTime.toFormat('yyyy-MM-dd\'T\'HH:mm');
+    } catch (error) {
+      console.error('[EditAppointmentForm] Error converting start time:', error);
+      return '';
+    }
+  };
 
   const form = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      start_at: defaultStartTime,
+      start_at: getDefaultStartTime(),
       status: appointment.status || '',
       notes: appointment.notes || '',
     },
@@ -74,7 +95,7 @@ const EditAppointmentForm: React.FC<EditAppointmentFormProps> = ({
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsLoading(true);
     try {
-      // Convert start time to DateTime object in appointment's timezone
+      // CRITICAL: Convert the edited time back to UTC using appointment's timezone
       const startDateTime = DateTime.fromISO(values.start_at, { zone: displayTimeZone });
       
       // Calculate end time as 1 hour after start time
@@ -88,6 +109,7 @@ const EditAppointmentForm: React.FC<EditAppointmentFormProps> = ({
       let appointmentTimeZone = appointment.appointment_timezone;
       if (!appointmentTimeZone) {
         appointmentTimeZone = await getClinicianTimeZone(appointment.clinician_id);
+        console.warn(`[EditAppointmentForm] No existing appointment_timezone, using clinician timezone: ${appointmentTimeZone}`);
       }
 
       const { error } = await supabase
@@ -134,6 +156,11 @@ const EditAppointmentForm: React.FC<EditAppointmentFormProps> = ({
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
         <div>
           <h3 className="text-sm font-medium mb-2">Client: {getClientName()}</h3>
+          {!appointment.appointment_timezone && (
+            <div className="text-xs text-amber-600 mb-2">
+              ⚠️ No saved timezone for this appointment, using {TimeZoneService.getTimeZoneDisplayName(displayTimeZone)}
+            </div>
+          )}
         </div>
         
         <FormField

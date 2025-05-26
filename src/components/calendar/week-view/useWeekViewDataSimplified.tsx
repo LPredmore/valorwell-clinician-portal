@@ -98,7 +98,7 @@ export const useWeekViewDataSimplified = (
 
   // Process appointments into appointment blocks
   useEffect(() => {
-    console.log('[useWeekViewDataSimplified] Processing appointments:', {
+    console.log('[useWeekViewDataSimplified] Processing appointments for WeekView positioning:', {
       appointmentsCount: appointments.length,
       userTimeZone,
       sampleAppointment: appointments[0] ? {
@@ -121,18 +121,30 @@ export const useWeekViewDataSimplified = (
       }
 
       try {
-        // CRITICAL FIX: Always use userTimeZone for positioning consistency
-        // The user's timezone is the reference for all grid positioning
-        console.log('[useWeekViewDataSimplified] Converting appointment times to userTimeZone:', {
+        // CRITICAL: Use appointment's saved timezone for positioning, NOT user timezone
+        const getAppointmentTimezone = () => {
+          if (appointment.appointment_timezone) {
+            return appointment.appointment_timezone;
+          }
+          
+          // Fallback to user timezone with warning
+          console.warn(`[useWeekViewDataSimplified] Missing appointment_timezone for appointment ${appointment.id}, falling back to user timezone`);
+          return userTimeZone;
+        };
+
+        const appointmentTimezone = getAppointmentTimezone();
+
+        console.log('[useWeekViewDataSimplified] Converting appointment times for WeekView positioning:', {
           appointmentId: appointment.id,
           originalStart: appointment.start_at,
-          originalTimezone: appointment.appointment_timezone,
-          targetTimezone: userTimeZone
+          appointmentTimezone,
+          userTimeZone,
+          usingFallback: !appointment.appointment_timezone
         });
 
-        // Convert UTC times to the user's timezone for consistent positioning
-        const start = DateTime.fromISO(appointment.start_at, { zone: 'UTC' }).setZone(userTimeZone);
-        const end = DateTime.fromISO(appointment.end_at, { zone: 'UTC' }).setZone(userTimeZone);
+        // Convert UTC times to appointment's saved timezone for correct positioning
+        const start = DateTime.fromISO(appointment.start_at, { zone: 'UTC' }).setZone(appointmentTimezone);
+        const end = DateTime.fromISO(appointment.end_at, { zone: 'UTC' }).setZone(appointmentTimezone);
         const day = start.startOf('day');
 
         // Get client name
@@ -167,15 +179,15 @@ export const useWeekViewDataSimplified = (
 
         processedAppointmentBlocks.push(appointmentBlock);
 
-        console.log('[useWeekViewDataSimplified] Created appointment block:', {
+        console.log('[useWeekViewDataSimplified] Created appointment block for WeekView:', {
           appointmentId: appointment.id,
           clientName,
           originalStart: appointment.start_at,
           convertedStart: start.toFormat('yyyy-MM-dd HH:mm'),
           convertedEnd: end.toFormat('yyyy-MM-dd HH:mm'),
           day: day.toFormat('yyyy-MM-dd'),
-          originalTimezone: appointment.appointment_timezone,
-          positioningTimezone: userTimeZone
+          appointmentTimezone,
+          positionedInTimezone: appointmentTimezone
         });
       } catch (error) {
         console.error('[useWeekViewDataSimplified] Error creating appointment block:', {
@@ -229,25 +241,34 @@ export const useWeekViewDataSimplified = (
     });
   };
 
-  // CRITICAL FIX: Simplified appointment slot matching using consistent timezone
+  // CRITICAL: Updated appointment slot matching using appointment's timezone
   const getAppointmentForTimeSlot = (day: Date, timeSlot: Date): AppointmentBlock | undefined => {
     const dayDt = DateTime.fromJSDate(day, { zone: userTimeZone });
     const timeSlotDt = DateTime.fromJSDate(timeSlot, { zone: userTimeZone });
 
     const result = appointmentBlocks.find(appt => {
-      // Check if it's the same day
+      // Check if it's the same day in the appointment's timezone
       const isSameDay = appt.day?.hasSame(dayDt, 'day') || false;
       if (!isSameDay) return false;
 
-      // CRITICAL FIX: Simplified comparison - both appointment and slot are now in userTimeZone
-      const slotTime = dayDt.set({
+      // CRITICAL: Create slot time in appointment's timezone for accurate comparison
+      const appointmentTimezone = appt.appointment_timezone || userTimeZone;
+      
+      // Convert the grid slot time to the appointment's timezone
+      const slotTimeInUserTz = dayDt.set({
         hour: timeSlotDt.hour,
         minute: timeSlotDt.minute,
         second: 0,
         millisecond: 0
       });
+      
+      // Since appointment positioning uses appointment's timezone, 
+      // we need to compare in appointment's timezone
+      const slotTimeInApptTz = slotTimeInUserTz.setZone(appointmentTimezone);
+      const apptStartInApptTz = appt.start;
+      const apptEndInApptTz = appt.end;
 
-      const isInRange = slotTime >= appt.start && slotTime < appt.end;
+      const isInRange = slotTimeInApptTz >= apptStartInApptTz && slotTimeInApptTz < apptEndInApptTz;
       
       // Enhanced logging for debugging
       console.log(`[getAppointmentForTimeSlot] Checking appointment ${appt.id}:`, {
@@ -256,9 +277,11 @@ export const useWeekViewDataSimplified = (
         dayCheck: isSameDay,
         slotDay: dayDt.toFormat('yyyy-MM-dd'),
         apptDay: appt.day?.toFormat('yyyy-MM-dd'),
-        slotTime: slotTime.toFormat('HH:mm'),
-        apptStart: appt.start.toFormat('HH:mm'),
-        apptEnd: appt.end.toFormat('HH:mm'),
+        slotTimeUserTz: slotTimeInUserTz.toFormat('HH:mm'),
+        slotTimeApptTz: slotTimeInApptTz.toFormat('HH:mm'),
+        apptStart: apptStartInApptTz.toFormat('HH:mm'),
+        apptEnd: apptEndInApptTz.toFormat('HH:mm'),
+        appointmentTimezone,
         userTimeZone,
         isInRange
       });
