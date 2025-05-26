@@ -15,6 +15,11 @@ interface WeekViewData {
   timeSlots: Date[];
   availabilityByDay: Map<string, TimeBlock[]>;
   appointmentsByDay: Map<string, AppointmentBlock[]>;
+  appointmentBlocks: AppointmentBlock[];
+  timeBlocks: TimeBlock[];
+  isTimeSlotAvailable: (day: Date, timeSlot: Date) => boolean;
+  getBlockForTimeSlot: (day: Date, timeSlot: Date) => TimeBlock | undefined;
+  getAppointmentForTimeSlot: (day: Date, timeSlot: Date) => AppointmentBlock | undefined;
 }
 
 export const useWeekViewData = (
@@ -166,12 +171,61 @@ export const useWeekViewData = (
     return appointmentMap;
   }, [appointments, externalAppointments, clients, userTimeZone]);
 
+  // Create flat arrays for backwards compatibility
+  const appointmentBlocks = useMemo(() => {
+    const blocks: AppointmentBlock[] = [];
+    appointmentsByDay.forEach(dayBlocks => blocks.push(...dayBlocks));
+    return blocks;
+  }, [appointmentsByDay]);
+
+  const timeBlocks = useMemo(() => {
+    const blocks: TimeBlock[] = [];
+    availabilityByDay.forEach(dayBlocks => blocks.push(...dayBlocks));
+    return blocks;
+  }, [availabilityByDay]);
+
+  // Utility functions
+  const isTimeSlotAvailable = (day: Date, timeSlot: Date): boolean => {
+    const dayKey = format(day, 'yyyy-MM-dd');
+    const dayBlocks = availabilityByDay.get(dayKey) || [];
+    const slotTime = DateTime.fromJSDate(timeSlot);
+    
+    return dayBlocks.some(block => 
+      slotTime >= block.start && slotTime < block.end
+    );
+  };
+
+  const getBlockForTimeSlot = (day: Date, timeSlot: Date): TimeBlock | undefined => {
+    const dayKey = format(day, 'yyyy-MM-dd');
+    const dayBlocks = availabilityByDay.get(dayKey) || [];
+    const slotTime = DateTime.fromJSDate(timeSlot);
+    
+    return dayBlocks.find(block => 
+      slotTime >= block.start && slotTime < block.end
+    );
+  };
+
+  const getAppointmentForTimeSlot = (day: Date, timeSlot: Date): AppointmentBlock | undefined => {
+    const dayKey = format(day, 'yyyy-MM-dd');
+    const dayAppointments = appointmentsByDay.get(dayKey) || [];
+    const slotTime = DateTime.fromJSDate(timeSlot);
+    
+    return dayAppointments.find(appt => 
+      slotTime >= appt.start && slotTime < appt.end
+    );
+  };
+
   return {
     loading,
     error,
     weekDays,
     timeSlots,
     availabilityByDay,
-    appointmentsByDay
+    appointmentsByDay,
+    appointmentBlocks,
+    timeBlocks,
+    isTimeSlotAvailable,
+    getBlockForTimeSlot,
+    getAppointmentForTimeSlot
   };
 };

@@ -1,10 +1,11 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { DateTime } from 'luxon';
 import { format } from 'date-fns';
 import { Card } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
 import { useWeekViewData } from './useWeekViewData';
-import TimeSlot from '../TimeSlot';
+import TimeSlot from './TimeSlot';
 import { Appointment } from '@/types/appointment';
 import { TimeBlock } from './types';
 import { TimeZoneService } from '@/utils/timeZoneService';
@@ -58,7 +59,10 @@ const WeekView: React.FC<WeekViewProps> = ({
   }
 
   if (error) {
-    return <CalendarErrorMessage error={error} />;
+    return <CalendarErrorMessage 
+      componentName="WeekView"
+      error={error} 
+    />;
   }
 
   return (

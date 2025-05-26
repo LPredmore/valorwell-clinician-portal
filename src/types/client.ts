@@ -14,6 +14,9 @@ export interface ClientDetails {
   client_date_of_birth?: string;
   client_age?: number;
   client_gender?: string;
+  client_gender_identity?: string;
+  client_time_zone?: string;
+  client_minor?: boolean;
   client_address?: string;
   client_city?: string;
   client_state?: string;
@@ -25,6 +28,14 @@ export interface ClientDetails {
   client_insurance_provider?: string;
   client_insurance_id?: string;
   client_insurance_group?: string;
+  client_insurance_company_primary?: string;
+  client_policy_number_primary?: string;
+  client_group_number_primary?: string;
+  client_subscriber_name_primary?: string;
+  client_insurance_type_primary?: string;
+  client_subscriber_dob_primary?: string;
+  client_vacoverage?: string;
+  client_tricare_has_referral?: boolean;
   client_copay?: number;
   client_deductible?: number;
   client_notes?: string;
@@ -59,6 +70,7 @@ export interface ClientDetails {
   client_billing_city?: string;
   client_billing_state?: string;
   client_billing_zipcode?: string;
+  client_self_goal?: string;
   created_at?: string;
   updated_at?: string;
 
@@ -101,6 +113,23 @@ export interface ClientDetails {
 }
 
 /**
+ * Clinician Interface
+ * Represents clinician information
+ */
+export interface Clinician {
+  id: string;
+  clinician_first_name: string;
+  clinician_last_name: string;
+  clinician_professional_name?: string;
+  clinician_email?: string;
+  clinician_time_zone: string;
+  clinician_bio?: string;
+  clinician_image_url?: string;
+  // Availability columns for all days and slots
+  [key: string]: any; // For dynamic availability columns
+}
+
+/**
  * Partial Client Details Interface
  * For when only basic client info is fetched
  */
@@ -122,6 +151,10 @@ export interface TabProps {
   isEditing: boolean;
   onSave: (data: Partial<ClientDetails>) => void;
   onCancel: () => void;
+  form?: any;
+  handleAddDiagnosis?: (diagnosis: string) => void;
+  handleRemoveDiagnosis?: (index: number) => void;
+  clinicians?: Clinician[];
 }
 
 /**
