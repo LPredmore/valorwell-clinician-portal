@@ -2,7 +2,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import Layout from "../components/layout/Layout";
 import ErrorBoundary from "@/components/ErrorBoundary";
-import CalendarErrorBoundary from "@/components/calendar/CalendarErrorBoundary";
 import CalendarView from "../components/calendar/CalendarView";
 import { addWeeks, subWeeks } from "date-fns";
 import { useCalendarState } from "../hooks/useCalendarState";
@@ -14,9 +13,11 @@ import { useUser } from "@/context/UserContext";
 import { useTimeZone } from "@/context/TimeZoneContext";
 import { useAppointments } from "@/hooks/useAppointments";
 import { useRealTimeCalendar } from "@/hooks/useRealTimeCalendar";
+import { CalendarDebugUtils } from "@/utils/calendarDebugUtils";
 import { Appointment } from "@/types/appointment";
 import { Button } from "@/components/ui/button";
 
+// Component name for logging
 const COMPONENT_NAME = 'Calendar';
 
 const CalendarPage = () => {
@@ -261,37 +262,35 @@ const CalendarPage = () => {
             </div>
           )}
 
-          <CalendarErrorBoundary fallbackTitle="Calendar View Error">
-            <ErrorBoundary
-              componentName="CalendarView"
-              fallback={
-                <div className="p-4 border border-red-300 bg-red-50 rounded-md">
-                  <h3 className="text-lg font-medium text-red-800 mb-2">Calendar Error</h3>
-                  <p className="text-red-600 mb-2">
-                    There was an error rendering the calendar view
-                  </p>
-                  <button
-                    className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-                    onClick={() => window.location.reload()}
-                  >
-                    Reload Page
-                  </button>
-                </div>
-              }
-            >
-              <CalendarView
-                view="week"
-                showAvailability={showAvailability}
-                clinicianId={selectedClinicianId}
-                currentDate={currentDate}
-                userTimeZone={userTimeZone}
-                refreshTrigger={appointmentRefreshTrigger}
-                appointments={appointments}
-                isLoading={isLoadingAppointments}
-                error={appointmentsError}
-              />
-            </ErrorBoundary>
-          </CalendarErrorBoundary>
+          <ErrorBoundary
+            componentName="CalendarView"
+            fallback={
+              <div className="p-4 border border-red-300 bg-red-50 rounded-md">
+                <h3 className="text-lg font-medium text-red-800 mb-2">Calendar Error</h3>
+                <p className="text-red-600 mb-2">
+                  There was an error rendering the calendar view
+                </p>
+                <button
+                  className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                  onClick={() => window.location.reload()}
+                >
+                  Reload Page
+                </button>
+              </div>
+            }
+          >
+            <CalendarView
+              view="week"
+              showAvailability={showAvailability}
+              clinicianId={selectedClinicianId}
+              currentDate={currentDate}
+              userTimeZone={userTimeZone}
+              refreshTrigger={appointmentRefreshTrigger}
+              appointments={appointments}
+              isLoading={isLoadingAppointments}
+              error={appointmentsError}
+            />
+          </ErrorBoundary>
           
           {/* Full real-time indicator at the bottom of the calendar */}
           <div className="mt-4">
@@ -309,7 +308,7 @@ const CalendarPage = () => {
         clients={clients}
         loadingClients={loadingClients}
         selectedClinicianId={selectedClinicianId}
-        onAppointmentCreated={handleDataChanged}
+        onAppointmentCreated={handleDataChanged} // Use the central data changed handler
       />
     </Layout>
   );
