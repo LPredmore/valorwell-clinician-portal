@@ -1,5 +1,10 @@
 
 import { Appointment } from '@/types/appointment';
+import { DateTime } from 'luxon';
+import { addWeeks, addMonths, format } from 'date-fns';
+
+// Constants
+export const DEFAULT_START_TIME = '09:00';
 
 /**
  * Formats a client name consistently across the application
@@ -50,7 +55,7 @@ export const convertAppointmentBlockToAppointment = (
   let endAt: string;
 
   try {
-    // Handle Luxon DateTime objects
+    // Handle Luxon DateTime objects properly
     if (appointmentBlock.start && typeof appointmentBlock.start === 'object' && appointmentBlock.start.toISO) {
       startAt = appointmentBlock.start.toUTC().toISO();
     } else if (typeof appointmentBlock.start === 'string') {
@@ -100,4 +105,113 @@ export const convertAppointmentBlockToAppointment = (
   });
 
   return appointment;
+};
+
+/**
+ * Generates time options for appointment scheduling
+ */
+export const generateTimeOptions = (): string[] => {
+  const options: string[] = [];
+  for (let hour = 6; hour < 22; hour++) {
+    for (let minute of [0, 15, 30, 45]) {
+      const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+      options.push(timeString);
+    }
+  }
+  return options;
+};
+
+/**
+ * Calculates end time based on start time (adds 1 hour by default)
+ */
+export const calculateEndTime = (startTime: string, durationMinutes: number = 60): string => {
+  const [hours, minutes] = startTime.split(':').map(Number);
+  const startDate = new Date();
+  startDate.setHours(hours, minutes, 0, 0);
+  
+  const endDate = new Date(startDate.getTime() + durationMinutes * 60000);
+  return `${endDate.getHours().toString().padStart(2, '0')}:${endDate.getMinutes().toString().padStart(2, '0')}`;
+};
+
+/**
+ * Ensures ID is a string (converts numbers to strings)
+ */
+export const ensureStringId = (id: string | number | null | undefined): string | null => {
+  if (id === null || id === undefined) return null;
+  return String(id);
+};
+
+/**
+ * Generates recurring dates based on pattern
+ */
+export const generateRecurringDates = (startDate: Date, pattern: string, count: number = 24): Date[] => {
+  const dates: Date[] = [startDate];
+  
+  for (let i = 1; i < count; i++) {
+    let nextDate: Date;
+    
+    switch (pattern) {
+      case 'weekly':
+        nextDate = addWeeks(startDate, i);
+        break;
+      case 'biweekly':
+        nextDate = addWeeks(startDate, i * 2);
+        break;
+      case 'monthly':
+        nextDate = addMonths(startDate, i);
+        break;
+      default:
+        nextDate = addWeeks(startDate, i);
+    }
+    
+    dates.push(nextDate);
+  }
+  
+  return dates;
+};
+
+/**
+ * Formats time for display in the UI
+ */
+export const formatTimeDisplay = (time: string, timeZone?: string): string => {
+  try {
+    const [hours, minutes] = time.split(':').map(Number);
+    const date = new Date();
+    date.setHours(hours, minutes, 0, 0);
+    
+    return date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: timeZone || undefined
+    });
+  } catch (error) {
+    return time;
+  }
+};
+
+/**
+ * Formats appointment date for display
+ */
+export const formatAppointmentDate = (dateTimeString: string, timeZone: string): string => {
+  try {
+    const dateTime = DateTime.fromISO(dateTimeString).setZone(timeZone);
+    return dateTime.toFormat('MMM dd, yyyy');
+  } catch (error) {
+    console.error('Error formatting appointment date:', error);
+    return 'No date available';
+  }
+};
+
+/**
+ * Formats appointment time for display
+ */
+export const formatAppointmentTime = (dateTimeString: string, timeZone: string): string => {
+  try {
+    const dateTime = DateTime.fromISO(dateTimeString).setZone(timeZone);
+    return dateTime.toFormat('h:mm a');
+  } catch (error) {
+    console.error('Error formatting appointment time:', error);
+    return 'N/A';
+  }
 };
