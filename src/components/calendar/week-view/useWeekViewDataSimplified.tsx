@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { DateTime } from 'luxon';
@@ -24,27 +25,54 @@ export const useWeekViewDataSimplified = (
   const [timeBlocks, setTimeBlocks] = useState<TimeBlock[]>([]);
   const [appointmentBlocks, setAppointmentBlocks] = useState<AppointmentBlock[]>([]);
 
+  console.log('[useWeekViewDataSimplified] Hook initialized with:', {
+    selectedClinicianId,
+    userTimeZone,
+    clinicianTimeZone,
+    daysCount: days?.length || 0,
+    appointmentsCount: appointments?.length || 0,
+    refreshTrigger
+  });
+
   // Generate week days using clinician's timezone for calendar grid consistency
   const weekDays = useMemo(() => {
     if (!days || days.length === 0) {
+      console.warn('[useWeekViewDataSimplified] No days provided');
       return [];
     }
     
-    return days.map(day => TimeZoneService.fromJSDate(day, clinicianTimeZone));
+    const result = days.map(day => TimeZoneService.fromJSDate(day, clinicianTimeZone));
+    console.log('[useWeekViewDataSimplified] Generated weekDays in clinician timezone:', {
+      count: result.length,
+      timezone: clinicianTimeZone,
+      firstDay: result[0]?.toFormat('yyyy-MM-dd'),
+      lastDay: result[result.length - 1]?.toFormat('yyyy-MM-dd')
+    });
+    return result;
   }, [days, clinicianTimeZone]);
 
   // Fetch availability data
   useEffect(() => {
     const fetchAvailability = async () => {
       if (!selectedClinicianId || !days || days.length === 0) {
+        console.log('[useWeekViewDataSimplified] Skipping availability fetch - missing clinician or days');
         setAvailability([]);
         setTimeBlocks([]);
         return;
       }
 
       try {
-        const startDate = DateTime.fromJSDate(days[0], { zone: userTimeZone }).startOf('day').toUTC();
-        const endDate = DateTime.fromJSDate(days[days.length - 1], { zone: userTimeZone }).endOf('day').toUTC();
+        console.log('[useWeekViewDataSimplified] Fetching availability for clinician:', selectedClinicianId);
+        
+        // CRITICAL FIX: Use clinician timezone for date range calculations
+        const startDate = DateTime.fromJSDate(days[0], { zone: clinicianTimeZone }).startOf('day').toUTC();
+        const endDate = DateTime.fromJSDate(days[days.length - 1], { zone: clinicianTimeZone }).endOf('day').toUTC();
+
+        console.log('[useWeekViewDataSimplified] Fetching availability between:', {
+          startDate: startDate.toISO(),
+          endDate: endDate.toISO(),
+          clinicianTimeZone
+        });
 
         const { data: availabilityData, error: availabilityError } = await supabase
           .from('availability_blocks')
@@ -61,17 +89,39 @@ export const useWeekViewDataSimplified = (
         }
 
         const blocks = availabilityData || [];
+        console.log('[useWeekViewDataSimplified] Fetched availability blocks:', {
+          count: blocks.length,
+          blocks: blocks.map(b => ({
+            id: b.id,
+            start_at: b.start_at,
+            end_at: b.end_at
+          }))
+        });
         setAvailability(blocks);
 
-        // Process time blocks
+        // CRITICAL FIX: Process time blocks using clinician timezone
         const processedTimeBlocks: TimeBlock[] = [];
         blocks.forEach(block => {
-          if (!block.start_at || !block.end_at) return;
+          if (!block.start_at || !block.end_at) {
+            console.warn('[useWeekViewDataSimplified] Skipping block with missing times:', block.id);
+            return;
+          }
 
           try {
-            const start = DateTime.fromISO(block.start_at, { zone: 'UTC' }).setZone(userTimeZone);
-            const end = DateTime.fromISO(block.end_at, { zone: 'UTC' }).setZone(userTimeZone);
+            // Convert UTC times to clinician timezone for display
+            const start = DateTime.fromISO(block.start_at, { zone: 'UTC' }).setZone(clinicianTimeZone);
+            const end = DateTime.fromISO(block.end_at, { zone: 'UTC' }).setZone(clinicianTimeZone);
             const day = start.startOf('day');
+
+            console.log('[useWeekViewDataSimplified] Processing availability block in clinician timezone:', {
+              blockId: block.id,
+              utcStart: block.start_at,
+              utcEnd: block.end_at,
+              clinicianStart: start.toFormat('yyyy-MM-dd HH:mm'),
+              clinicianEnd: end.toFormat('yyyy-MM-dd HH:mm'),
+              day: day.toFormat('yyyy-MM-dd'),
+              timezone: clinicianTimeZone
+            });
 
             processedTimeBlocks.push({
               start,
@@ -86,6 +136,15 @@ export const useWeekViewDataSimplified = (
           }
         });
 
+        console.log('[useWeekViewDataSimplified] Processed time blocks:', {
+          count: processedTimeBlocks.length,
+          blocks: processedTimeBlocks.map(b => ({
+            day: b.day?.toFormat('yyyy-MM-dd'),
+            start: b.start.toFormat('HH:mm'),
+            end: b.end.toFormat('HH:mm')
+          }))
+        });
+
         setTimeBlocks(processedTimeBlocks);
       } catch (error) {
         console.error('[useWeekViewDataSimplified] Unexpected error:', error);
@@ -94,7 +153,7 @@ export const useWeekViewDataSimplified = (
     };
 
     fetchAvailability();
-  }, [selectedClinicianId, days, userTimeZone, refreshTrigger]);
+  }, [selectedClinicianId, days, clinicianTimeZone, refreshTrigger]);
 
   // Process appointments into appointment blocks using clinician's current timezone
   useEffect(() => {
@@ -186,16 +245,27 @@ export const useWeekViewDataSimplified = (
       }
     });
 
+    console.log('[useWeekViewDataSimplified] Final processed appointment blocks:', {
+      count: processedAppointmentBlocks.length,
+      blocks: processedAppointmentBlocks.map(b => ({
+        id: b.id,
+        clientName: b.clientName,
+        day: b.day?.toFormat('yyyy-MM-dd'),
+        start: b.start.toFormat('HH:mm'),
+        end: b.end.toFormat('HH:mm')
+      }))
+    });
+
     setAppointmentBlocks(processedAppointmentBlocks);
     setLoading(false);
   }, [appointments, clinicianTimeZone, getClientName]);
 
-  // Utility function to check if a time slot is available
+  // CRITICAL FIX: Update utility functions to use clinician timezone consistently
   const isTimeSlotAvailable = (day: Date, timeSlot: Date): boolean => {
-    const dayDt = DateTime.fromJSDate(day, { zone: userTimeZone });
-    const timeSlotDt = DateTime.fromJSDate(timeSlot, { zone: userTimeZone });
+    const dayDt = DateTime.fromJSDate(day, { zone: clinicianTimeZone });
+    const timeSlotDt = DateTime.fromJSDate(timeSlot, { zone: clinicianTimeZone });
 
-    return timeBlocks.some(block => {
+    const result = timeBlocks.some(block => {
       const isSameDay = block.day?.hasSame(dayDt, 'day') || false;
       if (!isSameDay) return false;
 
@@ -206,14 +276,28 @@ export const useWeekViewDataSimplified = (
         millisecond: 0
       });
 
-      return slotTime >= block.start && slotTime < block.end;
+      const isAvailable = slotTime >= block.start && slotTime < block.end;
+      
+      if (isAvailable) {
+        console.log('[isTimeSlotAvailable] Found available slot:', {
+          day: dayDt.toFormat('yyyy-MM-dd'),
+          slotTime: slotTime.toFormat('HH:mm'),
+          blockStart: block.start.toFormat('HH:mm'),
+          blockEnd: block.end.toFormat('HH:mm'),
+          timezone: clinicianTimeZone
+        });
+      }
+
+      return isAvailable;
     });
+
+    return result;
   };
 
-  // Utility function to get the block for a time slot
+  // CRITICAL FIX: Update to use clinician timezone
   const getBlockForTimeSlot = (day: Date, timeSlot: Date): TimeBlock | undefined => {
-    const dayDt = DateTime.fromJSDate(day, { zone: userTimeZone });
-    const timeSlotDt = DateTime.fromJSDate(timeSlot, { zone: userTimeZone });
+    const dayDt = DateTime.fromJSDate(day, { zone: clinicianTimeZone });
+    const timeSlotDt = DateTime.fromJSDate(timeSlot, { zone: clinicianTimeZone });
 
     return timeBlocks.find(block => {
       const isSameDay = block.day?.hasSame(dayDt, 'day') || false;
@@ -254,18 +338,16 @@ export const useWeekViewDataSimplified = (
 
       const isInRange = slotTimeInClinicianTz >= apptStartInClinicianTz && slotTimeInClinicianTz < apptEndInClinicianTz;
       
-      console.log(`[getAppointmentForTimeSlot] Checking appointment ${appt.id} in clinician timezone:`, {
-        appointmentId: appt.id,
-        clientName: appt.clientName,
-        dayCheck: isSameDay,
-        slotDay: dayDt.toFormat('yyyy-MM-dd'),
-        apptDay: appt.day?.toFormat('yyyy-MM-dd'),
-        slotTime: slotTimeInClinicianTz.toFormat('HH:mm'),
-        apptStart: apptStartInClinicianTz.toFormat('HH:mm'),
-        apptEnd: apptEndInClinicianTz.toFormat('HH:mm'),
-        clinicianTimeZone,
-        isInRange
-      });
+      if (isInRange) {
+        console.log(`[getAppointmentForTimeSlot] Found appointment at ${dayDt.toFormat('yyyy-MM-dd')} ${timeSlotDt.toFormat('HH:mm')} in clinician timezone:`, {
+          appointmentId: appt.id,
+          clientName: appt.clientName,
+          slotTime: slotTimeInClinicianTz.toFormat('yyyy-MM-dd HH:mm'),
+          apptStart: apptStartInClinicianTz.toFormat('yyyy-MM-dd HH:mm'),
+          apptEnd: apptEndInClinicianTz.toFormat('yyyy-MM-dd HH:mm'),
+          clinicianTimeZone
+        });
+      }
 
       return isInRange;
     });
