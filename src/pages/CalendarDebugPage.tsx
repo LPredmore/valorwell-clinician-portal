@@ -27,7 +27,7 @@ const CalendarDebugPage: React.FC = () => {
       DebugUtils.log(DEBUG_CONTEXT, 'Generating sample appointments');
       
       const now = DateTime.now();
-      const userTimeZone = 'America/Chicago';
+      const clinicianTimeZone = 'America/Chicago'; // Changed from userTimeZone to clinicianTimeZone
       const appointments: Appointment[] = [];
       
       // Create appointments for the current week
@@ -40,7 +40,7 @@ const CalendarDebugPage: React.FC = () => {
           appointmentDate.toFormat('yyyy-MM-dd'),
           '09:00',
           60,
-          userTimeZone
+          clinicianTimeZone
         );
         morningAppointment.clientName = `Morning Client ${i + 1}`;
         appointments.push(morningAppointment);
@@ -50,7 +50,7 @@ const CalendarDebugPage: React.FC = () => {
           appointmentDate.toFormat('yyyy-MM-dd'),
           '14:00',
           60,
-          userTimeZone
+          clinicianTimeZone
         );
         afternoonAppointment.clientName = `Afternoon Client ${i + 1}`;
         appointments.push(afternoonAppointment);
@@ -62,7 +62,7 @@ const CalendarDebugPage: React.FC = () => {
         problematicDate.toFormat('yyyy-MM-dd'),
         '23:30',
         60,
-        userTimeZone
+        clinicianTimeZone
       );
       problematicAppointment.clientName = 'Midnight Crossing Client';
       appointments.push(problematicAppointment);
@@ -71,14 +71,14 @@ const CalendarDebugPage: React.FC = () => {
       // March 10, 2024 was a DST transition date in the US
       const dstTransitionDate = DateTime.fromObject(
         { year: 2024, month: 3, day: 10 },
-        { zone: userTimeZone }
+        { zone: clinicianTimeZone }
       );
       
       const dstAppointment = AppointmentDebugUtils.generateTestAppointment(
         dstTransitionDate.toFormat('yyyy-MM-dd'),
         '01:30',
         60,
-        userTimeZone
+        clinicianTimeZone
       );
       dstAppointment.clientName = 'DST Transition Client';
       appointments.push(dstAppointment);
@@ -115,7 +115,7 @@ const CalendarDebugPage: React.FC = () => {
       <CalendarDebugWrapper
         clinicianId={clinicianId}
         initialAppointments={sampleAppointments}
-        userTimeZone="America/Chicago"
+        clinicianTimeZone="America/Chicago"
       />
       
       <div className="mt-8 p-4 bg-gray-100 rounded-md">

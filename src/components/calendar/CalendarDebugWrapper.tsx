@@ -18,7 +18,7 @@ const DEBUG_CONTEXT = 'CalendarDebugWrapper';
 interface CalendarDebugWrapperProps {
   clinicianId: string | null;
   initialAppointments?: Appointment[];
-  userTimeZone?: string;
+  clinicianTimeZone: string; // Changed from userTimeZone to clinicianTimeZone
 }
 
 /**
@@ -28,13 +28,13 @@ interface CalendarDebugWrapperProps {
 export const CalendarDebugWrapper: React.FC<CalendarDebugWrapperProps> = ({
   clinicianId,
   initialAppointments = [],
-  userTimeZone = 'America/Chicago'
+  clinicianTimeZone // Changed from userTimeZone
 }) => {
   // State for controlling the calendar view
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [appointments, setAppointments] = useState<Appointment[]>(initialAppointments);
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
-  const [selectedTimezone, setSelectedTimezone] = useState<string>(userTimeZone);
+  const [selectedTimezone, setSelectedTimezone] = useState<string>(clinicianTimeZone);
   const [debugMode, setDebugMode] = useState<boolean>(true);
   const [consoleCleared, setConsoleCleared] = useState<boolean>(false);
   
@@ -48,7 +48,7 @@ export const CalendarDebugWrapper: React.FC<CalendarDebugWrapperProps> = ({
     DebugUtils.log(DEBUG_CONTEXT, 'Component initialized', {
       clinicianId,
       initialAppointmentsCount: initialAppointments.length,
-      userTimeZone
+      clinicianTimeZone
     });
     
     // Clear console on first render if debug mode is enabled
@@ -58,7 +58,7 @@ export const CalendarDebugWrapper: React.FC<CalendarDebugWrapperProps> = ({
       console.log('═════════════════════════════════════════════════════');
       setConsoleCleared(true);
     }
-  }, [clinicianId, initialAppointments, userTimeZone, debugMode, consoleCleared]);
+  }, [clinicianId, initialAppointments, clinicianTimeZone, debugMode, consoleCleared]);
   
   // Handle date change
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -98,9 +98,9 @@ export const CalendarDebugWrapper: React.FC<CalendarDebugWrapperProps> = ({
   };
   
   // Handle availability click
-  const handleAvailabilityClick = (date: Date, availabilityBlock: any) => {
+  const handleAvailabilityClick = (date: DateTime, availabilityBlock: any) => {
     DebugUtils.log(DEBUG_CONTEXT, 'Availability clicked', {
-      date: date.toISOString(),
+      date: date.toISO(),
       blockId: availabilityBlock.id
     });
   };
@@ -181,7 +181,12 @@ export const CalendarDebugWrapper: React.FC<CalendarDebugWrapperProps> = ({
             <span>Calendar Debug Tools</span>
             <Button 
               variant={debugMode ? "default" : "outline"} 
-              onClick={handleToggleDebugMode}
+              onClick={() => {
+                const newMode = !debugMode;
+                DebugUtils.log(DEBUG_CONTEXT, `Debug mode ${newMode ? 'enabled' : 'disabled'}`);
+                setDebugMode(newMode);
+                DebugUtils.VERBOSE = newMode;
+              }}
             >
               {debugMode ? "Debug Mode ON" : "Debug Mode OFF"}
             </Button>
@@ -232,7 +237,10 @@ export const CalendarDebugWrapper: React.FC<CalendarDebugWrapperProps> = ({
                     Refresh Count: {refreshTrigger}
                   </span>
                 </div>
-                <Button onClick={handleRefresh}>Refresh Calendar</Button>
+                <Button onClick={() => {
+                  DebugUtils.log(DEBUG_CONTEXT, 'Manual refresh triggered');
+                  setRefreshTrigger(prev => prev + 1);
+                }}>Refresh Calendar</Button>
               </div>
             </TabsContent>
             
@@ -320,7 +328,7 @@ export const CalendarDebugWrapper: React.FC<CalendarDebugWrapperProps> = ({
             getClientName={getClientName}
             onAppointmentClick={handleAppointmentClick}
             onAvailabilityClick={handleAvailabilityClick}
-            userTimeZone={selectedTimezone}
+            clinicianTimeZone={selectedTimezone}
           />
         </CardContent>
       </Card>

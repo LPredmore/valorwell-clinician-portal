@@ -16,8 +16,7 @@ import CalendarErrorBoundary from './CalendarErrorBoundary';
 interface WeekViewProps {
   days: Date[];
   selectedClinicianId: string | null;
-  userTimeZone: string;
-  clinicianTimeZone: string;
+  clinicianTimeZone: string; // Changed from userTimeZone to clinicianTimeZone
   showAvailability?: boolean;
   refreshTrigger?: number;
   appointments?: any[];
@@ -38,8 +37,7 @@ const INTERVAL_MINUTES = 30;
 const WeekView: React.FC<WeekViewProps> = ({
   days,
   selectedClinicianId,
-  userTimeZone,
-  clinicianTimeZone,
+  clinicianTimeZone, // Changed from userTimeZone
   showAvailability = true,
   refreshTrigger = 0,
   appointments = [],
@@ -55,7 +53,7 @@ const WeekView: React.FC<WeekViewProps> = ({
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [isAppointmentDetailsOpen, setIsAppointmentDetailsOpen] = useState(false);
   
-  // PHASE 4: Robust Error Handling - Validate clinician timezone
+  // Robust Error Handling - Validate clinician timezone
   const validClinicianTimeZone = useMemo(() => {
     if (!clinicianTimeZone) {
       console.warn('[WeekView] Missing clinicianTimeZone, falling back to UTC');
@@ -81,7 +79,7 @@ const WeekView: React.FC<WeekViewProps> = ({
     hasError: !!error
   });
 
-  // PHASE 1 & 2: Generate timezone-aware TIME_SLOTS using clinician's timezone exclusively
+  // Generate timezone-aware TIME_SLOTS using clinician's timezone exclusively
   const TIME_SLOTS = useMemo(() => {
     console.log('[WeekView] Generating timezone-aware TIME_SLOTS for clinician timezone:', validClinicianTimeZone);
     
@@ -122,14 +120,14 @@ const WeekView: React.FC<WeekViewProps> = ({
     refreshTrigger,
     appointments,
     (id: string) => `Client ${id}`,
-    userTimeZone, // Keep for backwards compatibility but not used in WeekView logic
+    validClinicianTimeZone, // Only use clinicianTimeZone
     validClinicianTimeZone
   );
 
   // Handle click on an availability block
-  const handleAvailabilityBlockClick = (day: Date, block: TimeBlock) => {
+  const handleAvailabilityBlockClick = (day: DateTime, block: TimeBlock) => {
     console.log('[WeekView] Availability block clicked:', {
-      day: format(day, 'yyyy-MM-dd'),
+      day: day.toFormat('yyyy-MM-dd'),
       start: block.start.toFormat('HH:mm'),
       end: block.end.toFormat('HH:mm'),
     });
@@ -144,7 +142,7 @@ const WeekView: React.FC<WeekViewProps> = ({
         is_active: true
       };
       
-      onAvailabilityClick(day, availabilityBlock);
+      onAvailabilityClick(day.toJSDate(), availabilityBlock);
     }
   };
 
@@ -208,7 +206,7 @@ const WeekView: React.FC<WeekViewProps> = ({
             setIsAppointmentDetailsOpen(false);
             setSelectedAppointment(null);
           }}
-          userTimeZone={userTimeZone}
+          userTimeZone={validClinicianTimeZone}
         />
 
         {/* Time column headers */}
@@ -240,9 +238,9 @@ const WeekView: React.FC<WeekViewProps> = ({
           {weekDays.map(day => (
             <div key={day.toISO() || ''} className="flex-1 border-r last:border-r-0">
               {TIME_SLOTS.map((timeSlot, i) => {
-                // PHASE 1: Use only Luxon DateTime objects - NO .toJSDate() conversions
-                const dayDt = day; // weekDays are already timezone-aware DateTime objects in clinician's timezone
-                const timeSlotDt = timeSlot; // TIME_SLOTS are now timezone-aware DateTime objects in clinician's timezone
+                // Use only Luxon DateTime objects - weekDays are already timezone-aware DateTime objects in clinician's timezone
+                const dayDt = day;
+                const timeSlotDt = timeSlot;
                 
                 // Create the specific time slot for this day by combining day and time
                 const dayTimeSlot = dayDt.set({
@@ -252,7 +250,7 @@ const WeekView: React.FC<WeekViewProps> = ({
                   millisecond: 0
                 });
                 
-                // PHASE 3: Enhanced debug logging for timezone operations
+                // Enhanced debug logging for timezone operations
                 console.log(`[WeekView] Processing slot ${dayDt.toFormat('yyyy-MM-dd')} ${timeSlotDt.toFormat('HH:mm')} in clinician timezone:`, {
                   dayDt: dayDt.toISO(),
                   timeSlotDt: timeSlotDt.toISO(),
@@ -261,7 +259,7 @@ const WeekView: React.FC<WeekViewProps> = ({
                   timezoneValid: dayTimeSlot.zoneName === validClinicianTimeZone
                 });
                 
-                // PHASE 1: Pass only Luxon DateTime objects to all functions
+                // Pass only Luxon DateTime objects to all functions
                 const isAvailable = showAvailability && isTimeSlotAvailable(dayTimeSlot);
                 
                 const currentBlock = isAvailable ? getBlockForTimeSlot(dayTimeSlot) : undefined;
@@ -287,8 +285,8 @@ const WeekView: React.FC<WeekViewProps> = ({
                                 ${i % 2 === 0 ? 'bg-gray-50' : 'bg-white'}`}
                   >
                     <TimeSlot
-                      day={dayTimeSlot.toJSDate()} // Only convert to JS Date at the very edge for TimeSlot component
-                      timeSlot={timeSlotDt.toJSDate()} // Only convert to JS Date at the very edge for TimeSlot component
+                      day={dayTimeSlot}
+                      timeSlot={timeSlotDt}
                       isAvailable={isAvailable}
                       currentBlock={currentBlock}
                       appointment={appointment}

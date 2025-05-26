@@ -6,8 +6,8 @@ import { DateTime } from 'luxon';
 import { convertAppointmentBlockToAppointment } from '@/utils/appointmentUtils';
 
 interface TimeSlotProps {
-  day: Date;
-  timeSlot: Date;
+  day: DateTime;
+  timeSlot: DateTime;
   isAvailable: boolean;
   currentBlock?: TimeBlock;
   appointment?: AppointmentBlock;
@@ -15,11 +15,11 @@ interface TimeSlotProps {
   isEndOfBlock: boolean;
   isStartOfAppointment: boolean;
   isEndOfAppointment?: boolean;
-  handleAvailabilityBlockClick: (day: Date, block: TimeBlock) => void;
+  handleAvailabilityBlockClick: (day: DateTime, block: TimeBlock) => void;
   onAppointmentClick?: (appointmentBlock: any) => void;
   onAppointmentDragStart?: (appointment: any, event: React.DragEvent) => void;
-  onAppointmentDragOver?: (day: Date, timeSlot: Date, event: React.DragEvent) => void;
-  onAppointmentDrop?: (day: Date, timeSlot: Date, event: React.DragEvent) => void;
+  onAppointmentDragOver?: (day: DateTime, timeSlot: DateTime, event: React.DragEvent) => void;
+  onAppointmentDrop?: (day: DateTime, timeSlot: DateTime, event: React.DragEvent) => void;
   originalAppointments: Appointment[];
 }
 
@@ -40,12 +40,8 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
   onAppointmentDrop,
   originalAppointments
 }) => {
-  const specificDate = '2025-05-15';
-  const formattedDay = new Date(day).toISOString().split('T')[0];
-  const slotHour = timeSlot.getHours();
-  const slotMinutes = timeSlot.getMinutes();
-  const formattedTime = `${slotHour}:${slotMinutes.toString().padStart(2, '0')}`;
-  const debugMode = formattedDay === specificDate && (slotHour >= 8 && slotHour <= 18);
+  const formattedDay = day.toFormat('yyyy-MM-dd');
+  const formattedTime = timeSlot.toFormat('HH:mm');
 
   const handleDragOver = (e: React.DragEvent) => {
     if (onAppointmentDragOver) {
@@ -70,15 +66,13 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
 
   if (appointment) {
     onClick = (e: React.MouseEvent) => {
-      e.stopPropagation(); // Stop event propagation
-      e.preventDefault(); // Prevent default behavior
+      e.stopPropagation();
+      e.preventDefault();
       
-      // Enhanced logging to debug appointment matching
       console.log(`[TimeSlot] Looking for appointment with ID: ${appointment.id}`);
       console.log(`[TimeSlot] Original appointments available: ${originalAppointments?.length || 0}`);
       
       try {
-        // More robust lookup with additional logging
         const originalAppointment = originalAppointments?.find(a => a.id === appointment.id);
         
         if (originalAppointment) {
@@ -91,7 +85,6 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
             end_at: originalAppointment.end_at
           });
           
-          // Ensure we have a valid callback before calling it
           if (onAppointmentClick) {
             onAppointmentClick(originalAppointment);
           } else {
@@ -99,7 +92,6 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
           }
         } else {
           console.warn(`[TimeSlot] Original appointment not found for ID: ${appointment.id}. Converting AppointmentBlock to full Appointment.`);
-          // Convert the AppointmentBlock to a full Appointment object
           const fullAppointment = convertAppointmentBlockToAppointment(appointment, originalAppointments || []);
           console.log(`[TimeSlot] Converted appointment:`, {
             id: fullAppointment.id,
@@ -110,7 +102,6 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
             end_at: fullAppointment.end_at
           });
           
-          // Ensure we have a valid callback before calling it
           if (onAppointmentClick) {
             onAppointmentClick(fullAppointment);
           } else {

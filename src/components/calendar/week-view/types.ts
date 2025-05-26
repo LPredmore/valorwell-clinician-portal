@@ -49,15 +49,15 @@ export interface AvailabilityException {
 }
 
 export interface TimeSlotProps {
-  day: Date;
-  timeSlot: Date;
+  day: DateTime;
+  timeSlot: DateTime;
   isAvailable: boolean;
   currentBlock?: TimeBlock;
   appointment?: AppointmentBlock;
   isStartOfBlock: boolean;
   isEndOfBlock: boolean;
   isStartOfAppointment: boolean;
-  handleAvailabilityBlockClick: (day: Date, block: TimeBlock) => void;
+  handleAvailabilityBlockClick: (day: DateTime, block: TimeBlock) => void;
   onAppointmentClick?: (appointment: any) => void;
   originalAppointments: any[];
 }

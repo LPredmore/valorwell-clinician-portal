@@ -1,4 +1,3 @@
-
 import React, { useMemo, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
@@ -22,8 +21,8 @@ export interface WeekViewDebugProps {
   appointments?: Appointment[];
   getClientName?: (clientId: string) => string;
   onAppointmentClick?: (appointment: Appointment) => void;
-  onAvailabilityClick?: (date: Date, availabilityBlock: any) => void;
-  clinicianTimeZone?: string;
+  onAvailabilityClick?: (date: DateTime, availabilityBlock: any) => void;
+  clinicianTimeZone: string; // Required, not optional
 }
 
 const WeekViewDebug: React.FC<WeekViewDebugProps> = ({
@@ -34,9 +33,9 @@ const WeekViewDebug: React.FC<WeekViewDebugProps> = ({
   getClientName = () => "Unknown Client",
   onAppointmentClick,
   onAvailabilityClick,
-  clinicianTimeZone = "UTC",
+  clinicianTimeZone, // Required parameter
 }) => {
-  // PHASE 4: Validate clinician timezone with fallback
+  // Validate clinician timezone with fallback
   const validClinicianTimeZone = useMemo(() => {
     if (!clinicianTimeZone) {
       console.warn('[WeekViewDebug] Missing clinicianTimeZone, falling back to UTC');
@@ -69,9 +68,8 @@ const WeekViewDebug: React.FC<WeekViewDebugProps> = ({
     userTimeZone: validClinicianTimeZone
   });
 
-  // PHASE 1: Create array of days for the week and time slots using Luxon DateTime
+  // Generate days and time slots using Luxon DateTime exclusively
   const { days, timeSlots } = useMemo(() => {
-    // Log the input currentDate in multiple formats for debugging
     DebugUtils.log(DEBUG_CONTEXT, "Generating days with currentDate", {
       jsDate: currentDate.toISOString(),
       luxonDate: TimeZoneService.fromJSDate(currentDate, validClinicianTimeZone).toISO(),
@@ -84,15 +82,15 @@ const WeekViewDebug: React.FC<WeekViewDebugProps> = ({
     const daysInWeek = TimeZoneService.eachDayOfInterval(
       weekStart,
       weekEnd
-    ).map((dt) => dt.toJSDate());
+    );
 
     DebugUtils.log(
       DEBUG_CONTEXT,
       "Generated days for week",
-      daysInWeek.map((d) => DateTime.fromJSDate(d, { zone: validClinicianTimeZone }).toFormat('yyyy-MM-dd'))
+      daysInWeek.map((d) => d.toFormat('yyyy-MM-dd'))
     );
 
-    // PHASE 1: Generate time slots using Luxon DateTime from 8 AM to 6 PM in 30-minute increments
+    // Generate time slots using Luxon DateTime from 8 AM to 6 PM in 30-minute increments
     const slots = Array.from({ length: 21 }, (_, i) => {
       const minutes = i * 30;
       // Create a base date in clinician's timezone at 8:00 AM
@@ -102,13 +100,13 @@ const WeekViewDebug: React.FC<WeekViewDebugProps> = ({
         second: 0,
         millisecond: 0
       });
-      return baseDate.plus({ minutes }).toJSDate();
+      return baseDate.plus({ minutes });
     });
 
     DebugUtils.log(DEBUG_CONTEXT, "Generated time slots", {
       count: slots.length,
-      first: DateTime.fromJSDate(slots[0], { zone: validClinicianTimeZone }).toFormat('HH:mm'),
-      last: DateTime.fromJSDate(slots[slots.length - 1], { zone: validClinicianTimeZone }).toFormat('HH:mm'),
+      first: slots[0].toFormat('HH:mm'),
+      last: slots[slots.length - 1].toFormat('HH:mm'),
       timezone: validClinicianTimeZone
     });
 
@@ -125,7 +123,6 @@ const WeekViewDebug: React.FC<WeekViewDebugProps> = ({
     getClientName
   };
   
-  // Log the hook props to debug parameter mismatch
   DebugUtils.log(DEBUG_CONTEXT, 'Calling useWeekViewDataDebug with props', hookProps);
   
   const {
@@ -219,7 +216,7 @@ const WeekViewDebug: React.FC<WeekViewDebugProps> = ({
     DebugUtils.log(
       DEBUG_CONTEXT,
       "Days in view",
-      days.map((d) => DateTime.fromJSDate(d, { zone: validClinicianTimeZone }).toFormat('yyyy-MM-dd'))
+      days.map((d) => d.toFormat('yyyy-MM-dd'))
     );
   }, [appointments, appointmentBlocks, getClientName, days, validClinicianTimeZone, timeBlocks]);
 
@@ -234,7 +231,6 @@ const WeekViewDebug: React.FC<WeekViewDebugProps> = ({
       let appointmentToSend: Appointment | undefined = appointments?.find(a => a.id === appointmentBlock.id);
 
       if (!appointmentToSend) {
-        // Fallback: Construct a valid Appointment from the AppointmentBlock
         console.warn(`Original Appointment not found for ID: ${appointmentBlock.id}. Constructing from AppointmentBlock.`);
         appointmentToSend = {
           id: appointmentBlock.id,
@@ -258,9 +254,9 @@ const WeekViewDebug: React.FC<WeekViewDebugProps> = ({
   };
 
   // Handle click on availability block
-  const handleAvailabilityBlockClick = (day: Date, block: any) => {
+  const handleAvailabilityBlockClick = (day: DateTime, block: any) => {
     DebugUtils.log(DEBUG_CONTEXT, 'Availability block clicked', {
-      day: DateTime.fromJSDate(day, { zone: validClinicianTimeZone }).toFormat('yyyy-MM-dd'),
+      day: day.toFormat('yyyy-MM-dd'),
       block
     });
     
@@ -287,7 +283,7 @@ const WeekViewDebug: React.FC<WeekViewDebugProps> = ({
         
         const availabilityBlock = {
           id: exception.id,
-          day_of_week: DateTime.fromJSDate(day, { zone: validClinicianTimeZone }).toFormat('EEEE'),
+          day_of_week: day.toFormat('EEEE'),
           start_time: exception.start_time || "",
           end_time: exception.end_time || "",
           clinician_id: exception.clinician_id,
@@ -339,21 +335,20 @@ const WeekViewDebug: React.FC<WeekViewDebugProps> = ({
         {/* Header row */}
         <div className="col-span-1"></div>
         {days.map((day) => {
-          const dayDt = DateTime.fromJSDate(day, { zone: validClinicianTimeZone });
           return (
             <div
               key={day.toString()}
               className="col-span-1 p-2 text-center font-medium border-b-2 border-gray-200"
             >
-              <div className="text-sm text-gray-400">{dayDt.toFormat('EEE')}</div>
+              <div className="text-sm text-gray-400">{day.toFormat('EEE')}</div>
               <div
                 className={`text-lg ${
-                  dayDt.toFormat('yyyy-MM-dd') === DateTime.now().setZone(validClinicianTimeZone).toFormat('yyyy-MM-dd')
+                  day.toFormat('yyyy-MM-dd') === DateTime.now().setZone(validClinicianTimeZone).toFormat('yyyy-MM-dd')
                     ? "bg-valorwell-500 text-white rounded-full w-8 h-8 flex items-center justify-center mx-auto"
                     : ""
                 }`}
               >
-                {dayDt.toFormat('d')}
+                {day.toFormat('d')}
               </div>
             </div>
           );
@@ -361,8 +356,7 @@ const WeekViewDebug: React.FC<WeekViewDebugProps> = ({
 
         {/* Time slots and day cells */}
         {timeSlots.map((timeSlot) => {
-          const timeSlotDt = DateTime.fromJSDate(timeSlot, { zone: validClinicianTimeZone });
-          const timeLabel = timeSlotDt.toFormat('h:mm a');
+          const timeLabel = timeSlot.toFormat('h:mm a');
 
           return (
             <React.Fragment key={timeSlot.toString()}>
@@ -373,24 +367,18 @@ const WeekViewDebug: React.FC<WeekViewDebugProps> = ({
 
               {/* Day columns for this time slot */}
               {days.map((day) => {
-                // PHASE 1: Convert JS Dates to Luxon DateTime objects in clinician's timezone
-                const dayDt = DateTime.fromJSDate(day, { zone: validClinicianTimeZone });
-                const timeSlotDt = DateTime.fromJSDate(timeSlot, { zone: validClinicianTimeZone });
-                
                 // Create the specific time slot for this day by combining day and time
-                const slotStartTime = dayDt.set({
-                  hour: timeSlotDt.hour,
-                  minute: timeSlotDt.minute,
+                const slotStartTime = day.set({
+                  hour: timeSlot.hour,
+                  minute: timeSlot.minute,
                   second: 0,
                   millisecond: 0
                 });
 
-                // PHASE 3: All utility functions now receive Luxon DateTime objects
+                // All utility functions now receive Luxon DateTime objects
                 const isAvailable = isTimeSlotAvailable(slotStartTime);
                 const currentBlock = getBlockForTimeSlot(slotStartTime);
                 const appointment = getAppointmentForTimeSlot(slotStartTime);
-
-                const slotEndTime = slotStartTime.plus({ minutes: 30 });
 
                 const blockStartCheck = isStartOfBlock(slotStartTime, currentBlock);
                 const blockEndCheck = isEndOfBlock(slotStartTime, currentBlock);
