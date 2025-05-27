@@ -20,7 +20,6 @@ interface DeleteAppointmentDialogProps {
   onOpenChange: (open: boolean) => void;
   appointmentId: string;
   recurrenceId: string | null;
-  appointmentStartAt: string;
   onDeleteSuccess: () => void;
 }
 
@@ -29,10 +28,9 @@ const DeleteAppointmentDialog: React.FC<DeleteAppointmentDialogProps> = ({
   onOpenChange,
   appointmentId,
   recurrenceId,
-  appointmentStartAt,
   onDeleteSuccess
 }) => {
-  const [deleteOption, setDeleteOption] = React.useState<'single' | 'future' | 'all'>('single');
+  const [deleteOption, setDeleteOption] = React.useState<'single' | 'series'>('single');
   const [isLoading, setIsLoading] = React.useState(false);
   const { toast } = useToast();
   const isRecurring = !!recurrenceId;
@@ -40,35 +38,20 @@ const DeleteAppointmentDialog: React.FC<DeleteAppointmentDialogProps> = ({
   const handleDeleteAppointment = async () => {
     setIsLoading(true);
     try {
-      if (isRecurring && deleteOption === 'all') {
-        // Delete all appointments in the series (including past)
-        const { error } = await supabase
-          .from('appointments')
-          .delete()
-          .eq('recurring_group_id', recurrenceId);
-
-        if (error) throw error;
-        
-        toast({
-          title: "Success",
-          description: "All appointments in the series have been deleted.",
-        });
-      } else if (isRecurring && deleteOption === 'future') {
-        // Delete this and all future appointments in the series
+      if (isRecurring && deleteOption === 'series') {
         const { error } = await supabase
           .from('appointments')
           .delete()
           .eq('recurring_group_id', recurrenceId)
-          .gte('start_at', appointmentStartAt);
+          .gte('start_at', new Date().toISOString());
 
         if (error) throw error;
         
         toast({
           title: "Success",
-          description: "This appointment and all future recurring appointments have been deleted.",
+          description: "All future recurring appointments have been deleted.",
         });
       } else {
-        // Delete only this appointment
         const { error } = await supabase
           .from('appointments')
           .delete()
@@ -104,20 +87,16 @@ const DeleteAppointmentDialog: React.FC<DeleteAppointmentDialogProps> = ({
           <AlertDialogDescription>
             {isRecurring ? (
               <div className="space-y-4">
-                <p>This is a recurring appointment. How would you like to delete it?</p>
+                <p>This is a recurring appointment. Would you like to delete just this appointment or all future appointments in this series?</p>
                 
-                <RadioGroup value={deleteOption} onValueChange={(value) => setDeleteOption(value as 'single' | 'future' | 'all')}>
+                <RadioGroup value={deleteOption} onValueChange={(value) => setDeleteOption(value as 'single' | 'series')}>
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="single" id="single" />
                     <Label htmlFor="single">Delete only this appointment</Label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="future" id="future" />
-                    <Label htmlFor="future">Delete this and all future appointments in the series</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="all" id="all" />
-                    <Label htmlFor="all">Delete all appointments in this series (including past appointments)</Label>
+                    <RadioGroupItem value="series" id="series" />
+                    <Label htmlFor="series">Delete this and all future appointments in the series</Label>
                   </div>
                 </RadioGroup>
               </div>
