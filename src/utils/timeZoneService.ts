@@ -7,6 +7,25 @@ export class TimeZoneService {
   public static readonly DATE_FORMAT = 'yyyy-MM-dd';
 
   /**
+   * Validates if a timezone string is a valid IANA timezone
+   * @param timezone The timezone string to validate
+   * @returns True if the timezone is valid, false otherwise
+   */
+  public static isValidTimeZone(timezone: string | null | undefined): boolean {
+    if (!timezone || typeof timezone !== 'string') {
+      return false;
+    }
+
+    try {
+      // Use Luxon's IANAZone.isValidZone for robust validation
+      return IANAZone.isValidZone(timezone);
+    } catch (error) {
+      console.error(`Error validating timezone '${timezone}':`, error);
+      return false;
+    }
+  }
+
+  /**
    * Ensures that the given timezone is a valid IANA timezone.
    * If the timezone is null, undefined, or invalid, it returns the default timezone.
    * @param timezone The timezone string to validate.

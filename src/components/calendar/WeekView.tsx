@@ -188,7 +188,9 @@ const WeekView: React.FC<WeekViewProps> = ({
     });
     setSelectedBlock(block);
     
+    // Call the parent's onAvailabilityClick if provided
     if (onAvailabilityClick) {
+      // Convert the TimeBlock to AvailabilityBlock format before passing to the parent handler
       const availabilityBlock: AvailabilityBlock = {
         id: block.availabilityIds?.[0] || 'unknown',
         clinician_id: selectedClinicianId || '',
@@ -197,36 +199,38 @@ const WeekView: React.FC<WeekViewProps> = ({
         is_active: true
       };
       
-      onAvailabilityClick(dayDt.toJSDate(), availabilityBlock);
+      onAvailabilityClick(day, availabilityBlock);
     }
   };
 
-  // Handle click on an appointment block
-  const handleAppointmentClick = (appointment: any) => {
+  // Handle click on an appointment block - delegate to parent component
+  const handleAppointmentClick = (appointment: AppointmentBlock) => {
     console.log('[WeekView] Appointment clicked:', {
       id: appointment.id,
       clientName: appointment.clientName,
+      clientId: appointment.clientId,
+      hasClient: !!appointment.client,
       start_at: appointment.start_at,
-      end_at: appointment.end_at,
-      appointment_timezone: appointment.appointment_timezone
+      end_at: appointment.end_at
     });
     
+    // Find the complete original appointment with all data
     const originalAppointment = appointments?.find(a => a.id === appointment.id);
     
     if (originalAppointment) {
-      setSelectedAppointment(originalAppointment);
+      console.log('[WeekView] Found original appointment with complete data');
+      if (onAppointmentClick) {
+        onAppointmentClick(originalAppointment);
+      }
     } else {
+      console.warn('[WeekView] Original appointment not found, converting to full appointment');
       const fullAppointment = convertAppointmentBlockToAppointment(appointment, appointments || []);
-      setSelectedAppointment(fullAppointment);
-    }
-    setIsAppointmentDetailsOpen(true);
-    
-    if (onAppointmentClick) {
-      onAppointmentClick(originalAppointment || appointment);
+      if (onAppointmentClick) {
+        onAppointmentClick(fullAppointment);
+      }
     }
   };
 
-  // Get a formatted time string for display
   const formatTime = (timeSlot: DateTime) => {
     return timeSlot.toFormat('h:mm a');
   };
@@ -236,61 +240,23 @@ const WeekView: React.FC<WeekViewProps> = ({
   }
 
   if (hookError || error) {
-    console.error('[WeekView] CRITICAL ERROR - Calendar data loading failed:', {
-      hookError,
-      error: error?.message || error,
-      appointmentsCount: appointments?.length || 0,
-      selectedClinicianId
-    });
     return (
-      <div className="flex justify-center items-center h-32 text-red-600">
-        Error loading calendar: {hookError || error?.message || 'Unknown error'}
+      <div className="flex justify-center items-center h-32">
+        <div className="text-center text-red-600">
+          <p>Error loading calendar: {hookError?.toString() || error?.message || 'Unknown error'}</p>
+        </div>
       </div>
     );
   }
 
-  // STEP 4: Validate data before rendering
-  if (!weekDays || weekDays.length === 0) {
-    console.error('[WeekView] CRITICAL ERROR - No week days generated');
-    return <div className="flex justify-center items-center h-32 text-red-600">No calendar days available</div>;
-  }
-
-  if (!TIME_SLOTS || TIME_SLOTS.length === 0) {
-    console.error('[WeekView] CRITICAL ERROR - No time slots generated');
-    return <div className="flex justify-center items-center h-32 text-red-600">No time slots available</div>;
-  }
-
-  console.log('[WeekView] STEP 4 - Final validation passed, rendering calendar with:', {
-    weekDays: weekDays.length,
-    timeSlots: TIME_SLOTS.length,
-    appointmentBlocks: appointmentBlocks.length,
-    timeBlocks: timeBlocks.length
-  });
-
   return (
     <CalendarErrorBoundary>
       <div className="flex flex-col">
-        {/* AppointmentDetailsDialog */}
-        <AppointmentDetailsDialog 
-          isOpen={isAppointmentDetailsOpen}
-          onClose={() => {
-            setIsAppointmentDetailsOpen(false);
-            setSelectedAppointment(null);
-          }}
-          appointment={selectedAppointment}
-          onAppointmentUpdated={() => {
-            if (onAppointmentUpdate) {
-              onAppointmentUpdate("refresh-trigger", "", "");
-            }
-            setIsAppointmentDetailsOpen(false);
-            setSelectedAppointment(null);
-          }}
-          userTimeZone={validUserTimeZone}
-        />
-
         {/* Time column headers */}
         <div className="flex">
+          {/* Time label column header - add matching width to align with time labels */}
           <div className="w-16 flex-shrink-0"></div>
+          {/* Day headers - use exact same width as the day columns below */}
           {weekDays.map(day => (
             <div 
               key={day.toISO()} 
@@ -317,46 +283,24 @@ const WeekView: React.FC<WeekViewProps> = ({
           {weekDays.map(day => (
             <div key={day.toISO() || ''} className="flex-1 border-r last:border-r-0">
               {TIME_SLOTS.map((timeSlot, i) => {
-                // Use clinician timezone for grid positioning
-                const dayDt = day;
-                const timeSlotDt = timeSlot;
-                
-                // Create the specific time slot for this day by combining day and time
-                const dayTimeSlot = dayDt.set({
-                  hour: timeSlotDt.hour,
-                  minute: timeSlotDt.minute,
-                  second: 0,
-                  millisecond: 0
+                // Check for availability and appointments using Luxon DateTime objects
+                const dayTimeSlot = day.set({ 
+                  hour: timeSlot.hour, 
+                  minute: timeSlot.minute, 
+                  second: 0, 
+                  millisecond: 0 
                 });
                 
-                // STEP 5: Enhanced debug logging for timezone conversion flow
-                console.log(`[WeekView] STEP 5 - Processing slot ${dayDt.toFormat('yyyy-MM-dd')} ${timeSlotDt.toFormat('HH:mm')} in clinician timezone:`, {
-                  dayDt: dayDt.toISO(),
-                  timeSlotDt: timeSlotDt.toISO(),
-                  combinedDayTimeSlot: dayTimeSlot.toISO(),
-                  timezone: validClinicianTimeZone,
-                  timezoneValid: dayTimeSlot.zoneName === validClinicianTimeZone
-                });
-                
-                // Pass Luxon DateTime objects to all functions
                 const isAvailable = showAvailability && isTimeSlotAvailable(dayTimeSlot);
-                
                 const currentBlock = isAvailable ? getBlockForTimeSlot(dayTimeSlot) : undefined;
-                
                 const appointment = getAppointmentForTimeSlot(dayTimeSlot);
-
-                // STEP 5: Enhanced debug logging for appointment timezone conversion
-                if (appointment) {
-                  console.log(`[WeekView] STEP 5 - Appointment found with timezone conversion flow:`, {
-                    appointmentId: appointment.id,
-                    originalUTC: appointment.start_at,
-                    appointmentTimezone: appointment.appointment_timezone,
-                    convertedToClinician: appointment.start.toFormat('yyyy-MM-dd HH:mm'),
-                    clinicianTimeZone: validClinicianTimeZone,
-                    slotTime: dayTimeSlot.toFormat('yyyy-MM-dd HH:mm'),
-                    conversionFlow: `UTC(${appointment.start_at}) → appointment_tz(${appointment.appointment_timezone}) → clinician_tz(${validClinicianTimeZone})`
-                  });
-                }
+                
+                // Determine if this is the start or end of a block
+                const isStartOfBlock = currentBlock && 
+                  timeSlot.toFormat('HH:mm') === currentBlock.start.toFormat('HH:mm');
+                
+                const isStartOfAppointment = appointment && 
+                  timeSlot.toFormat('HH:mm') === appointment.start.toFormat('HH:mm');
 
                 return (
                   <div
@@ -365,14 +309,14 @@ const WeekView: React.FC<WeekViewProps> = ({
                                 ${i % 2 === 0 ? 'bg-gray-50' : 'bg-white'}`}
                   >
                     <TimeSlot
-                      day={dayTimeSlot.toJSDate()}
-                      timeSlot={timeSlotDt.toJSDate()}
+                      day={day.toJSDate()}
+                      timeSlot={timeSlot.toJSDate()}
                       isAvailable={isAvailable}
                       currentBlock={currentBlock}
                       appointment={appointment}
-                      isStartOfBlock={false}
+                      isStartOfBlock={!!isStartOfBlock}
                       isEndOfBlock={false}
-                      isStartOfAppointment={false}
+                      isStartOfAppointment={!!isStartOfAppointment}
                       isEndOfAppointment={false}
                       handleAvailabilityBlockClick={handleAvailabilityBlockClick}
                       onAppointmentClick={handleAppointmentClick}
@@ -391,29 +335,12 @@ const WeekView: React.FC<WeekViewProps> = ({
         {/* Debug section */}
         {process.env.NODE_ENV !== 'production' && (
           <div className="mt-4 p-4 bg-gray-100 rounded">
-            <h3 className="text-lg font-semibold">STEP 2-5 FIXES - Debug Info</h3>
+            <h3 className="text-lg font-semibold">Debug Info</h3>
             <p>Clinician ID: {selectedClinicianId || 'None'}</p>
-            <p>Clinician Timezone: {validClinicianTimeZone}</p>
-            <p>User Timezone: {validUserTimeZone}</p>
             <p>Time Blocks: {timeBlocks.length}</p>
             <p>Appointments: {appointmentBlocks.length}</p>
-            <p>TIME_SLOTS Generated: {TIME_SLOTS.length} (all Luxon DateTime in {validClinicianTimeZone})</p>
-            {appointmentBlocks.length > 0 && (
-              <div className="mt-2">
-                <p className="font-medium">STEP 5 - Timezone Conversion Flow:</p>
-                {appointmentBlocks.slice(0, 3).map(apt => (
-                  <p key={apt.id} className="text-sm">
-                    {apt.clientName}: UTC({apt.start_at}) → appointment_tz({apt.appointment_timezone || 'MISSING'}) → clinician_tz({validClinicianTimeZone})
-                  </p>
-                ))}
-              </div>
-            )}
-            <div className="mt-2">
-              <p className="font-medium">STEP 2 FIX - Hook Parameters:</p>
-              <p className="text-sm">
-                useWeekViewDataSimplified(days, clinicianId, refreshTrigger, appointments, getClientName, userTimeZone, clinicianTimeZone)
-              </p>
-            </div>
+            <p>User Timezone: {validUserTimeZone}</p>
+            <p>Clinician Timezone: {validClinicianTimeZone}</p>
           </div>
         )}
       </div>
