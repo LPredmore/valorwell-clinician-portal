@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -35,6 +34,7 @@ import { getUserTimeZone } from '@/utils/timeZoneUtils';
 import { getClinicianTimeZone } from '@/hooks/useClinicianData';
 import { supabase, getOrCreateVideoRoom } from '@/integrations/supabase/client';
 import { v4 as uuidv4 } from 'uuid';
+import { TimePicker } from "@/components/ui/time-picker"
 
 interface AppointmentDialogProps {
   isOpen: boolean;
@@ -510,7 +510,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
                   onSelect={setAppointmentDate}
                   disabled={{ before: new Date() }}
                   initialFocus
-                  className="p-3"
+                  className="p-3 pointer-events-auto"
                 />
               </PopoverContent>
             </Popover>
@@ -518,11 +518,10 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
 
           <div>
             <Label htmlFor="startTime">Start Time (1 hour appointment)</Label>
-            <Input
-              type="time"
-              id="startTime"
+            <TimePicker
               value={startTime}
-              onChange={(e) => setStartTime(e.target.value)}
+              onChange={setStartTime}
+              className="mt-2"
             />
           </div>
 
@@ -588,7 +587,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
                         onSelect={setRecurringEndDate}
                         disabled={{ before: addDays(appointmentDate || new Date(), 1) }}
                         initialFocus
-                        className="p-3"
+                        className="p-3 pointer-events-auto"
                       />
                     </PopoverContent>
                   </Popover>

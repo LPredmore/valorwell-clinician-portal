@@ -1,8 +1,11 @@
+
 import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { DateTime } from 'luxon';
+import { format } from 'date-fns';
+import { CalendarIcon } from 'lucide-react';
 import { 
   Form, 
   FormField, 
@@ -14,6 +17,14 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
+import { Calendar } from '@/components/ui/calendar';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { TimePicker } from '@/components/ui/time-picker';
+import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { getClinicianTimeZone } from '@/hooks/useClinicianData';
@@ -65,40 +76,67 @@ const EditAppointmentForm: React.FC<EditAppointmentFormProps> = ({
 
   // Schema for form validation
   const formSchema = z.object({
-    start_at: z.string().min(1, 'Start time is required'),
+    start_date: z.date({ required_error: 'Start date is required' }),
+    start_time: z.string().min(1, 'Start time is required'),
     status: z.string().min(1, 'Status is required'),
     notes: z.string().optional(),
   });
 
   // CRITICAL: Convert UTC start_at to appointment's timezone for form display
-  const getDefaultStartTime = () => {
-    if (!appointment.start_at) return '';
+  const getDefaultValues = () => {
+    if (!appointment.start_at) {
+      return {
+        start_date: new Date(),
+        start_time: '09:00',
+        status: appointment.status || '',
+        notes: appointment.notes || '',
+      };
+    }
     
     try {
       // Convert UTC time to appointment's timezone
       const utcDateTime = DateTime.fromISO(appointment.start_at, { zone: 'UTC' });
       const localDateTime = utcDateTime.setZone(displayTimeZone);
-      return localDateTime.toFormat('yyyy-MM-dd\'T\'HH:mm');
+      
+      return {
+        start_date: localDateTime.toJSDate(),
+        start_time: localDateTime.toFormat('HH:mm'),
+        status: appointment.status || '',
+        notes: appointment.notes || '',
+      };
     } catch (error) {
       console.error('[EditAppointmentForm] Error converting start time:', error);
-      return '';
+      return {
+        start_date: new Date(),
+        start_time: '09:00',
+        status: appointment.status || '',
+        notes: appointment.notes || '',
+      };
     }
   };
 
   const form = useForm({
     resolver: zodResolver(formSchema),
-    defaultValues: {
-      start_at: getDefaultStartTime(),
-      status: appointment.status || '',
-      notes: appointment.notes || '',
-    },
+    defaultValues: getDefaultValues(),
   });
 
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsLoading(true);
     try {
-      // CRITICAL: Convert the edited time back to UTC using appointment's timezone
-      const newStartDateTime = DateTime.fromISO(values.start_at, { zone: displayTimeZone });
+      // CRITICAL: Convert the edited date and time back to UTC using appointment's timezone
+      const [hour, minute] = values.start_time.split(':').map(Number);
+      
+      // Create DateTime object in appointment's timezone
+      const newStartDateTime = DateTime.fromObject(
+        {
+          year: values.start_date.getFullYear(),
+          month: values.start_date.getMonth() + 1,
+          day: values.start_date.getDate(),
+          hour,
+          minute
+        },
+        { zone: displayTimeZone }
+      );
       
       // Calculate end time as 1 hour after start time
       const newEndDateTime = newStartDateTime.plus({ hours: 1 });
@@ -315,12 +353,57 @@ const EditAppointmentForm: React.FC<EditAppointmentFormProps> = ({
         
         <FormField
           control={form.control}
-          name="start_at"
+          name="start_date"
+          render={({ field }) => (
+            <FormItem className="flex flex-col">
+              <FormLabel>Start Date</FormLabel>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <FormControl>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "w-[240px] pl-3 text-left font-normal",
+                        !field.value && "text-muted-foreground"
+                      )}
+                    >
+                      {field.value ? (
+                        format(field.value, "PPP")
+                      ) : (
+                        <span>Pick a date</span>
+                      )}
+                      <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                    </Button>
+                  </FormControl>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={field.value}
+                    onSelect={field.onChange}
+                    disabled={(date) => date < new Date()}
+                    initialFocus
+                    className="p-3 pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        
+        <FormField
+          control={form.control}
+          name="start_time"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Start Time (1 hour appointment)</FormLabel>
               <FormControl>
-                <Input type="datetime-local" {...field} />
+                <TimePicker
+                  value={field.value}
+                  onChange={field.onChange}
+                  className="mt-2"
+                />
               </FormControl>
               <FormMessage />
               <p className="text-xs text-muted-foreground mt-1">
