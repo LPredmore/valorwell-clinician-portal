@@ -47,18 +47,19 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // CRITICAL FIX: Start with authInitialized set to false, but set it to true in multiple paths
   const [authInitialized, setAuthInitialized] = useState(false);
 
-  // Set multiple safety timeouts to ensure authInitialized is eventually set to true
+  /**
+   * Safety mechanism to ensure auth state is properly initialized
+   * Sets authInitialized to true after a timeout to prevent UI deadlocks
+   */
   useEffect(() => {
-    // Independent safety timeout that doesn't depend on authInitialized state
+    // Primary safety timeout (3s)
     const safetyTimeoutId = setTimeout(() => {
-      logInfo("[UserContext] Safety timeout reached (3s) - forcing authInitialized to true");
       setAuthInitialized(true);
       setIsLoading(false);
-    }, 3000); 
+    }, 3000);
     
-    // Secondary extended timeout for extra protection
+    // Secondary backup timeout (5s)
     const extendedTimeoutId = setTimeout(() => {
-      logInfo("[UserContext] Extended safety timeout reached (5s) - double-checking authInitialized is true");
       setAuthInitialized(true);
       setIsLoading(false);
     }, 5000);
@@ -67,23 +68,25 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       clearTimeout(safetyTimeoutId);
       clearTimeout(extendedTimeoutId);
     };
-  }, []); // No dependencies - this runs once on mount
+  }, []);
 
-  // Fetches client-specific data if a user is authenticated.
+  /**
+   * Fetches client-specific data for an authenticated user
+   * @param currentAuthUser The authenticated Supabase user
+   */
   const fetchClientSpecificData = useCallback(async (currentAuthUser: SupabaseUser) => {
-    logInfo("[UserContext] fetchClientSpecificData called for user:", currentAuthUser.id);
-    setIsLoading(true); // Indicate loading for this specific fetch operation
-    
-    // CRITICAL FIX: Set authInitialized true as early as possible
+    setIsLoading(true);
     setAuthInitialized(true);
 
     try {
+      // Get user role from metadata or default to client
       const role = currentAuthUser.user_metadata?.role || 'client';
       setUserRole(role);
-      logInfo(`[UserContext] User role set: ${role}`);
 
+      // Only fetch client data for relevant roles
       if (role === 'client' || role === 'admin' || role === 'clinician') {
         try {
+          // Query client data from database
           const { data: clientData, error } = await supabase
             .from('clients')
             .select('*')
@@ -91,11 +94,15 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
             .single();
 
           if (error) {
-            logError('[UserContext] Error fetching client data:', error);
+            // Handle specific error cases
             if (error.code === 'PGRST116') {
-              setClientStatus('New'); setClientProfile(null);
+              // No data found - new client
+              setClientStatus('New');
+              setClientProfile(null);
             } else {
-              setClientStatus('ErrorFetchingStatus'); setClientProfile(null);
+              // Other error
+              setClientStatus('ErrorFetchingStatus');
+              setClientProfile(null);
             }
           } else if (clientData) {
             setClientProfile(clientData as ClientProfile);

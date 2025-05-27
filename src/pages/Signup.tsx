@@ -55,16 +55,19 @@ const Signup = () => {
     },
   });
 
+  /**
+   * Handle form submission for signup
+   * Includes retry logic for better reliability
+   */
   const onSubmit = async (values: SignupFormValues) => {
     setIsSubmitting(true);
     setError(null);
     
     try {
-      console.log("[Signup] Starting client registration with values:", values);
-      
-      // Generate a random password (will be reset later)
+      // Generate a secure random temporary password
       const tempPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8);
       
+      // Setup retry mechanism
       let attempt = 0;
       let success = false;
       let lastError = null;
@@ -72,12 +75,12 @@ const Signup = () => {
       // Retry logic for authentication
       while (!success && attempt < MAX_RETRIES) {
         try {
+          // Add delay between retry attempts
           if (attempt > 0) {
-            console.log(`[Signup] Retrying signup attempt ${attempt + 1}/${MAX_RETRIES + 1}...`);
             await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
           }
           
-          // Create auth user with client role directly in the metadata
+          // Create auth user with client role in metadata
           const { data: authData, error: authError } = await supabase.auth.signUp({
             email: values.email,
             password: tempPassword,
@@ -93,15 +96,15 @@ const Signup = () => {
             }
           });
           
+          // Handle authentication errors
           if (authError) {
-            console.error(`[Signup] Auth error on attempt ${attempt + 1}:`, authError);
             lastError = authError;
             attempt++;
             continue;
           }
           
+          // Verify user was created
           if (!authData.user) {
-            console.error(`[Signup] No user returned in auth data on attempt ${attempt + 1}`);
             lastError = new Error("Failed to create user account - no user returned");
             attempt++;
             continue;

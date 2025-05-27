@@ -34,36 +34,39 @@ const Login = () => {
     }
   }
 
+  /**
+   * Handle form submission for login
+   * @param data Form data containing email and password
+   */
   const handleSubmit = async (data: { email: string; password: string }) => {
     setLoading(true);
     setError(null);
 
     try {
+      // Attempt to sign in with Supabase
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email: data.email,
         password: data.password,
       });
 
+      // Handle authentication errors
       if (authError) {
-        console.error('Authentication error:', authError);
         throw new Error(authError.message);
       }
 
-      // If we got here, the sign in was successful
-      console.log('Login successful');
+      // Success - show toast notification
       toast({
         title: 'Success',
         description: 'Successfully signed in.',
       });
 
-      // Store will check the user's role and redirect accordingly
-      // We'll let the Index page handle the redirect
+      // Navigate to home page - role-based routing will happen there
       navigate('/');
     } catch (err) {
-      let message = 'Failed to sign in';
-      if (err instanceof Error) {
-        message = err.message;
-      }
+      // Format error message
+      const message = err instanceof Error ? err.message : 'Failed to sign in';
+      
+      // Set error state and show toast
       setError(message);
       toast({
         title: 'Error',

@@ -99,31 +99,17 @@ export const useAppointments = (
   const safeUserTimeZone = TimeZoneService.ensureIANATimeZone(
     timeZone || TimeZoneService.DEFAULT_TIMEZONE
   );
-  
-  // STEP 1: ENHANCED LOGGING FOR CLINICIAN ID VALIDATION
-  console.log("[useAppointments] STEP 1 - Clinician ID Analysis:", {
-    rawClinicianId: clinicianId,
-    formattedClinicianId,
-    isNull: clinicianId === null,
-    isUndefined: clinicianId === undefined,
-    isEmptyString: clinicianId === "",
-    isUUIDFormat: clinicianId ? /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(clinicianId) : false,
-    length: clinicianId ? clinicianId.length : 0,
-    fromTimeZone: safeUserTimeZone
-  });
 
+  /**
+   * Calculate date range for appointments query
+   * Uses current week if no dates provided
+   */
   const { fromUTCISO, toUTCISO } = useMemo(() => {
-    // FIX: Use current week if no dates provided
+    // Use current week if no dates provided
     if (!fromDate && !toDate) {
       const now = DateTime.now().setZone(safeUserTimeZone);
       const startOfWeek = now.startOf('week');
       const endOfWeek = now.endOf('week');
-      
-      console.log("[useAppointments] STEP 1 - Using current week range:", {
-        startOfWeek: startOfWeek.toISO(),
-        endOfWeek: endOfWeek.toISO(),
-        timeZone: safeUserTimeZone
-      });
       
       return {
         fromUTCISO: startOfWeek.toUTC().toISO(),
@@ -135,32 +121,22 @@ export const useAppointments = (
     let toISO: string | undefined;
     try {
       if (fromDate) {
-        fromISO = 
+        fromISO =
           DateTime.fromJSDate(fromDate)
             .setZone(safeUserTimeZone)
-            .startOf('day') 
+            .startOf('day')
             .toUTC()
             .toISO();
       }
       
       if (toDate) {
-        toISO = 
+        toISO =
           DateTime.fromJSDate(toDate)
             .setZone(safeUserTimeZone)
             .endOf('day')
             .toUTC()
             .toISO();
       }
-      
-      // STEP 1: LOG CALCULATED DATE RANGE
-      console.log("[useAppointments] STEP 1 - Calculated Date Range:", {
-        originalFromDate: fromDate?.toISOString(),
-        originalToDate: toDate?.toISOString(),
-        calculatedFromUTC: fromISO,
-        calculatedToUTC: toISO,
-        timeZone: safeUserTimeZone,
-        rangeInDays: fromISO && toISO ? Math.ceil((new Date(toISO).getTime() - new Date(fromISO).getTime()) / (1000 * 60 * 60 * 24)) : 'unknown'
-      });
       
       return { fromUTCISO: fromISO, toUTCISO: toISO };
     } catch (e) {
@@ -169,16 +145,8 @@ export const useAppointments = (
     }
   }, [fromDate, toDate, safeUserTimeZone]);
 
-  // FIX: Always enable the query if we have a clinician ID
+  // Enable query if we have a clinician ID
   const queryEnabled = Boolean(formattedClinicianId);
-  
-  console.log("[useAppointments] STEP 1 - Query Configuration:", {
-    queryEnabled,
-    formattedClinicianId,
-    fromUTCISO,
-    toUTCISO,
-    refreshTrigger
-  });
 
   const {
     data: fetchedAppointments = [],
@@ -189,15 +157,6 @@ export const useAppointments = (
     // Include refreshTrigger in the queryKey to force refresh when it changes
     queryKey: ["appointments", formattedClinicianId, fromUTCISO, toUTCISO, refreshTrigger],
     queryFn: async (): Promise<Appointment[]> => {
-      // STEP 1: DETAILED QUERY FUNCTION LOGGING
-      console.log("[useAppointments] STEP 1 - Query Function Starting:", {
-        formattedClinicianId,
-        isClinicianIdValid: !!formattedClinicianId,
-        fromUTCISO,
-        toUTCISO,
-        refreshTrigger,
-        queryEnabled
-      });
 
       if (!formattedClinicianId) {
         console.log("[useAppointments] STEP 1 - Returning empty array due to missing clinician ID");

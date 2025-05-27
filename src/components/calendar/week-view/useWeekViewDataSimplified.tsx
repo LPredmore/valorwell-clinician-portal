@@ -407,106 +407,63 @@ export const useWeekViewDataSimplified = (
   }, [appointments, validClinicianTimeZone, getClientName]);
 
   // PHASE 1: Refactor to accept only Luxon DateTime objects
+  /**
+   * Checks if a time slot is available based on the clinician's availability blocks
+   * @param dayTimeSlot The DateTime to check
+   * @returns True if the time slot is available
+   */
   const isTimeSlotAvailable = (dayTimeSlot: DateTime): boolean => {
-    console.log('[isTimeSlotAvailable] Checking slot in clinician timezone:', {
-      slot: dayTimeSlot.toFormat('yyyy-MM-dd HH:mm'),
-      timezone: dayTimeSlot.zoneName,
-      validTimezone: validClinicianTimeZone
-    });
+    // Ensure timezone consistency
+    const normalizedTimeSlot = dayTimeSlot.zoneName !== validClinicianTimeZone
+      ? dayTimeSlot.setZone(validClinicianTimeZone)
+      : dayTimeSlot;
 
-    // PHASE 4: Validate timezone consistency
-    if (dayTimeSlot.zoneName !== validClinicianTimeZone) {
-      console.warn('[isTimeSlotAvailable] Timezone mismatch detected:', {
-        slotTimezone: dayTimeSlot.zoneName,
-        expectedTimezone: validClinicianTimeZone
-      });
-    }
-
-    const result = timeBlocks.some(block => {
-      const isSameDay = block.day?.hasSame(dayTimeSlot, 'day') || false;
+    return timeBlocks.some(block => {
+      const isSameDay = block.day?.hasSame(normalizedTimeSlot, 'day') || false;
       if (!isSameDay) return false;
 
-      const isAvailable = dayTimeSlot >= block.start && dayTimeSlot < block.end;
-      
-      if (isAvailable) {
-        console.log('[isTimeSlotAvailable] Found available slot:', {
-          day: dayTimeSlot.toFormat('yyyy-MM-dd'),
-          slotTime: dayTimeSlot.toFormat('HH:mm'),
-          blockStart: block.start.toFormat('HH:mm'),
-          blockEnd: block.end.toFormat('HH:mm'),
-          timezone: validClinicianTimeZone
-        });
-      }
-
-      return isAvailable;
+      return normalizedTimeSlot >= block.start && normalizedTimeSlot < block.end;
     });
-
-    return result;
   };
 
-  // PHASE 1: Refactor to accept only Luxon DateTime objects
+  /**
+   * Gets the availability block for a specific time slot
+   * @param dayTimeSlot The DateTime to check
+   * @returns The TimeBlock if found, undefined otherwise
+   */
   const getBlockForTimeSlot = (dayTimeSlot: DateTime): TimeBlock | undefined => {
-    console.log('[getBlockForTimeSlot] Looking for block at slot in clinician timezone:', {
-      slot: dayTimeSlot.toFormat('yyyy-MM-dd HH:mm'),
-      timezone: dayTimeSlot.zoneName,
-      validTimezone: validClinicianTimeZone
-    });
-
-    // PHASE 4: Validate timezone consistency
-    if (dayTimeSlot.zoneName !== validClinicianTimeZone) {
-      console.warn('[getBlockForTimeSlot] Timezone mismatch detected:', {
-        slotTimezone: dayTimeSlot.zoneName,
-        expectedTimezone: validClinicianTimeZone
-      });
-    }
+    // Ensure timezone consistency
+    const normalizedTimeSlot = dayTimeSlot.zoneName !== validClinicianTimeZone
+      ? dayTimeSlot.setZone(validClinicianTimeZone)
+      : dayTimeSlot;
 
     return timeBlocks.find(block => {
-      const isSameDay = block.day?.hasSame(dayTimeSlot, 'day') || false;
+      const isSameDay = block.day?.hasSame(normalizedTimeSlot, 'day') || false;
       if (!isSameDay) return false;
 
-      return dayTimeSlot >= block.start && dayTimeSlot < block.end;
+      return normalizedTimeSlot >= block.start && normalizedTimeSlot < block.end;
     });
   };
 
-  // PHASE 1: Refactor to accept only Luxon DateTime objects
+  /**
+   * Gets the appointment for a specific time slot
+   * @param dayTimeSlot The DateTime to check
+   * @returns The AppointmentBlock if found, undefined otherwise
+   */
   const getAppointmentForTimeSlot = (dayTimeSlot: DateTime): AppointmentBlock | undefined => {
-    console.log('[getAppointmentForTimeSlot] Looking for appointment at slot in clinician timezone:', {
-      slot: dayTimeSlot.toFormat('yyyy-MM-dd HH:mm'),
-      timezone: dayTimeSlot.zoneName,
-      validTimezone: validClinicianTimeZone
-    });
+    // Ensure timezone consistency
+    const normalizedTimeSlot = dayTimeSlot.zoneName !== validClinicianTimeZone
+      ? dayTimeSlot.setZone(validClinicianTimeZone)
+      : dayTimeSlot;
 
-    // PHASE 4: Validate timezone consistency
-    if (dayTimeSlot.zoneName !== validClinicianTimeZone) {
-      console.warn('[getAppointmentForTimeSlot] Timezone mismatch detected:', {
-        slotTimezone: dayTimeSlot.zoneName,
-        expectedTimezone: validClinicianTimeZone
-      });
-    }
-
-    const result = appointmentBlocks.find(appt => {
+    return appointmentBlocks.find(appt => {
       // Check if it's the same day in the clinician's timezone
-      const isSameDay = appt.day?.hasSame(dayTimeSlot, 'day') || false;
+      const isSameDay = appt.day?.hasSame(normalizedTimeSlot, 'day') || false;
       if (!isSameDay) return false;
 
       // Since appointments are positioned in clinician's timezone, compare directly
-      const isInRange = dayTimeSlot >= appt.start && dayTimeSlot < appt.end;
-      
-      if (isInRange) {
-        console.log(`[getAppointmentForTimeSlot] Found appointment at ${dayTimeSlot.toFormat('yyyy-MM-dd HH:mm')} in clinician timezone:`, {
-          appointmentId: appt.id,
-          clientName: appt.clientName,
-          slotTime: dayTimeSlot.toFormat('yyyy-MM-dd HH:mm'),
-          apptStart: appt.start.toFormat('yyyy-MM-dd HH:mm'),
-          apptEnd: appt.end.toFormat('yyyy-MM-dd HH:mm'),
-          clinicianTimeZone: validClinicianTimeZone
-        });
-      }
-
-      return isInRange;
+      return normalizedTimeSlot >= appt.start && normalizedTimeSlot < appt.end;
     });
-
-    return result;
   };
 
   return {

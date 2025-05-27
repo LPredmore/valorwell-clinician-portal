@@ -1,52 +1,69 @@
 
 import { TimeZoneService } from './timeZoneService';
+import { DateTime } from 'luxon';
 
 /**
  * Get the user's timezone from the browser
+ * @returns A valid IANA timezone string
  */
 export function getUserTimeZone(): string {
   try {
     const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     return TimeZoneService.ensureIANATimeZone(browserTimezone);
-  } catch (error) {
-    console.error('Error getting user timezone:', error);
+  } catch {
+    // Fallback to default timezone if browser API fails
     return TimeZoneService.DEFAULT_TIMEZONE;
   }
 }
 
 /**
  * Format timezone for display (e.g. "EDT" or "America/New_York")
+ * @param timezone The timezone to format
+ * @returns Formatted timezone string (typically abbreviation)
  */
 export function formatTimeZoneDisplay(timezone: string): string {
   try {
+    // Ensure we have a valid timezone
     const safeTimezone = TimeZoneService.ensureIANATimeZone(timezone);
     
+    // Get current time in the timezone
     const now = TimeZoneService.now(safeTimezone);
-    if (!now.isValid) {
-      console.error('Invalid DateTime for timezone display', now.invalidReason, now.invalidExplanation);
-      return safeTimezone;
+    
+    // Return the timezone abbreviation if valid
+    if (now.isValid) {
+      return now.toFormat('ZZZZ'); // Returns the timezone abbreviation (e.g., EDT)
     }
-    return now.toFormat('ZZZZ'); // Returns the timezone abbreviation (e.g., EDT)
-  } catch (error) {
-    console.error('Error formatting timezone display:', error);
+    
+    // Fallback to the timezone name itself
+    return safeTimezone;
+  } catch {
+    // Return original or default if formatting fails
     return timezone || TimeZoneService.DEFAULT_TIMEZONE;
   }
 }
 
 /**
- * Convert a date and time string to a specific timezone
+ * Convert a date and time string to a DateTime in a specific timezone
+ * @param dateStr Date string in YYYY-MM-DD format
+ * @param timeStr Time string in HH:MM format
+ * @param timezone Target timezone
+ * @returns DateTime object in the specified timezone
  */
-export function convertToTimezone(dateStr: string, timeStr: string, timezone: string) {
+export function convertToTimezone(dateStr: string, timeStr: string, timezone: string): DateTime {
   try {
     return TimeZoneService.createDateTime(dateStr, timeStr, timezone);
-  } catch (error) {
-    console.error('Error converting to timezone:', error);
+  } catch {
+    // Return current time in the timezone if conversion fails
     return TimeZoneService.now(timezone);
   }
 }
 
 /**
  * Format a date with timezone (e.g. "Mar 12, 2023 at 3:30 PM EDT")
+ * @param date Date to format
+ * @param timezone Timezone to use for formatting
+ * @param formatStr Optional format string
+ * @returns Formatted date string with timezone
  */
 export function formatWithTimeZone(date: Date, timezone: string, formatStr: string = 'MMM d, yyyy \'at\' h:mm a ZZZZ'): string {
   try {

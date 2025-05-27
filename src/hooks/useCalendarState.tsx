@@ -34,40 +34,37 @@ export const useCalendarState = (initialClinicianId: string | null = null) => {
 
   const formattedClinicianId = ensureStringId(selectedClinicianId);
   
-  // Log important state information
-  useEffect(() => {
-    console.log('[useCalendarState] Current state:', {
-      view,
-      clinicianId: formattedClinicianId,
-      originalClinicianId: selectedClinicianId,
-      timeZone: userTimeZone,
-      isLoadingTimeZone,
-      refreshTrigger: appointmentRefreshTrigger
-    });
-  }, [view, selectedClinicianId, formattedClinicianId, userTimeZone, isLoadingTimeZone, appointmentRefreshTrigger]);
-
-  // Set user timezone from clinician or browser
+  /**
+   * Set user timezone based on clinician settings or browser defaults
+   * Priority:
+   * 1. Clinician's timezone if available
+   * 2. Browser's timezone as fallback
+   */
   useEffect(() => {
     const fetchClinicianTimeZone = async () => {
-      if (formattedClinicianId) {
-        try {
+      setIsLoadingTimeZone(true);
+      
+      try {
+        if (formattedClinicianId) {
+          // Try to get clinician's timezone
           const timeZone = await getClinicianTimeZone(formattedClinicianId);
+          
           if (timeZone) {
+            // Use clinician's timezone if available
             setUserTimeZone(TimeZoneService.ensureIANATimeZone(timeZone));
           } else {
-            // Fallback to browser timezone if clinician timezone is not set
+            // Fallback to browser timezone
             setUserTimeZone(TimeZoneService.ensureIANATimeZone(getUserTimeZone()));
           }
-        } catch (error) {
-          console.error("[useCalendarState] Error fetching clinician timezone:", error);
-          // Fallback to browser timezone on error
+        } else {
+          // No clinician ID, use browser timezone
           setUserTimeZone(TimeZoneService.ensureIANATimeZone(getUserTimeZone()));
-        } finally {
-          setIsLoadingTimeZone(false);
         }
-      } else {
-        // No clinician ID provided, use browser timezone
+      } catch (error) {
+        // On error, fallback to browser timezone
+        console.error("[useCalendarState] Error fetching timezone:", error);
         setUserTimeZone(TimeZoneService.ensureIANATimeZone(getUserTimeZone()));
+      } finally {
         setIsLoadingTimeZone(false);
       }
     };

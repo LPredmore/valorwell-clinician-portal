@@ -8,68 +8,64 @@ import { DateTime } from 'luxon';
  * another date string parsable by Luxon, or null/undefined.
  * @returns number representing age in years, or null if input is invalid or not provided.
  */
-export const calculateAge = (dateOfBirth: Date | string | null | undefined): number | null => { 
-  // If no dateOfBirth is provided (this will catch null, undefined, empty string etc.), 
-  // return null immediately.
+/**
+ * Calculates age in years from a date of birth
+ * Handles multiple date formats and performs robust parsing
+ * @param dateOfBirth Date of birth as Date object or string
+ * @returns Age in years, or null if input is invalid
+ */
+export const calculateAge = (dateOfBirth: Date | string | null | undefined): number | null => {
+  // Return null for empty inputs
   if (!dateOfBirth) {
-    console.warn("[calculateAge] dateOfBirth is null, undefined, or empty.");
     return null;
   }
 
-  let dobDateTime;
+  let dobDateTime: DateTime | null = null;
 
-  // Check if dateOfBirth is a string and attempt to parse it with Luxon
+  // Parse string dates with multiple format attempts
   if (typeof dateOfBirth === 'string') {
-    try {
-      // Try ISO format first
-      dobDateTime = DateTime.fromISO(dateOfBirth);
-      
-      // If not valid, try other formats
-      if (!dobDateTime.isValid) {
-        console.warn(`[calculateAge] ISO parsing failed for: "${dateOfBirth}". Trying SQL date format.`);
-        dobDateTime = DateTime.fromSQL(dateOfBirth);
-      }
-      
-      // If still not valid, try general parsing
-      if (!dobDateTime.isValid) {
-        console.warn(`[calculateAge] SQL date parsing failed for: "${dateOfBirth}". Trying general format.`);
-        dobDateTime = DateTime.fromFormat(dateOfBirth, 'yyyy-MM-dd');
-      }
-    } catch (e) {
-      console.warn(`[calculateAge] Error parsing date string: "${dateOfBirth}"`, e);
-      try {
-        // Last resort - try JavaScript Date object and convert to Luxon
+    // Try different formats in order of preference
+    const formats = [
+      // Try parsing as ISO format
+      () => DateTime.fromISO(dateOfBirth),
+      // Try SQL date format
+      () => DateTime.fromSQL(dateOfBirth),
+      // Try standard date format
+      () => DateTime.fromFormat(dateOfBirth, 'yyyy-MM-dd'),
+      // Last resort - use JS Date constructor
+      () => {
         const jsDate = new Date(dateOfBirth);
-        dobDateTime = DateTime.fromJSDate(jsDate);
-      } catch (e2) {
-        console.error(`[calculateAge] All parsing attempts failed for: "${dateOfBirth}"`, e2);
-        return null;
+        return DateTime.fromJSDate(jsDate);
+      }
+    ];
+
+    // Try each format until one works
+    for (const formatFn of formats) {
+      try {
+        dobDateTime = formatFn();
+        if (dobDateTime.isValid) {
+          break;
+        }
+      } catch (e) {
+        // Continue to next format
       }
     }
   } else if (dateOfBirth instanceof Date) {
-    // If it's a Date object, convert to Luxon
+    // Convert JS Date to Luxon DateTime
     dobDateTime = DateTime.fromJSDate(dateOfBirth);
-  } else {
-    // Unknown type
-    console.warn("[calculateAge] dateOfBirth is of an unexpected type:", typeof dateOfBirth);
-    return null;
   }
 
-  // Final validation: Check if the resulting dobDateTime is valid
+  // Return null if we couldn't parse the date
   if (!dobDateTime || !dobDateTime.isValid) {
-    console.warn("[calculateAge] Invalid date result after parsing:", dateOfBirth);
     return null;
   }
 
-  // Calculate the difference in years from today using Luxon
+  // Calculate age in years
   const now = DateTime.now();
   const age = now.diff(dobDateTime, 'years').years;
   
-  // Round down to whole years
-  const wholeYears = Math.floor(age);
-  
-  console.log(`[calculateAge] Calculated age: ${wholeYears} for DOB: ${dobDateTime.toISODate()}`);
-  return wholeYears;
+  // Return whole years (floor to handle partial years)
+  return Math.floor(age);
 };
 
 /**

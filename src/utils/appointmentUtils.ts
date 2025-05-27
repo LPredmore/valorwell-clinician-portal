@@ -30,63 +30,57 @@ export const formatClientName = (client: any): string => {
  * This handles the case where calendar components pass AppointmentBlock objects
  * but we need full Appointment objects for dialogs and forms
  */
+/**
+ * Converts an AppointmentBlock to a full Appointment object
+ * Handles different time formats and preserves all appointment data
+ * @param appointmentBlock The appointment block to convert
+ * @param originalAppointments Array of original appointments to search for a match
+ * @returns A complete Appointment object
+ */
 export const convertAppointmentBlockToAppointment = (
   appointmentBlock: any,
   originalAppointments: Appointment[]
 ): Appointment => {
-  console.log('[convertAppointmentBlockToAppointment] Converting appointment block:', {
-    blockId: appointmentBlock.id,
-    hasStart: !!appointmentBlock.start,
-    hasEnd: !!appointmentBlock.end,
-    startType: typeof appointmentBlock.start,
-    endType: typeof appointmentBlock.end,
-    startValue: appointmentBlock.start,
-    endValue: appointmentBlock.end,
-    startIsLuxon: appointmentBlock.start && typeof appointmentBlock.start === 'object' && appointmentBlock.start.toISO,
-    endIsLuxon: appointmentBlock.end && typeof appointmentBlock.end === 'object' && appointmentBlock.end.toISO
-  });
-
   // First, try to find the original appointment from the appointments array
   const originalAppointment = originalAppointments.find(a => a.id === appointmentBlock.id);
   if (originalAppointment) {
-    console.log('[convertAppointmentBlockToAppointment] Found original appointment, using it directly');
     return originalAppointment;
   }
-
-  console.log('[convertAppointmentBlockToAppointment] No original appointment found, converting block');
 
   // Convert DateTime objects to ISO strings with proper error handling
   let startAt: string;
   let endAt: string;
 
   try {
-    // Handle start time
+    // Handle start time based on its type
     if (appointmentBlock.start) {
       if (typeof appointmentBlock.start === 'string') {
+        // Already a string
         startAt = appointmentBlock.start;
-        console.log('[convertAppointmentBlockToAppointment] Start is already string:', startAt);
-      } else if (appointmentBlock.start && typeof appointmentBlock.start === 'object' && appointmentBlock.start.toISO) {
-        // This is a Luxon DateTime object
+      } else if (appointmentBlock.start &&
+                typeof appointmentBlock.start === 'object' &&
+                appointmentBlock.start.toISO) {
+        // Luxon DateTime object
         startAt = appointmentBlock.start.toUTC().toISO();
-        console.log('[convertAppointmentBlockToAppointment] Converted Luxon start to ISO:', startAt);
       } else {
-        throw new Error('Invalid start time format: ' + typeof appointmentBlock.start);
+        throw new Error('Invalid start time format');
       }
     } else {
       throw new Error('No start time provided');
     }
 
-    // Handle end time
+    // Handle end time based on its type
     if (appointmentBlock.end) {
       if (typeof appointmentBlock.end === 'string') {
+        // Already a string
         endAt = appointmentBlock.end;
-        console.log('[convertAppointmentBlockToAppointment] End is already string:', endAt);
-      } else if (appointmentBlock.end && typeof appointmentBlock.end === 'object' && appointmentBlock.end.toISO) {
-        // This is a Luxon DateTime object
+      } else if (appointmentBlock.end &&
+                typeof appointmentBlock.end === 'object' &&
+                appointmentBlock.end.toISO) {
+        // Luxon DateTime object
         endAt = appointmentBlock.end.toUTC().toISO();
-        console.log('[convertAppointmentBlockToAppointment] Converted Luxon end to ISO:', endAt);
       } else {
-        throw new Error('Invalid end time format: ' + typeof appointmentBlock.end);
+        throw new Error('Invalid end time format');
       }
     } else {
       throw new Error('No end time provided');
