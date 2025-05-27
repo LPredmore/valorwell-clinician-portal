@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
@@ -28,7 +27,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
-import { timezoneOptions } from '@/utils/timezoneOptions';
+import { getTimeZoneEnumOptions, getTimeZoneEnumLabel } from '@/utils/timezoneEnumOptions';
 
 interface Clinician {
   id: string;
@@ -583,17 +582,16 @@ const ClinicianDetails = () => {
                           <SelectValue placeholder="Select time zone" />
                         </SelectTrigger>
                         <SelectContent>
-                          {timezoneOptions.map((zone) => (
-                            <SelectItem key={zone.value} value={zone.value}>
-                              {zone.label}
+                          {getTimeZoneEnumOptions().map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     ) : (
                       <p className="p-2 border rounded-md bg-gray-50">
-                        {timezoneOptions.find(tz => tz.value === clinician.clinician_timezone)?.label || 
-                          (clinician.clinician_timezone || 'Central Time (CT)')}
+                        {getTimeZoneEnumLabel(clinician.clinician_timezone || 'America/Chicago')}
                       </p>
                     )}
                   </div>
