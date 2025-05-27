@@ -45,7 +45,7 @@ interface Clinician {
   clinician_type: string | null;
   clinician_licensed_states: string[] | null;
   clinician_image_url: string | null;
-  clinician_timezone: string | null;
+  clinician_time_zone: string | null;
 }
 
 const ClinicianDetails = () => {
@@ -575,8 +575,8 @@ const ClinicianDetails = () => {
                     </label>
                     {isEditing ? (
                       <Select 
-                        value={editedClinician?.clinician_timezone || 'America/Chicago'} 
-                        onValueChange={(value) => handleInputChange('clinician_timezone', value)}
+                        value={editedClinician?.clinician_time_zone || 'America/Chicago'} 
+                        onValueChange={(value) => handleInputChange('clinician_time_zone', value)}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select time zone" />
@@ -591,7 +591,7 @@ const ClinicianDetails = () => {
                       </Select>
                     ) : (
                       <p className="p-2 border rounded-md bg-gray-50">
-                        {getTimeZoneEnumLabel(clinician.clinician_timezone || 'America/Chicago')}
+                        {getTimeZoneEnumLabel(clinician.clinician_time_zone || 'America/Chicago')}
                       </p>
                     )}
                   </div>

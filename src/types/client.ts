@@ -126,7 +126,7 @@ export interface Clinician {
   clinician_professional_name: string | null;
   clinician_first_name: string | null;
   clinician_last_name: string | null;
-  clinician_timezone: string | null;
+  clinician_time_zone: string | null;
   clinician_nameinsurance: string | null;
 }
 
