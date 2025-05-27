@@ -100,11 +100,15 @@ export const useAppointments = (
     timeZone || TimeZoneService.DEFAULT_TIMEZONE
   );
   
-  // Log clinician ID handling for debugging
-  console.log("[useAppointments] Clinician ID handling:", {
+  // STEP 1: ENHANCED LOGGING FOR CLINICIAN ID VALIDATION
+  console.log("[useAppointments] STEP 1 - Clinician ID Analysis:", {
     rawClinicianId: clinicianId,
     formattedClinicianId,
-    isUUIDFormat: /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(clinicianId || ""),
+    isNull: clinicianId === null,
+    isUndefined: clinicianId === undefined,
+    isEmptyString: clinicianId === "",
+    isUUIDFormat: clinicianId ? /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(clinicianId) : false,
+    length: clinicianId ? clinicianId.length : 0,
     fromTimeZone: safeUserTimeZone
   });
 
@@ -155,6 +159,16 @@ export const useAppointments = (
         toISO = now.endOf('week').toISO();
       }
       
+      // STEP 1: LOG CALCULATED DATE RANGE
+      console.log("[useAppointments] STEP 1 - Calculated Date Range:", {
+        originalFromDate: fromDate?.toISOString(),
+        originalToDate: toDate?.toISOString(),
+        calculatedFromUTC: fromISO,
+        calculatedToUTC: toISO,
+        timeZone: safeUserTimeZone,
+        rangeInDays: fromISO && toISO ? Math.ceil((new Date(toISO).getTime() - new Date(fromISO).getTime()) / (1000 * 60 * 60 * 24)) : 'unknown'
+      });
+      
       return { fromUTCISO: fromISO, toUTCISO: toISO };
     } catch (e) {
       console.error("Error converting date range:", e);
@@ -171,9 +185,23 @@ export const useAppointments = (
     // Include refreshTrigger in the queryKey to force refresh when it changes
     queryKey: ["appointments", formattedClinicianId, fromUTCISO, toUTCISO, refreshTrigger],
     queryFn: async (): Promise<Appointment[]> => {
-      if (!formattedClinicianId) return [];
+      // STEP 1: DETAILED QUERY FUNCTION LOGGING
+      console.log("[useAppointments] STEP 1 - Query Function Starting:", {
+        formattedClinicianId,
+        isClinicianIdValid: !!formattedClinicianId,
+        fromUTCISO,
+        toUTCISO,
+        refreshTrigger,
+        queryEnabled: !!formattedClinicianId
+      });
+
+      if (!formattedClinicianId) {
+        console.log("[useAppointments] STEP 1 - Returning empty array due to missing clinician ID");
+        return [];
+      }
+      
       console.log(
-        "[useAppointments] Fetching for clinician:",
+        "[useAppointments] STEP 1 - Building Supabase Query for clinician:",
         formattedClinicianId,
         { from: fromUTCISO, to: toUTCISO, refreshTrigger }
       );
@@ -186,45 +214,90 @@ export const useAppointments = (
         .eq("clinician_id", formattedClinicianId)
         .eq("status", "scheduled");
 
-      // Use more robust timezone-aware filtering
-      console.log("[useAppointments] Applying robust UTC filter:", {
-        fromUTCISO,
-        toUTCISO,
-        clinicianTZ: safeUserTimeZone
+      // STEP 1: LOG QUERY BUILDING STEPS
+      console.log("[useAppointments] STEP 1 - Supabase Query Building:", {
+        baseQuery: "appointments table",
+        clinicianFilter: `clinician_id = ${formattedClinicianId}`,
+        statusFilter: "status = scheduled",
+        fromDateFilter: fromUTCISO ? `start_at >= ${fromUTCISO}` : 'none',
+        toDateFilter: toUTCISO ? `end_at <= ${toUTCISO}` : 'none'
       });
       
       if (fromUTCISO) query = query.gte("start_at", fromUTCISO);
       if (toUTCISO) query = query.lte("end_at", toUTCISO);
       
-      // Add explicit time zone debugging
-      query = query
-        .order("start_at", { ascending: true });
+      query = query.order("start_at", { ascending: true });
         
-      // Log debug info
-      console.log("[useAppointments] Final query details:", {
+      // STEP 1: LOG FINAL QUERY DETAILS
+      console.log("[useAppointments] STEP 1 - Final Query Details:", {
         clinician_id: formattedClinicianId,
         start_at: fromUTCISO ? `>= ${fromUTCISO}` : 'any',
-        end_at: toUTCISO ? `<= ${toUTCISO}` : 'any'
+        end_at: toUTCISO ? `<= ${toUTCISO}` : 'any',
+        status: 'scheduled',
+        orderBy: 'start_at ASC'
       });
       
       const { data: rawDataAny, error: queryError } = await query;
 
-      // Debugging: Log raw Supabase response structure with more context
-      console.log('[useAppointments] Raw Supabase response structure:', {
+      // STEP 1: COMPREHENSIVE SUPABASE RESPONSE LOGGING
+      console.log('[useAppointments] STEP 1 - Supabase Query Response:', {
         hasData: !!rawDataAny,
         recordCount: rawDataAny?.length || 0,
-        sampleRecord: rawDataAny?.[0] || null,
-        hasClientsField: rawDataAny?.[0] ? 'clients' in rawDataAny[0] : false,
-        clientsFieldType: rawDataAny?.[0]?.clients ? typeof rawDataAny[0].clients : "undefined",
-        clientFieldKeys: rawDataAny?.[0]?.clients ? Object.keys(rawDataAny[0].clients) : [],
-        rawStartAtFormat: rawDataAny?.[0]?.start_at || "N/A",
-        appointmentsTimezone: rawDataAny?.[0]?.appointment_timezone || "N/A",
-        clinicianIdUsed: formattedClinicianId
+        hasError: !!queryError,
+        errorMessage: queryError?.message || null,
+        errorDetails: queryError?.details || null,
+        errorHint: queryError?.hint || null,
+        rawResponse: rawDataAny,
+        queryExecuted: {
+          table: 'appointments',
+          clinician_id: formattedClinicianId,
+          date_range: { from: fromUTCISO, to: toUTCISO },
+          status: 'scheduled'
+        }
       });
+
+      // STEP 2: DATABASE VERIFICATION LOGGING
+      if (rawDataAny && rawDataAny.length > 0) {
+        console.log('[useAppointments] STEP 2 - Database Verification - Appointments Found:', {
+          totalCount: rawDataAny.length,
+          clinicianIds: [...new Set(rawDataAny.map((apt: any) => apt.clinician_id))],
+          requestedClinicianId: formattedClinicianId,
+          clinicianIdMatches: rawDataAny.every((apt: any) => apt.clinician_id === formattedClinicianId),
+          dateRange: {
+            earliest: rawDataAny.length > 0 ? Math.min(...rawDataAny.map((apt: any) => new Date(apt.start_at).getTime())) : null,
+            latest: rawDataAny.length > 0 ? Math.max(...rawDataAny.map((apt: any) => new Date(apt.start_at).getTime())) : null
+          },
+          sampleAppointments: rawDataAny.slice(0, 2).map((apt: any) => ({
+            id: apt.id,
+            clinician_id: apt.clinician_id,
+            start_at: apt.start_at,
+            end_at: apt.end_at,
+            appointment_timezone: apt.appointment_timezone,
+            status: apt.status,
+            hasValidTimes: !!(apt.start_at && apt.end_at)
+          }))
+        });
+      } else {
+        console.log('[useAppointments] STEP 2 - Database Verification - NO APPOINTMENTS FOUND:', {
+          queryParams: {
+            clinician_id: formattedClinicianId,
+            start_at_gte: fromUTCISO,
+            end_at_lte: toUTCISO,
+            status: 'scheduled'
+          },
+          possibleIssues: [
+            'No appointments exist for this clinician',
+            'Date range excludes all appointments',
+            'Clinician ID mismatch',
+            'All appointments have different status',
+            'Timezone conversion error'
+          ]
+        });
+      }
 
       if (queryError) {
         console.error(
-          "[useAppointments] Error fetching appointments:",
+          "[useAppointments] STEP 1 - Supabase Query Error:",
           queryError
         );
         throw new Error(queryError.message);
@@ -232,12 +305,12 @@ export const useAppointments = (
 
       // Cast the raw data while ensuring proper validation
       if (!rawDataAny) {
-        console.warn("[useAppointments] No data returned from Supabase");
+        console.warn("[useAppointments] STEP 1 - No data returned from Supabase");
         return [];
       }
 
       console.log(
-        `[useAppointments] Fetched ${rawDataAny.length || 0} raw appointments.`
+        `[useAppointments] STEP 1 - Processing ${rawDataAny.length || 0} raw appointments.`
       );
 
       // Safely process the data with standardized client name formatting using our shared function

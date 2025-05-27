@@ -74,6 +74,21 @@ const CalendarPage = () => {
     appointmentRefreshTrigger
   });
   
+  // Calculate date range for debugging
+  const fromDate = subWeeks(currentDate, 4);
+  const toDate = addWeeks(currentDate, 8);
+  
+  // STEP 1: DETAILED LOGGING FOR useAppointments HOOK PARAMETERS
+  console.log('[CalendarPage] STEP 1 - useAppointments Hook Parameters:', {
+    selectedClinicianId,
+    fromDate: fromDate.toISOString(),
+    toDate: toDate.toISOString(),
+    userTimeZone,
+    appointmentRefreshTrigger,
+    currentDate: currentDate.toISOString(),
+    dateRangeDays: Math.ceil((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24))
+  });
+  
   // Fetch appointments with better date range
   const {
     appointments,
@@ -82,11 +97,60 @@ const CalendarPage = () => {
     refetch: refetchAppointments
   } = useAppointments(
     selectedClinicianId,
-    subWeeks(currentDate, 4),
-    addWeeks(currentDate, 8),
+    fromDate,
+    toDate,
     userTimeZone,
     appointmentRefreshTrigger
   );
+
+  // STEP 1: DETAILED LOGGING FOR useAppointments HOOK RESULTS
+  console.log('[CalendarPage] STEP 1 - useAppointments Hook Results:', {
+    appointmentsCount: appointments?.length || 0,
+    appointmentsArray: appointments,
+    isLoadingAppointments,
+    appointmentsError: appointmentsError?.message || null,
+    hasError: !!appointmentsError,
+    isDataEmpty: !appointments || appointments.length === 0
+  });
+
+  // STEP 1: LOG DETAILED APPOINTMENT DATA IF ANY EXISTS
+  if (appointments && appointments.length > 0) {
+    console.log('[CalendarPage] STEP 1 - Detailed Appointment Data:', {
+      totalCount: appointments.length,
+      firstThreeAppointments: appointments.slice(0, 3).map(apt => ({
+        id: apt.id,
+        client_id: apt.client_id,
+        clinician_id: apt.clinician_id,
+        start_at: apt.start_at,
+        end_at: apt.end_at,
+        appointment_timezone: apt.appointment_timezone,
+        clientName: apt.clientName,
+        status: apt.status,
+        type: apt.type
+      })),
+      allClinicianIds: [...new Set(appointments.map(apt => apt.clinician_id))],
+      dateRange: {
+        earliest: Math.min(...appointments.map(apt => new Date(apt.start_at).getTime())),
+        latest: Math.max(...appointments.map(apt => new Date(apt.start_at).getTime()))
+      }
+    });
+  } else {
+    console.log('[CalendarPage] STEP 1 - NO APPOINTMENTS FOUND - Detailed Analysis:', {
+      selectedClinicianId,
+      isClinicianIdValid: !!selectedClinicianId,
+      isClinicianIdUUID: selectedClinicianId ? /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(selectedClinicianId) : false,
+      queryDateRange: {
+        from: fromDate.toISOString(),
+        to: toDate.toISOString(),
+        includesCurrentWeek: fromDate <= currentDate && currentDate <= toDate
+      },
+      hookState: {
+        isLoading: isLoadingAppointments,
+        hasError: !!appointmentsError,
+        errorMessage: appointmentsError?.message
+      }
+    });
+  }
 
   console.log('[CalendarPage] Appointments hook result:', {
     appointmentsCount: appointments?.length || 0,
