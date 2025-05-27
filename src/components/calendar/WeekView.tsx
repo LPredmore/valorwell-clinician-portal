@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { format } from 'date-fns';
 import { useWeekViewDataSimplified } from './week-view/useWeekViewDataSimplified';
@@ -12,6 +11,7 @@ import { convertAppointmentBlockToAppointment } from '@/utils/appointmentUtils';
 import AppointmentDetailsDialog from './AppointmentDetailsDialog';
 import { Appointment } from '@/types/appointment';
 import CalendarErrorBoundary from './CalendarErrorBoundary';
+import { useTimeRange } from '@/hooks/useTimeRange';
 
 interface WeekViewProps {
   days: Date[];
@@ -30,9 +30,6 @@ interface WeekViewProps {
   onAppointmentDelete?: (appointmentId: string) => void;
 }
 
-// Generate timezone-aware time slots for the day (30-minute intervals)
-const START_HOUR = 7; // 7 AM
-const END_HOUR = 19; // 7 PM
 const INTERVAL_MINUTES = 30;
 
 const WeekView: React.FC<WeekViewProps> = ({
@@ -100,36 +97,6 @@ const WeekView: React.FC<WeekViewProps> = ({
     })) || []
   });
 
-  // Generate timezone-aware TIME_SLOTS using clinician's timezone for grid positioning
-  const TIME_SLOTS = useMemo(() => {
-    console.log('[WeekView] GENERATING TIME_SLOTS for clinician timezone:', validClinicianTimeZone);
-    
-    const slots: DateTime[] = [];
-    // Create a base date in the clinician's timezone (today at midnight)
-    const baseDate = DateTime.now().setZone(validClinicianTimeZone).startOf('day');
-    
-    for (let hour = START_HOUR; hour < END_HOUR; hour++) {
-      for (let minute = 0; minute < 60; minute += INTERVAL_MINUTES) {
-        const slot = baseDate.set({ hour, minute, second: 0, millisecond: 0 });
-        slots.push(slot);
-      }
-    }
-    
-    console.log('[WeekView] GENERATED TIME_SLOTS:', {
-      count: slots.length,
-      timezone: validClinicianTimeZone,
-      firstSlot: slots[0]?.toFormat('HH:mm'),
-      lastSlot: slots[slots.length - 1]?.toFormat('HH:mm'),
-      sampleSlots: slots.slice(0, 5).map(slot => ({
-        time: slot.toFormat('HH:mm'),
-        iso: slot.toISO(),
-        zone: slot.zoneName
-      }))
-    });
-    
-    return slots;
-  }, [validClinicianTimeZone]);
-
   // Use useWeekViewDataSimplified with correct parameters
   const {
     loading: hookLoading,
@@ -149,6 +116,44 @@ const WeekView: React.FC<WeekViewProps> = ({
     validUserTimeZone,
     validClinicianTimeZone
   );
+
+  // Calculate dynamic time range based on actual data
+  const { startHour, endHour } = useTimeRange({
+    appointmentBlocks: appointmentBlocks || [],
+    timeBlocks: timeBlocks || [],
+    weekDays: weekDays || []
+  });
+
+  // Generate timezone-aware TIME_SLOTS using dynamic range and clinician's timezone
+  const TIME_SLOTS = useMemo(() => {
+    console.log('[WeekView] GENERATING DYNAMIC TIME_SLOTS:', {
+      startHour,
+      endHour,
+      timezone: validClinicianTimeZone,
+      totalHours: endHour - startHour
+    });
+    
+    const slots: DateTime[] = [];
+    // Create a base date in the clinician's timezone (today at midnight)
+    const baseDate = DateTime.now().setZone(validClinicianTimeZone).startOf('day');
+    
+    for (let hour = startHour; hour < endHour; hour++) {
+      for (let minute = 0; minute < 60; minute += INTERVAL_MINUTES) {
+        const slot = baseDate.set({ hour, minute, second: 0, millisecond: 0 });
+        slots.push(slot);
+      }
+    }
+    
+    console.log('[WeekView] GENERATED DYNAMIC TIME_SLOTS:', {
+      count: slots.length,
+      timezone: validClinicianTimeZone,
+      firstSlot: slots[0]?.toFormat('HH:mm'),
+      lastSlot: slots[slots.length - 1]?.toFormat('HH:mm'),
+      dynamicRange: `${startHour}:00 - ${endHour}:00`
+    });
+    
+    return slots;
+  }, [validClinicianTimeZone, startHour, endHour]);
 
   // DEBUGGING: Log processed data from hook
   console.log('[WeekView] PROCESSED DATA FROM HOOK:', {
@@ -390,6 +395,7 @@ const WeekView: React.FC<WeekViewProps> = ({
             <p>User Timezone: {validUserTimeZone}</p>
             <p>Clinician Timezone: {validClinicianTimeZone}</p>
             <p>Raw Appointments: {appointments?.length || 0}</p>
+            <p>Dynamic Time Range: {startHour}:00 - {endHour}:00 ({endHour - startHour} hours)</p>
           </div>
         )}
       </div>
