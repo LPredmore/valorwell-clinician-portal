@@ -68,7 +68,7 @@ export const useWeekViewDataSimplified = (
     return result;
   }, [days, validClinicianTimeZone]);
 
-  // Helper function to process clinician availability into TimeBlocks
+  // FIXED: Helper function to process clinician availability into TimeBlocks with proper timezone handling
   const processClinicianAvailability = (clinicianData: any, weekDays: DateTime[]): TimeBlock[] => {
     if (!clinicianData) return [];
 
@@ -108,29 +108,27 @@ export const useWeekViewDataSimplified = (
             const [startHour, startMinute] = startTime.split(':').map(Number);
             const [endHour, endMinute] = endTime.split(':').map(Number);
 
-            // Create DateTime objects in the slot's timezone
-            const slotStart = weekDay.setZone(slotTimezone).set({
+            // FIXED: Create times directly in the clinician's current timezone for display
+            // This avoids DST conversion issues by not doing timezone conversions
+            const slotStart = weekDay.set({
               hour: startHour,
               minute: startMinute,
               second: 0,
               millisecond: 0
             });
 
-            const slotEnd = weekDay.setZone(slotTimezone).set({
+            const slotEnd = weekDay.set({
               hour: endHour,
               minute: endMinute,
               second: 0,
               millisecond: 0
             });
 
-            // Convert to clinician's timezone for calendar display
-            const displayStart = slotStart.setZone(validClinicianTimeZone);
-            const displayEnd = slotEnd.setZone(validClinicianTimeZone);
-            const displayDay = weekDay.startOf('day').setZone(validClinicianTimeZone);
+            const displayDay = weekDay.startOf('day');
 
             const timeBlock: TimeBlock = {
-              start: displayStart,
-              end: displayEnd,
+              start: slotStart,
+              end: slotEnd,
               day: displayDay,
               availabilityIds: [`clinician-${dayOfWeekName}-${slotNum}`],
               isException: false,
@@ -139,16 +137,17 @@ export const useWeekViewDataSimplified = (
 
             processedTimeBlocks.push(timeBlock);
 
-            console.log('[useWeekViewDataSimplified] Created availability time block:', {
+            console.log('[useWeekViewDataSimplified] FIXED: Created availability time block without timezone conversion:', {
               day: weekDay.toFormat('yyyy-MM-dd'),
               dayOfWeek: dayOfWeekName,
               slot: slotNum,
               originalStart: startTime,
               originalEnd: endTime,
-              slotTimezone,
-              displayStart: displayStart.toFormat('HH:mm'),
-              displayEnd: displayEnd.toFormat('HH:mm'),
-              displayTimezone: validClinicianTimeZone
+              storedSlotTimezone: slotTimezone,
+              displayStart: slotStart.toFormat('HH:mm'),
+              displayEnd: slotEnd.toFormat('HH:mm'),
+              displayTimezone: validClinicianTimeZone,
+              noTimezoneConversion: true
             });
           } catch (error) {
             console.error('[useWeekViewDataSimplified] Error processing availability slot:', {
@@ -163,7 +162,7 @@ export const useWeekViewDataSimplified = (
       }
     });
 
-    console.log('[useWeekViewDataSimplified] Processed availability blocks:', {
+    console.log('[useWeekViewDataSimplified] FIXED: Processed availability blocks without timezone shifts:', {
       count: processedTimeBlocks.length,
       timezone: validClinicianTimeZone,
       blocks: processedTimeBlocks.map(b => ({
@@ -280,7 +279,7 @@ export const useWeekViewDataSimplified = (
 
         setClinicianAvailability(clinicianData);
 
-        // Process the availability data into time blocks
+        // FIXED: Process the availability data using the corrected processing logic
         const processedTimeBlocks = processClinicianAvailability(clinicianData, weekDays);
         setTimeBlocks(processedTimeBlocks);
 
