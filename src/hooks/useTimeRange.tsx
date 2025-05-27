@@ -30,10 +30,6 @@ export const useTimeRange = ({
     const DEFAULT_START = 7; // 7 AM
     const DEFAULT_END = 19; // 7 PM
     
-    // Safety bounds
-    const MIN_START = 6; // 6 AM earliest
-    const MAX_END = 22; // 10 PM latest
-    
     // Padding in hours
     const PADDING = 1;
 
@@ -86,11 +82,11 @@ export const useTimeRange = ({
       };
     }
 
-    // Add padding and apply bounds
-    const paddedStart = Math.max(MIN_START, earliestHour - PADDING);
-    const paddedEnd = Math.min(MAX_END, latestHour + PADDING);
+    // Add padding with basic hour validation (0-23 range)
+    const paddedStart = Math.max(0, earliestHour - PADDING);
+    const paddedEnd = Math.min(23, latestHour + PADDING);
 
-    console.log('[useTimeRange] Calculated range:', {
+    console.log('[useTimeRange] Calculated range (no bounds):', {
       originalEarliest: earliestHour,
       originalLatest: latestHour,
       paddedStart,
