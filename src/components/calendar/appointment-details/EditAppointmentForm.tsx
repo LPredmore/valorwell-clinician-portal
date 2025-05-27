@@ -29,6 +29,7 @@ interface EditAppointmentFormProps {
     notes?: string;
     clinician_id: string;
     appointment_timezone?: string;
+    recurring_group_id?: string | null;
     client?: {
       client_first_name: string;
       client_last_name: string;
@@ -37,13 +38,15 @@ interface EditAppointmentFormProps {
   onCancel: () => void;
   onSave: () => void;
   userTimeZone: string;
+  editMode?: 'single' | 'future' | 'all';
 }
 
 const EditAppointmentForm: React.FC<EditAppointmentFormProps> = ({
   appointment,
   onCancel,
   onSave,
-  userTimeZone
+  userTimeZone,
+  editMode = 'single'
 }) => {
   const [isLoading, setIsLoading] = React.useState(false);
   const { toast } = useToast();
@@ -112,24 +115,73 @@ const EditAppointmentForm: React.FC<EditAppointmentFormProps> = ({
         console.warn(`[EditAppointmentForm] No existing appointment_timezone, using clinician timezone: ${appointmentTimeZone}`);
       }
 
-      const { error } = await supabase
-        .from('appointments')
-        .update({
-          start_at: startUtc,
-          end_at: endUtc,
-          type: 'Therapy Session', // Always set to Therapy Session
-          status: values.status,
-          notes: values.notes,
-          appointment_timezone: appointmentTimeZone
-        })
-        .eq('id', appointment.id);
+      const updateData = {
+        start_at: startUtc,
+        end_at: endUtc,
+        type: 'Therapy Session', // Always set to Therapy Session
+        status: values.status,
+        notes: values.notes,
+        appointment_timezone: appointmentTimeZone
+      };
 
-      if (error) throw error;
+      if (editMode === 'single' && appointment.recurring_group_id) {
+        // For single edit of recurring appointment, break it from the series
+        const { error } = await supabase
+          .from('appointments')
+          .update({
+            ...updateData,
+            recurring_group_id: null,
+            appointment_recurring: null
+          })
+          .eq('id', appointment.id);
 
-      toast({
-        title: "Success",
-        description: "Appointment updated successfully",
-      });
+        if (error) throw error;
+        
+        toast({
+          title: "Success",
+          description: "Appointment updated and removed from recurring series.",
+        });
+      } else if (editMode === 'future' && appointment.recurring_group_id) {
+        // Update this and all future appointments in the series
+        const { error } = await supabase
+          .from('appointments')
+          .update(updateData)
+          .eq('recurring_group_id', appointment.recurring_group_id)
+          .gte('start_at', appointment.start_at);
+
+        if (error) throw error;
+        
+        toast({
+          title: "Success",
+          description: "This and all future appointments in the series have been updated.",
+        });
+      } else if (editMode === 'all' && appointment.recurring_group_id) {
+        // Update all appointments in the series
+        const { error } = await supabase
+          .from('appointments')
+          .update(updateData)
+          .eq('recurring_group_id', appointment.recurring_group_id);
+
+        if (error) throw error;
+        
+        toast({
+          title: "Success",
+          description: "All appointments in the series have been updated.",
+        });
+      } else {
+        // Regular single appointment update
+        const { error } = await supabase
+          .from('appointments')
+          .update(updateData)
+          .eq('id', appointment.id);
+
+        if (error) throw error;
+
+        toast({
+          title: "Success",
+          description: "Appointment updated successfully",
+        });
+      }
 
       onSave();
     } catch (error) {
@@ -151,6 +203,21 @@ const EditAppointmentForm: React.FC<EditAppointmentFormProps> = ({
     return 'Unknown Client';
   };
 
+  const getEditModeDescription = () => {
+    if (!appointment.recurring_group_id) return '';
+    
+    switch (editMode) {
+      case 'single':
+        return 'Editing only this appointment (will be removed from recurring series)';
+      case 'future':
+        return 'Editing this and all future appointments in the series';
+      case 'all':
+        return 'Editing all appointments in the series';
+      default:
+        return '';
+    }
+  };
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
@@ -159,6 +226,11 @@ const EditAppointmentForm: React.FC<EditAppointmentFormProps> = ({
           {!appointment.appointment_timezone && (
             <div className="text-xs text-amber-600 mb-2">
               ⚠️ No saved timezone for this appointment, using {TimeZoneService.getTimeZoneDisplayName(displayTimeZone)}
+            </div>
+          )}
+          {editMode !== 'single' && appointment.recurring_group_id && (
+            <div className="text-xs text-blue-600 mb-2">
+              ℹ️ {getEditModeDescription()}
             </div>
           )}
         </div>

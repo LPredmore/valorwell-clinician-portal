@@ -11,6 +11,7 @@ import { Appointment } from '@/types/appointment';
 import AppointmentDetails from './appointment-details/AppointmentDetails';
 import EditAppointmentForm from './appointment-details/EditAppointmentForm';
 import DeleteAppointmentDialog from './appointment-details/DeleteAppointmentDialog';
+import EditRecurringAppointmentDialog from './appointment-details/EditRecurringAppointmentDialog';
 
 interface AppointmentDetailsDialogProps {
   isOpen: boolean;
@@ -28,10 +29,14 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
   userTimeZone
 }) => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isEditRecurringDialogOpen, setIsEditRecurringDialogOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [editMode, setEditMode] = useState<'single' | 'future' | 'all'>('single');
   const { toast } = useToast();
 
   if (!appointment) return null;
+
+  const isRecurring = !!appointment.recurring_group_id;
 
   const handleAppointmentDeleted = () => {
     onClose();
@@ -41,6 +46,23 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
   const handleAppointmentSaved = () => {
     setIsEditing(false);
     onAppointmentUpdated();
+  };
+
+  const handleEditClick = () => {
+    if (isRecurring) {
+      setIsEditRecurringDialogOpen(true);
+    } else {
+      setIsEditing(true);
+    }
+  };
+
+  const handleEditOptionSelected = (option: 'single' | 'future' | 'all') => {
+    setEditMode(option);
+    setIsEditing(true);
+  };
+
+  const handleDeleteClick = () => {
+    setIsDeleteDialogOpen(true);
   };
 
   return (
@@ -59,12 +81,13 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
               onCancel={() => setIsEditing(false)}
               onSave={handleAppointmentSaved}
               userTimeZone={userTimeZone}
+              editMode={editMode}
             />
           ) : (
             <AppointmentDetails
               appointment={appointment}
-              onEditClick={() => setIsEditing(true)}
-              onDeleteClick={() => setIsDeleteDialogOpen(true)}
+              onEditClick={handleEditClick}
+              onDeleteClick={handleDeleteClick}
               onClose={onClose}
               onAppointmentUpdated={onAppointmentUpdated}
               userTimeZone={userTimeZone}
@@ -79,6 +102,12 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
         appointmentId={appointment.id}
         recurrenceId={appointment.recurring_group_id}
         onDeleteSuccess={handleAppointmentDeleted}
+      />
+
+      <EditRecurringAppointmentDialog
+        isOpen={isEditRecurringDialogOpen}
+        onOpenChange={setIsEditRecurringDialogOpen}
+        onEditOptionSelected={handleEditOptionSelected}
       />
     </>
   );
