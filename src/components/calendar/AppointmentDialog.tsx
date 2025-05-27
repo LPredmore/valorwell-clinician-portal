@@ -34,7 +34,6 @@ import { getUserTimeZone } from '@/utils/timeZoneUtils';
 import { getClinicianTimeZone } from '@/hooks/useClinicianData';
 import { supabase, getOrCreateVideoRoom } from '@/integrations/supabase/client';
 import { v4 as uuidv4 } from 'uuid';
-import { TimePicker } from "@/components/ui/time-picker"
 
 interface AppointmentDialogProps {
   isOpen: boolean;
@@ -122,6 +121,24 @@ const convertLocalToUTC = (date: Date, timeStr: string, timezone: string): Date 
   return utcDate;
 };
 
+// Helper function to generate time options for dropdown
+const generateTimeOptions = () => {
+  const options = [];
+  for (let hour = 0; hour < 24; hour++) {
+    for (let minute of [0, 30]) {
+      const time24 = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+      
+      // Convert to 12-hour format for display
+      const hour12 = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+      const ampm = hour < 12 ? 'AM' : 'PM';
+      const display = `${hour12}:${minute.toString().padStart(2, '0')} ${ampm}`;
+      
+      options.push({ value: time24, label: display });
+    }
+  }
+  return options;
+};
+
 const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
   isOpen,
   onClose,
@@ -154,6 +171,8 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
       sampleClient: clients?.[0]
     });
   }, [clients, loadingClients]);
+
+  const timeOptions = generateTimeOptions();
 
   useEffect(() => {
     if (selectedDate && selectedTimeSlot) {
@@ -518,11 +537,18 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
 
           <div>
             <Label htmlFor="startTime">Start Time (1 hour appointment)</Label>
-            <TimePicker
-              value={startTime}
-              onChange={setStartTime}
-              className="mt-2"
-            />
+            <Select onValueChange={setStartTime} value={startTime}>
+              <SelectTrigger className="mt-2">
+                <SelectValue placeholder="Select start time" />
+              </SelectTrigger>
+              <SelectContent className="max-h-[200px]">
+                {timeOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div>

@@ -23,7 +23,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { TimePicker } from '@/components/ui/time-picker';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -51,6 +57,24 @@ interface EditAppointmentFormProps {
   editMode?: 'single' | 'future' | 'all';
 }
 
+// Helper function to generate time options for dropdown
+const generateTimeOptions = () => {
+  const options = [];
+  for (let hour = 0; hour < 24; hour++) {
+    for (let minute of [0, 30]) {
+      const time24 = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+      
+      // Convert to 12-hour format for display
+      const hour12 = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+      const ampm = hour < 12 ? 'AM' : 'PM';
+      const display = `${hour12}:${minute.toString().padStart(2, '0')} ${ampm}`;
+      
+      options.push({ value: time24, label: display });
+    }
+  }
+  return options;
+};
+
 const EditAppointmentForm: React.FC<EditAppointmentFormProps> = ({
   appointment,
   onCancel,
@@ -60,6 +84,8 @@ const EditAppointmentForm: React.FC<EditAppointmentFormProps> = ({
 }) => {
   const [isLoading, setIsLoading] = React.useState(false);
   const { toast } = useToast();
+
+  const timeOptions = generateTimeOptions();
 
   // CRITICAL: Always use appointment's saved timezone for editing
   const getDisplayTimezone = () => {
@@ -399,11 +425,18 @@ const EditAppointmentForm: React.FC<EditAppointmentFormProps> = ({
             <FormItem>
               <FormLabel>Start Time (1 hour appointment)</FormLabel>
               <FormControl>
-                <TimePicker
-                  value={field.value}
-                  onChange={field.onChange}
-                  className="mt-2"
-                />
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <SelectTrigger className="mt-2">
+                    <SelectValue placeholder="Select start time" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[200px]">
+                    {timeOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </FormControl>
               <FormMessage />
               <p className="text-xs text-muted-foreground mt-1">
