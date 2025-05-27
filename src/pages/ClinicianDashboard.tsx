@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, AlertCircle } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
@@ -19,7 +20,7 @@ const ClinicianDashboard = () => {
   const [clinicianTimeZone, setClinicianTimeZone] = useState<string>(TimeZoneService.DEFAULT_TIMEZONE);
   const [isLoadingTimeZone, setIsLoadingTimeZone] = useState(true);
   
-  // PHASE 2: Add refreshTrigger state for proper data management
+  // STEP 3: Add refreshTrigger state for proper data management
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
   
   // Ensure timezone is always a string
@@ -47,11 +48,11 @@ const ClinicianDashboard = () => {
         setIsLoadingTimeZone(true);
         try {
           const timeZone = await getClinicianTimeZone(currentUserId);
-          console.log("[ClinicianDashboard] PHASE 2 - Fetched clinician timezone:", { timeZone, type: typeof timeZone, isArray: Array.isArray(timeZone) });
+          console.log("[ClinicianDashboard] STEP 3 - Fetched clinician timezone:", { timeZone, type: typeof timeZone, isArray: Array.isArray(timeZone) });
           
           // Ensure timezone is a string
           const safeTimeZone = Array.isArray(timeZone) ? timeZone[0] : timeZone;
-          console.log("[ClinicianDashboard] PHASE 2 - Safe timezone after conversion:", { safeTimeZone, type: typeof safeTimeZone });
+          console.log("[ClinicianDashboard] STEP 3 - Safe timezone after conversion:", { safeTimeZone, type: typeof safeTimeZone });
           
           setClinicianTimeZone(safeTimeZone);
         } catch (error) {
@@ -67,11 +68,12 @@ const ClinicianDashboard = () => {
     fetchClinicianTimeZone();
   }, [currentUserId]);
 
-  // CRITICAL FIX: Correct useAppointments call with proper parameter order
-  console.log("[ClinicianDashboard] CRITICAL FIX - Calling useAppointments with parameters:", {
+  // STEP 3: FIX - Correct useAppointments call with proper parameter order
+  console.log("[ClinicianDashboard] STEP 3 FIX - Calling useAppointments with corrected parameters:", {
     currentUserId,
     safeClinicianTimeZone,
     refreshTrigger,
+    parameterOrder: "useAppointments(clinicianId, undefined, undefined, clinicianTimeZone, refreshTrigger)",
     parameterTypes: {
       currentUserId: typeof currentUserId,
       safeClinicianTimeZone: typeof safeClinicianTimeZone,
@@ -103,10 +105,10 @@ const ClinicianDashboard = () => {
     undefined, 
     safeClinicianTimeZone, 
     refreshTrigger
-  ); // CRITICAL FIX: Proper parameter order
+  ); // STEP 3 FIX: Correct parameter order - refreshTrigger is now in position 5
 
-  // PHASE 2: Enhanced logging for duplicate card debugging
-  console.log("[ClinicianDashboard] PHASE 2 - Data validation for duplicate prevention:", {
+  // STEP 3: Enhanced logging for duplicate card debugging
+  console.log("[ClinicianDashboard] STEP 3 - Data validation for duplicate prevention:", {
     currentUserId,
     refreshTrigger,
     totalAppointments: appointments?.length || 0,
@@ -117,18 +119,18 @@ const ClinicianDashboard = () => {
     hasError: !!error
   });
 
-  // PHASE 2: Log appointment IDs to detect duplicates
+  // STEP 3: Log appointment IDs to detect duplicates
   if (appointments?.length > 0) {
     const appointmentIds = appointments.map(apt => apt.id);
     const uniqueIds = [...new Set(appointmentIds)];
     if (appointmentIds.length !== uniqueIds.length) {
-      console.error("[ClinicianDashboard] PHASE 2 - DUPLICATE APPOINTMENTS DETECTED:", {
+      console.error("[ClinicianDashboard] STEP 3 - DUPLICATE APPOINTMENTS DETECTED:", {
         totalAppointments: appointmentIds.length,
         uniqueAppointments: uniqueIds.length,
         duplicateIds: appointmentIds.filter((id, index) => appointmentIds.indexOf(id) !== index)
       });
     } else {
-      console.log("[ClinicianDashboard] PHASE 2 - No duplicate appointments detected");
+      console.log("[ClinicianDashboard] STEP 3 - No duplicate appointments detected");
     }
   }
 
@@ -140,7 +142,7 @@ const ClinicianDashboard = () => {
   const closeSessionDidNotOccurDialog = () => {
     setShowSessionDidNotOccurDialog(false);
     setSelectedAppointmentForNoShow(null);
-    // PHASE 2: Trigger refresh to update appointment lists
+    // STEP 3: Trigger refresh to update appointment lists
     setRefreshTrigger(prev => prev + 1);
   };
 
@@ -263,7 +265,7 @@ const ClinicianDashboard = () => {
     };
   };
 
-  console.log("[ClinicianDashboard] PHASE 2 - Rendering with corrected data management:", {
+  console.log("[ClinicianDashboard] STEP 3 - Rendering with corrected data management:", {
     clinicianTimeZone,
     safeClinicianTimeZone,
     timeZoneDisplay,
@@ -278,7 +280,7 @@ const ClinicianDashboard = () => {
         <SessionNoteTemplate 
           onClose={() => {
             closeSessionTemplate();
-            // PHASE 2: Trigger refresh after closing session template
+            // STEP 3: Trigger refresh after closing session template
             setRefreshTrigger(prev => prev + 1);
           }}
           appointment={currentAppointment}
@@ -363,7 +365,7 @@ const ClinicianDashboard = () => {
           onClose={() => {
             setShowSessionDidNotOccurDialog(false);
             setSelectedAppointmentForNoShow(null);
-            // PHASE 2: Trigger refresh to update appointment lists
+            // STEP 3: Trigger refresh to update appointment lists
             setRefreshTrigger(prev => prev + 1);
           }}
           appointmentId={selectedAppointmentForNoShow.id}

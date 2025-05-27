@@ -26,7 +26,7 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
   onDocumentSession,
   onSessionDidNotOccur
 }) => {
-  // PHASE 3: CRITICAL - Implement proper timezone conversion flow
+  // STEP 5: CRITICAL - Implement proper timezone conversion flow
   // Step 1: Convert UTC start_at to appointment_timezone (source of truth)
   // Step 2: Convert that value to clinician's current timezone for display
   const getDisplayTimezone = () => {
@@ -35,15 +35,16 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
     }
     
     // Fallback to user timezone with warning
-    console.warn(`[AppointmentCard] PHASE 3 - Missing appointment_timezone for appointment ${appointment.id}, falling back to user timezone`);
+    console.warn(`[AppointmentCard] STEP 5 - Missing appointment_timezone for appointment ${appointment.id}, falling back to user timezone`);
     return userTimeZone;
   };
 
   const performTimezoneConversion = (utcTimestamp: string) => {
-    console.log(`[AppointmentCard] PHASE 3 - Starting timezone conversion for appointment ${appointment.id}:`, {
+    console.log(`[AppointmentCard] STEP 5 - Starting timezone conversion for appointment ${appointment.id}:`, {
       utcTimestamp,
       appointmentTimezone: appointment.appointment_timezone,
-      clinicianCurrentTimezone: userTimeZone
+      clinicianCurrentTimezone: userTimeZone,
+      conversionFlow: `UTC → appointment_timezone(${appointment.appointment_timezone}) → clinician_timezone(${userTimeZone})`
     });
 
     try {
@@ -51,7 +52,7 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
       const appointmentTimezone = getDisplayTimezone();
       const inAppointmentTimezone = TimeZoneService.fromUTC(utcTimestamp, appointmentTimezone);
       
-      console.log(`[AppointmentCard] PHASE 3 - Step 1 complete - UTC to appointment timezone:`, {
+      console.log(`[AppointmentCard] STEP 5 - Step 1 complete - UTC to appointment timezone:`, {
         original: utcTimestamp,
         appointmentTimezone,
         converted: inAppointmentTimezone.toFormat('yyyy-MM-dd HH:mm'),
@@ -61,35 +62,37 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
       // Step 2: Convert from appointment timezone to clinician's current timezone
       const inClinicianTimezone = inAppointmentTimezone.setZone(userTimeZone);
       
-      console.log(`[AppointmentCard] PHASE 3 - Step 2 complete - Appointment timezone to clinician timezone:`, {
+      console.log(`[AppointmentCard] STEP 5 - Step 2 complete - Appointment timezone to clinician timezone:`, {
         fromTimezone: appointmentTimezone,
         toTimezone: userTimeZone,
         converted: inClinicianTimezone.toFormat('yyyy-MM-dd HH:mm'),
-        iso: inClinicianTimezone.toISO()
+        iso: inClinicianTimezone.toISO(),
+        fullConversionFlow: `${utcTimestamp} → ${inAppointmentTimezone.toFormat('yyyy-MM-dd HH:mm')} (${appointmentTimezone}) → ${inClinicianTimezone.toFormat('yyyy-MM-dd HH:mm')} (${userTimeZone})`
       });
 
       return inClinicianTimezone;
     } catch (error) {
-      console.error(`[AppointmentCard] PHASE 3 - Timezone conversion error for appointment ${appointment.id}:`, error);
+      console.error(`[AppointmentCard] STEP 5 - Timezone conversion error for appointment ${appointment.id}:`, error);
       // Fallback: direct UTC to clinician timezone conversion
       return TimeZoneService.fromUTC(utcTimestamp, userTimeZone);
     }
   };
 
-  // PHASE 3: Apply the conversion flow to start and end times
+  // STEP 5: Apply the conversion flow to start and end times
   const displayStartTime = performTimezoneConversion(appointment.start_at);
   const displayEndTime = performTimezoneConversion(appointment.end_at);
 
   const displayTimeZoneLabel = TimeZoneService.getTimeZoneDisplayName(userTimeZone);
 
-  console.log(`[AppointmentCard] PHASE 3 - Final display times for appointment ${appointment.id}:`, {
+  console.log(`[AppointmentCard] STEP 5 - Final display times for appointment ${appointment.id}:`, {
     originalStartUTC: appointment.start_at,
     originalEndUTC: appointment.end_at,
     appointmentTimezone: appointment.appointment_timezone,
     clinicianTimezone: userTimeZone,
     displayStart: displayStartTime.toFormat('yyyy-MM-dd HH:mm'),
     displayEnd: displayEndTime.toFormat('yyyy-MM-dd HH:mm'),
-    displayTimezoneLabel: displayTimeZoneLabel
+    displayTimezoneLabel: displayTimeZoneLabel,
+    timezoneConversionSuccess: !!(appointment.appointment_timezone && appointment.appointment_timezone !== userTimeZone)
   });
 
   if (onDocumentSession) {
@@ -114,6 +117,12 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
             </span>
           </div>
           <div className="text-sm mt-1">{appointment.type}</div>
+          {/* STEP 5: Show timezone conversion info for debugging */}
+          {process.env.NODE_ENV !== 'production' && appointment.appointment_timezone && (
+            <div className="text-xs text-gray-400 mt-1">
+              Saved in: {appointment.appointment_timezone}
+            </div>
+          )}
         </CardContent>
         <CardFooter className="flex flex-col gap-2">
           <Button
@@ -163,6 +172,12 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
           </span>
         </div>
         <div className="text-sm mt-1">{appointment.type}</div>
+        {/* STEP 5: Show timezone conversion info for debugging */}
+        {process.env.NODE_ENV !== 'production' && appointment.appointment_timezone && (
+          <div className="text-xs text-gray-400 mt-1">
+            Saved in: {appointment.appointment_timezone}
+          </div>
+        )}
       </CardContent>
       {showStartButton && onStartSession && (
         <CardFooter>
