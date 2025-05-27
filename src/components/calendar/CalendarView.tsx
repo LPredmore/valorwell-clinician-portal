@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import WeekView from './WeekView';
 import MonthView from './MonthView';
@@ -39,17 +38,19 @@ const CalendarView = ({
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [isAppointmentDialogOpen, setIsAppointmentDialogOpen] = useState(false);
   
-  console.log('[CalendarView] Rendering with:', {
+  console.log('[CalendarView] CRITICAL FIX - Rendering with corrected timezone parameters:', {
     view,
     clinicianId,
     appointmentsCount: appointments?.length || 0,
-    timeZone: userTimeZone,
+    userTimeZone,
+    clinicianTimeZone,
     isLoading,
     hasError: !!error
   });
   
-  // Ensure we have a valid IANA timezone
-  const validTimeZone = TimeZoneService.ensureIANATimeZone(userTimeZone);
+  // Ensure we have valid IANA timezones
+  const validUserTimeZone = TimeZoneService.ensureIANATimeZone(userTimeZone);
+  const validClinicianTimeZone = TimeZoneService.ensureIANATimeZone(clinicianTimeZone);
   
   // Use a local refresh trigger that combines the external one plus local changes
   const [localRefreshTrigger, setLocalRefreshTrigger] = useState(0);
@@ -113,7 +114,7 @@ const CalendarView = ({
   // Handle availability block clicked in calendar
   const handleAvailabilityClick = (date: DateTime | Date, availabilityBlock: AvailabilityBlock) => {
     const dateTime = date instanceof Date ? 
-      TimeZoneService.fromJSDate(date, validTimeZone) : date;
+      TimeZoneService.fromJSDate(date, validUserTimeZone) : date;
       
     console.log(`[CalendarView] Availability clicked for ${dateTime.toFormat('yyyy-MM-dd')} - Block:`, availabilityBlock);
   };
@@ -204,10 +205,52 @@ const CalendarView = ({
               selectedClinicianId={clinicianId}
               refreshTrigger={combinedRefreshTrigger}
               appointments={appointments}
-              onAppointmentClick={handleAppointmentClick}
-              onAvailabilityClick={handleAvailabilityClick}
-              onAppointmentUpdate={handleAppointmentDragUpdate}
-              userTimeZone={validTimeZone}
+              onAppointmentClick={setSelectedAppointment}
+              onAvailabilityClick={(date: DateTime | Date, availabilityBlock: AvailabilityBlock) => {
+                const dateTime = date instanceof Date ? 
+                  TimeZoneService.fromJSDate(date, validUserTimeZone) : date;
+                console.log(`[CalendarView] Availability clicked for ${dateTime.toFormat('yyyy-MM-dd')} - Block:`, availabilityBlock);
+              }}
+              onAppointmentUpdate={(appointmentId: string, newStartAt: string, newEndAt: string) => {
+                console.log('[CalendarView] Appointment updated via drag-and-drop, triggering calendar refresh...');
+                
+                if (appointmentId === "refresh-trigger" && !newStartAt && !newEndAt) {
+                  setLocalRefreshTrigger(prev => prev + 1);
+                  return;
+                }
+                
+                if (appointmentId && newStartAt && newEndAt) {
+                  console.log('[CalendarView] Updating appointment:', {
+                    appointmentId,
+                    newStartAt,
+                    newEndAt
+                  });
+                  
+                  (async () => {
+                    try {
+                      const { supabase } = await import('@/integrations/supabase/client');
+                      const { error } = await supabase
+                        .from('appointments')
+                        .update({
+                          start_at: newStartAt,
+                          end_at: newEndAt
+                        })
+                        .eq('id', appointmentId);
+                        
+                      if (error) {
+                        throw error;
+                      }
+                      
+                      console.log('[CalendarView] Successfully updated appointment in database');
+                      setLocalRefreshTrigger(prev => prev + 1);
+                    } catch (error) {
+                      console.error('[CalendarView] Error updating appointment:', error);
+                    }
+                  })();
+                }
+              }}
+              userTimeZone={validUserTimeZone}
+              clinicianTimeZone={validClinicianTimeZone} // CRITICAL FIX: Now provided
               isLoading={isLoading}
               error={error}
             />
@@ -221,9 +264,13 @@ const CalendarView = ({
                 const appointment = appointments.find(app => app.client_id === clientId);
                 return appointment?.clientName || 'Unknown Client';
               }}
-              onAppointmentClick={handleAppointmentClick}
-              onAvailabilityClick={handleAvailabilityClick}
-              userTimeZone={validTimeZone}
+              onAppointmentClick={setSelectedAppointment}
+              onAvailabilityClick={(date: DateTime | Date, availabilityBlock: AvailabilityBlock) => {
+                const dateTime = date instanceof Date ? 
+                  TimeZoneService.fromJSDate(date, validUserTimeZone) : date;
+                console.log(`[CalendarView] Availability clicked for ${dateTime.toFormat('yyyy-MM-dd')} - Block:`, availabilityBlock);
+              }}
+              userTimeZone={validUserTimeZone}
             />
           )}
         </div>
@@ -232,8 +279,11 @@ const CalendarView = ({
           <div className="md:col-span-1">
             <ClinicianAvailabilityPanel 
               clinicianId={clinicianId} 
-              onAvailabilityUpdated={handleAvailabilityUpdated}
-              userTimeZone={validTimeZone}
+              onAvailabilityUpdated={() => {
+                console.log('[CalendarView] Availability updated, triggering calendar refresh...');
+                setLocalRefreshTrigger(prev => prev + 1);
+              }}
+              userTimeZone={validUserTimeZone}
             />
           </div>
         )}
@@ -246,8 +296,13 @@ const CalendarView = ({
             setSelectedAppointment(null);
           }}
           appointment={selectedAppointment}
-          onAppointmentUpdated={handleAppointmentUpdated}
-          userTimeZone={validTimeZone}
+          onAppointmentUpdated={() => {
+            console.log('[CalendarView] Appointment updated, triggering calendar refresh...');
+            setLocalRefreshTrigger(prev => prev + 1);
+            setIsAppointmentDialogOpen(false);
+            setSelectedAppointment(null);
+          }}
+          userTimeZone={validUserTimeZone}
         />
       </div>
     </CalendarErrorBoundary>

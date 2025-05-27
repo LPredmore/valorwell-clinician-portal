@@ -211,13 +211,27 @@ export const CalendarDebugWrapper: React.FC<CalendarDebugWrapperProps> = ({
                     id="date-input"
                     type="date"
                     value={DateTime.fromJSDate(currentDate).toFormat('yyyy-MM-dd')}
-                    onChange={handleDateChange}
+                    onChange={(e) => {
+                      const newDate = new Date(e.target.value);
+                      if (!isNaN(newDate.getTime())) {
+                        DebugUtils.log(DEBUG_CONTEXT, 'Date changed', {
+                          newDate: newDate.toISOString()
+                        });
+                        setCurrentDate(newDate);
+                      }
+                    }}
                   />
                 </div>
                 
                 <div className="space-y-2">
                   <Label htmlFor="timezone-select">Timezone</Label>
-                  <Select value={selectedTimezone} onValueChange={handleTimezoneChange}>
+                  <Select value={selectedTimezone} onValueChange={(value) => {
+                    DebugUtils.log(DEBUG_CONTEXT, 'Timezone changed', {
+                      oldTimezone: selectedTimezone,
+                      newTimezone: value
+                    });
+                    setSelectedTimezone(value);
+                  }}>
                     <SelectTrigger id="timezone-select">
                       <SelectValue placeholder="Select timezone" />
                     </SelectTrigger>
@@ -283,10 +297,29 @@ export const CalendarDebugWrapper: React.FC<CalendarDebugWrapperProps> = ({
               </div>
               
               <div className="flex justify-between">
-                <Button onClick={handleGenerateTestAppointment}>
+                <Button onClick={() => {
+                  DebugUtils.log(DEBUG_CONTEXT, 'Generating test appointment', {
+                    date: testDate,
+                    time: testTime,
+                    duration: testDuration,
+                    timezone: selectedTimezone
+                  });
+                  
+                  const testAppointment = AppointmentDebugUtils.generateTestAppointment(
+                    testDate,
+                    testTime,
+                    testDuration,
+                    selectedTimezone
+                  );
+                  
+                  setAppointments(prev => [...prev, testAppointment]);
+                }}>
                   Generate Test Appointment
                 </Button>
-                <Button variant="outline" onClick={handleClearTestAppointments}>
+                <Button variant="outline" onClick={() => {
+                  DebugUtils.log(DEBUG_CONTEXT, 'Clearing test appointments');
+                  setAppointments(initialAppointments);
+                }}>
                   Clear Test Appointments
                 </Button>
               </div>
@@ -310,7 +343,21 @@ export const CalendarDebugWrapper: React.FC<CalendarDebugWrapperProps> = ({
                 </div>
               </div>
               
-              <Button onClick={handleTestTimezoneConversion}>
+              <Button onClick={() => {
+                DebugUtils.log(DEBUG_CONTEXT, 'Testing timezone conversion', {
+                  date: testDate,
+                  time: testTime,
+                  fromTimezone: selectedTimezone,
+                  toTimezone: 'UTC'
+                });
+                
+                AppointmentDebugUtils.testTimezoneConversion(
+                  testDate,
+                  testTime,
+                  selectedTimezone,
+                  'UTC'
+                );
+              }}>
                 Test Timezone Conversion
               </Button>
             </TabsContent>
@@ -328,11 +375,28 @@ export const CalendarDebugWrapper: React.FC<CalendarDebugWrapperProps> = ({
             clinicianId={clinicianId}
             refreshTrigger={refreshTrigger}
             appointments={appointments}
-            getClientName={getClientName}
-            onAppointmentClick={handleAppointmentClick}
-            onAvailabilityClick={handleAvailabilityClick}
+            getClientName={(clientId: string): string => {
+              return `Client ${clientId.substring(0, 8)}`;
+            }}
+            onAppointmentClick={(appointment: Appointment) => {
+              DebugUtils.log(DEBUG_CONTEXT, 'Appointment clicked', {
+                appointmentId: appointment.id,
+                clientName: appointment.clientName || appointment.client_id
+              });
+              
+              // Analyze the appointment
+              AppointmentDebugUtils.analyzeAppointment(appointment, selectedTimezone);
+            }}
+            onAvailabilityClick={(date: Date, availabilityBlock: any) => {
+              // Convert Date to DateTime internally for logging
+              const dateDt = TimeZoneService.fromJSDate(date, selectedTimezone);
+              DebugUtils.log(DEBUG_CONTEXT, 'Availability clicked', {
+                date: dateDt.toISO(),
+                blockId: availabilityBlock.id
+              });
+            }}
             userTimeZone={selectedTimezone}
-            clinicianTimeZone={selectedTimezone} // CRITICAL FIX: Add missing clinicianTimeZone parameter
+            clinicianTimeZone={selectedTimezone} // CRITICAL FIX: Added missing clinicianTimeZone parameter
           />
         </CardContent>
       </Card>

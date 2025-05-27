@@ -1,4 +1,3 @@
-
 import React, { useMemo, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
@@ -23,7 +22,8 @@ export interface WeekViewDebugProps {
   getClientName?: (clientId: string) => string;
   onAppointmentClick?: (appointment: Appointment) => void;
   onAvailabilityClick?: (date: Date, availabilityBlock: any) => void;
-  userTimeZone: string; // Updated to use userTimeZone instead of clinicianTimeZone
+  userTimeZone: string;
+  clinicianTimeZone?: string; // CRITICAL FIX: Added missing prop
 }
 
 const WeekViewDebug: React.FC<WeekViewDebugProps> = ({
@@ -34,24 +34,28 @@ const WeekViewDebug: React.FC<WeekViewDebugProps> = ({
   getClientName = () => "Unknown Client",
   onAppointmentClick,
   onAvailabilityClick,
-  userTimeZone, // Updated to use userTimeZone
+  userTimeZone,
+  clinicianTimeZone // CRITICAL FIX: Now accepts the prop
 }) => {
-  // Validate user timezone with fallback
-  const validUserTimeZone = useMemo(() => {
-    if (!userTimeZone) {
-      console.warn('[WeekViewDebug] Missing userTimeZone, falling back to UTC');
+  // CRITICAL FIX: Use clinicianTimeZone when provided, fallback to userTimeZone
+  const effectiveTimeZone = clinicianTimeZone || userTimeZone;
+
+  // Validate timezone with fallback
+  const validTimeZone = useMemo(() => {
+    if (!effectiveTimeZone) {
+      console.warn('[WeekViewDebug] Missing timezone, falling back to UTC');
       return 'UTC';
     }
     
     try {
-      DateTime.now().setZone(userTimeZone);
-      console.log('[WeekViewDebug] Using validated user timezone:', userTimeZone);
-      return userTimeZone;
+      DateTime.now().setZone(effectiveTimeZone);
+      console.log('[WeekViewDebug] Using validated timezone:', effectiveTimeZone);
+      return effectiveTimeZone;
     } catch (error) {
-      console.warn('[WeekViewDebug] Invalid userTimeZone, falling back to UTC:', error);
+      console.warn('[WeekViewDebug] Invalid timezone, falling back to UTC:', error);
       return 'UTC';
     }
-  }, [userTimeZone]);
+  }, [effectiveTimeZone]);
 
   // Log component initialization
   DebugUtils.log(DEBUG_CONTEXT, 'Component initialized with props', {
@@ -59,25 +63,28 @@ const WeekViewDebug: React.FC<WeekViewDebugProps> = ({
     clinicianId,
     refreshTrigger,
     appointmentsCount: appointments.length,
-    validUserTimeZone
+    userTimeZone,
+    clinicianTimeZone,
+    effectiveTimeZone,
+    validTimeZone
   });
 
   // Validate props
   CalendarDebugUtils.validateHookParameters(DEBUG_CONTEXT, {
     currentDate,
     clinicianId,
-    userTimeZone: validUserTimeZone
+    userTimeZone: validTimeZone
   });
 
   // Generate days and time slots using Luxon DateTime exclusively
   const { days, timeSlots } = useMemo(() => {
     DebugUtils.log(DEBUG_CONTEXT, "Generating days with currentDate", {
       jsDate: currentDate.toISOString(),
-      luxonDate: TimeZoneService.fromJSDate(currentDate, validUserTimeZone).toISO(),
+      luxonDate: TimeZoneService.fromJSDate(currentDate, validTimeZone).toISO(),
     });
 
     // Use the TimeZoneService to generate days in the user's timezone
-    const today = TimeZoneService.fromJSDate(currentDate, validUserTimeZone);
+    const today = TimeZoneService.fromJSDate(currentDate, validTimeZone);
     const weekStart = TimeZoneService.startOfWeek(today);
     const weekEnd = TimeZoneService.endOfWeek(today);
     const daysInWeek = TimeZoneService.eachDayOfInterval(
@@ -95,7 +102,7 @@ const WeekViewDebug: React.FC<WeekViewDebugProps> = ({
     const slots = Array.from({ length: 21 }, (_, i) => {
       const minutes = i * 30;
       // Create a base date in user's timezone at 8:00 AM
-      const baseDate = DateTime.now().setZone(validUserTimeZone).set({
+      const baseDate = DateTime.now().setZone(validTimeZone).set({
         hour: 8,
         minute: 0,
         second: 0,
@@ -108,17 +115,17 @@ const WeekViewDebug: React.FC<WeekViewDebugProps> = ({
       count: slots.length,
       first: slots[0].toFormat('HH:mm'),
       last: slots[slots.length - 1].toFormat('HH:mm'),
-      timezone: validUserTimeZone
+      timezone: validTimeZone
     });
 
     return { days: daysInWeek, timeSlots: slots };
-  }, [currentDate, validUserTimeZone]);
+  }, [currentDate, validTimeZone]);
 
   // Use the custom hook to get all the data and utility functions
   const hookProps = {
     currentDate,
     clinicianId,
-    clinicianTimeZone: validUserTimeZone, // Hook still expects clinicianTimeZone parameter
+    clinicianTimeZone: validTimeZone, // CRITICAL FIX: Use effective timezone
     refreshTrigger,
     appointments,
     getClientName
@@ -159,7 +166,7 @@ const WeekViewDebug: React.FC<WeekViewDebugProps> = ({
           id: app.id,
           start_at: app.start_at,
           dateFormatted: app.start_at
-            ? TimeZoneService.fromUTC(app.start_at, validUserTimeZone).toFormat(
+            ? TimeZoneService.fromUTC(app.start_at, validTimeZone).toFormat(
                 "yyyy-MM-dd"
               )
             : "Invalid",
@@ -172,7 +179,7 @@ const WeekViewDebug: React.FC<WeekViewDebugProps> = ({
       for (let i = 0; i < samplesToLog; i++) {
         const app = appointments[i];
         const startLocalDateTime = app.start_at
-          ? TimeZoneService.fromUTC(app.start_at, validUserTimeZone)
+          ? TimeZoneService.fromUTC(app.start_at, validTimeZone)
           : null;
 
         DebugUtils.log(
@@ -219,7 +226,7 @@ const WeekViewDebug: React.FC<WeekViewDebugProps> = ({
       "Days in view",
       days.map((d) => d.toFormat('yyyy-MM-dd'))
     );
-  }, [appointments, appointmentBlocks, getClientName, days, validUserTimeZone, timeBlocks]);
+  }, [appointments, appointmentBlocks, getClientName, days, validTimeZone, timeBlocks]);
 
   // Adapter function to convert AppointmentBlock to Appointment
   const handleAppointmentBlockClick = (appointmentBlock: AppointmentBlock) => {
@@ -282,7 +289,7 @@ const WeekViewDebug: React.FC<WeekViewDebugProps> = ({
           exceptionId: exception.id
         });
         
-        const dayDt = TimeZoneService.fromJSDate(day, validUserTimeZone);
+        const dayDt = TimeZoneService.fromJSDate(day, validTimeZone);
         const availabilityBlock = {
           id: exception.id,
           day_of_week: dayDt.toFormat('EEEE'),
@@ -345,7 +352,7 @@ const WeekViewDebug: React.FC<WeekViewDebugProps> = ({
               <div className="text-sm text-gray-400">{day.toFormat('EEE')}</div>
               <div
                 className={`text-lg ${
-                  day.toFormat('yyyy-MM-dd') === DateTime.now().setZone(validUserTimeZone).toFormat('yyyy-MM-dd')
+                  day.toFormat('yyyy-MM-dd') === DateTime.now().setZone(validTimeZone).toFormat('yyyy-MM-dd')
                     ? "bg-valorwell-500 text-white rounded-full w-8 h-8 flex items-center justify-center mx-auto"
                     : ""
                 }`}
@@ -407,8 +414,32 @@ const WeekViewDebug: React.FC<WeekViewDebugProps> = ({
                       isEndOfBlock={blockEndCheck}
                       isStartOfAppointment={appointmentStartCheck}
                       isEndOfAppointment={false}
-                      handleAvailabilityBlockClick={handleAvailabilityBlockClick}
-                      onAppointmentClick={handleAppointmentBlockClick}
+                      handleAvailabilityBlockClick={(day: Date, block: any) => {
+                        if (onAvailabilityClick) {
+                          onAvailabilityClick(day, block);
+                        }
+                      }}
+                      onAppointmentClick={(appointmentBlock: any) => {
+                        if (onAppointmentClick) {
+                          let appointmentToSend: Appointment | undefined = appointments?.find(a => a.id === appointmentBlock.id);
+
+                          if (!appointmentToSend) {
+                            console.warn(`Original Appointment not found for ID: ${appointmentBlock.id}. Constructing from AppointmentBlock.`);
+                            appointmentToSend = {
+                              id: appointmentBlock.id,
+                              client_id: appointmentBlock.clientId,
+                              clinician_id: clinicianId || '',
+                              start_at: appointmentBlock.start.toISO(),
+                              end_at: appointmentBlock.end.toISO(),
+                              status: 'unknown',
+                              type: appointmentBlock.type || 'unknown',
+                              clientName: appointmentBlock.clientName
+                            };
+                          }
+                          
+                          onAppointmentClick(appointmentToSend);
+                        }
+                      }}
                       onAppointmentDragStart={() => {}}
                       onAppointmentDragOver={() => {}}
                       onAppointmentDrop={() => {}}

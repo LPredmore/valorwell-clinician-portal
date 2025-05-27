@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, AlertCircle } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
@@ -68,7 +67,18 @@ const ClinicianDashboard = () => {
     fetchClinicianTimeZone();
   }, [currentUserId]);
 
-  // PHASE 2: CRITICAL FIX - Add refreshTrigger parameter to useAppointments
+  // CRITICAL FIX: Correct useAppointments call with proper parameter order
+  console.log("[ClinicianDashboard] CRITICAL FIX - Calling useAppointments with parameters:", {
+    currentUserId,
+    safeClinicianTimeZone,
+    refreshTrigger,
+    parameterTypes: {
+      currentUserId: typeof currentUserId,
+      safeClinicianTimeZone: typeof safeClinicianTimeZone,
+      refreshTrigger: typeof refreshTrigger
+    }
+  });
+
   const {
     appointments,
     todayAppointments,
@@ -87,7 +97,13 @@ const ClinicianDashboard = () => {
     openSessionTemplate,
     closeSessionTemplate,
     closeVideoSession
-  } = useAppointments(currentUserId, refreshTrigger); // CRITICAL FIX: Added refreshTrigger parameter
+  } = useAppointments(
+    currentUserId, 
+    undefined, 
+    undefined, 
+    safeClinicianTimeZone, 
+    refreshTrigger
+  ); // CRITICAL FIX: Proper parameter order
 
   // PHASE 2: Enhanced logging for duplicate card debugging
   console.log("[ClinicianDashboard] PHASE 2 - Data validation for duplicate prevention:", {
@@ -307,7 +323,10 @@ const ClinicianDashboard = () => {
               timeZoneDisplay={timeZoneDisplay}
               userTimeZone={safeClinicianTimeZone}
               onDocumentSession={openSessionTemplate}
-              onSessionDidNotOccur={handleSessionDidNotOccur}
+              onSessionDidNotOccur={(appointment: Appointment) => {
+                setSelectedAppointmentForNoShow(appointment);
+                setShowSessionDidNotOccurDialog(true);
+              }}
             />
           </div>
           
@@ -341,7 +360,12 @@ const ClinicianDashboard = () => {
       {showSessionDidNotOccurDialog && selectedAppointmentForNoShow && (
         <SessionDidNotOccurDialog
           isOpen={showSessionDidNotOccurDialog}
-          onClose={closeSessionDidNotOccurDialog}
+          onClose={() => {
+            setShowSessionDidNotOccurDialog(false);
+            setSelectedAppointmentForNoShow(null);
+            // PHASE 2: Trigger refresh to update appointment lists
+            setRefreshTrigger(prev => prev + 1);
+          }}
           appointmentId={selectedAppointmentForNoShow.id}
           onStatusUpdate={() => {
             refetch();
