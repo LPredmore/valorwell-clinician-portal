@@ -332,6 +332,7 @@ export const CalendarDebugWrapper: React.FC<CalendarDebugWrapperProps> = ({
             onAppointmentClick={handleAppointmentClick}
             onAvailabilityClick={handleAvailabilityClick}
             userTimeZone={selectedTimezone}
+            clinicianTimeZone={selectedTimezone} // CRITICAL FIX: Add missing clinicianTimeZone parameter
           />
         </CardContent>
       </Card>
