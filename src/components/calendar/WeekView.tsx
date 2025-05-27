@@ -76,7 +76,7 @@ const WeekView: React.FC<WeekViewProps> = ({
     return TimeZoneService.ensureIANATimeZone(userTimeZone);
   }, [userTimeZone]);
   
-  console.log('[WeekView] STEP 2 FIX - Rendering with corrected parameters:', {
+  console.log('[WeekView] RENDERING DEBUG - Initial parameters:', {
     daysCount: days.length,
     appointmentsCount: appointments?.length || 0,
     clinicianId: selectedClinicianId,
@@ -86,23 +86,23 @@ const WeekView: React.FC<WeekViewProps> = ({
     hasError: !!error
   });
 
-  // STEP 4: Add comprehensive logging for raw appointment data
-  console.log('[WeekView] STEP 4 - Raw appointments received:', {
+  // DEBUGGING: Log raw appointment data received
+  console.log('[WeekView] RAW APPOINTMENT DATA:', {
     appointmentsArray: appointments,
     count: appointments?.length || 0,
     isEmpty: !appointments || appointments.length === 0,
-    sampleAppointment: appointments?.[0] ? {
-      id: appointments[0].id,
-      start_at: appointments[0].start_at,
-      end_at: appointments[0].end_at,
-      appointment_timezone: appointments[0].appointment_timezone,
-      clientName: appointments[0].clientName
-    } : null
+    sampleAppointments: appointments?.slice(0, 3).map(apt => ({
+      id: apt.id,
+      start_at: apt.start_at,
+      end_at: apt.end_at,
+      appointment_timezone: apt.appointment_timezone,
+      clientName: apt.clientName
+    })) || []
   });
 
   // Generate timezone-aware TIME_SLOTS using clinician's timezone for grid positioning
   const TIME_SLOTS = useMemo(() => {
-    console.log('[WeekView] STEP 2 - Generating timezone-aware TIME_SLOTS for clinician timezone:', validClinicianTimeZone);
+    console.log('[WeekView] GENERATING TIME_SLOTS for clinician timezone:', validClinicianTimeZone);
     
     const slots: DateTime[] = [];
     // Create a base date in the clinician's timezone (today at midnight)
@@ -115,18 +115,22 @@ const WeekView: React.FC<WeekViewProps> = ({
       }
     }
     
-    console.log('[WeekView] STEP 2 - Generated timezone-aware TIME_SLOTS:', {
+    console.log('[WeekView] GENERATED TIME_SLOTS:', {
       count: slots.length,
       timezone: validClinicianTimeZone,
       firstSlot: slots[0]?.toFormat('HH:mm'),
       lastSlot: slots[slots.length - 1]?.toFormat('HH:mm'),
-      sampleSlot: slots[10]?.toISO() // 10:00 AM slot for reference
+      sampleSlots: slots.slice(0, 5).map(slot => ({
+        time: slot.toFormat('HH:mm'),
+        iso: slot.toISO(),
+        zone: slot.zoneName
+      }))
     });
     
     return slots;
   }, [validClinicianTimeZone]);
 
-  // STEP 2: Use useWeekViewDataSimplified with correct parameters
+  // Use useWeekViewDataSimplified with correct parameters
   const {
     loading: hookLoading,
     error: hookError,
@@ -146,36 +150,39 @@ const WeekView: React.FC<WeekViewProps> = ({
     validClinicianTimeZone
   );
 
-  // STEP 4: Add comprehensive data validation and logging
-  console.log('[WeekView] STEP 4 - Data validation after hook processing:', {
+  // DEBUGGING: Log processed data from hook
+  console.log('[WeekView] PROCESSED DATA FROM HOOK:', {
     rawAppointments: appointments?.length || 0,
     processedAppointmentBlocks: appointmentBlocks?.length || 0,
-    rawTimeBlocks: timeBlocks?.length || 0,
+    processedTimeBlocks: timeBlocks?.length || 0,
     weekDaysGenerated: weekDays?.length || 0,
     isHookLoading: hookLoading,
     hookError: hookError?.toString()
   });
 
-  // STEP 4: Log sample processed data for debugging
+  // DEBUGGING: Log detailed appointment blocks if any exist
   if (appointmentBlocks?.length > 0) {
-    console.log('[WeekView] STEP 4 - Sample processed appointment block:', {
-      id: appointmentBlocks[0].id,
-      originalStart: appointmentBlocks[0].start_at,
-      originalTimezone: appointmentBlocks[0].appointment_timezone,
-      processedStart: appointmentBlocks[0].start.toFormat('yyyy-MM-dd HH:mm'),
-      processedTimezone: appointmentBlocks[0].start.zoneName,
-      clientName: appointmentBlocks[0].clientName
-    });
+    console.log('[WeekView] DETAILED APPOINTMENT BLOCKS:', appointmentBlocks.map(block => ({
+      id: block.id,
+      clientName: block.clientName,
+      originalStart: block.start_at,
+      originalTimezone: block.appointment_timezone,
+      processedStart: block.start.toFormat('yyyy-MM-dd HH:mm'),
+      processedEnd: block.end.toFormat('yyyy-MM-dd HH:mm'),
+      processedTimezone: block.start.zoneName,
+      startHour: block.start.hour,
+      startMinute: block.start.minute
+    })));
+  } else {
+    console.log('[WeekView] NO APPOINTMENT BLOCKS FOUND - This is likely the issue!');
   }
 
-  if (timeBlocks?.length > 0) {
-    console.log('[WeekView] STEP 4 - Sample processed time block:', {
-      start: timeBlocks[0].start.toFormat('yyyy-MM-dd HH:mm'),
-      end: timeBlocks[0].end.toFormat('yyyy-MM-dd HH:mm'),
-      timezone: timeBlocks[0].start.zoneName,
-      availabilityIds: timeBlocks[0].availabilityIds
-    });
-  }
+  // DEBUGGING: Log week days
+  console.log('[WeekView] WEEK DAYS:', weekDays.map(day => ({
+    date: day.toFormat('yyyy-MM-dd'),
+    dayOfWeek: day.toFormat('EEE'),
+    timezone: day.zoneName
+  })));
 
   // Handle click on an availability block - now accepts Date object
   const handleAvailabilityBlockClick = (day: Date, block: TimeBlock) => {
@@ -295,12 +302,53 @@ const WeekView: React.FC<WeekViewProps> = ({
                 const currentBlock = isAvailable ? getBlockForTimeSlot(dayTimeSlot) : undefined;
                 const appointment = getAppointmentForTimeSlot(dayTimeSlot);
                 
+                // DEBUGGING: Log appointment matching for specific time slots
+                const debugTimeSlot = timeSlot.hour >= 8 && timeSlot.hour <= 18;
+                if (debugTimeSlot) {
+                  console.log(`[WeekView] TIME SLOT MATCHING DEBUG for ${day.toFormat('yyyy-MM-dd')} ${timeSlot.toFormat('HH:mm')}:`, {
+                    dayTimeSlot: dayTimeSlot.toFormat('yyyy-MM-dd HH:mm'),
+                    dayTimeSlotISO: dayTimeSlot.toISO(),
+                    dayTimeSlotZone: dayTimeSlot.zoneName,
+                    isAvailable,
+                    hasCurrentBlock: !!currentBlock,
+                    hasAppointment: !!appointment,
+                    appointmentDetails: appointment ? {
+                      id: appointment.id,
+                      clientName: appointment.clientName,
+                      startTime: appointment.start.toFormat('yyyy-MM-dd HH:mm'),
+                      startISO: appointment.start.toISO(),
+                      startZone: appointment.start.zoneName
+                    } : null
+                  });
+                  
+                  // Log the call to getAppointmentForTimeSlot
+                  console.log(`[WeekView] CALLING getAppointmentForTimeSlot with:`, {
+                    input: dayTimeSlot.toISO(),
+                    result: appointment ? {
+                      id: appointment.id,
+                      start: appointment.start.toISO(),
+                      clientName: appointment.clientName
+                    } : 'null'
+                  });
+                }
+                
                 // Determine if this is the start or end of a block
                 const isStartOfBlock = currentBlock && 
                   timeSlot.toFormat('HH:mm') === currentBlock.start.toFormat('HH:mm');
                 
                 const isStartOfAppointment = appointment && 
                   timeSlot.toFormat('HH:mm') === appointment.start.toFormat('HH:mm');
+
+                // DEBUGGING: Log when we should be showing an appointment
+                if (appointment && debugTimeSlot) {
+                  console.log(`[WeekView] SHOULD SHOW APPOINTMENT:`, {
+                    timeSlot: timeSlot.toFormat('HH:mm'),
+                    appointmentStart: appointment.start.toFormat('HH:mm'),
+                    isStartOfAppointment,
+                    appointmentId: appointment.id,
+                    clientName: appointment.clientName
+                  });
+                }
 
                 return (
                   <div
@@ -338,9 +386,10 @@ const WeekView: React.FC<WeekViewProps> = ({
             <h3 className="text-lg font-semibold">Debug Info</h3>
             <p>Clinician ID: {selectedClinicianId || 'None'}</p>
             <p>Time Blocks: {timeBlocks.length}</p>
-            <p>Appointments: {appointmentBlocks.length}</p>
+            <p>Appointment Blocks: {appointmentBlocks.length}</p>
             <p>User Timezone: {validUserTimeZone}</p>
             <p>Clinician Timezone: {validClinicianTimeZone}</p>
+            <p>Raw Appointments: {appointments?.length || 0}</p>
           </div>
         )}
       </div>

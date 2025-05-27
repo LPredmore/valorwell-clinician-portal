@@ -48,6 +48,26 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
   const formattedDay = dayDt.toFormat('yyyy-MM-dd');
   const formattedTime = timeSlotDt.toFormat('HH:mm');
 
+  // DEBUGGING: Log what this TimeSlot is rendering
+  const debugTimeSlot = timeSlotDt.hour >= 8 && timeSlotDt.hour <= 18;
+  if (debugTimeSlot) {
+    console.log(`[TimeSlot] RENDERING ${formattedDay} ${formattedTime}:`, {
+      hasAppointment: !!appointment,
+      appointmentDetails: appointment ? {
+        id: appointment.id,
+        clientName: appointment.clientName,
+        startTime: appointment.start.toFormat('HH:mm'),
+        endTime: appointment.end.toFormat('HH:mm')
+      } : null,
+      isStartOfAppointment,
+      isEndOfAppointment,
+      isAvailable,
+      hasCurrentBlock: !!currentBlock,
+      isStartOfBlock,
+      isEndOfBlock
+    });
+  }
+
   const handleDragOver = (e: React.DragEvent) => {
     if (onAppointmentDragOver) {
       e.preventDefault();
@@ -70,11 +90,23 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
   let onDragStart = undefined;
 
   if (appointment) {
+    // DEBUGGING: Log appointment rendering decision
+    if (debugTimeSlot) {
+      console.log(`[TimeSlot] RENDERING APPOINTMENT ${appointment.id} at ${formattedDay} ${formattedTime}:`, {
+        clientName: appointment.clientName,
+        isStartOfAppointment,
+        isEndOfAppointment,
+        appointmentStart: appointment.start.toFormat('HH:mm'),
+        appointmentEnd: appointment.end.toFormat('HH:mm'),
+        timeSlotTime: formattedTime
+      });
+    }
+
     onClick = (e: React.MouseEvent) => {
       e.stopPropagation();
       e.preventDefault();
       
-      console.log(`[TimeSlot] Looking for appointment with ID: ${appointment.id}`);
+      console.log(`[TimeSlot] Appointment clicked - Looking for appointment with ID: ${appointment.id}`);
       console.log(`[TimeSlot] Original appointments available: ${originalAppointments?.length || 0}`);
       
       try {
@@ -147,6 +179,15 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
     if (isStartOfAppointment) {
       className = `${baseAppointmentClass} ${positionClass} text-xs font-medium truncate appointment-start`;
       content = appointment.clientName || 'Unknown Client';
+      
+      // DEBUGGING: Log when we're showing appointment content
+      if (debugTimeSlot) {
+        console.log(`[TimeSlot] SHOWING APPOINTMENT CONTENT:`, {
+          content: content,
+          className: className,
+          appointmentId: appointment.id
+        });
+      }
     } else if (isEndOfAppointment) {
       className = `${baseAppointmentClass} ${positionClass} text-xs opacity-75 appointment-end`;
       content = '\u00A0';
@@ -183,6 +224,15 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
     }
   } else {
     className = 'h-full w-full z-0 relative empty-slot cursor-pointer';
+    
+    // DEBUGGING: Log empty slots during debug hours
+    if (debugTimeSlot) {
+      console.log(`[TimeSlot] EMPTY SLOT at ${formattedDay} ${formattedTime}:`, {
+        isAvailable,
+        hasCurrentBlock: !!currentBlock,
+        hasAppointment: !!appointment
+      });
+    }
   }
 
   const debugClass = appointment
@@ -192,6 +242,16 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
     : 'empty-slot';
 
   const shouldAcceptDrops = !appointment;
+
+  // DEBUGGING: Final render decision
+  if (debugTimeSlot) {
+    console.log(`[TimeSlot] FINAL RENDER DECISION for ${formattedDay} ${formattedTime}:`, {
+      renderType: appointment ? 'appointment' : (isAvailable && currentBlock) ? 'availability' : 'empty',
+      className,
+      content: typeof content === 'string' ? content : 'React element',
+      hasOnClick: !!onClick
+    });
+  }
 
   return (
     <div
