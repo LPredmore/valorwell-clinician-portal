@@ -99,14 +99,14 @@ const EditAppointmentForm: React.FC<EditAppointmentFormProps> = ({
     setIsLoading(true);
     try {
       // CRITICAL: Convert the edited time back to UTC using appointment's timezone
-      const startDateTime = DateTime.fromISO(values.start_at, { zone: displayTimeZone });
+      const newStartDateTime = DateTime.fromISO(values.start_at, { zone: displayTimeZone });
       
       // Calculate end time as 1 hour after start time
-      const endDateTime = startDateTime.plus({ hours: 1 });
+      const newEndDateTime = newStartDateTime.plus({ hours: 1 });
       
       // Convert both to UTC for storage in database
-      const startUtc = startDateTime.toUTC().toISO();
-      const endUtc = endDateTime.toUTC().toISO();
+      const startUtc = newStartDateTime.toUTC().toISO();
+      const endUtc = newEndDateTime.toUTC().toISO();
 
       // Use the existing appointment timezone or fetch the clinician's current timezone
       let appointmentTimeZone = appointment.appointment_timezone;
@@ -142,31 +142,109 @@ const EditAppointmentForm: React.FC<EditAppointmentFormProps> = ({
           description: "Appointment updated and removed from recurring series.",
         });
       } else if (editMode === 'future' && appointment.recurring_group_id) {
-        // Update this and all future appointments in the series
-        const { error } = await supabase
+        // Calculate time difference for shifting future appointments
+        const originalStartDateTime = DateTime.fromISO(appointment.start_at, { zone: 'UTC' });
+        const timeDiffMinutes = newStartDateTime.toUTC().diff(originalStartDateTime, 'minutes').minutes;
+        
+        console.log('[EditAppointmentForm] Updating future appointments with time shift:', {
+          originalStart: appointment.start_at,
+          newStart: startUtc,
+          timeDiffMinutes,
+          recurringGroupId: appointment.recurring_group_id
+        });
+
+        // Get all future appointments in the series
+        const { data: futureAppointments, error: fetchError } = await supabase
           .from('appointments')
-          .update(updateData)
+          .select('id, start_at, end_at')
           .eq('recurring_group_id', appointment.recurring_group_id)
           .gte('start_at', appointment.start_at);
 
-        if (error) throw error;
+        if (fetchError) throw fetchError;
+
+        // Update each appointment by applying the time shift
+        const updatePromises = futureAppointments.map(async (appt) => {
+          const apptStartDateTime = DateTime.fromISO(appt.start_at, { zone: 'UTC' });
+          const apptEndDateTime = DateTime.fromISO(appt.end_at, { zone: 'UTC' });
+          
+          const newApptStartDateTime = apptStartDateTime.plus({ minutes: timeDiffMinutes });
+          const newApptEndDateTime = apptEndDateTime.plus({ minutes: timeDiffMinutes });
+          
+          return supabase
+            .from('appointments')
+            .update({
+              start_at: newApptStartDateTime.toISO(),
+              end_at: newApptEndDateTime.toISO(),
+              status: values.status,
+              notes: values.notes,
+              appointment_timezone: appointmentTimeZone
+            })
+            .eq('id', appt.id);
+        });
+
+        const results = await Promise.all(updatePromises);
+        const errors = results.filter(result => result.error);
+        
+        if (errors.length > 0) {
+          console.error('[EditAppointmentForm] Errors updating future appointments:', errors);
+          throw new Error('Failed to update some future appointments');
+        }
         
         toast({
           title: "Success",
-          description: "This and all future appointments in the series have been updated.",
+          description: `Updated ${futureAppointments.length} future appointments in the series.`,
         });
       } else if (editMode === 'all' && appointment.recurring_group_id) {
-        // Update all appointments in the series
-        const { error } = await supabase
+        // Calculate time difference for shifting all appointments
+        const originalStartDateTime = DateTime.fromISO(appointment.start_at, { zone: 'UTC' });
+        const timeDiffMinutes = newStartDateTime.toUTC().diff(originalStartDateTime, 'minutes').minutes;
+        
+        console.log('[EditAppointmentForm] Updating all appointments with time shift:', {
+          originalStart: appointment.start_at,
+          newStart: startUtc,
+          timeDiffMinutes,
+          recurringGroupId: appointment.recurring_group_id
+        });
+
+        // Get all appointments in the series
+        const { data: allAppointments, error: fetchError } = await supabase
           .from('appointments')
-          .update(updateData)
+          .select('id, start_at, end_at')
           .eq('recurring_group_id', appointment.recurring_group_id);
 
-        if (error) throw error;
+        if (fetchError) throw fetchError;
+
+        // Update each appointment by applying the time shift
+        const updatePromises = allAppointments.map(async (appt) => {
+          const apptStartDateTime = DateTime.fromISO(appt.start_at, { zone: 'UTC' });
+          const apptEndDateTime = DateTime.fromISO(appt.end_at, { zone: 'UTC' });
+          
+          const newApptStartDateTime = apptStartDateTime.plus({ minutes: timeDiffMinutes });
+          const newApptEndDateTime = apptEndDateTime.plus({ minutes: timeDiffMinutes });
+          
+          return supabase
+            .from('appointments')
+            .update({
+              start_at: newApptStartDateTime.toISO(),
+              end_at: newApptEndDateTime.toISO(),
+              status: values.status,
+              notes: values.notes,
+              appointment_timezone: appointmentTimeZone
+            })
+            .eq('id', appt.id);
+        });
+
+        const results = await Promise.all(updatePromises);
+        const errors = results.filter(result => result.error);
+        
+        if (errors.length > 0) {
+          console.error('[EditAppointmentForm] Errors updating all appointments:', errors);
+          throw new Error('Failed to update some appointments in the series');
+        }
         
         toast({
           title: "Success",
-          description: "All appointments in the series have been updated.",
+          description: `Updated all ${allAppointments.length} appointments in the series.`,
         });
       } else {
         // Regular single appointment update
