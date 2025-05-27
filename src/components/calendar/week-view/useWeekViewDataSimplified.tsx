@@ -10,27 +10,6 @@ import { TimeBlock, AppointmentBlock } from './types';
 
 type Client = ClientDetails;
 
-// Interface for availability data from the database
-interface AvailabilityData {
-  id: string;
-  clinician_id: string;
-  day_of_week: string;
-  start_time: string;
-  end_time: string;
-  is_active: boolean;
-}
-
-// Interface for availability exceptions from the database
-interface AvailabilityException {
-  id: string;
-  clinician_id: string;
-  specific_date: string;
-  start_time: string | null;
-  end_time: string | null;
-  is_deleted: boolean;
-  original_availability_id: string | null;
-}
-
 export const useWeekViewDataSimplified = (
   days: Date[],
   selectedClinicianId: string | null,
@@ -89,7 +68,7 @@ export const useWeekViewDataSimplified = (
     return result;
   }, [days, validClinicianTimeZone]);
 
-  // Fetch availability data from the correct tables
+  // Fetch availability data
   useEffect(() => {
     const fetchAvailability = async () => {
       if (!selectedClinicianId || !days || days.length === 0) {
@@ -102,180 +81,95 @@ export const useWeekViewDataSimplified = (
       try {
         console.log('[useWeekViewDataSimplified] Fetching availability for clinician:', selectedClinicianId);
         
-        // Fetch regular weekly availability
-        const { data: regularAvailability, error: availabilityError } = await supabase
-          .from('availability')
+        // PHASE 2: Use clinician timezone for date range calculations
+        const startDate = DateTime.fromJSDate(days[0], { zone: validClinicianTimeZone }).startOf('day').toUTC();
+        const endDate = DateTime.fromJSDate(days[days.length - 1], { zone: validClinicianTimeZone }).endOf('day').toUTC();
+
+        console.log('[useWeekViewDataSimplified] Fetching availability between:', {
+          startDate: startDate.toISO(),
+          endDate: endDate.toISO(),
+          clinicianTimeZone: validClinicianTimeZone
+        });
+
+        const { data: availabilityData, error: availabilityError } = await supabase
+          .from('availability_blocks')
           .select('*')
           .eq('clinician_id', selectedClinicianId)
+          .gte('start_at', startDate.toISO())
+          .lte('end_at', endDate.toISO())
           .eq('is_active', true);
 
         if (availabilityError) {
-          console.error('[useWeekViewDataSimplified] Error fetching regular availability:', availabilityError);
+          console.error('[useWeekViewDataSimplified] Error fetching availability:', availabilityError);
           setError(availabilityError.message);
           return;
         }
 
-        console.log('[useWeekViewDataSimplified] Fetched regular availability:', {
-          count: regularAvailability?.length || 0,
-          availability: regularAvailability
+        const blocks = availabilityData || [];
+        console.log('[useWeekViewDataSimplified] Fetched availability blocks:', {
+          count: blocks.length,
+          blocks: blocks.map(b => ({
+            id: b.id,
+            start_at: b.start_at,
+            end_at: b.end_at
+          }))
         });
+        setAvailability(blocks);
 
-        // Calculate date range for exceptions
-        const startDate = DateTime.fromJSDate(days[0], { zone: validClinicianTimeZone }).startOf('day');
-        const endDate = DateTime.fromJSDate(days[days.length - 1], { zone: validClinicianTimeZone }).endOf('day');
-
-        // Fetch availability exceptions for the week
-        const { data: availabilityExceptions, error: exceptionsError } = await supabase
-          .from('availability_exceptions')
-          .select('*')
-          .eq('clinician_id', selectedClinicianId)
-          .gte('specific_date', startDate.toFormat('yyyy-MM-dd'))
-          .lte('specific_date', endDate.toFormat('yyyy-MM-dd'));
-
-        if (exceptionsError) {
-          console.error('[useWeekViewDataSimplified] Error fetching availability exceptions:', exceptionsError);
-          setError(exceptionsError.message);
-          return;
-        }
-
-        console.log('[useWeekViewDataSimplified] Fetched availability exceptions:', {
-          count: availabilityExceptions?.length || 0,
-          exceptions: availabilityExceptions
-        });
-
-        // Process availability data into time blocks
+        // PHASE 2: Process time blocks using clinician timezone exclusively
         const processedTimeBlocks: TimeBlock[] = [];
+        blocks.forEach(block => {
+          if (!block.start_at || !block.end_at) {
+            console.warn('[useWeekViewDataSimplified] Skipping block with missing times:', block.id);
+            return;
+          }
 
-        // Process each day of the week
-        weekDays.forEach(day => {
-          const dayOfWeek = day.toFormat('EEEE').toLowerCase(); // e.g., 'monday', 'tuesday'
-          const specificDate = day.toFormat('yyyy-MM-dd');
+          try {
+            // PHASE 3: Enhanced debug logging for timezone operations
+            const start = DateTime.fromISO(block.start_at, { zone: 'UTC' }).setZone(validClinicianTimeZone);
+            const end = DateTime.fromISO(block.end_at, { zone: 'UTC' }).setZone(validClinicianTimeZone);
+            const day = start.startOf('day');
 
-          console.log('[useWeekViewDataSimplified] Processing day:', {
-            day: specificDate,
-            dayOfWeek,
-            timezone: validClinicianTimeZone
-          });
-
-          // Check for exceptions first
-          const dayExceptions = availabilityExceptions?.filter(exc => 
-            exc.specific_date === specificDate
-          ) || [];
-
-          if (dayExceptions.length > 0) {
-            console.log('[useWeekViewDataSimplified] Found exceptions for day:', {
-              date: specificDate,
-              exceptionsCount: dayExceptions.length,
-              exceptions: dayExceptions
+            console.log('[useWeekViewDataSimplified] Processing availability block in clinician timezone:', {
+              blockId: block.id,
+              utcStart: block.start_at,
+              utcEnd: block.end_at,
+              clinicianStart: start.toFormat('yyyy-MM-dd HH:mm'),
+              clinicianEnd: end.toFormat('yyyy-MM-dd HH:mm'),
+              day: day.toFormat('yyyy-MM-dd'),
+              timezone: validClinicianTimeZone,
+              startTzValid: start.isValid,
+              endTzValid: end.isValid
             });
 
-            // Process exceptions
-            dayExceptions.forEach(exception => {
-              if (exception.is_deleted) {
-                console.log('[useWeekViewDataSimplified] Skipping deleted exception:', exception.id);
-                return;
-              }
+            if (!start.isValid || !end.isValid) {
+              console.error('[useWeekViewDataSimplified] Invalid DateTime objects created:', {
+                start: start.invalidReason,
+                end: end.invalidReason
+              });
+              return;
+            }
 
-              if (exception.start_time && exception.end_time) {
-                try {
-                  // Parse time strings and create DateTime objects in clinician timezone
-                  const [startHour, startMinute] = exception.start_time.split(':').map(Number);
-                  const [endHour, endMinute] = exception.end_time.split(':').map(Number);
-
-                  const start = day.set({ hour: startHour, minute: startMinute, second: 0, millisecond: 0 });
-                  const end = day.set({ hour: endHour, minute: endMinute, second: 0, millisecond: 0 });
-
-                  if (start.isValid && end.isValid) {
-                    processedTimeBlocks.push({
-                      start,
-                      end,
-                      day,
-                      availabilityIds: [exception.id],
-                      isException: true,
-                      isStandalone: true
-                    });
-
-                    console.log('[useWeekViewDataSimplified] Added exception time block:', {
-                      date: specificDate,
-                      start: start.toFormat('HH:mm'),
-                      end: end.toFormat('HH:mm'),
-                      exceptionId: exception.id
-                    });
-                  }
-                } catch (error) {
-                  console.error('[useWeekViewDataSimplified] Error processing exception:', error);
-                }
-              }
+            processedTimeBlocks.push({
+              start,
+              end,
+              day,
+              availabilityIds: [block.id],
+              isException: false,
+              isStandalone: false
             });
-          } else {
-            // No exceptions, use regular availability
-            const dayAvailability = regularAvailability?.filter(avail => 
-              avail.day_of_week === dayOfWeek
-            ) || [];
-
-            console.log('[useWeekViewDataSimplified] Using regular availability for day:', {
-              date: specificDate,
-              dayOfWeek,
-              availabilityCount: dayAvailability.length,
-              availability: dayAvailability
-            });
-
-            // Check if any regular availability is cancelled by deleted exceptions
-            const deletedExceptions = availabilityExceptions?.filter(exc => 
-              exc.specific_date === specificDate && exc.is_deleted
-            ) || [];
-
-            dayAvailability.forEach(avail => {
-              // Check if this availability is cancelled by a deleted exception
-              const isCancelled = deletedExceptions.some(exc => 
-                exc.original_availability_id === avail.id
-              );
-
-              if (isCancelled) {
-                console.log('[useWeekViewDataSimplified] Skipping cancelled availability:', avail.id);
-                return;
-              }
-
-              try {
-                // Parse time strings and create DateTime objects in clinician timezone
-                const [startHour, startMinute] = avail.start_time.split(':').map(Number);
-                const [endHour, endMinute] = avail.end_time.split(':').map(Number);
-
-                const start = day.set({ hour: startHour, minute: startMinute, second: 0, millisecond: 0 });
-                const end = day.set({ hour: endHour, minute: endMinute, second: 0, millisecond: 0 });
-
-                if (start.isValid && end.isValid) {
-                  processedTimeBlocks.push({
-                    start,
-                    end,
-                    day,
-                    availabilityIds: [avail.id],
-                    isException: false,
-                    isStandalone: false
-                  });
-
-                  console.log('[useWeekViewDataSimplified] Added regular time block:', {
-                    date: specificDate,
-                    start: start.toFormat('HH:mm'),
-                    end: end.toFormat('HH:mm'),
-                    availabilityId: avail.id
-                  });
-                }
-              } catch (error) {
-                console.error('[useWeekViewDataSimplified] Error processing regular availability:', error);
-              }
-            });
+          } catch (error) {
+            console.error('[useWeekViewDataSimplified] Error processing time block:', error);
           }
         });
 
-        console.log('[useWeekViewDataSimplified] Final processed time blocks:', {
+        console.log('[useWeekViewDataSimplified] Processed time blocks:', {
           count: processedTimeBlocks.length,
           timezone: validClinicianTimeZone,
           blocks: processedTimeBlocks.map(b => ({
             day: b.day?.toFormat('yyyy-MM-dd'),
             start: b.start.toFormat('HH:mm'),
-            end: b.end.toFormat('HH:mm'),
-            isException: b.isException
+            end: b.end.toFormat('HH:mm')
           }))
         });
 
@@ -287,7 +181,7 @@ export const useWeekViewDataSimplified = (
     };
 
     fetchAvailability();
-  }, [selectedClinicianId, days, validClinicianTimeZone, refreshTrigger, weekDays]);
+  }, [selectedClinicianId, days, validClinicianTimeZone, refreshTrigger]);
 
   // Process appointments into appointment blocks using clinician's timezone
   useEffect(() => {
