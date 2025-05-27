@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -32,7 +33,7 @@ import { CalendarIcon } from "lucide-react"
 import { addDays, isBefore } from 'date-fns';
 import { getUserTimeZone } from '@/utils/timeZoneUtils';
 import { getClinicianTimeZone } from '@/hooks/useClinicianData';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, getOrCreateVideoRoom } from '@/integrations/supabase/client';
 import { v4 as uuidv4 } from 'uuid';
 
 interface AppointmentDialogProps {
@@ -169,7 +170,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
     try {
       console.log('[AppointmentDialog] Saving appointment:', appointmentData);
       
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('appointments')
         .insert([{
           client_id: appointmentData.clientId,
@@ -182,15 +183,30 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
           appointment_timezone: appointmentData.appointment_timezone,
           appointment_recurring: appointmentData.isRecurring ? appointmentData.recurringData?.recurringType : null,
           recurring_group_id: appointmentData.recurringGroupId || null
-        }]);
+        }])
+        .select()
+        .single();
 
       if (error) {
         console.error('[AppointmentDialog] Error saving appointment:', error);
         throw error;
       }
 
-      console.log('[AppointmentDialog] Appointment saved successfully');
-      return { success: true };
+      console.log('[AppointmentDialog] Appointment saved successfully, creating video room');
+      
+      // Create Daily.co video room URL for the new appointment
+      try {
+        const videoRoomResult = await getOrCreateVideoRoom(data.id, false);
+        if (videoRoomResult.success) {
+          console.log('[AppointmentDialog] Video room created successfully:', videoRoomResult.url);
+        } else {
+          console.warn('[AppointmentDialog] Failed to create video room, but appointment was saved:', videoRoomResult.error);
+        }
+      } catch (videoError) {
+        console.warn('[AppointmentDialog] Video room creation failed, but appointment was saved:', videoError);
+      }
+
+      return { success: true, data };
     } catch (error) {
       console.error('[AppointmentDialog] Save error:', error);
       return { success: false, error };
@@ -345,7 +361,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
             notes: notes,
             isRecurring: true,
             recurringData: recurringData,
-            appointment_timezone: clinicianTimezone, // Use clinician's timezone
+            appointment_timezone: clinicianTimezone,
             recurringGroupId: recurringGroupId,
           };
 
@@ -357,7 +373,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
 
         toast({
           title: "Success",
-          description: `${recurringDates.length} recurring appointments created successfully.`,
+          description: `${recurringDates.length} recurring appointments created successfully with video rooms.`,
           variant: "success",
         });
       } else {
@@ -371,7 +387,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
           notes: notes,
           isRecurring: false,
           recurringData: null,
-          appointment_timezone: clinicianTimezone, // Use clinician's timezone
+          appointment_timezone: clinicianTimezone,
         };
 
         const result = await saveAppointment(appointmentData);
@@ -381,7 +397,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
 
         toast({
           title: "Success",
-          description: "Appointment created successfully.",
+          description: "Appointment created successfully with video room.",
           variant: "success",
         });
       }
