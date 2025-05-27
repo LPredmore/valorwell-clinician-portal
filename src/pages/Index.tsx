@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '@/context/UserContext';
@@ -79,7 +78,7 @@ const Index = () => {
         if (userRole === 'admin') {
           navigate('/settings');
         } else if (userRole === 'clinician') {
-          navigate('/clinician-dashboard');
+          navigate('/calendar'); // FIX: Redirect clinicians to calendar instead of dashboard
         } else if (userRole === 'client') {
           // Inform client users they are on the wrong portal
           toast({
@@ -119,8 +118,8 @@ const Index = () => {
         navigate('/settings');
         redirected = true;
       } else if (userRole === 'clinician') {
-        console.log("[Index] Redirecting clinician to Dashboard page");
-        navigate('/clinician-dashboard');
+        console.log("[Index] Redirecting clinician to Calendar page"); // FIX: Updated log message
+        navigate('/calendar'); // FIX: Redirect to calendar instead of dashboard
         redirected = true;
       } else if (userRole === 'client') {
         console.log("[Index] Client on clinician portal - redirecting to login with message");

@@ -113,6 +113,24 @@ export const useAppointments = (
   });
 
   const { fromUTCISO, toUTCISO } = useMemo(() => {
+    // FIX: Use current week if no dates provided
+    if (!fromDate && !toDate) {
+      const now = DateTime.now().setZone(safeUserTimeZone);
+      const startOfWeek = now.startOf('week');
+      const endOfWeek = now.endOf('week');
+      
+      console.log("[useAppointments] STEP 1 - Using current week range:", {
+        startOfWeek: startOfWeek.toISO(),
+        endOfWeek: endOfWeek.toISO(),
+        timeZone: safeUserTimeZone
+      });
+      
+      return {
+        fromUTCISO: startOfWeek.toUTC().toISO(),
+        toUTCISO: endOfWeek.toUTC().toISO()
+      };
+    }
+    
     let fromISO: string | undefined;
     let toISO: string | undefined;
     try {
@@ -123,40 +141,15 @@ export const useAppointments = (
             .startOf('day') 
             .toUTC()
             .toISO();
-        
-        // Add 6 days to create a proper week window (since our view has 7 days)
-        const weekEnd = DateTime.fromJSDate(fromDate)
-          .setZone(safeUserTimeZone)
-          .startOf('day')
-          .plus({ days: 6 })
-          .endOf('day')
-          .toUTC()
-          .toISO();
-          
-        toISO = weekEnd;
-      } else if (toDate) {
-        // If only toDate exists, calculate a week window ending on toDate
+      }
+      
+      if (toDate) {
         toISO = 
           DateTime.fromJSDate(toDate)
             .setZone(safeUserTimeZone)
             .endOf('day')
             .toUTC()
             .toISO();
-            
-        const weekStart = DateTime.fromJSDate(toDate)
-          .setZone(safeUserTimeZone)
-          .endOf('day')
-          .minus({ days: 6 })
-          .startOf('day')
-          .toUTC()
-          .toISO();
-          
-        fromISO = weekStart;
-      } else {
-        // If neither from/to dates exist, fetch current UTC week
-        const now = DateTime.utc();
-        fromISO = now.startOf('week').toISO();
-        toISO = now.endOf('week').toISO();
       }
       
       // STEP 1: LOG CALCULATED DATE RANGE
@@ -176,6 +169,17 @@ export const useAppointments = (
     }
   }, [fromDate, toDate, safeUserTimeZone]);
 
+  // FIX: Always enable the query if we have a clinician ID
+  const queryEnabled = Boolean(formattedClinicianId);
+  
+  console.log("[useAppointments] STEP 1 - Query Configuration:", {
+    queryEnabled,
+    formattedClinicianId,
+    fromUTCISO,
+    toUTCISO,
+    refreshTrigger
+  });
+
   const {
     data: fetchedAppointments = [],
     isLoading,
@@ -192,7 +196,7 @@ export const useAppointments = (
         fromUTCISO,
         toUTCISO,
         refreshTrigger,
-        queryEnabled: !!formattedClinicianId
+        queryEnabled
       });
 
       if (!formattedClinicianId) {
@@ -236,6 +240,8 @@ export const useAppointments = (
         status: 'scheduled',
         orderBy: 'start_at ASC'
       });
+      
+      console.log("[useAppointments] STEP 1 - EXECUTING SUPABASE QUERY NOW...");
       
       const { data: rawDataAny, error: queryError } = await query;
 
@@ -364,7 +370,7 @@ export const useAppointments = (
         };
       });
     },
-    enabled: !!formattedClinicianId,
+    enabled: queryEnabled,
   });
 
   // Helper function to add display formatting
