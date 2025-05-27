@@ -19,6 +19,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { getClinicianTimeZone } from '@/hooks/useClinicianData';
 import { TimeZoneService } from '@/utils/timeZoneService';
+import { v4 as uuidv4 } from 'uuid';
 
 interface EditAppointmentFormProps {
   appointment: {
@@ -29,6 +30,7 @@ interface EditAppointmentFormProps {
     notes?: string;
     clinician_id: string;
     appointment_timezone?: string;
+    recurring_group_id?: string;
     client?: {
       client_first_name: string;
       client_last_name: string;
@@ -37,13 +39,15 @@ interface EditAppointmentFormProps {
   onCancel: () => void;
   onSave: () => void;
   userTimeZone: string;
+  editOption?: 'single' | 'future' | 'all';
 }
 
 const EditAppointmentForm: React.FC<EditAppointmentFormProps> = ({
   appointment,
   onCancel,
   onSave,
-  userTimeZone
+  userTimeZone,
+  editOption = 'single'
 }) => {
   const [isLoading, setIsLoading] = React.useState(false);
   const { toast } = useToast();
@@ -112,19 +116,70 @@ const EditAppointmentForm: React.FC<EditAppointmentFormProps> = ({
         console.warn(`[EditAppointmentForm] No existing appointment_timezone, using clinician timezone: ${appointmentTimeZone}`);
       }
 
-      const { error } = await supabase
-        .from('appointments')
-        .update({
-          start_at: startUtc,
-          end_at: endUtc,
-          type: 'Therapy Session', // Always set to Therapy Session
-          status: values.status,
-          notes: values.notes,
-          appointment_timezone: appointmentTimeZone
-        })
-        .eq('id', appointment.id);
+      if (editOption === 'single' && appointment.recurring_group_id) {
+        // For single edit of recurring appointment, remove from series
+        const { error } = await supabase
+          .from('appointments')
+          .update({
+            start_at: startUtc,
+            end_at: endUtc,
+            type: 'Therapy Session',
+            status: values.status,
+            notes: values.notes,
+            appointment_timezone: appointmentTimeZone,
+            recurring_group_id: null, // Remove from recurring series
+            appointment_recurring: null
+          })
+          .eq('id', appointment.id);
 
-      if (error) throw error;
+        if (error) throw error;
+      } else if (editOption === 'future' && appointment.recurring_group_id) {
+        // Edit this and all future appointments in the series
+        const { error } = await supabase
+          .from('appointments')
+          .update({
+            start_at: startUtc,
+            end_at: endUtc,
+            type: 'Therapy Session',
+            status: values.status,
+            notes: values.notes,
+            appointment_timezone: appointmentTimeZone
+          })
+          .eq('recurring_group_id', appointment.recurring_group_id)
+          .gte('start_at', appointment.start_at);
+
+        if (error) throw error;
+      } else if (editOption === 'all' && appointment.recurring_group_id) {
+        // Edit all appointments in the series
+        const { error } = await supabase
+          .from('appointments')
+          .update({
+            start_at: startUtc,
+            end_at: endUtc,
+            type: 'Therapy Session',
+            status: values.status,
+            notes: values.notes,
+            appointment_timezone: appointmentTimeZone
+          })
+          .eq('recurring_group_id', appointment.recurring_group_id);
+
+        if (error) throw error;
+      } else {
+        // Single appointment or non-recurring appointment
+        const { error } = await supabase
+          .from('appointments')
+          .update({
+            start_at: startUtc,
+            end_at: endUtc,
+            type: 'Therapy Session',
+            status: values.status,
+            notes: values.notes,
+            appointment_timezone: appointmentTimeZone
+          })
+          .eq('id', appointment.id);
+
+        if (error) throw error;
+      }
 
       toast({
         title: "Success",
@@ -151,6 +206,21 @@ const EditAppointmentForm: React.FC<EditAppointmentFormProps> = ({
     return 'Unknown Client';
   };
 
+  const getEditOptionDescription = () => {
+    if (!appointment.recurring_group_id) return '';
+    
+    switch (editOption) {
+      case 'single':
+        return 'This appointment will be removed from the recurring series.';
+      case 'future':
+        return 'This and all future appointments in the series will be updated.';
+      case 'all':
+        return 'All appointments in the series will be updated.';
+      default:
+        return '';
+    }
+  };
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
@@ -159,6 +229,11 @@ const EditAppointmentForm: React.FC<EditAppointmentFormProps> = ({
           {!appointment.appointment_timezone && (
             <div className="text-xs text-amber-600 mb-2">
               ⚠️ No saved timezone for this appointment, using {TimeZoneService.getTimeZoneDisplayName(displayTimeZone)}
+            </div>
+          )}
+          {appointment.recurring_group_id && editOption && (
+            <div className="text-xs text-blue-600 mb-2">
+              📅 {getEditOptionDescription()}
             </div>
           )}
         </div>
