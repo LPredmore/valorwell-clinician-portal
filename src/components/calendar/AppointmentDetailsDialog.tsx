@@ -39,13 +39,15 @@ const AppointmentDetailsDialog: React.FC<AppointmentDetailsDialogProps> = ({
   const isRecurring = !!appointment.recurring_group_id;
 
   const handleAppointmentDeleted = () => {
+    console.log('[AppointmentDetailsDialog] Appointment deleted, triggering calendar refresh');
     onClose();
-    onAppointmentUpdated();
+    onAppointmentUpdated(); // This triggers the calendar refresh
   };
 
   const handleAppointmentSaved = () => {
+    console.log('[AppointmentDetailsDialog] Appointment saved, triggering calendar refresh');
     setIsEditing(false);
-    onAppointmentUpdated();
+    onAppointmentUpdated(); // This triggers the calendar refresh
   };
 
   const handleEditClick = () => {

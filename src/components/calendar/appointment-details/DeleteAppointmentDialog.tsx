@@ -80,8 +80,9 @@ const DeleteAppointmentDialog: React.FC<DeleteAppointmentDialogProps> = ({
         });
       }
       
+      console.log('[DeleteAppointmentDialog] Appointment deletion completed successfully, calling onDeleteSuccess callback');
       onOpenChange(false);
-      onDeleteSuccess();
+      onDeleteSuccess(); // This will trigger the calendar refresh
     } catch (error) {
       console.error('Error deleting appointment:', error);
       toast({

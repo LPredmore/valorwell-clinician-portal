@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -261,7 +260,8 @@ const EditAppointmentForm: React.FC<EditAppointmentFormProps> = ({
         });
       }
 
-      onSave();
+      console.log('[EditAppointmentForm] Appointment update completed successfully, calling onSave callback');
+      onSave(); // This will trigger the calendar refresh
     } catch (error) {
       console.error('Error updating appointment:', error);
       toast({
