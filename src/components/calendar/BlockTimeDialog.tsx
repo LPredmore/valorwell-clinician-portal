@@ -33,16 +33,6 @@ interface BlockTimeDialogProps {
   onBlockCreated: () => void;
 }
 
-// Debug logging utility
-const debugLog = (step: string, data?: any, isError: boolean = false) => {
-  const timestamp = new Date().toISOString();
-  const prefix = isError ? '❌ [BlockTime ERROR]' : '🔍 [BlockTime DEBUG]';
-  console.log(`${prefix} [${timestamp}] ${step}`);
-  if (data !== undefined) {
-    console.log(data);
-  }
-};
-
 // Helper function to generate time options for dropdown
 const generateTimeOptions = () => {
   const options = [];
@@ -73,89 +63,54 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
   const [blockLabel, setBlockLabel] = useState('Blocked');
   const [notes, setNotes] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [debugStatus, setDebugStatus] = useState<string>('');
   const { toast } = useToast();
 
   const timeOptions = generateTimeOptions();
 
-  // Debug state updates
-  const updateDebugStatus = (status: string) => {
-    setDebugStatus(status);
-    debugLog(`Status Update: ${status}`);
-  };
-
   // Reset form when dialog opens
   useEffect(() => {
     if (isOpen) {
-      debugLog('Dialog opened, resetting form');
       setSelectedDate(new Date());
       setStartTime('09:00');
       setEndTime('10:00');
       setBlockLabel('Blocked');
       setNotes('');
-      setDebugStatus('');
     }
   }, [isOpen]);
 
   // Validate form inputs
   const validateInputs = () => {
-    debugLog('Validating form inputs', {
-      selectedDate: selectedDate?.toISOString(),
-      selectedClinicianId,
-      startTime,
-      endTime,
-      blockLabel
-    });
-
     if (!selectedDate) {
-      debugLog('Validation failed: No date selected', null, true);
       return 'Please select a date';
     }
 
     if (!selectedClinicianId) {
-      debugLog('Validation failed: No clinician selected', null, true);
       return 'No clinician selected';
     }
 
     if (startTime >= endTime) {
-      debugLog('Validation failed: Invalid time range', { startTime, endTime }, true);
       return 'End time must be after start time';
     }
 
-    debugLog('Form validation passed');
     return null;
   };
 
-  // Ensure blocked time client exists with comprehensive error handling
+  // Ensure blocked time client exists with minimal required fields only
   const ensureBlockedTimeClient = async () => {
     try {
-      debugLog('Step 1: Checking if blocked time client exists');
-      updateDebugStatus('Checking blocked time client...');
-      
       // Check if blocked time client already exists
       const { data: existingClient, error: checkError } = await supabase
         .from('clients')
-        .select('id, client_first_name, client_last_name')
+        .select('id')
         .eq('id', BLOCKED_TIME_CLIENT_ID)
         .single();
 
-      debugLog('Client check query result', {
-        data: existingClient,
-        error: checkError,
-        errorCode: checkError?.code,
-        errorMessage: checkError?.message
-      });
-
       if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "not found"
-        debugLog('Database error during client check', checkError, true);
         throw new Error(`Database error checking client: ${checkError.message}`);
       }
 
       if (!existingClient) {
-        debugLog('Step 2: Creating blocked time client');
-        updateDebugStatus('Creating blocked time client...');
-        
-        // Create blocked time client with all required fields - FIXED: client_zipcode instead of client_zip
+        // Create blocked time client with only essential fields that exist in the schema
         const clientData = {
           id: BLOCKED_TIME_CLIENT_ID,
           client_first_name: 'Blocked',
@@ -167,53 +122,28 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
           client_address: 'System Internal',
           client_city: 'System',
           client_state: 'Internal',
-          client_zipcode: '00000', // FIXED: was client_zip
-          client_emergency_contact_name: 'System',
-          client_emergency_contact_phone: '000-000-0000',
-          client_emergency_contact_relationship: 'System',
+          client_zipcode: '00000',
           client_assigned_therapist: selectedClinicianId,
           client_status: 'active'
         };
 
-        debugLog('Attempting to insert client with data', clientData);
-
-        const { data: insertedClient, error: insertError } = await supabase
+        const { error: insertError } = await supabase
           .from('clients')
-          .insert(clientData)
-          .select();
-
-        debugLog('Client insert result', {
-          data: insertedClient,
-          error: insertError,
-          errorCode: insertError?.code,
-          errorMessage: insertError?.message,
-          errorHint: insertError?.hint,
-          errorDetails: insertError?.details
-        });
+          .insert(clientData);
 
         if (insertError) {
-          debugLog('Failed to create blocked time client', insertError, true);
+          console.error('Failed to create blocked time client:', insertError);
           throw new Error(`Failed to create blocked time client: ${insertError.message}`);
         }
-
-        debugLog('Successfully created blocked time client', insertedClient);
-      } else {
-        debugLog('Blocked time client already exists', existingClient);
       }
-
-      updateDebugStatus('Blocked time client ready');
     } catch (error) {
-      debugLog('Error in ensureBlockedTimeClient', error, true);
-      updateDebugStatus('Failed to setup blocked time client');
+      console.error('Error in ensureBlockedTimeClient:', error);
       throw error;
     }
   };
 
   const handleSubmit = async () => {
-    debugLog('=== BLOCK TIME SAVE STARTED ===');
-    updateDebugStatus('Starting save process...');
-    
-    // Step 1: Validate inputs
+    // Validate inputs
     const validationError = validateInputs();
     if (validationError) {
       toast({
@@ -227,13 +157,10 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
     setIsLoading(true);
 
     try {
-      // Step 2: Ensure blocked time client exists
+      // Ensure blocked time client exists
       await ensureBlockedTimeClient();
 
-      // Step 3: Get clinician's timezone with fallback
-      debugLog('Step 3: Getting clinician timezone');
-      updateDebugStatus('Getting clinician timezone...');
-      
+      // Get clinician's timezone with fallback
       let clinicianTimeZone;
       try {
         const timeZoneResult = await getClinicianTimeZone(selectedClinicianId!);
@@ -242,27 +169,14 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
         if (!clinicianTimeZone) {
           clinicianTimeZone = 'America/New_York'; // Default fallback
         }
-        
-        debugLog('Clinician timezone resolved', { 
-          original: timeZoneResult, 
-          resolved: clinicianTimeZone 
-        });
       } catch (tzError) {
-        debugLog('Error getting clinician timezone, using default', tzError, true);
+        console.error('Error getting clinician timezone, using default:', tzError);
         clinicianTimeZone = 'America/New_York';
       }
 
-      // Step 4: Parse times and create Date objects
-      debugLog('Step 4: Parsing date and time values');
-      updateDebugStatus('Processing date and time...');
-
+      // Parse times and create Date objects
       const [startHour, startMinute] = startTime.split(':').map(Number);
       const [endHour, endMinute] = endTime.split(':').map(Number);
-
-      debugLog('Parsed time components', {
-        startHour, startMinute, endHour, endMinute,
-        selectedDate: selectedDate!.toISOString()
-      });
 
       // Create start and end Date objects
       const startDateTime = new Date(selectedDate!);
@@ -275,16 +189,7 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
       const startAtISO = startDateTime.toISOString();
       const endAtISO = endDateTime.toISOString();
 
-      debugLog('Generated ISO timestamps', {
-        startAtISO,
-        endAtISO,
-        duration: (endDateTime.getTime() - startDateTime.getTime()) / (1000 * 60) + ' minutes'
-      });
-
-      // Step 5: Create the blocked time appointment
-      debugLog('Step 5: Creating appointment record');
-      updateDebugStatus('Creating appointment...');
-
+      // Create the blocked time appointment
       const appointmentData = {
         client_id: BLOCKED_TIME_CLIENT_ID,
         clinician_id: selectedClinicianId,
@@ -296,29 +201,14 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
         appointment_timezone: clinicianTimeZone
       };
 
-      debugLog('Attempting to insert appointment with data', appointmentData);
-
-      const { data: createdAppointment, error: appointmentError } = await supabase
+      const { error: appointmentError } = await supabase
         .from('appointments')
-        .insert(appointmentData)
-        .select();
-
-      debugLog('Appointment insert result', {
-        data: createdAppointment,
-        error: appointmentError,
-        errorCode: appointmentError?.code,
-        errorMessage: appointmentError?.message,
-        errorHint: appointmentError?.hint,
-        errorDetails: appointmentError?.details
-      });
+        .insert(appointmentData);
 
       if (appointmentError) {
-        debugLog('Failed to create appointment', appointmentError, true);
+        console.error('Failed to create appointment:', appointmentError);
         throw new Error(`Failed to create appointment: ${appointmentError.message}`);
       }
-
-      debugLog('Successfully created blocked time appointment', createdAppointment);
-      updateDebugStatus('Success!');
 
       toast({
         title: "Success",
@@ -328,8 +218,7 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
       onBlockCreated();
       onClose();
     } catch (error: any) {
-      debugLog('=== BLOCK TIME SAVE FAILED ===', error, true);
-      updateDebugStatus(`Failed: ${error.message}`);
+      console.error('Block time save failed:', error);
       
       // Enhanced error messages based on specific error types
       let errorMessage = "Failed to create time block.";
@@ -353,7 +242,6 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
       });
     } finally {
       setIsLoading(false);
-      debugLog('=== BLOCK TIME SAVE COMPLETED ===');
     }
   };
 
@@ -365,13 +253,6 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Debug Status Display (only shown when debugging) */}
-          {debugStatus && (
-            <div className="bg-gray-100 p-2 rounded text-sm text-gray-600">
-              Status: {debugStatus}
-            </div>
-          )}
-
           <div>
             <Label htmlFor="blockLabel">Block Label</Label>
             <Input
