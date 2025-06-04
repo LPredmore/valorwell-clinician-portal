@@ -1,5 +1,5 @@
 
-import React, { memo } from 'react';
+import React, { memo, useCallback } from 'react';
 import { TimeBlock, AppointmentBlock } from './types';
 import { Appointment } from '@/types/appointment';
 import { DateTime } from 'luxon';
@@ -42,26 +42,64 @@ const TimeSlotMemo: React.FC<TimeSlotProps> = memo(({
   onAppointmentDrop,
   originalAppointments
 }) => {
-  // Convert Date objects to DateTime internally when needed for formatting
-  const dayDt = TimeZoneService.fromJSDate(day, 'UTC');
-  const timeSlotDt = TimeZoneService.fromJSDate(timeSlot, 'UTC');
-  
-  const formattedDay = dayDt.toFormat('yyyy-MM-dd');
-  const formattedTime = timeSlotDt.toFormat('HH:mm');
-
-  const handleDragOver = React.useCallback((e: React.DragEvent) => {
+  // Always call hooks at the top level - never conditionally
+  const handleDragOver = useCallback((e: React.DragEvent) => {
     if (onAppointmentDragOver) {
       e.preventDefault();
       onAppointmentDragOver(day, timeSlot, e);
     }
   }, [onAppointmentDragOver, day, timeSlot]);
 
-  const handleDrop = React.useCallback((e: React.DragEvent) => {
+  const handleDrop = useCallback((e: React.DragEvent) => {
     if (onAppointmentDrop) {
       e.preventDefault();
       onAppointmentDrop(day, timeSlot, e);
     }
   }, [onAppointmentDrop, day, timeSlot]);
+
+  const handleAppointmentClickCallback = useCallback((e: React.MouseEvent) => {
+    if (!appointment || !onAppointmentClick) return;
+    
+    e.stopPropagation();
+    e.preventDefault();
+    
+    try {
+      const originalAppointment = originalAppointments?.find(a => a.id === appointment.id);
+      
+      if (originalAppointment) {
+        onAppointmentClick(originalAppointment);
+      } else {
+        const fullAppointment = convertAppointmentBlockToAppointment(appointment, originalAppointments || []);
+        onAppointmentClick(fullAppointment);
+      }
+    } catch (error) {
+      console.error('[TimeSlot] Error handling appointment click:', error);
+    }
+  }, [appointment, originalAppointments, onAppointmentClick]);
+
+  const handleAvailabilityClickCallback = useCallback(() => {
+    if (currentBlock) {
+      handleAvailabilityBlockClick(day, currentBlock);
+    }
+  }, [currentBlock, handleAvailabilityBlockClick, day]);
+
+  const handleDragStartCallback = useCallback((e: React.DragEvent) => {
+    if (!appointment || !onAppointmentDragStart) return;
+    
+    const original = originalAppointments.find(a => a.id === appointment.id) || appointment;
+    e.dataTransfer.setData('application/json', JSON.stringify({
+      appointmentId: original.id,
+      clientName: original.clientName
+    }));
+    onAppointmentDragStart(original, e);
+  }, [appointment, originalAppointments, onAppointmentDragStart]);
+
+  // Convert Date objects to DateTime internally when needed for formatting
+  const dayDt = TimeZoneService.fromJSDate(day, 'UTC');
+  const timeSlotDt = TimeZoneService.fromJSDate(timeSlot, 'UTC');
+  
+  const formattedDay = dayDt.toFormat('yyyy-MM-dd');
+  const formattedTime = timeSlotDt.toFormat('HH:mm');
 
   let content = null;
   let className = '';
@@ -74,42 +112,14 @@ const TimeSlotMemo: React.FC<TimeSlotProps> = memo(({
     // Check if this is a blocked time appointment
     const isBlockedTime = isBlockedTimeAppointment(appointment);
     
-    onClick = React.useCallback((e: React.MouseEvent) => {
-      e.stopPropagation();
-      e.preventDefault();
-      
-      try {
-        const originalAppointment = originalAppointments?.find(a => a.id === appointment.id);
-        
-        if (originalAppointment) {
-          if (onAppointmentClick) {
-            onAppointmentClick(originalAppointment);
-          }
-        } else {
-          const fullAppointment = convertAppointmentBlockToAppointment(appointment, originalAppointments || []);
-          
-          if (onAppointmentClick) {
-            onAppointmentClick(fullAppointment);
-          }
-        }
-      } catch (error) {
-        console.error('[TimeSlot] Error handling appointment click:', error);
-      }
-    }, [appointment, originalAppointments, onAppointmentClick]);
+    onClick = handleAppointmentClickCallback;
 
     // Different styling for blocked time vs regular appointments
     const baseAppointmentClass = isBlockedTime 
       ? 'p-1 bg-red-100 border-l-4 border-red-500 h-full w-full cursor-pointer transition-colors hover:bg-red-200 z-20 relative'
       : 'p-1 bg-blue-100 border-l-4 border-blue-500 h-full w-full cursor-pointer transition-colors hover:bg-blue-200 z-20 relative';
 
-    onDragStart = React.useCallback((e: React.DragEvent) => {
-      const original = originalAppointments.find(a => a.id === appointment.id) || appointment;
-      e.dataTransfer.setData('application/json', JSON.stringify({
-        appointmentId: original.id,
-        clientName: original.clientName
-      }));
-      onAppointmentDragStart?.(original, e);
-    }, [appointment, originalAppointments, onAppointmentDragStart]);
+    onDragStart = handleDragStartCallback;
 
     let positionClass = '';
     const isMiddleOfAppointment = appointment && !isStartOfAppointment && !isEndOfAppointment;
@@ -157,11 +167,7 @@ const TimeSlotMemo: React.FC<TimeSlotProps> = memo(({
       className += ' border-b-0';
     }
 
-    onClick = React.useCallback(() => {
-      if (currentBlock) {
-        handleAvailabilityBlockClick(day, currentBlock);
-      }
-    }, [currentBlock, handleAvailabilityBlockClick, day]);
+    onClick = handleAvailabilityClickCallback;
 
     if (isStartOfBlock) {
       content = (

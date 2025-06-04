@@ -71,6 +71,9 @@ const WeekView: React.FC<WeekViewProps> = React.memo(({
   // Memoize the days array conversion to prevent unnecessary recalculations
   const memoizedDays = useMemo(() => days, [days.map(d => d.getTime()).join(',')]);
 
+  // Always call hooks at the top level - create stable callbacks
+  const getClientNameCallback = useCallback((id: string) => `Client ${id}`, []);
+
   // Use useWeekViewDataSimplified with correct parameters and memoized dependencies
   const {
     loading: hookLoading,
@@ -86,7 +89,7 @@ const WeekView: React.FC<WeekViewProps> = React.memo(({
     selectedClinicianId,
     refreshTrigger,
     appointments,
-    useCallback((id: string) => `Client ${id}`, []),
+    getClientNameCallback,
     validUserTimeZone,
     validClinicianTimeZone
   );
@@ -114,9 +117,7 @@ const WeekView: React.FC<WeekViewProps> = React.memo(({
     return slots;
   }, [validClinicianTimeZone, startHour, endHour]);
 
-  /**
-   * Handle click on an availability block with useCallback optimization
-   */
+  // Always call useCallback at top level - handle availability block click
   const handleAvailabilityBlockClick = useCallback((day: Date, block: TimeBlock) => {
     // Convert Date to DateTime internally for processing
     const dayDt = TimeZoneService.fromJSDate(day, validClinicianTimeZone);
@@ -137,9 +138,7 @@ const WeekView: React.FC<WeekViewProps> = React.memo(({
     }
   }, [validClinicianTimeZone, selectedClinicianId, onAvailabilityClick]);
 
-  /**
-   * Handle click on an appointment block with useCallback optimization
-   */
+  // Always call useCallback at top level - handle appointment click
   const handleAppointmentClick = useCallback((appointment: AppointmentBlock) => {
     // Find the complete original appointment with all data
     const originalAppointment = appointments?.find(a => a.id === appointment.id);
@@ -156,6 +155,7 @@ const WeekView: React.FC<WeekViewProps> = React.memo(({
     }
   }, [appointments, onAppointmentClick]);
 
+  // Always call useCallback at top level - format time
   const formatTime = useCallback((timeSlot: DateTime) => {
     return timeSlot.toFormat('h:mm a');
   }, []);
