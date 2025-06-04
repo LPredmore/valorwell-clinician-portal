@@ -175,13 +175,12 @@ export const useAppointments = (
           `id, client_id, clinician_id, start_at, end_at, type, status, appointment_recurring, recurring_group_id, video_room_url, notes, appointment_timezone, clients (client_first_name, client_last_name, client_preferred_name, client_email, client_phone, client_status, client_date_of_birth, client_gender, client_address, client_city, client_state, client_zipcode)`
         )
         .eq("clinician_id", formattedClinicianId)
-        .eq("status", "scheduled");
+        .in("status", ["scheduled", "blocked"]); // Updated to include both scheduled and blocked appointments
 
-      // STEP 1: LOG QUERY BUILDING STEPS
       console.log("[useAppointments] STEP 1 - Supabase Query Building:", {
         baseQuery: "appointments table",
         clinicianFilter: `clinician_id = ${formattedClinicianId}`,
-        statusFilter: "status = scheduled",
+        statusFilter: "status IN (scheduled, blocked)", // Updated log message
         fromDateFilter: fromUTCISO ? `start_at >= ${fromUTCISO}` : 'none',
         toDateFilter: toUTCISO ? `end_at <= ${toUTCISO}` : 'none'
       });
@@ -191,12 +190,11 @@ export const useAppointments = (
       
       query = query.order("start_at", { ascending: true });
         
-      // STEP 1: LOG FINAL QUERY DETAILS
       console.log("[useAppointments] STEP 1 - Final Query Details:", {
         clinician_id: formattedClinicianId,
         start_at: fromUTCISO ? `>= ${fromUTCISO}` : 'any',
         end_at: toUTCISO ? `<= ${toUTCISO}` : 'any',
-        status: 'scheduled',
+        status: 'scheduled OR blocked', // Updated log message
         orderBy: 'start_at ASC'
       });
       
@@ -217,7 +215,7 @@ export const useAppointments = (
           table: 'appointments',
           clinician_id: formattedClinicianId,
           date_range: { from: fromUTCISO, to: toUTCISO },
-          status: 'scheduled'
+          status: 'scheduled OR blocked'
         }
       });
 
@@ -248,7 +246,7 @@ export const useAppointments = (
             clinician_id: formattedClinicianId,
             start_at_gte: fromUTCISO,
             end_at_lte: toUTCISO,
-            status: 'scheduled'
+            status: 'scheduled OR blocked'
           },
           possibleIssues: [
             'No appointments exist for this clinician',

@@ -1,10 +1,10 @@
-
 import React from 'react';
 import { TimeBlock, AppointmentBlock } from './types';
 import { Appointment } from '@/types/appointment';
 import { DateTime } from 'luxon';
 import { convertAppointmentBlockToAppointment } from '@/utils/appointmentUtils';
 import { TimeZoneService } from '@/utils/timeZoneService';
+import { isBlockedTimeAppointment, getBlockedTimeDisplayName } from '@/utils/blockedTimeUtils';
 
 interface TimeSlotProps {
   day: Date;
@@ -90,24 +90,14 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
   let onDragStart = undefined;
 
   if (appointment) {
-    // DEBUGGING: Log appointment rendering decision
-    if (debugTimeSlot) {
-      console.log(`[TimeSlot] RENDERING APPOINTMENT ${appointment.id} at ${formattedDay} ${formattedTime}:`, {
-        clientName: appointment.clientName,
-        isStartOfAppointment,
-        isEndOfAppointment,
-        appointmentStart: appointment.start.toFormat('HH:mm'),
-        appointmentEnd: appointment.end.toFormat('HH:mm'),
-        timeSlotTime: formattedTime
-      });
-    }
-
+    // Check if this is a blocked time appointment
+    const isBlockedTime = isBlockedTimeAppointment(appointment);
+    
     onClick = (e: React.MouseEvent) => {
       e.stopPropagation();
       e.preventDefault();
       
       console.log(`[TimeSlot] Appointment clicked - Looking for appointment with ID: ${appointment.id}`);
-      console.log(`[TimeSlot] Original appointments available: ${originalAppointments?.length || 0}`);
       
       try {
         const originalAppointment = originalAppointments?.find(a => a.id === appointment.id);
@@ -117,32 +107,19 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
             id: originalAppointment.id,
             clientName: originalAppointment.clientName,
             clientId: originalAppointment.client_id,
-            hasClient: !!originalAppointment.client,
-            start_at: originalAppointment.start_at,
-            end_at: originalAppointment.end_at
+            status: originalAppointment.status,
+            isBlockedTime: isBlockedTimeAppointment(originalAppointment)
           });
           
           if (onAppointmentClick) {
             onAppointmentClick(originalAppointment);
-          } else {
-            console.error('[TimeSlot] onAppointmentClick callback is not defined');
           }
         } else {
           console.warn(`[TimeSlot] Original appointment not found for ID: ${appointment.id}. Converting AppointmentBlock to full Appointment.`);
           const fullAppointment = convertAppointmentBlockToAppointment(appointment, originalAppointments || []);
-          console.log(`[TimeSlot] Converted appointment:`, {
-            id: fullAppointment.id,
-            clientName: fullAppointment.clientName,
-            clientId: fullAppointment.client_id,
-            hasClient: !!fullAppointment.client,
-            start_at: fullAppointment.start_at,
-            end_at: fullAppointment.end_at
-          });
           
           if (onAppointmentClick) {
             onAppointmentClick(fullAppointment);
-          } else {
-            console.error('[TimeSlot] onAppointmentClick callback is not defined');
           }
         }
       } catch (error) {
@@ -150,7 +127,10 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
       }
     };
 
-    const baseAppointmentClass = 'p-1 bg-blue-100 border-l-4 border-blue-500 h-full w-full cursor-pointer transition-colors hover:bg-blue-200 z-20 relative';
+    // Different styling for blocked time vs regular appointments
+    const baseAppointmentClass = isBlockedTime 
+      ? 'p-1 bg-red-100 border-l-4 border-red-500 h-full w-full cursor-pointer transition-colors hover:bg-red-200 z-20 relative'
+      : 'p-1 bg-blue-100 border-l-4 border-blue-500 h-full w-full cursor-pointer transition-colors hover:bg-blue-200 z-20 relative';
 
     onDragStart = (e: React.DragEvent) => {
       const original = originalAppointments.find(a => a.id === appointment.id) || appointment;
@@ -173,12 +153,18 @@ const TimeSlot: React.FC<TimeSlotProps> = ({
       positionClass = 'rounded-b border-r border-l border-b border-t-0';
     }
 
-    title = `${appointment.clientName || 'Unknown Client'} - ${appointment.start.toFormat('h:mm a')} to ${appointment.end.toFormat('h:mm a')}`;
-    draggable = true;
+    title = isBlockedTime 
+      ? `${getBlockedTimeDisplayName(appointment)} - ${appointment.start.toFormat('h:mm a')} to ${appointment.end.toFormat('h:mm a')}`
+      : `${appointment.clientName || 'Unknown Client'} - ${appointment.start.toFormat('h:mm a')} to ${appointment.end.toFormat('h:mm a')}`;
+    
+    // Blocked time appointments should not be draggable
+    draggable = !isBlockedTime;
 
     if (isStartOfAppointment) {
       className = `${baseAppointmentClass} ${positionClass} text-xs font-medium truncate appointment-start`;
-      content = appointment.clientName || 'Unknown Client';
+      content = isBlockedTime 
+        ? getBlockedTimeDisplayName(appointment)
+        : (appointment.clientName || 'Unknown Client');
       
       // DEBUGGING: Log when we're showing appointment content
       if (debugTimeSlot) {
