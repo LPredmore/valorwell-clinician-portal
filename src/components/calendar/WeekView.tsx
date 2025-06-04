@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+
+import React, { useState, useMemo, useCallback } from 'react';
 import { useWeekViewDataSimplified } from './week-view/useWeekViewDataSimplified';
 import { TimeBlock, AppointmentBlock } from './week-view/types';
 import { TimeZoneService } from '@/utils/timeZoneService';
@@ -29,7 +30,7 @@ interface WeekViewProps {
 
 const INTERVAL_MINUTES = 30;
 
-const WeekView: React.FC<WeekViewProps> = ({
+const WeekView: React.FC<WeekViewProps> = React.memo(({
   days,
   selectedClinicianId,
   userTimeZone,
@@ -49,7 +50,7 @@ const WeekView: React.FC<WeekViewProps> = ({
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [isAppointmentDetailsOpen, setIsAppointmentDetailsOpen] = useState(false);
   
-  // Validate and normalize timezone values
+  // Validate and normalize timezone values with memoization
   const validClinicianTimeZone = useMemo(() => {
     if (!clinicianTimeZone) {
       return 'UTC';
@@ -67,7 +68,10 @@ const WeekView: React.FC<WeekViewProps> = ({
     return TimeZoneService.ensureIANATimeZone(userTimeZone);
   }, [userTimeZone]);
 
-  // Use useWeekViewDataSimplified with correct parameters
+  // Memoize the days array conversion to prevent unnecessary recalculations
+  const memoizedDays = useMemo(() => days, [days.map(d => d.getTime()).join(',')]);
+
+  // Use useWeekViewDataSimplified with correct parameters and memoized dependencies
   const {
     loading: hookLoading,
     error: hookError,
@@ -78,23 +82,23 @@ const WeekView: React.FC<WeekViewProps> = ({
     getBlockForTimeSlot,
     getAppointmentForTimeSlot,
   } = useWeekViewDataSimplified(
-    days,
+    memoizedDays,
     selectedClinicianId,
     refreshTrigger,
     appointments,
-    (id: string) => `Client ${id}`,
+    useCallback((id: string) => `Client ${id}`, []),
     validUserTimeZone,
     validClinicianTimeZone
   );
 
-  // Calculate dynamic time range based on actual data
+  // Calculate dynamic time range based on actual data with memoization
   const { startHour, endHour } = useTimeRange({
     appointmentBlocks: appointmentBlocks || [],
     timeBlocks: timeBlocks || [],
     weekDays: weekDays || []
   });
 
-  // Generate timezone-aware TIME_SLOTS using dynamic range and clinician's timezone
+  // Generate timezone-aware TIME_SLOTS using dynamic range and clinician's timezone with memoization
   const TIME_SLOTS = useMemo(() => {
     const slots: DateTime[] = [];
     // Create a base date in the clinician's timezone (today at midnight)
@@ -111,9 +115,9 @@ const WeekView: React.FC<WeekViewProps> = ({
   }, [validClinicianTimeZone, startHour, endHour]);
 
   /**
-   * Handle click on an availability block
+   * Handle click on an availability block with useCallback optimization
    */
-  const handleAvailabilityBlockClick = (day: Date, block: TimeBlock) => {
+  const handleAvailabilityBlockClick = useCallback((day: Date, block: TimeBlock) => {
     // Convert Date to DateTime internally for processing
     const dayDt = TimeZoneService.fromJSDate(day, validClinicianTimeZone);
     setSelectedBlock(block);
@@ -131,12 +135,12 @@ const WeekView: React.FC<WeekViewProps> = ({
       
       onAvailabilityClick(day, availabilityBlock);
     }
-  };
+  }, [validClinicianTimeZone, selectedClinicianId, onAvailabilityClick]);
 
   /**
-   * Handle click on an appointment block
+   * Handle click on an appointment block with useCallback optimization
    */
-  const handleAppointmentClick = (appointment: AppointmentBlock) => {
+  const handleAppointmentClick = useCallback((appointment: AppointmentBlock) => {
     // Find the complete original appointment with all data
     const originalAppointment = appointments?.find(a => a.id === appointment.id);
     
@@ -150,12 +154,13 @@ const WeekView: React.FC<WeekViewProps> = ({
         onAppointmentClick(fullAppointment);
       }
     }
-  };
+  }, [appointments, onAppointmentClick]);
 
-  const formatTime = (timeSlot: DateTime) => {
+  const formatTime = useCallback((timeSlot: DateTime) => {
     return timeSlot.toFormat('h:mm a');
-  };
+  }, []);
 
+  // Memoize the loading and error states
   if (hookLoading || isLoading) {
     return <div className="flex justify-center items-center h-32">Loading calendar...</div>;
   }
@@ -257,6 +262,22 @@ const WeekView: React.FC<WeekViewProps> = ({
       </div>
     </CalendarErrorBoundary>
   );
-};
+}, (prevProps, nextProps) => {
+  // Custom comparison function for WeekView memo
+  return (
+    prevProps.selectedClinicianId === nextProps.selectedClinicianId &&
+    prevProps.userTimeZone === nextProps.userTimeZone &&
+    prevProps.clinicianTimeZone === nextProps.clinicianTimeZone &&
+    prevProps.showAvailability === nextProps.showAvailability &&
+    prevProps.refreshTrigger === nextProps.refreshTrigger &&
+    prevProps.isLoading === nextProps.isLoading &&
+    JSON.stringify(prevProps.error) === JSON.stringify(nextProps.error) &&
+    prevProps.appointments?.length === nextProps.appointments?.length &&
+    prevProps.days.length === nextProps.days.length &&
+    prevProps.days.every((day, index) => day.getTime() === nextProps.days[index]?.getTime())
+  );
+});
+
+WeekView.displayName = 'WeekView';
 
 export default WeekView;

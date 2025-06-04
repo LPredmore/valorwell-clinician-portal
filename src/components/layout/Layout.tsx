@@ -1,5 +1,5 @@
 
-import { ReactNode, useEffect, useState } from 'react';
+import { ReactNode, useEffect, useState, useMemo, useCallback } from 'react';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import { useNavigate } from 'react-router-dom';
@@ -17,28 +17,30 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { isLoading: userContextLoading, userId, authInitialized } = useUser();
   const [loadingTimeout, setLoadingTimeout] = useState(false);
 
-  // Effect to handle redirects based on authentication status
+  // Memoize loading state to prevent unnecessary re-renders
+  const isLoadingState = useMemo(() => {
+    return userContextLoading && !authInitialized;
+  }, [userContextLoading, authInitialized]);
+
+  // Effect to handle redirects based on authentication status with proper dependencies
   useEffect(() => {
-    console.log("[Layout] Initializing layout, userContextLoading:", userContextLoading, "authInitialized:", authInitialized);
-    
     if (authInitialized) {
       if (!userId) {
-        console.log("[Layout] No authenticated user found, redirecting to login");
         navigate('/login');
       }
     }
-  }, [navigate, userContextLoading, userId, authInitialized]);
+  }, [navigate, userId, authInitialized]);
 
-  // Add timeout mechanism to prevent indefinite loading
+  // Add timeout mechanism to prevent indefinite loading with optimized dependencies
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
     
-    if (userContextLoading && !authInitialized) {
-      console.log("[Layout] Starting loading timeout check");
+    if (isLoadingState) {
       timeoutId = setTimeout(() => {
-        console.log("[Layout] Loading timeout reached after 10 seconds");
         setLoadingTimeout(true);
       }, 10000); // 10 seconds timeout
+    } else {
+      setLoadingTimeout(false);
     }
     
     return () => {
@@ -46,18 +48,21 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         clearTimeout(timeoutId);
       }
     };
-  }, [userContextLoading, authInitialized]);
+  }, [isLoadingState]);
+
+  // Memoize loading component to prevent re-renders
+  const loadingComponent = useMemo(() => (
+    <div className="flex h-screen w-full items-center justify-center flex-col">
+      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-valorwell-600 mb-4"></div>
+      <p className="text-valorwell-600">
+        {loadingTimeout ? "Taking longer than expected..." : "Loading user data..."}
+      </p>
+    </div>
+  ), [loadingTimeout]);
 
   // Show loading state while checking auth - updated to consider both states
-  if (userContextLoading && !authInitialized) {
-    return (
-      <div className="flex h-screen w-full items-center justify-center flex-col">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-valorwell-600 mb-4"></div>
-        <p className="text-valorwell-600">
-          {loadingTimeout ? "Taking longer than expected..." : "Loading user data..."}
-        </p>
-      </div>
-    );
+  if (isLoadingState) {
+    return loadingComponent;
   }
 
   return (

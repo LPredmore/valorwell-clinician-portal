@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useForm } from 'react-hook-form';
 import { Link, useNavigate } from 'react-router-dom';
@@ -12,7 +12,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/context/UserContext';
 
-const Login = () => {
+const Login = React.memo(() => {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -23,22 +23,43 @@ const Login = () => {
     },
   });
   const { toast } = useToast();
-  const { userId, userRole } = useUser();
+  const { userId, userRole, authInitialized } = useUser();
 
-  // Redirect if already authenticated and has appropriate role
-  if (userId && (userRole === 'clinician' || userRole === 'admin')) {
-    if (userRole === 'clinician') {
-      navigate('/clinician-dashboard');
-    } else if (userRole === 'admin') {
-      navigate('/settings');
+  // Handle runtime connection errors
+  useEffect(() => {
+    const handleError = (event: ErrorEvent) => {
+      // Suppress runtime.lastError messages that don't affect functionality
+      if (event.error?.message?.includes('runtime.lastError') || 
+          event.error?.message?.includes('Could not establish connection')) {
+        event.preventDefault();
+        return;
+      }
+    };
+
+    window.addEventListener('error', handleError);
+    return () => window.removeEventListener('error', handleError);
+  }, []);
+
+  // Memoize redirect logic to prevent unnecessary re-renders
+  const shouldRedirect = useMemo(() => {
+    return authInitialized && userId && (userRole === 'clinician' || userRole === 'admin');
+  }, [authInitialized, userId, userRole]);
+
+  // Handle redirects with useEffect to avoid render-time side effects
+  useEffect(() => {
+    if (shouldRedirect) {
+      if (userRole === 'clinician') {
+        navigate('/calendar');
+      } else if (userRole === 'admin') {
+        navigate('/settings');
+      }
     }
-  }
+  }, [shouldRedirect, userRole, navigate]);
 
   /**
-   * Handle form submission for login
-   * @param data Form data containing email and password
+   * Handle form submission for login with useCallback optimization
    */
-  const handleSubmit = async (data: { email: string; password: string }) => {
+  const handleSubmit = useCallback(async (data: { email: string; password: string }) => {
     setLoading(true);
     setError(null);
 
@@ -76,7 +97,19 @@ const Login = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast, navigate]);
+
+  // Don't render if already authenticated and should redirect
+  if (shouldRedirect) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-gray-50 p-4">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mb-4 mx-auto"></div>
+          <p>Redirecting...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen flex items-center justify-center bg-gray-50 p-4">
@@ -170,6 +203,8 @@ const Login = () => {
       </Card>
     </div>
   );
-};
+});
+
+Login.displayName = 'Login';
 
 export default Login;
