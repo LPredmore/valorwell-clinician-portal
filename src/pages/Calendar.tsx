@@ -6,6 +6,7 @@ import { useCalendarState } from "../hooks/useCalendarState";
 import CalendarHeader from "../components/calendar/CalendarHeader";
 import CalendarViewControls from "../components/calendar/CalendarViewControls";
 import AppointmentDialog from "../components/calendar/AppointmentDialog";
+import BlockTimeDialog from "../components/calendar/BlockTimeDialog";
 import { useUser } from "@/context/UserContext";
 import { useAppointments } from "@/hooks/useAppointments";
 import CalendarErrorBoundary from "../components/calendar/CalendarErrorBoundary";
@@ -33,6 +34,9 @@ const CalendarPage = () => {
     userTimeZone,
     isLoadingTimeZone,
   } = useCalendarState(userId);
+
+  // State for Block Time dialog
+  const [isBlockTimeDialogOpen, setIsBlockTimeDialogOpen] = React.useState(false);
 
   // Fetch clinician's current timezone for WeekView display
   const [clinicianTimeZone, setClinicianTimeZone] = React.useState<string | null>(null);
@@ -203,6 +207,11 @@ const CalendarPage = () => {
     setAppointmentRefreshTrigger(prev => prev + 1);
   };
 
+  const handleBlockTimeCreated = () => {
+    console.log("[CalendarPage] Block time created, refreshing calendar...");
+    handleDataChanged();
+  };
+
   // Show loading state while timezone is loading
   if (isLoadingTimeZone || isLoadingClinicianTimeZone) {
     return (
@@ -231,6 +240,7 @@ const CalendarPage = () => {
                   showAvailability={showAvailability}
                   onToggleAvailability={toggleAvailability}
                   onNewAppointment={() => setIsDialogOpen(true)}
+                  onBlockTime={() => setIsBlockTimeDialogOpen(true)}
                   selectedClinicianId={selectedClinicianId}
                 />
               </div>
@@ -266,6 +276,13 @@ const CalendarPage = () => {
           clients={clients}
           selectedClinicianId={selectedClinicianId}
           onAppointmentCreated={handleDataChanged}
+        />
+
+        <BlockTimeDialog
+          isOpen={isBlockTimeDialogOpen}
+          onClose={() => setIsBlockTimeDialogOpen(false)}
+          selectedClinicianId={selectedClinicianId}
+          onBlockCreated={handleBlockTimeCreated}
         />
       </CalendarErrorBoundary>
     </Layout>

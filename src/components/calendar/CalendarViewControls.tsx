@@ -1,12 +1,13 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Clock, Plus } from 'lucide-react';
+import { Clock, Plus, Ban } from 'lucide-react';
 
 interface CalendarViewControlsProps {
   showAvailability: boolean;
   onToggleAvailability: () => void;
   onNewAppointment: () => void;
+  onBlockTime: () => void;
   selectedClinicianId?: string | null;
 }
 
@@ -14,6 +15,7 @@ const CalendarViewControls: React.FC<CalendarViewControlsProps> = ({
   showAvailability,
   onToggleAvailability,
   onNewAppointment,
+  onBlockTime,
   selectedClinicianId
 }) => {
   return (
@@ -29,6 +31,11 @@ const CalendarViewControls: React.FC<CalendarViewControlsProps> = ({
       <Button onClick={onNewAppointment}>
         <Plus className="h-4 w-4 mr-2" />
         New Appointment
+      </Button>
+
+      <Button variant="outline" onClick={onBlockTime}>
+        <Ban className="h-4 w-4 mr-2" />
+        Block Time
       </Button>
     </div>
   );
