@@ -24,7 +24,7 @@ import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { getClinicianTimeZone } from '@/hooks/useClinicianData';
-import { DateTime } from 'luxon';
+import { BLOCKED_TIME_CLIENT_ID } from '@/utils/blockedTimeUtils';
 
 interface BlockTimeDialogProps {
   isOpen: boolean;
@@ -50,9 +50,6 @@ const generateTimeOptions = () => {
   }
   return options;
 };
-
-// Special client ID for blocked time appointments
-const BLOCKED_TIME_CLIENT_ID = '00000000-0000-0000-0000-000000000001';
 
 const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
   isOpen,
@@ -84,6 +81,8 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
   // Ensure blocked time client exists
   const ensureBlockedTimeClient = async () => {
     try {
+      console.log('[BlockTimeDialog] Checking if blocked time client exists...');
+      
       // Check if blocked time client already exists
       const { data: existingClient, error: checkError } = await supabase
         .from('clients')
@@ -92,17 +91,21 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
         .single();
 
       if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "not found"
+        console.error('[BlockTimeDialog] Error checking for existing client:', checkError);
         throw checkError;
       }
 
       if (!existingClient) {
-        // Create blocked time client
+        console.log('[BlockTimeDialog] Creating blocked time client...');
+        
+        // Create blocked time client with all required fields
         const { error: insertError } = await supabase
           .from('clients')
           .insert({
             id: BLOCKED_TIME_CLIENT_ID,
             client_first_name: 'Blocked',
             client_last_name: 'Time',
+            client_preferred_name: 'Blocked',
             client_email: 'blocked@system.internal',
             client_phone: '000-000-0000',
             client_date_of_birth: '1900-01-01',
@@ -113,22 +116,28 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
             client_emergency_contact_name: 'System',
             client_emergency_contact_phone: '000-000-0000',
             client_emergency_contact_relationship: 'System',
-            client_assigned_therapist: selectedClinicianId
+            client_assigned_therapist: selectedClinicianId,
+            client_status: 'active'
           });
 
         if (insertError) {
+          console.error('[BlockTimeDialog] Error creating blocked time client:', insertError);
           throw insertError;
         }
 
-        console.log('Created blocked time client');
+        console.log('[BlockTimeDialog] Successfully created blocked time client');
+      } else {
+        console.log('[BlockTimeDialog] Blocked time client already exists');
       }
     } catch (error) {
-      console.error('Error ensuring blocked time client:', error);
+      console.error('[BlockTimeDialog] Error in ensureBlockedTimeClient:', error);
       throw error;
     }
   };
 
   const handleSubmit = async () => {
+    console.log('[BlockTimeDialog] Starting block time creation...');
+    
     if (!selectedDate || !selectedClinicianId) {
       toast({
         title: "Error",
@@ -153,57 +162,70 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
       // Ensure blocked time client exists
       await ensureBlockedTimeClient();
 
-      // Get clinician's timezone
-      const clinicianTimeZone = await getClinicianTimeZone(selectedClinicianId);
+      console.log('[BlockTimeDialog] Getting clinician timezone...');
+      
+      // Get clinician's timezone with fallback
+      let clinicianTimeZone;
+      try {
+        const timeZoneResult = await getClinicianTimeZone(selectedClinicianId);
+        clinicianTimeZone = Array.isArray(timeZoneResult) ? timeZoneResult[0] : timeZoneResult;
+        
+        if (!clinicianTimeZone) {
+          clinicianTimeZone = 'America/New_York'; // Default fallback
+        }
+        
+        console.log('[BlockTimeDialog] Using timezone:', clinicianTimeZone);
+      } catch (tzError) {
+        console.warn('[BlockTimeDialog] Error getting clinician timezone, using default:', tzError);
+        clinicianTimeZone = 'America/New_York';
+      }
 
-      // Parse times and create DateTime objects
+      // Parse times and create Date objects (simpler approach without Luxon)
       const [startHour, startMinute] = startTime.split(':').map(Number);
       const [endHour, endMinute] = endTime.split(':').map(Number);
 
-      // Create start and end DateTime objects in clinician's timezone
-      const startDateTime = DateTime.fromObject(
-        {
-          year: selectedDate.getFullYear(),
-          month: selectedDate.getMonth() + 1,
-          day: selectedDate.getDate(),
-          hour: startHour,
-          minute: startMinute
-        },
-        { zone: clinicianTimeZone }
-      );
+      // Create start and end Date objects
+      const startDateTime = new Date(selectedDate);
+      startDateTime.setHours(startHour, startMinute, 0, 0);
 
-      const endDateTime = DateTime.fromObject(
-        {
-          year: selectedDate.getFullYear(),
-          month: selectedDate.getMonth() + 1,
-          day: selectedDate.getDate(),
-          hour: endHour,
-          minute: endMinute
-        },
-        { zone: clinicianTimeZone }
-      );
+      const endDateTime = new Date(selectedDate);
+      endDateTime.setHours(endHour, endMinute, 0, 0);
 
-      // Convert to UTC for storage
-      const startAtUTC = startDateTime.toUTC().toISO();
-      const endAtUTC = endDateTime.toUTC().toISO();
+      // Convert to ISO strings for storage (these will be in local time, but that's fine for now)
+      const startAtISO = startDateTime.toISOString();
+      const endAtISO = endDateTime.toISOString();
+
+      console.log('[BlockTimeDialog] Creating appointment with data:', {
+        client_id: BLOCKED_TIME_CLIENT_ID,
+        clinician_id: selectedClinicianId,
+        start_at: startAtISO,
+        end_at: endAtISO,
+        type: 'Blocked Time',
+        status: 'blocked',
+        appointment_timezone: clinicianTimeZone
+      });
 
       // Create the blocked time appointment
-      const { error } = await supabase
+      const { error, data } = await supabase
         .from('appointments')
         .insert({
           client_id: BLOCKED_TIME_CLIENT_ID,
           clinician_id: selectedClinicianId,
-          start_at: startAtUTC,
-          end_at: endAtUTC,
+          start_at: startAtISO,
+          end_at: endAtISO,
           type: 'Blocked Time',
           status: 'blocked',
           notes: notes || `Blocked time: ${blockLabel}`,
           appointment_timezone: clinicianTimeZone
-        });
+        })
+        .select();
 
       if (error) {
+        console.error('[BlockTimeDialog] Error creating appointment:', error);
         throw error;
       }
+
+      console.log('[BlockTimeDialog] Successfully created blocked time appointment:', data);
 
       toast({
         title: "Success",
@@ -213,10 +235,22 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
       onBlockCreated();
       onClose();
     } catch (error) {
-      console.error('Error creating time block:', error);
+      console.error('[BlockTimeDialog] Error creating time block:', error);
+      
+      // More specific error messages
+      let errorMessage = "Failed to create time block. Please try again.";
+      
+      if (error?.message?.includes('violates foreign key constraint')) {
+        errorMessage = "Error: Invalid clinician selected. Please refresh and try again.";
+      } else if (error?.message?.includes('violates check constraint')) {
+        errorMessage = "Error: Invalid data provided. Please check your inputs.";
+      } else if (error?.message) {
+        errorMessage = `Error: ${error.message}`;
+      }
+      
       toast({
         title: "Error",
-        description: "Failed to create time block. Please try again.",
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
