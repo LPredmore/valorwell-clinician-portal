@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -25,6 +24,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { getClinicianTimeZone } from '@/hooks/useClinicianData';
 import { BLOCKED_TIME_CLIENT_ID } from '@/utils/blockedTimeUtils';
+import { TimeZoneService } from '@/utils/timeZoneService';
 
 interface BlockTimeDialogProps {
   isOpen: boolean;
@@ -49,6 +49,17 @@ const generateTimeOptions = () => {
     }
   }
   return options;
+};
+
+// Helper function to convert local date/time to UTC (matching AppointmentDialog logic)
+const convertLocalToUTC = (dateString: string, timeString: string, timezone: string) => {
+  try {
+    const localDateTimeStr = `${dateString}T${timeString}`;
+    return TimeZoneService.convertLocalToUTC(localDateTimeStr, timezone);
+  } catch (error) {
+    console.error('[BlockTimeDialog] Error converting to UTC:', error);
+    throw error;
+  }
 };
 
 const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
@@ -160,7 +171,7 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
       // Ensure blocked time client exists
       await ensureBlockedTimeClient();
 
-      // Get clinician's timezone with fallback
+      // Get clinician's timezone with fallback (matching AppointmentDialog logic)
       let clinicianTimeZone;
       try {
         const timeZoneResult = await getClinicianTimeZone(selectedClinicianId!);
@@ -174,32 +185,37 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
         clinicianTimeZone = 'America/New_York';
       }
 
-      // Parse times and create Date objects
-      const [startHour, startMinute] = startTime.split(':').map(Number);
-      const [endHour, endMinute] = endTime.split(':').map(Number);
+      console.log('[BlockTimeDialog] Using clinician timezone:', clinicianTimeZone);
 
-      // Create start and end Date objects
-      const startDateTime = new Date(selectedDate!);
-      startDateTime.setHours(startHour, startMinute, 0, 0);
+      // Format date for conversion (matching AppointmentDialog logic)
+      const dateString = format(selectedDate!, 'yyyy-MM-dd');
 
-      const endDateTime = new Date(selectedDate!);
-      endDateTime.setHours(endHour, endMinute, 0, 0);
+      // Convert start and end times to UTC using the same logic as AppointmentDialog
+      const startAtUTC = convertLocalToUTC(dateString, startTime, clinicianTimeZone);
+      const endAtUTC = convertLocalToUTC(dateString, endTime, clinicianTimeZone);
 
-      // Convert to ISO strings for storage
-      const startAtISO = startDateTime.toISOString();
-      const endAtISO = endDateTime.toISOString();
+      console.log('[BlockTimeDialog] Timezone conversion results:', {
+        dateString,
+        startTime,
+        endTime,
+        clinicianTimeZone,
+        startAtUTC: startAtUTC.toISO(),
+        endAtUTC: endAtUTC.toISO()
+      });
 
-      // Create the blocked time appointment
+      // Create the blocked time appointment with consistent timezone handling
       const appointmentData = {
         client_id: BLOCKED_TIME_CLIENT_ID,
         clinician_id: selectedClinicianId,
-        start_at: startAtISO,
-        end_at: endAtISO,
+        start_at: startAtUTC.toISO(),
+        end_at: endAtUTC.toISO(),
         type: 'Blocked Time',
         status: 'blocked',
         notes: notes || `Blocked time: ${blockLabel}`,
-        appointment_timezone: clinicianTimeZone
+        appointment_timezone: clinicianTimeZone // Save the clinician's timezone
       };
+
+      console.log('[BlockTimeDialog] Creating appointment with data:', appointmentData);
 
       const { error: appointmentError } = await supabase
         .from('appointments')
