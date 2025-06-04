@@ -1,6 +1,6 @@
-
 import { DebugUtils, loadDebugModule } from './debugUtils';
 import { testAuthFixes, verifyAuthInitializedFlag } from './authFixesTest';
+import { BlockTimeDebug } from './blockTimeDebug';
 
 // Re-export the main debug utility
 export { DebugUtils, loadDebugModule };
@@ -32,6 +32,17 @@ export const AuthDebug = {
   // Add authentication fixes test functions
   testAuthFixes,
   verifyAuthInitializedFlag
+};
+
+// Add Block Time debugging utility
+export const BlockTimeDebugUtils = {
+  logOperation: BlockTimeDebug.logOperation.bind(BlockTimeDebug),
+  logDatabaseOperation: BlockTimeDebug.logDatabaseOperation.bind(BlockTimeDebug),
+  logValidation: BlockTimeDebug.logValidation.bind(BlockTimeDebug),
+  logTimezoneOperation: BlockTimeDebug.logTimezoneOperation.bind(BlockTimeDebug),
+  logFormState: BlockTimeDebug.logFormState.bind(BlockTimeDebug),
+  createDebugReport: BlockTimeDebug.createDebugReport.bind(BlockTimeDebug),
+  testDatabaseConnectivity: BlockTimeDebug.testDatabaseConnectivity.bind(BlockTimeDebug),
 };
 
 // Helper to conditionally enable debug features based on environment

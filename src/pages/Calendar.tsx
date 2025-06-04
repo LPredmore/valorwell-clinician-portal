@@ -209,7 +209,33 @@ const CalendarPage = () => {
 
   const handleBlockTimeCreated = () => {
     console.log("[CalendarPage] Block time created, refreshing calendar...");
+    
+    // Add debugging for block time creation
+    console.log("[CalendarPage] DEBUG: Block time creation callback triggered", {
+      selectedClinicianId,
+      currentDate: currentDate?.toISOString(),
+      refreshTrigger: appointmentRefreshTrigger,
+      timestamp: new Date().toISOString()
+    });
+    
     handleDataChanged();
+  };
+
+  // Enhanced block time dialog open handler with debugging
+  const handleOpenBlockTimeDialog = () => {
+    console.log("[CalendarPage] DEBUG: Opening block time dialog", {
+      selectedClinicianId,
+      isClinicianSelected: !!selectedClinicianId,
+      currentDate: currentDate?.toISOString(),
+      userTimeZone,
+      timestamp: new Date().toISOString()
+    });
+    
+    if (!selectedClinicianId) {
+      console.warn("[CalendarPage] WARNING: No clinician selected for block time");
+    }
+    
+    setIsBlockTimeDialogOpen(true);
   };
 
   // Show loading state while timezone is loading
@@ -240,7 +266,7 @@ const CalendarPage = () => {
                   showAvailability={showAvailability}
                   onToggleAvailability={toggleAvailability}
                   onNewAppointment={() => setIsDialogOpen(true)}
-                  onBlockTime={() => setIsBlockTimeDialogOpen(true)}
+                  onBlockTime={handleOpenBlockTimeDialog}
                   selectedClinicianId={selectedClinicianId}
                 />
               </div>
