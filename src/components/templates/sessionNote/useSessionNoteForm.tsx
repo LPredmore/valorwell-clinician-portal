@@ -1,4 +1,3 @@
-
 import { useState, useEffect, RefObject } from 'react';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -315,7 +314,7 @@ export const useSessionNoteForm = ({
       if (appointment?.id) {
         const { error: appointmentError } = await supabase
           .from('appointments')
-          .update({ status: 'Documented' })
+          .update({ status: 'completed' })
           .eq('id', appointment.id);
 
         if (appointmentError) {
@@ -326,11 +325,10 @@ export const useSessionNoteForm = ({
             variant: "default",
           });
         } else {
-          console.log(`Appointment ${appointment.id} marked as Documented`);
+          console.log(`Appointment ${appointment.id} marked as completed`);
         }
       }
 
-      // Generate and save PDF
       if (contentRef?.current && appointment?.date) {
         const sessionDate = new Date(appointment.date).toISOString().split('T')[0];
         const clientName = formState.patientName || 'Unknown Client';
