@@ -1,6 +1,5 @@
-
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useUser } from '@/context/UserContext';
 import { useToast } from '@/hooks/use-toast';
 import { AlertCircle } from 'lucide-react';
@@ -8,18 +7,18 @@ import AuthStateMonitor from '@/components/auth/AuthStateMonitor';
 
 const Index = React.memo(() => {
   const navigate = useNavigate();
-  const location = useLocation();
   const { toast } = useToast();
   const { userRole, isLoading, authInitialized, userId } = useUser();
   const [loadingTimeout, setLoadingTimeout] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [forceRedirectTimer, setForceRedirectTimer] = useState(0);
   
-  // Memoize loading state with stable dependencies
+  // Memoize loading state to prevent unnecessary effects
   const isCurrentlyLoading = useMemo(() => {
     return (isLoading || !authInitialized) && !authError;
   }, [isLoading, authInitialized, authError]);
   
-  // Memoize navigation logic with stable dependencies
+  // Memoize the navigation logic to prevent unnecessary re-calculations
   const navigationLogic = useCallback((role: string | null, hasUserId: boolean) => {
     if (!hasUserId) {
       return '/login';
@@ -42,7 +41,7 @@ const Index = React.memo(() => {
     }
   }, [toast]);
   
-  // Optimized timeout mechanism
+  // Add timeout mechanism with optimized dependencies
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
     let criticalTimeoutId: NodeJS.Timeout;
@@ -75,17 +74,17 @@ const Index = React.memo(() => {
     };
   }, [isCurrentlyLoading, toast]);
 
-  // Handle navigation when auth is ready with location awareness
+  // Handle navigation when auth is ready
   useEffect(() => {
     if (authInitialized && !isLoading && !authError) {
       const destination = navigationLogic(userRole, !!userId);
-      if (destination && location.pathname !== destination) {
+      if (destination) {
         navigate(destination);
       }
     }
-  }, [authInitialized, isLoading, userRole, userId, navigate, navigationLogic, authError, location.pathname]);
+  }, [authInitialized, isLoading, userRole, userId, navigate, navigationLogic, authError]);
 
-  // Memoized components to prevent unnecessary re-renders
+  // Memoize error component to prevent re-renders
   const errorComponent = useMemo(() => (
     <div className="min-h-screen flex items-center justify-center">
       <div className="flex flex-col items-center bg-red-50 p-6 rounded-lg border border-red-200 max-w-md">
@@ -102,9 +101,10 @@ const Index = React.memo(() => {
     </div>
   ), [authError]);
 
+  // Memoize loading component to prevent re-renders
   const loadingComponent = useMemo(() => (
     <div className="min-h-screen flex items-center justify-center">
-      {process.env.NODE_ENV === 'development' && <AuthStateMonitor visible={true} />}
+      <AuthStateMonitor visible={process.env.NODE_ENV === 'development'} />
       <div className="text-center">
         <div className="flex flex-col items-center">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mb-4"></div>
@@ -131,6 +131,7 @@ const Index = React.memo(() => {
     return loadingComponent;
   }
 
+  // This should rarely be reached due to navigation effect
   return loadingComponent;
 });
 

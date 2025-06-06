@@ -16,27 +16,27 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = React.memo(({
   const { userRole, isLoading, authInitialized } = useUser();
   const { toast } = useToast();
   
-  // Memoize the loading state calculation with stable dependencies
+  // Memoize the loading state calculation to prevent unnecessary re-renders
   const loadingState = useMemo(() => {
     return isLoading || !authInitialized;
   }, [isLoading, authInitialized]);
   
-  // Memoize the access decision with stable role checking
+  // Memoize the access decision to prevent unnecessary recalculations
   const accessDecision = useMemo(() => {
     if (loadingState) {
       return { type: 'loading' };
     }
     
-    // Admin can access all routes
-    if (userRole === 'admin') {
-      return { type: 'allow' };
-    }
-    
-    // Check role-based access
+    // First check role-based access
     if (!userRole || !allowedRoles.includes(userRole)) {
       // Check if this is a client trying to access clinician functionality
       if (userRole === 'client') {
         return { type: 'client_redirect' };
+      }
+      
+      // Admin can access all routes
+      if (userRole === 'admin') {
+        return { type: 'allow' };
       }
       // Redirect clinicians to Calendar page
       else if (userRole === 'clinician') {
@@ -51,7 +51,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = React.memo(({
     return { type: 'allow' };
   }, [loadingState, userRole, allowedRoles]);
   
-  // Handle different access decisions without blocking navigation
+  // Handle different access decisions
   switch (accessDecision.type) {
     case 'loading':
       return (
@@ -66,14 +66,11 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = React.memo(({
       );
       
     case 'client_redirect':
-      // Only show toast once, not on every render
-      React.useEffect(() => {
-        toast({
-          title: "Access Denied",
-          description: "This portal is only for clinicians. Please use the client portal.",
-          variant: "destructive"
-        });
-      }, [toast]);
+      toast({
+        title: "Access Denied",
+        description: "This portal is only for clinicians. Please use the client portal.",
+        variant: "destructive"
+      });
       return <Navigate to="/login" replace />;
       
     case 'clinician_redirect':
@@ -87,7 +84,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = React.memo(({
       return <>{children}</>;
   }
 }, (prevProps, nextProps) => {
-  // Optimized comparison to prevent unnecessary re-renders during navigation
+  // Custom comparison to prevent unnecessary re-renders
   return (
     JSON.stringify(prevProps.allowedRoles) === JSON.stringify(nextProps.allowedRoles) &&
     React.Children.count(prevProps.children) === React.Children.count(nextProps.children)
