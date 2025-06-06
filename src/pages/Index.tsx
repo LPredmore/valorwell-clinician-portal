@@ -11,7 +11,6 @@ const Index = React.memo(() => {
   const { userRole, isLoading, authInitialized, userId } = useUser();
   const [loadingTimeout, setLoadingTimeout] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
-  const [forceRedirectTimer, setForceRedirectTimer] = useState(0);
   
   // Memoize loading state to prevent unnecessary effects
   const isCurrentlyLoading = useMemo(() => {
@@ -74,7 +73,7 @@ const Index = React.memo(() => {
     };
   }, [isCurrentlyLoading, toast]);
 
-  // Handle navigation when auth is ready
+  // CRITICAL FIX: Only navigate when auth is fully stable
   useEffect(() => {
     if (authInitialized && !isLoading && !authError) {
       const destination = navigationLogic(userRole, !!userId);

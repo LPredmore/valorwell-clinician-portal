@@ -16,18 +16,14 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = React.memo(({
   const { userRole, isLoading, authInitialized } = useUser();
   const { toast } = useToast();
   
-  // Memoize the loading state calculation to prevent unnecessary re-renders
-  const loadingState = useMemo(() => {
-    return isLoading || !authInitialized;
-  }, [isLoading, authInitialized]);
-  
   // Memoize the access decision to prevent unnecessary recalculations
   const accessDecision = useMemo(() => {
-    if (loadingState) {
+    // CRITICAL FIX: Only make decisions when auth is fully initialized
+    if (!authInitialized || isLoading) {
       return { type: 'loading' };
     }
     
-    // First check role-based access
+    // Check role-based access
     if (!userRole || !allowedRoles.includes(userRole)) {
       // Check if this is a client trying to access clinician functionality
       if (userRole === 'client') {
@@ -49,7 +45,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = React.memo(({
     }
     
     return { type: 'allow' };
-  }, [loadingState, userRole, allowedRoles]);
+  }, [authInitialized, isLoading, userRole, allowedRoles]);
   
   // Handle different access decisions
   switch (accessDecision.type) {
@@ -83,12 +79,6 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = React.memo(({
     default:
       return <>{children}</>;
   }
-}, (prevProps, nextProps) => {
-  // Custom comparison to prevent unnecessary re-renders
-  return (
-    JSON.stringify(prevProps.allowedRoles) === JSON.stringify(nextProps.allowedRoles) &&
-    React.Children.count(prevProps.children) === React.Children.count(nextProps.children)
-  );
 });
 
 ProtectedRoute.displayName = 'ProtectedRoute';

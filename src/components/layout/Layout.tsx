@@ -1,5 +1,5 @@
 
-import { ReactNode, useEffect, useState, useMemo, useCallback } from 'react';
+import { ReactNode, useEffect, useState, useMemo } from 'react';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import { useNavigate } from 'react-router-dom';
@@ -19,19 +19,19 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   // Memoize loading state to prevent unnecessary re-renders
   const isLoadingState = useMemo(() => {
-    return userContextLoading && !authInitialized;
+    return userContextLoading || !authInitialized;
   }, [userContextLoading, authInitialized]);
 
-  // Effect to handle redirects based on authentication status with proper dependencies
+  // CRITICAL FIX: Only redirect when auth is fully initialized and stable
   useEffect(() => {
-    if (authInitialized) {
+    if (authInitialized && !userContextLoading) {
       if (!userId) {
         navigate('/login');
       }
     }
-  }, [navigate, userId, authInitialized]);
+  }, [navigate, userId, authInitialized, userContextLoading]);
 
-  // Add timeout mechanism to prevent indefinite loading with optimized dependencies
+  // Add timeout mechanism to prevent indefinite loading
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
     
@@ -60,7 +60,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     </div>
   ), [loadingTimeout]);
 
-  // Show loading state while checking auth - updated to consider both states
+  // Show loading state while checking auth
   if (isLoadingState) {
     return loadingComponent;
   }
