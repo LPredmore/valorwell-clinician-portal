@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { ClientDetails } from '@/types/client';
 import { generateAndSavePDF } from '@/utils/pdfUtils';
+import { createCMS1500ClaimsForCompletedAppointment } from '@/utils/cms1500ClaimsUtils';
 
 interface UseSessionNoteFormProps {
   clientData: ClientDetails | null;
@@ -326,6 +327,29 @@ export const useSessionNoteForm = ({
           });
         } else {
           console.log(`Appointment ${appointment.id} marked as completed`);
+          
+          // Create CMS1500 claims after successfully marking appointment as completed
+          try {
+            const claimsResult = await createCMS1500ClaimsForCompletedAppointment(appointment.id);
+            
+            if (claimsResult.success) {
+              console.log(`Successfully created ${claimsResult.claimsCreated} CMS1500 claims`);
+            } else {
+              console.error('Failed to create CMS1500 claims:', claimsResult.error);
+              toast({
+                title: "Warning",
+                description: "Session note saved but claims creation failed.",
+                variant: "default",
+              });
+            }
+          } catch (claimsError) {
+            console.error('Error in CMS1500 claims creation:', claimsError);
+            toast({
+              title: "Warning",
+              description: "Session note saved but claims creation failed.",
+              variant: "default",
+            });
+          }
         }
       }
 
