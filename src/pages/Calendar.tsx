@@ -12,6 +12,7 @@ import { useAppointments } from "@/hooks/useAppointments";
 import CalendarErrorBoundary from "../components/calendar/CalendarErrorBoundary";
 import { getClinicianTimeZone } from "../hooks/useClinicianData";
 import CalendarConnectionsPanel from "../components/calendar/CalendarConnectionsPanel";
+import ClinicianAvailabilityPanel from "../components/calendar/ClinicianAvailabilityPanel";
 
 const CalendarPage = React.memo(() => {
   // Get the logged-in user's ID
