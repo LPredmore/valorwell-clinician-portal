@@ -1,4 +1,3 @@
-
 import React, { useEffect, useMemo, useCallback } from "react";
 import Layout from "../components/layout/Layout";
 import CalendarView from "../components/calendar/CalendarView";
@@ -12,6 +11,7 @@ import { useUser } from "@/context/UserContext";
 import { useAppointments } from "@/hooks/useAppointments";
 import CalendarErrorBoundary from "../components/calendar/CalendarErrorBoundary";
 import { getClinicianTimeZone } from "../hooks/useClinicianData";
+import CalendarConnectionsPanel from "../components/calendar/CalendarConnectionsPanel";
 
 const CalendarPage = React.memo(() => {
   // Get the logged-in user's ID
@@ -168,18 +168,35 @@ const CalendarPage = React.memo(() => {
               onNavigateToday={navigateToday}
             />
 
-            <CalendarView
-              view="week"
-              showAvailability={showAvailability}
-              clinicianId={selectedClinicianId}
-              currentDate={currentDate}
-              userTimeZone={userTimeZone}
-              clinicianTimeZone={clinicianTimeZone || userTimeZone}
-              refreshTrigger={appointmentRefreshTrigger}
-              appointments={appointments}
-              isLoading={isLoadingAppointments}
-              error={appointmentsError}
-            />
+            {/* Updated layout to include calendar connections */}
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+              <div className="lg:col-span-3">
+                <CalendarView
+                  view="week"
+                  showAvailability={showAvailability}
+                  clinicianId={selectedClinicianId}
+                  currentDate={currentDate}
+                  userTimeZone={userTimeZone}
+                  clinicianTimeZone={clinicianTimeZone || userTimeZone}
+                  refreshTrigger={appointmentRefreshTrigger}
+                  appointments={appointments}
+                  isLoading={isLoadingAppointments}
+                  error={appointmentsError}
+                />
+              </div>
+              
+              <div className="lg:col-span-1 space-y-4">
+                <CalendarConnectionsPanel />
+                
+                {showAvailability && (
+                  <ClinicianAvailabilityPanel 
+                    clinicianId={selectedClinicianId} 
+                    onAvailabilityUpdated={handleDataChanged}
+                    userTimeZone={userTimeZone}
+                  />
+                )}
+              </div>
+            </div>
           </div>
         </div>
 
