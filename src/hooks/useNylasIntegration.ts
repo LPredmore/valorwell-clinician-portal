@@ -24,7 +24,7 @@ export const useNylasIntegration = () => {
       setIsLoading(true);
       const { data, error } = await supabase
         .from('nylas_connections')
-        .select('id, email, provider, is_active, created_at')
+        .select('id, email, provider, is_active, created_at, calendar_ids')
         .eq('is_active', true)
         .order('created_at', { ascending: false });
 

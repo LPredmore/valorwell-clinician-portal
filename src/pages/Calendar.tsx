@@ -14,7 +14,7 @@ import { getClinicianTimeZone } from "../hooks/useClinicianData";
 import CalendarConnectionsPanel from "../components/calendar/CalendarConnectionsPanel";
 import ClinicianAvailabilityPanel from "../components/calendar/ClinicianAvailabilityPanel";
 import SchedulerManagementPanel from "../components/calendar/SchedulerManagementPanel";
-import NylasVirtualCalendar from "../components/calendar/NylasVirtualCalendar";
+import NylasHybridCalendar from "../components/calendar/NylasHybridCalendar";
 
 const CalendarPage = React.memo(() => {
   // Get the logged-in user's ID
@@ -171,27 +171,20 @@ const CalendarPage = React.memo(() => {
               onNavigateToday={navigateToday}
             />
 
-            {/* Updated layout to include scheduler management */}
+            {/* Updated layout with hybrid calendar */}
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
               <div className="lg:col-span-3">
-                <NylasVirtualCalendar
+                <CalendarView
+                  view="week"
+                  showAvailability={showAvailability}
                   clinicianId={selectedClinicianId}
+                  currentDate={currentDate}
                   userTimeZone={userTimeZone}
-                  onEventClick={(event) => {
-                    console.log('Nylas event clicked:', event);
-                  }}
-                  onEventCreate={(event) => {
-                    console.log('Nylas event created:', event);
-                    handleDataChanged();
-                  }}
-                  onEventUpdate={(event) => {
-                    console.log('Nylas event updated:', event);
-                    handleDataChanged();
-                  }}
-                  onEventDelete={(event) => {
-                    console.log('Nylas event deleted:', event);
-                    handleDataChanged();
-                  }}
+                  clinicianTimeZone={clinicianTimeZone || userTimeZone}
+                  refreshTrigger={appointmentRefreshTrigger}
+                  appointments={appointments}
+                  isLoading={isLoadingAppointments}
+                  error={appointmentsError}
                 />
               </div>
               
@@ -200,6 +193,15 @@ const CalendarPage = React.memo(() => {
                 
                 <SchedulerManagementPanel 
                   clinicianId={selectedClinicianId} 
+                />
+
+                <NylasHybridCalendar
+                  clinicianId={selectedClinicianId}
+                  userTimeZone={userTimeZone}
+                  currentDate={currentDate}
+                  onEventClick={(event) => {
+                    console.log('External event clicked:', event);
+                  }}
                 />
                 
                 {showAvailability && (
@@ -236,3 +238,5 @@ const CalendarPage = React.memo(() => {
 CalendarPage.displayName = 'CalendarPage';
 
 export default CalendarPage;
+
+}

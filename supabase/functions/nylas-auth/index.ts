@@ -55,7 +55,7 @@ serve(async (req) => {
         nylasAuthUrl.searchParams.set('client_id', NYLAS_CLIENT_ID)
         nylasAuthUrl.searchParams.set('redirect_uri', NYLAS_REDIRECT_URI)
         nylasAuthUrl.searchParams.set('response_type', 'code')
-        nylasAuthUrl.searchParams.set('state', user.id) // Use user ID as state
+        nylasAuthUrl.searchParams.set('state', user.id)
         nylasAuthUrl.searchParams.set('scope', 'calendar')
         nylasAuthUrl.searchParams.set('prompt', 'select_provider')
 
@@ -106,7 +106,20 @@ serve(async (req) => {
 
         const userInfo = await userInfoResponse.json()
 
-        // Store connection in database
+        // Fetch user's calendars to store calendar IDs
+        const calendarsResponse = await fetch(`https://api.nylas.com/v3/grants/${tokenData.grant_id}/calendars`, {
+          headers: {
+            'Authorization': `Bearer ${tokenData.access_token}`,
+          }
+        })
+
+        let calendarIds = []
+        if (calendarsResponse.ok) {
+          const calendarsData = await calendarsResponse.json()
+          calendarIds = (calendarsData.data || []).map((cal: any) => cal.id)
+        }
+
+        // Store connection in database with calendar IDs
         const { data: connection, error: dbError } = await supabaseClient
           .from('nylas_connections')
           .upsert({
@@ -117,6 +130,7 @@ serve(async (req) => {
             access_token: tokenData.access_token,
             refresh_token: tokenData.refresh_token,
             expires_at: tokenData.expires_in ? new Date(Date.now() + tokenData.expires_in * 1000).toISOString() : null,
+            calendar_ids: calendarIds,
             is_active: true
           })
           .select()
@@ -133,7 +147,8 @@ serve(async (req) => {
             connection: {
               id: connection.id,
               email: connection.email,
-              provider: connection.provider
+              provider: connection.provider,
+              calendar_ids: calendarIds
             }
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
