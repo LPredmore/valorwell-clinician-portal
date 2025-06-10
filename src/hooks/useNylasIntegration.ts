@@ -9,6 +9,7 @@ interface NylasConnection {
   provider: string;
   is_active: boolean;
   created_at: string;
+  calendar_ids?: string[];
 }
 
 export const useNylasIntegration = () => {

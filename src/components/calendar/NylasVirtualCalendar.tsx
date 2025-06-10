@@ -57,10 +57,15 @@ const NylasVirtualCalendar: React.FC<NylasVirtualCalendarProps> = ({
       if (!window.Nylas || !calendarRef.current) return;
 
       try {
+        // Get calendar IDs from connections - use connection ID as fallback if calendar_ids not available
+        const calendarIds = connections.flatMap(conn => 
+          conn.calendar_ids && conn.calendar_ids.length > 0 ? conn.calendar_ids : [conn.id]
+        );
+
         // Initialize the Virtual Calendar
         const calendar = window.Nylas.calendar({
           element: calendarRef.current,
-          calendar_ids: connections.map(conn => conn.calendar_ids || []).flat(),
+          calendar_ids: calendarIds,
           theme: 'light',
           timezone: userTimeZone,
           view: 'week',
