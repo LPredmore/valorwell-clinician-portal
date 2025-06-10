@@ -1,3 +1,4 @@
+
 import React, { useEffect, useMemo, useCallback } from "react";
 import Layout from "../components/layout/Layout";
 import CalendarView from "../components/calendar/CalendarView";
@@ -238,5 +239,3 @@ const CalendarPage = React.memo(() => {
 CalendarPage.displayName = 'CalendarPage';
 
 export default CalendarPage;
-
-}
