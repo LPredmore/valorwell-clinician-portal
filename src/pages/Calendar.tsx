@@ -13,6 +13,8 @@ import CalendarErrorBoundary from "../components/calendar/CalendarErrorBoundary"
 import { getClinicianTimeZone } from "../hooks/useClinicianData";
 import CalendarConnectionsPanel from "../components/calendar/CalendarConnectionsPanel";
 import ClinicianAvailabilityPanel from "../components/calendar/ClinicianAvailabilityPanel";
+import SchedulerManagementPanel from "../components/calendar/SchedulerManagementPanel";
+import NylasVirtualCalendar from "../components/calendar/NylasVirtualCalendar";
 
 const CalendarPage = React.memo(() => {
   // Get the logged-in user's ID
@@ -169,25 +171,36 @@ const CalendarPage = React.memo(() => {
               onNavigateToday={navigateToday}
             />
 
-            {/* Updated layout to include calendar connections */}
+            {/* Updated layout to include scheduler management */}
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
               <div className="lg:col-span-3">
-                <CalendarView
-                  view="week"
-                  showAvailability={showAvailability}
+                <NylasVirtualCalendar
                   clinicianId={selectedClinicianId}
-                  currentDate={currentDate}
                   userTimeZone={userTimeZone}
-                  clinicianTimeZone={clinicianTimeZone || userTimeZone}
-                  refreshTrigger={appointmentRefreshTrigger}
-                  appointments={appointments}
-                  isLoading={isLoadingAppointments}
-                  error={appointmentsError}
+                  onEventClick={(event) => {
+                    console.log('Nylas event clicked:', event);
+                  }}
+                  onEventCreate={(event) => {
+                    console.log('Nylas event created:', event);
+                    handleDataChanged();
+                  }}
+                  onEventUpdate={(event) => {
+                    console.log('Nylas event updated:', event);
+                    handleDataChanged();
+                  }}
+                  onEventDelete={(event) => {
+                    console.log('Nylas event deleted:', event);
+                    handleDataChanged();
+                  }}
                 />
               </div>
               
               <div className="lg:col-span-1 space-y-4">
                 <CalendarConnectionsPanel />
+                
+                <SchedulerManagementPanel 
+                  clinicianId={selectedClinicianId} 
+                />
                 
                 {showAvailability && (
                   <ClinicianAvailabilityPanel 
