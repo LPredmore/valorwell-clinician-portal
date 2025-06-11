@@ -21,6 +21,26 @@ export const useNylasIntegration = () => {
   const { toast } = useToast();
   const { userId, authInitialized } = useUser();
 
+  // Listen for callback success messages
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'NYLAS_AUTH_SUCCESS') {
+        console.log('[useNylasIntegration] Received auth success message');
+        setIsConnecting(false);
+        toast({
+          title: 'Calendar Connected',
+          description: `Successfully connected ${event.data.connection?.provider} calendar`,
+          variant: 'success'
+        });
+        // Refresh connections
+        fetchConnections();
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
   // Fetch user's calendar connections
   const fetchConnections = async () => {
     if (!authInitialized || !userId) {
@@ -123,11 +143,14 @@ export const useNylasIntegration = () => {
           'width=500,height=600,scrollbars=yes,resizable=yes'
         );
 
+        // Monitor popup closure (in case user closes without completing auth)
         const checkClosed = setInterval(() => {
           if (popup?.closed) {
             clearInterval(checkClosed);
-            setIsConnecting(false);
-            setTimeout(fetchConnections, 1000);
+            // Only set connecting to false if we haven't received a success message
+            setTimeout(() => {
+              setIsConnecting(false);
+            }, 1000);
           }
         }, 1000);
       } else {
