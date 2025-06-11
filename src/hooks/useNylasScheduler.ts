@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -32,17 +31,32 @@ export const useNylasScheduler = (clinicianId: string | null) => {
         .single();
 
       if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+      if (error && error.code !== 'PGRST116') {
         throw error;
       }
 
       setSchedulerConfig(data);
     } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching scheduler config:', error);
       toast({
         title: "Error",
         description: "Failed to load scheduler configuration",
         variant: "destructive"
       });
+      if (error?.status === 406) {
+        toast({
+          title: 'Access Denied',
+          description: 'You do not have permission to access this scheduler',
+          variant: 'destructive'
+        });
+      } else {
+        toast({
+          title: 'Error',
+          description: 'Failed to load scheduler configuration',
+          variant: 'destructive'
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -55,10 +69,13 @@ export const useNylasScheduler = (clinicianId: string | null) => {
     try {
       setIsCreating(true);
       
+
       const { data, error } = await supabase.functions.invoke('nylas-scheduler-config', {
         body: { 
+        body: {
           action: 'create_scheduler',
           clinicianId 
+          clinicianId
         }
       });
 
@@ -67,6 +84,8 @@ export const useNylasScheduler = (clinicianId: string | null) => {
       toast({
         title: "Scheduler Created",
         description: "Your booking scheduler has been created successfully"
+        title: 'Scheduler Created',
+        description: 'Your booking scheduler has been created successfully'
       });
 
       // Refresh the configuration
@@ -74,12 +93,26 @@ export const useNylasScheduler = (clinicianId: string | null) => {
       
       return data;
     } catch (error) {
+    } catch (error: any) {
       console.error('Error creating scheduler:', error);
       toast({
         title: "Creation Failed",
         description: "Failed to create booking scheduler",
         variant: "destructive"
       });
+      if (error?.status === 406) {
+        toast({
+          title: 'Access Denied',
+          description: 'You do not have permission to create a scheduler',
+          variant: 'destructive'
+        });
+      } else {
+        toast({
+          title: 'Creation Failed',
+          description: 'Failed to create booking scheduler',
+          variant: 'destructive'
+        });
+      }
     } finally {
       setIsCreating(false);
     }
@@ -105,16 +138,32 @@ export const useNylasScheduler = (clinicianId: string | null) => {
       toast({
         title: "Scheduler Deactivated",
         description: "Your booking scheduler has been deactivated"
+        title: 'Scheduler Deactivated',
+        description: 'Your booking scheduler has been deactivated'
       });
 
       setSchedulerConfig(null);
     } catch (error) {
+    } catch (error: any) {
       console.error('Error deactivating scheduler:', error);
       toast({
         title: "Deactivation Failed",
         description: "Failed to deactivate scheduler",
         variant: "destructive"
       });
+      if (error?.status === 406) {
+        toast({
+          title: 'Access Denied',
+          description: 'You do not have permission to deactivate this scheduler',
+          variant: 'destructive'
+        });
+      } else {
+        toast({
+          title: 'Deactivation Failed',
+          description: 'Failed to deactivate scheduler',
+          variant: 'destructive'
+        });
+      }
     }
   };
 
