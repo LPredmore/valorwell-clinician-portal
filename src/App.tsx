@@ -10,11 +10,10 @@ import ProtectedRoute from "@/components/auth/ProtectedRoute";
 // Pages
 import Login from "./pages/Login";
 import Calendar from "./pages/Calendar";
-import Dashboard from "./pages/Dashboard";
+import PatientDashboard from "./pages/PatientDashboard";
 import Clients from "./pages/Clients";
 import ClientDetails from "./pages/ClientDetails";
 import Settings from "./pages/Settings";
-import PatientPortal from "./pages/PatientPortal";
 import ResetPassword from "./pages/ResetPassword";
 
 const queryClient = new QueryClient();
@@ -31,7 +30,7 @@ const App = () => {
               {/* Public Routes */}
               <Route path="/login" element={<Login />} />
               <Route path="/reset-password" element={<ResetPassword />} />
-              <Route path="/portal" element={<PatientPortal />} />
+              <Route path="/portal" element={<PatientDashboard />} />
 
               {/* Protected Routes */}
               <Route 
@@ -46,7 +45,7 @@ const App = () => {
                 path="/dashboard" 
                 element={
                   <ProtectedRoute allowedRoles={['clinician', 'admin']}>
-                    <Dashboard />
+                    <PatientDashboard />
                   </ProtectedRoute>
                 } 
               />
