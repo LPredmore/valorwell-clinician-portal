@@ -1,5 +1,4 @@
 
-
 -- Fix RLS policies for Nylas integration tables and related tables
 -- This migration addresses 406 errors by ensuring proper RLS policy configuration
 
@@ -10,6 +9,8 @@
 DROP POLICY IF EXISTS "Users can view their own client data" ON clients;
 DROP POLICY IF EXISTS "Clinicians can view their assigned clients" ON clients;
 DROP POLICY IF EXISTS "Users can manage their own client data" ON clients;
+DROP POLICY IF EXISTS "Users can access their own client record" ON clients;
+DROP POLICY IF EXISTS "Clinicians can access assigned clients" ON clients;
 
 -- Create comprehensive RLS policies for clients table
 -- Allow users to access their own client record
@@ -96,4 +97,3 @@ $$;
 
 -- Grant execute permission on debug function
 GRANT EXECUTE ON FUNCTION debug_auth_context() TO authenticated;
-

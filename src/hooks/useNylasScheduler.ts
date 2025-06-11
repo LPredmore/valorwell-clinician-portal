@@ -31,20 +31,13 @@ export const useNylasScheduler = (clinicianId: string | null) => {
         .eq('is_active', true)
         .single();
 
-      if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
       if (error && error.code !== 'PGRST116') {
         throw error;
       }
 
       setSchedulerConfig(data);
-    } catch (error) {
     } catch (error: any) {
       console.error('Error fetching scheduler config:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load scheduler configuration",
-        variant: "destructive"
-      });
       if (error?.status === 406) {
         toast({
           title: 'Access Denied',
@@ -69,13 +62,10 @@ export const useNylasScheduler = (clinicianId: string | null) => {
 
     try {
       setIsCreating(true);
-      
 
       const { data, error } = await supabase.functions.invoke('nylas-scheduler-config', {
-        body: { 
         body: {
           action: 'create_scheduler',
-          clinicianId 
           clinicianId
         }
       });
@@ -83,8 +73,6 @@ export const useNylasScheduler = (clinicianId: string | null) => {
       if (error) throw error;
 
       toast({
-        title: "Scheduler Created",
-        description: "Your booking scheduler has been created successfully"
         title: 'Scheduler Created',
         description: 'Your booking scheduler has been created successfully'
       });
@@ -93,14 +81,8 @@ export const useNylasScheduler = (clinicianId: string | null) => {
       await fetchSchedulerConfig();
       
       return data;
-    } catch (error) {
     } catch (error: any) {
       console.error('Error creating scheduler:', error);
-      toast({
-        title: "Creation Failed",
-        description: "Failed to create booking scheduler",
-        variant: "destructive"
-      });
       if (error?.status === 406) {
         toast({
           title: 'Access Denied',
@@ -137,21 +119,13 @@ export const useNylasScheduler = (clinicianId: string | null) => {
       if (error) throw error;
 
       toast({
-        title: "Scheduler Deactivated",
-        description: "Your booking scheduler has been deactivated"
         title: 'Scheduler Deactivated',
         description: 'Your booking scheduler has been deactivated'
       });
 
       setSchedulerConfig(null);
-    } catch (error) {
     } catch (error: any) {
       console.error('Error deactivating scheduler:', error);
-      toast({
-        title: "Deactivation Failed",
-        description: "Failed to deactivate scheduler",
-        variant: "destructive"
-      });
       if (error?.status === 406) {
         toast({
           title: 'Access Denied',
