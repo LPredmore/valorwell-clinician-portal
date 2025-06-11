@@ -17,18 +17,20 @@ export const useNylasIntegration = () => {
   const [connections, setConnections] = useState<NylasConnection[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [infrastructureError, setInfrastructureError] = useState<string | null>(null);
   const { toast } = useToast();
   const { userId, authInitialized } = useUser();
 
   // Fetch user's calendar connections
   const fetchConnections = async () => {
     if (!authInitialized || !userId) {
-      console.log('[useNylasIntegration] Skipping fetch - auth not ready');
+      console.log('[useNylasIntegration] Skipping fetch - auth not ready or no user');
       return;
     }
 
     try {
       setIsLoading(true);
+      setInfrastructureError(null);
       console.log('[useNylasIntegration] Fetching connections for user:', userId);
       
       const { data, error } = await supabase
@@ -39,13 +41,23 @@ export const useNylasIntegration = () => {
 
       if (error) {
         console.error('[useNylasIntegration] Database error:', error);
+        
         if (error.code === 'PGRST301' || error.message?.includes('permission denied')) {
+          setInfrastructureError('Database permissions not configured. Please apply the RLS migration.');
           toast({
             title: 'Setup Required',
-            description: 'Calendar integration is not yet configured. Please contact support.',
+            description: 'Calendar integration requires database migration. Please contact support.',
+            variant: 'destructive'
+          });
+        } else if (error.message?.includes('does not exist')) {
+          setInfrastructureError('Database tables missing. Please apply Nylas migrations.');
+          toast({
+            title: 'Database Setup Required',
+            description: 'Nylas tables are missing. Please apply migrations.',
             variant: 'destructive'
           });
         } else {
+          setInfrastructureError(`Database error: ${error.message}`);
           throw error;
         }
         return;
@@ -55,6 +67,7 @@ export const useNylasIntegration = () => {
       setConnections(data || []);
     } catch (error: any) {
       console.error('[useNylasIntegration] Error fetching connections:', error);
+      setInfrastructureError(`Failed to load connections: ${error.message}`);
       toast({
         title: 'Error',
         description: 'Failed to load calendar connections',
@@ -78,6 +91,7 @@ export const useNylasIntegration = () => {
 
     try {
       setIsConnecting(true);
+      setInfrastructureError(null);
       console.log('[useNylasIntegration] Initializing calendar connection');
 
       const { data, error } = await supabase.functions.invoke('nylas-auth', {
@@ -86,7 +100,19 @@ export const useNylasIntegration = () => {
 
       if (error) {
         console.error('[useNylasIntegration] Function error:', error);
-        throw error;
+        
+        if (error.message?.includes('Failed to send a request') || error.message?.includes('does not exist')) {
+          setInfrastructureError('Edge function not deployed. Please deploy nylas-auth function.');
+          toast({
+            title: 'Infrastructure Required',
+            description: 'Nylas edge functions need to be deployed. Please contact support.',
+            variant: 'destructive'
+          });
+        } else {
+          setInfrastructureError(`Connection error: ${error.message}`);
+          throw error;
+        }
+        return;
       }
 
       if (data?.authUrl) {
@@ -105,10 +131,12 @@ export const useNylasIntegration = () => {
           }
         }, 1000);
       } else {
+        setInfrastructureError('No authorization URL received from server');
         throw new Error('No authorization URL received');
       }
     } catch (error: any) {
       console.error('[useNylasIntegration] Error connecting calendar:', error);
+      setInfrastructureError(`Connection failed: ${error.message}`);
       toast({
         title: 'Connection Failed',
         description: error.message || 'Failed to initialize calendar connection',
@@ -130,7 +158,17 @@ export const useNylasIntegration = () => {
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        if (error.message?.includes('Failed to send a request')) {
+          setInfrastructureError('Edge function not available for disconnect');
+          toast({
+            title: 'Infrastructure Error',
+            description: 'Cannot disconnect - edge functions not deployed',
+            variant: 'destructive'
+          });
+        }
+        throw error;
+      }
 
       toast({
         title: 'Calendar Disconnected',
@@ -148,51 +186,6 @@ export const useNylasIntegration = () => {
     }
   };
 
-  // Sync appointment to external calendars
-  const syncAppointmentToExternal = async (appointmentId: string, force = false) => {
-    try {
-      console.log('[useNylasIntegration] Syncing appointment:', appointmentId);
-      
-      const { data, error } = await supabase.functions.invoke('nylas-sync-appointments', {
-        body: {
-          action: 'sync_to_external',
-          appointmentId,
-          force
-        }
-      });
-
-      if (error) throw error;
-
-      const successCount = data?.results?.filter((r: any) => r.status === 'synced').length || 0;
-      const failCount = data?.results?.filter((r: any) => r.status === 'failed').length || 0;
-
-      if (successCount > 0) {
-        toast({
-          title: 'Sync Successful',
-          description: `Appointment synced to ${successCount} external calendar(s)`
-        });
-      }
-
-      if (failCount > 0) {
-        toast({
-          title: 'Partial Sync',
-          description: `${failCount} calendar(s) failed to sync`,
-          variant: 'destructive'
-        });
-      }
-
-      return data;
-    } catch (error: any) {
-      console.error('[useNylasIntegration] Error syncing appointment:', error);
-      toast({
-        title: 'Sync Failed',
-        description: error.message || 'Failed to sync appointment to external calendars',
-        variant: 'destructive'
-      });
-      throw error;
-    }
-  };
-
   useEffect(() => {
     if (authInitialized && userId) {
       fetchConnections();
@@ -203,9 +196,9 @@ export const useNylasIntegration = () => {
     connections,
     isLoading,
     isConnecting,
+    infrastructureError,
     connectCalendar,
     disconnectCalendar,
-    syncAppointmentToExternal,
     refreshConnections: fetchConnections
   };
 };
