@@ -2,11 +2,13 @@
 import React, { useMemo, useState } from 'react';
 import { useNylasIntegration } from '@/hooks/useNylasIntegration';
 import { useNylasEvents } from '@/hooks/useNylasEvents';
-import { Loader2, Calendar, ExternalLink, Plus } from 'lucide-react';
+import { Calendar, ExternalLink, Plus } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { addWeeks, subWeeks, format, startOfWeek, endOfWeek, eachDayOfInterval } from 'date-fns';
+import { format, startOfWeek, endOfWeek, eachDayOfInterval } from 'date-fns';
+import CalendarLoadingState from './CalendarLoadingState';
+import CalendarErrorState from './CalendarErrorState';
 
 interface NylasHybridCalendarProps {
   clinicianId: string | null;
@@ -46,14 +48,16 @@ const NylasHybridCalendar: React.FC<NylasHybridCalendarProps> = ({
     const grouped: { [key: string]: any[] } = {};
     
     events.forEach(event => {
-      const eventStartTime = new Date(event.when.start_time);
-      const dateKey = format(eventStartTime, 'yyyy-MM-dd');
-      
-      if (!grouped[dateKey]) {
-        grouped[dateKey] = [];
+      if (event.when?.start_time) {
+        const eventStartTime = new Date(event.when.start_time);
+        const dateKey = format(eventStartTime, 'yyyy-MM-dd');
+        
+        if (!grouped[dateKey]) {
+          grouped[dateKey] = [];
+        }
+        
+        grouped[dateKey].push(event);
       }
-      
-      grouped[dateKey].push(event);
     });
     
     return grouped;
@@ -67,6 +71,34 @@ const NylasHybridCalendar: React.FC<NylasHybridCalendarProps> = ({
     }
   };
 
+  // Show error state for database/deployment issues
+  if (error && (error.includes('does not exist') || error.includes('Failed to send a request'))) {
+    return (
+      <CalendarErrorState
+        title="Setup Required"
+        message="Nylas integration requires database migration and edge function deployment."
+        onRetry={refetch}
+        showRetry={false}
+      />
+    );
+  }
+
+  // Show error state for other errors
+  if (error) {
+    return (
+      <CalendarErrorState
+        message={`Error loading calendar events: ${error}`}
+        onRetry={refetch}
+      />
+    );
+  }
+
+  // Show loading state
+  if (isLoading) {
+    return <CalendarLoadingState message="Loading calendar events..." />;
+  }
+
+  // Show connect calendar prompt if no connections
   if (!connections.length) {
     return (
       <Card>
@@ -89,49 +121,6 @@ const NylasHybridCalendar: React.FC<NylasHybridCalendarProps> = ({
             <Button onClick={handleConnectCalendar} className="flex items-center gap-2">
               <Plus className="h-4 w-4" />
               Connect Calendar
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (isLoading) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
-            Calendar
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-center py-8">
-            <div className="text-center">
-              <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
-              <p>Loading calendar events...</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (error) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-red-600">
-            <Calendar className="h-5 w-5" />
-            Calendar Error
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-8 text-red-600">
-            <p>Error loading calendar events</p>
-            <p className="text-sm mt-2">{error}</p>
-            <Button onClick={refetch} variant="outline" className="mt-4">
-              Retry
             </Button>
           </div>
         </CardContent>
@@ -182,11 +171,13 @@ const NylasHybridCalendar: React.FC<NylasHybridCalendarProps> = ({
                       onClick={() => onEventClick?.(event)}
                     >
                       <div className="font-medium text-blue-900 truncate">
-                        {event.title}
+                        {event.title || 'Untitled Event'}
                       </div>
-                      <div className="text-blue-700">
-                        {format(new Date(event.when.start_time), 'h:mm a')}
-                      </div>
+                      {event.when?.start_time && (
+                        <div className="text-blue-700">
+                          {format(new Date(event.when.start_time), 'h:mm a')}
+                        </div>
+                      )}
                       <div className="flex items-center gap-1 mt-1">
                         <Badge variant="outline" className="text-xs">
                           {event.connection_provider}
