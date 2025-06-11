@@ -91,13 +91,9 @@ CREATE POLICY "Users can manage their own mappings" ON external_calendar_mapping
     )
   );
 
+-- Fixed RLS policy: Directly use clinician_id = auth.uid() instead of user_id reference
 CREATE POLICY "Clinicians can manage their own scheduler configs" ON nylas_scheduler_configs
-  FOR ALL USING (
-    EXISTS (
-      SELECT 1 FROM clinicians 
-      WHERE id = clinician_id AND user_id = auth.uid()
-    )
-  );
+  FOR ALL USING (clinician_id = auth.uid());
 
 -- Create indexes for performance
 CREATE INDEX IF NOT EXISTS idx_nylas_connections_user_id ON nylas_connections(user_id);
