@@ -1,11 +1,12 @@
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNylasIntegration } from '@/hooks/useNylasIntegration';
 import { useNylasEvents } from '@/hooks/useNylasEvents';
-import { Loader2, Calendar, ExternalLink } from 'lucide-react';
+import { Loader2, Calendar, ExternalLink, Plus } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { addWeeks, subWeeks, format } from 'date-fns';
+import { Button } from '@/components/ui/button';
+import { addWeeks, subWeeks, format, startOfWeek, endOfWeek, eachDayOfInterval } from 'date-fns';
 
 interface NylasHybridCalendarProps {
   clinicianId: string | null;
@@ -20,11 +21,11 @@ const NylasHybridCalendar: React.FC<NylasHybridCalendarProps> = ({
   currentDate,
   onEventClick,
 }) => {
-  const { connections, isLoading: isLoadingConnections } = useNylasIntegration();
+  const { connections, isLoading: isLoadingConnections, connectCalendar } = useNylasIntegration();
   
   // Calculate date range for fetching events (current week)
-  const startDate = useMemo(() => subWeeks(currentDate, 1), [currentDate]);
-  const endDate = useMemo(() => addWeeks(currentDate, 2), [currentDate]);
+  const startDate = useMemo(() => startOfWeek(currentDate), [currentDate]);
+  const endDate = useMemo(() => endOfWeek(currentDate), [currentDate]);
   
   const { 
     events, 
@@ -35,13 +36,18 @@ const NylasHybridCalendar: React.FC<NylasHybridCalendarProps> = ({
 
   const isLoading = isLoadingConnections || isLoadingEvents;
 
-  // Group events by date for better display
+  // Generate week days for the calendar grid
+  const weekDays = useMemo(() => {
+    return eachDayOfInterval({ start: startDate, end: endDate });
+  }, [startDate, endDate]);
+
+  // Group events by date for calendar display
   const eventsByDate = useMemo(() => {
     const grouped: { [key: string]: any[] } = {};
     
     events.forEach(event => {
-      const startTime = new Date(event.when.start_time);
-      const dateKey = format(startTime, 'yyyy-MM-dd');
+      const eventStartTime = new Date(event.when.start_time);
+      const dateKey = format(eventStartTime, 'yyyy-MM-dd');
       
       if (!grouped[dateKey]) {
         grouped[dateKey] = [];
@@ -53,23 +59,37 @@ const NylasHybridCalendar: React.FC<NylasHybridCalendarProps> = ({
     return grouped;
   }, [events]);
 
+  const handleConnectCalendar = async () => {
+    try {
+      await connectCalendar();
+    } catch (error) {
+      console.error('Error connecting calendar:', error);
+    }
+  };
+
   if (!connections.length) {
     return (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Calendar className="h-5 w-5" />
-            External Calendar Events
+            Calendar Integration
           </CardTitle>
           <CardDescription>
-            Connect external calendars to view events here
+            Connect your external calendars to manage all your appointments in one place
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-6 text-gray-500">
-            <Calendar className="h-12 w-12 mx-auto mb-3 opacity-50" />
-            <p>No calendars connected</p>
-            <p className="text-sm">Connect a calendar to view external events</p>
+          <div className="text-center py-8">
+            <Calendar className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+            <h3 className="text-lg font-medium mb-2">No calendars connected</h3>
+            <p className="text-gray-500 mb-6">
+              Connect Google Calendar, Outlook, or other calendar providers to see all your events
+            </p>
+            <Button onClick={handleConnectCalendar} className="flex items-center gap-2">
+              <Plus className="h-4 w-4" />
+              Connect Calendar
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -82,14 +102,14 @@ const NylasHybridCalendar: React.FC<NylasHybridCalendarProps> = ({
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Calendar className="h-5 w-5" />
-            External Calendar Events
+            Calendar
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-center py-6">
+          <div className="flex items-center justify-center py-8">
             <div className="text-center">
               <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
-              <p>Loading external events...</p>
+              <p>Loading calendar events...</p>
             </div>
           </div>
         </CardContent>
@@ -103,13 +123,16 @@ const NylasHybridCalendar: React.FC<NylasHybridCalendarProps> = ({
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-red-600">
             <Calendar className="h-5 w-5" />
-            External Calendar Events
+            Calendar Error
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-6 text-red-600">
-            <p>Error loading external events</p>
+          <div className="text-center py-8 text-red-600">
+            <p>Error loading calendar events</p>
             <p className="text-sm mt-2">{error}</p>
+            <Button onClick={refetch} variant="outline" className="mt-4">
+              Retry
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -117,82 +140,73 @@ const NylasHybridCalendar: React.FC<NylasHybridCalendarProps> = ({
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Calendar className="h-5 w-5" />
-          External Calendar Events
-        </CardTitle>
-        <CardDescription>
-          Events from your connected calendars ({events.length} events found)
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          {/* Connected calendars summary */}
-          <div className="flex flex-wrap gap-2 mb-4">
-            {connections.map((conn) => (
-              <Badge key={conn.id} variant="secondary" className="text-xs">
-                {conn.provider}: {conn.email}
-              </Badge>
-            ))}
-          </div>
+    <div className="space-y-6">
+      {/* Connected calendars summary */}
+      <div className="flex flex-wrap gap-2">
+        {connections.map((conn) => (
+          <Badge key={conn.id} variant="secondary" className="text-xs">
+            {conn.provider}: {conn.email}
+          </Badge>
+        ))}
+        <Button onClick={handleConnectCalendar} variant="outline" size="sm" className="ml-2">
+          <Plus className="h-3 w-3 mr-1" />
+          Add Calendar
+        </Button>
+      </div>
 
-          {/* Events list */}
-          {events.length === 0 ? (
-            <div className="text-center py-6 text-gray-500">
-              <Calendar className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              <p>No external events in this time period</p>
+      {/* Week view calendar grid */}
+      <div className="border rounded-lg overflow-hidden">
+        {/* Day headers */}
+        <div className="grid grid-cols-7 bg-gray-50 border-b">
+          {weekDays.map((day) => (
+            <div key={day.toISOString()} className="p-3 text-center border-r last:border-r-0">
+              <div className="font-medium text-sm">{format(day, 'EEE')}</div>
+              <div className="text-lg">{format(day, 'd')}</div>
             </div>
-          ) : (
-            <div className="space-y-3 max-h-96 overflow-y-auto">
-              {Object.entries(eventsByDate)
-                .sort(([a], [b]) => a.localeCompare(b))
-                .map(([date, dateEvents]) => (
-                  <div key={date} className="space-y-2">
-                    <h4 className="font-medium text-sm text-gray-700">
-                      {format(new Date(date), 'EEEE, MMM d')}
-                    </h4>
-                    {dateEvents.map((event) => (
-                      <div
-                        key={event.id}
-                        className="p-3 border rounded-md hover:bg-gray-50 cursor-pointer transition-colors"
-                        onClick={() => onEventClick?.(event)}
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="font-medium text-sm">{event.title}</div>
-                            <div className="text-xs text-gray-500 mt-1">
-                              {format(new Date(event.when.start_time), 'h:mm a')} - {' '}
-                              {format(new Date(event.when.end_time), 'h:mm a')}
-                            </div>
-                            {event.description && (
-                              <div className="text-xs text-gray-600 mt-1 line-clamp-2">
-                                {event.description}
-                              </div>
-                            )}
-                            <div className="flex items-center gap-1 mt-2">
-                              <Badge variant="outline" className="text-xs">
-                                {event.connection_provider}
-                              </Badge>
-                              {event.calendar_name && (
-                                <Badge variant="outline" className="text-xs">
-                                  {event.calendar_name}
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-                          <ExternalLink className="h-3 w-3 text-gray-400 ml-2 flex-shrink-0" />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ))}
-            </div>
-          )}
+          ))}
         </div>
-      </CardContent>
-    </Card>
+
+        {/* Events grid */}
+        <div className="grid grid-cols-7 min-h-[400px]">
+          {weekDays.map((day) => {
+            const dateKey = format(day, 'yyyy-MM-dd');
+            const dayEvents = eventsByDate[dateKey] || [];
+            
+            return (
+              <div key={day.toISOString()} className="border-r last:border-r-0 p-2 min-h-[400px]">
+                <div className="space-y-1">
+                  {dayEvents.map((event) => (
+                    <div
+                      key={event.id}
+                      className="p-2 bg-blue-100 border-l-4 border-blue-500 rounded text-xs cursor-pointer hover:bg-blue-200 transition-colors"
+                      onClick={() => onEventClick?.(event)}
+                    >
+                      <div className="font-medium text-blue-900 truncate">
+                        {event.title}
+                      </div>
+                      <div className="text-blue-700">
+                        {format(new Date(event.when.start_time), 'h:mm a')}
+                      </div>
+                      <div className="flex items-center gap-1 mt-1">
+                        <Badge variant="outline" className="text-xs">
+                          {event.connection_provider}
+                        </Badge>
+                        <ExternalLink className="h-3 w-3 text-blue-500" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Events summary */}
+      <div className="text-sm text-gray-600">
+        Showing {events.length} events from {connections.length} connected calendar{connections.length !== 1 ? 's' : ''}
+      </div>
+    </div>
   );
 };
 
