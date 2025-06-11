@@ -1,4 +1,5 @@
 
+
 -- Fix RLS policies for Nylas integration tables and related tables
 -- This migration addresses 406 errors by ensuring proper RLS policy configuration
 
@@ -84,12 +85,12 @@ ALTER TABLE clinicians ENABLE ROW LEVEL SECURITY;
 CREATE OR REPLACE FUNCTION debug_auth_context()
 RETURNS TABLE (
   current_user_id uuid,
-  current_role text,
+  current_user_role text,
   is_authenticated boolean
 ) LANGUAGE SQL SECURITY DEFINER AS $$
   SELECT 
     auth.uid() as current_user_id,
-    auth.role() as current_role,
+    auth.role() as current_user_role,
     auth.uid() IS NOT NULL as is_authenticated;
 $$;
 
