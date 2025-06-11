@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useUser } from '@/context/UserContext';
 
 interface SchedulerConfig {
   id: string;
@@ -17,13 +18,19 @@ export const useNylasScheduler = (clinicianId: string | null) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const { toast } = useToast();
+  const { authInitialized } = useUser();
 
   // Fetch existing scheduler configuration
   const fetchSchedulerConfig = async () => {
-    if (!clinicianId) return;
+    if (!authInitialized || !clinicianId) {
+      console.log('[useNylasScheduler] Skipping fetch - auth not ready or no clinician ID');
+      return;
+    }
 
     try {
       setIsLoading(true);
+      console.log('[useNylasScheduler] Fetching scheduler config for:', clinicianId);
+      
       const { data, error } = await supabase
         .from('nylas_scheduler_configs')
         .select('*')
@@ -32,25 +39,28 @@ export const useNylasScheduler = (clinicianId: string | null) => {
         .single();
 
       if (error && error.code !== 'PGRST116') {
-        throw error;
+        console.error('[useNylasScheduler] Database error:', error);
+        if (error.code === 'PGRST301' || error.message?.includes('permission denied')) {
+          toast({
+            title: 'Setup Required',
+            description: 'Scheduler integration is not yet configured. Please contact support.',
+            variant: 'destructive'
+          });
+        } else {
+          throw error;
+        }
+        return;
       }
 
+      console.log('[useNylasScheduler] Fetched scheduler config:', data);
       setSchedulerConfig(data);
     } catch (error: any) {
-      console.error('Error fetching scheduler config:', error);
-      if (error?.status === 406) {
-        toast({
-          title: 'Access Denied',
-          description: 'You do not have permission to access this scheduler',
-          variant: 'destructive'
-        });
-      } else {
-        toast({
-          title: 'Error',
-          description: 'Failed to load scheduler configuration',
-          variant: 'destructive'
-        });
-      }
+      console.error('[useNylasScheduler] Error fetching scheduler config:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load scheduler configuration',
+        variant: 'destructive'
+      });
     } finally {
       setIsLoading(false);
     }
@@ -58,10 +68,18 @@ export const useNylasScheduler = (clinicianId: string | null) => {
 
   // Create new scheduler for clinician
   const createScheduler = async () => {
-    if (!clinicianId) return;
+    if (!authInitialized || !clinicianId) {
+      toast({
+        title: 'Authentication Required',
+        description: 'Please log in to create a scheduler',
+        variant: 'destructive'
+      });
+      return;
+    }
 
     try {
       setIsCreating(true);
+      console.log('[useNylasScheduler] Creating scheduler for:', clinicianId);
 
       const { data, error } = await supabase.functions.invoke('nylas-scheduler-config', {
         body: {
@@ -70,32 +88,25 @@ export const useNylasScheduler = (clinicianId: string | null) => {
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('[useNylasScheduler] Function error:', error);
+        throw error;
+      }
 
       toast({
         title: 'Scheduler Created',
         description: 'Your booking scheduler has been created successfully'
       });
 
-      // Refresh the configuration
       await fetchSchedulerConfig();
-      
       return data;
     } catch (error: any) {
-      console.error('Error creating scheduler:', error);
-      if (error?.status === 406) {
-        toast({
-          title: 'Access Denied',
-          description: 'You do not have permission to create a scheduler',
-          variant: 'destructive'
-        });
-      } else {
-        toast({
-          title: 'Creation Failed',
-          description: 'Failed to create booking scheduler',
-          variant: 'destructive'
-        });
-      }
+      console.error('[useNylasScheduler] Error creating scheduler:', error);
+      toast({
+        title: 'Creation Failed',
+        description: error.message || 'Failed to create booking scheduler',
+        variant: 'destructive'
+      });
     } finally {
       setIsCreating(false);
     }
@@ -111,12 +122,17 @@ export const useNylasScheduler = (clinicianId: string | null) => {
     if (!schedulerConfig) return;
 
     try {
+      console.log('[useNylasScheduler] Deactivating scheduler:', schedulerConfig.id);
+      
       const { error } = await supabase
         .from('nylas_scheduler_configs')
         .update({ is_active: false })
         .eq('id', schedulerConfig.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('[useNylasScheduler] Database error:', error);
+        throw error;
+      }
 
       toast({
         title: 'Scheduler Deactivated',
@@ -125,26 +141,20 @@ export const useNylasScheduler = (clinicianId: string | null) => {
 
       setSchedulerConfig(null);
     } catch (error: any) {
-      console.error('Error deactivating scheduler:', error);
-      if (error?.status === 406) {
-        toast({
-          title: 'Access Denied',
-          description: 'You do not have permission to deactivate this scheduler',
-          variant: 'destructive'
-        });
-      } else {
-        toast({
-          title: 'Deactivation Failed',
-          description: 'Failed to deactivate scheduler',
-          variant: 'destructive'
-        });
-      }
+      console.error('[useNylasScheduler] Error deactivating scheduler:', error);
+      toast({
+        title: 'Deactivation Failed',
+        description: error.message || 'Failed to deactivate scheduler',
+        variant: 'destructive'
+      });
     }
   };
 
   useEffect(() => {
-    fetchSchedulerConfig();
-  }, [clinicianId]);
+    if (authInitialized && clinicianId) {
+      fetchSchedulerConfig();
+    }
+  }, [authInitialized, clinicianId]);
 
   return {
     schedulerConfig,

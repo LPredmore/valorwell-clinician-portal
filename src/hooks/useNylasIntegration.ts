@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useUser } from '@/context/UserContext';
 
 interface NylasConnection {
   id: string;
@@ -17,34 +18,48 @@ export const useNylasIntegration = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const { toast } = useToast();
+  const { userId, authInitialized } = useUser();
 
   // Fetch user's calendar connections
   const fetchConnections = async () => {
+    if (!authInitialized || !userId) {
+      console.log('[useNylasIntegration] Skipping fetch - auth not ready');
+      return;
+    }
+
     try {
       setIsLoading(true);
+      console.log('[useNylasIntegration] Fetching connections for user:', userId);
+      
       const { data, error } = await supabase
         .from('nylas_connections')
         .select('id, email, provider, is_active, created_at, calendar_ids')
         .eq('is_active', true)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('[useNylasIntegration] Database error:', error);
+        if (error.code === 'PGRST301' || error.message?.includes('permission denied')) {
+          toast({
+            title: 'Setup Required',
+            description: 'Calendar integration is not yet configured. Please contact support.',
+            variant: 'destructive'
+          });
+        } else {
+          throw error;
+        }
+        return;
+      }
+
+      console.log('[useNylasIntegration] Fetched connections:', data);
       setConnections(data || []);
     } catch (error: any) {
-      console.error('Error fetching connections:', error);
-      if (error?.status === 406) {
-        toast({
-          title: 'Access Denied',
-          description: 'You do not have permission to view calendar connections',
-          variant: 'destructive'
-        });
-      } else {
-        toast({
-          title: 'Error',
-          description: 'Failed to load calendar connections',
-          variant: 'destructive'
-        });
-      }
+      console.error('[useNylasIntegration] Error fetching connections:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load calendar connections',
+        variant: 'destructive'
+      });
     } finally {
       setIsLoading(false);
     }
@@ -52,49 +67,53 @@ export const useNylasIntegration = () => {
 
   // Initialize calendar connection
   const connectCalendar = async () => {
+    if (!authInitialized || !userId) {
+      toast({
+        title: 'Authentication Required',
+        description: 'Please log in to connect a calendar',
+        variant: 'destructive'
+      });
+      return;
+    }
+
     try {
       setIsConnecting(true);
+      console.log('[useNylasIntegration] Initializing calendar connection');
 
       const { data, error } = await supabase.functions.invoke('nylas-auth', {
         body: { action: 'initialize' }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('[useNylasIntegration] Function error:', error);
+        throw error;
+      }
 
       if (data?.authUrl) {
-        // Open OAuth window
+        console.log('[useNylasIntegration] Opening OAuth window');
         const popup = window.open(
           data.authUrl,
           'nylas-auth',
           'width=500,height=600,scrollbars=yes,resizable=yes'
         );
 
-        // Listen for OAuth completion
         const checkClosed = setInterval(() => {
           if (popup?.closed) {
             clearInterval(checkClosed);
             setIsConnecting(false);
-            // Refresh connections after OAuth
             setTimeout(fetchConnections, 1000);
           }
         }, 1000);
+      } else {
+        throw new Error('No authorization URL received');
       }
     } catch (error: any) {
-      console.error('Error connecting calendar:', error);
-      if (error?.status === 406) {
-        toast({
-          title: 'Access Denied',
-          description: 'You do not have permission to connect a calendar',
-          variant: 'destructive'
-        });
-      } else {
-        toast({
-          title: 'Connection Failed',
-          description: 'Failed to initialize calendar connection',
-          variant: 'destructive'
-        });
-      }
-    } finally {
+      console.error('[useNylasIntegration] Error connecting calendar:', error);
+      toast({
+        title: 'Connection Failed',
+        description: error.message || 'Failed to initialize calendar connection',
+        variant: 'destructive'
+      });
       setIsConnecting(false);
     }
   };
@@ -102,6 +121,8 @@ export const useNylasIntegration = () => {
   // Disconnect calendar
   const disconnectCalendar = async (connectionId: string) => {
     try {
+      console.log('[useNylasIntegration] Disconnecting calendar:', connectionId);
+      
       const { error } = await supabase.functions.invoke('nylas-auth', {
         body: {
           action: 'disconnect',
@@ -118,26 +139,20 @@ export const useNylasIntegration = () => {
 
       fetchConnections();
     } catch (error: any) {
-      console.error('Error disconnecting calendar:', error);
-      if (error?.status === 406) {
-        toast({
-          title: 'Access Denied',
-          description: 'You do not have permission to disconnect this calendar',
-          variant: 'destructive'
-        });
-      } else {
-        toast({
-          title: 'Disconnection Failed',
-          description: 'Failed to disconnect calendar',
-          variant: 'destructive'
-        });
-      }
+      console.error('[useNylasIntegration] Error disconnecting calendar:', error);
+      toast({
+        title: 'Disconnection Failed',
+        description: error.message || 'Failed to disconnect calendar',
+        variant: 'destructive'
+      });
     }
   };
 
   // Sync appointment to external calendars
   const syncAppointmentToExternal = async (appointmentId: string, force = false) => {
     try {
+      console.log('[useNylasIntegration] Syncing appointment:', appointmentId);
+      
       const { data, error } = await supabase.functions.invoke('nylas-sync-appointments', {
         body: {
           action: 'sync_to_external',
@@ -168,27 +183,21 @@ export const useNylasIntegration = () => {
 
       return data;
     } catch (error: any) {
-      console.error('Error syncing appointment:', error);
-      if (error?.status === 406) {
-        toast({
-          title: 'Access Denied',
-          description: 'You do not have permission to sync this appointment',
-          variant: 'destructive'
-        });
-      } else {
-        toast({
-          title: 'Sync Failed',
-          description: 'Failed to sync appointment to external calendars',
-          variant: 'destructive'
-        });
-      }
+      console.error('[useNylasIntegration] Error syncing appointment:', error);
+      toast({
+        title: 'Sync Failed',
+        description: error.message || 'Failed to sync appointment to external calendars',
+        variant: 'destructive'
+      });
       throw error;
     }
   };
 
   useEffect(() => {
-    fetchConnections();
-  }, []);
+    if (authInitialized && userId) {
+      fetchConnections();
+    }
+  }, [authInitialized, userId]);
 
   return {
     connections,
