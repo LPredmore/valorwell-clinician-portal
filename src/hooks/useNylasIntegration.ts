@@ -31,12 +31,26 @@ export const useNylasIntegration = () => {
       if (error) throw error;
       setConnections(data || []);
     } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching connections:', error);
       toast({
         title: "Error",
         description: "Failed to load calendar connections",
         variant: "destructive"
       });
+      if (error?.status === 406) {
+        toast({
+          title: 'Access Denied',
+          description: 'You do not have permission to view calendar connections',
+          variant: 'destructive'
+        });
+      } else {
+        toast({
+          title: 'Error',
+          description: 'Failed to load calendar connections',
+          variant: 'destructive'
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -47,6 +61,7 @@ export const useNylasIntegration = () => {
     try {
       setIsConnecting(true);
       
+
       const { data, error } = await supabase.functions.invoke('nylas-auth', {
         body: { action: 'initialize' }
       });
@@ -72,12 +87,27 @@ export const useNylasIntegration = () => {
         }, 1000);
       }
     } catch (error) {
+    } catch (error: any) {
       console.error('Error connecting calendar:', error);
       toast({
         title: "Connection Failed",
         description: "Failed to initialize calendar connection",
         variant: "destructive"
       });
+      if (error?.status === 406) {
+        toast({
+          title: 'Access Denied',
+          description: 'You do not have permission to connect a calendar',
+          variant: 'destructive'
+        });
+      } else {
+        toast({
+          title: 'Connection Failed',
+          description: 'Failed to initialize calendar connection',
+          variant: 'destructive'
+        });
+      }
+    } finally {
       setIsConnecting(false);
     }
   };
@@ -87,8 +117,10 @@ export const useNylasIntegration = () => {
     try {
       const { error } = await supabase.functions.invoke('nylas-auth', {
         body: { 
+        body: {
           action: 'disconnect',
           connectionId 
+          connectionId
         }
       });
 
@@ -97,16 +129,32 @@ export const useNylasIntegration = () => {
       toast({
         title: "Calendar Disconnected",
         description: "Calendar has been successfully disconnected"
+        title: 'Calendar Disconnected',
+        description: 'Calendar has been successfully disconnected'
       });
 
       fetchConnections();
     } catch (error) {
+    } catch (error: any) {
       console.error('Error disconnecting calendar:', error);
       toast({
         title: "Disconnection Failed",
         description: "Failed to disconnect calendar",
         variant: "destructive"
       });
+      if (error?.status === 406) {
+        toast({
+          title: 'Access Denied',
+          description: 'You do not have permission to disconnect this calendar',
+          variant: 'destructive'
+        });
+      } else {
+        toast({
+          title: 'Disconnection Failed',
+          description: 'Failed to disconnect calendar',
+          variant: 'destructive'
+        });
+      }
     }
   };
 
@@ -115,6 +163,7 @@ export const useNylasIntegration = () => {
     try {
       const { data, error } = await supabase.functions.invoke('nylas-sync-appointments', {
         body: { 
+        body: {
           action: 'sync_to_external',
           appointmentId,
           force
@@ -129,6 +178,7 @@ export const useNylasIntegration = () => {
       if (successCount > 0) {
         toast({
           title: "Sync Successful",
+          title: 'Sync Successful',
           description: `Appointment synced to ${successCount} external calendar(s)`
         });
       }
@@ -136,19 +186,35 @@ export const useNylasIntegration = () => {
       if (failCount > 0) {
         toast({
           title: "Partial Sync",
+          title: 'Partial Sync',
           description: `${failCount} calendar(s) failed to sync`,
           variant: "destructive"
+          variant: 'destructive'
         });
       }
 
       return data;
     } catch (error) {
+    } catch (error: any) {
       console.error('Error syncing appointment:', error);
       toast({
         title: "Sync Failed",
         description: "Failed to sync appointment to external calendars",
         variant: "destructive"
       });
+      if (error?.status === 406) {
+        toast({
+          title: 'Access Denied',
+          description: 'You do not have permission to sync this appointment',
+          variant: 'destructive'
+        });
+      } else {
+        toast({
+          title: 'Sync Failed',
+          description: 'Failed to sync appointment to external calendars',
+          variant: 'destructive'
+        });
+      }
       throw error;
     }
   };
