@@ -11,6 +11,10 @@ interface NylasConnection {
   is_active: boolean;
   created_at: string;
   calendar_ids?: string[];
+  connector_id?: string;
+  grant_status?: string;
+  scopes?: string[];
+  last_sync_at?: string;
 }
 
 export const useNylasIntegration = () => {
@@ -25,12 +29,12 @@ export const useNylasIntegration = () => {
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === 'NYLAS_AUTH_SUCCESS') {
-        console.log('[useNylasIntegration] Received auth success message');
+        console.log('[useNylasIntegration] Received Google Calendar auth success message');
         setIsConnecting(false);
         toast({
-          title: 'Calendar Connected',
-          description: `Successfully connected ${event.data.connection?.provider} calendar`,
-          variant: 'success'
+          title: 'Google Calendar Connected',
+          description: 'Successfully connected your Google Calendar via Nylas',
+          variant: 'default'
         });
         // Refresh connections
         fetchConnections();
@@ -55,7 +59,7 @@ export const useNylasIntegration = () => {
       
       const { data, error } = await supabase
         .from('nylas_connections')
-        .select('id, email, provider, is_active, created_at, calendar_ids')
+        .select('id, email, provider, is_active, created_at, calendar_ids, connector_id, grant_status, scopes, last_sync_at')
         .eq('is_active', true)
         .order('created_at', { ascending: false });
 
@@ -98,12 +102,12 @@ export const useNylasIntegration = () => {
     }
   };
 
-  // Initialize calendar connection
-  const connectCalendar = async () => {
+  // Initialize Google Calendar connection via Nylas
+  const connectGoogleCalendar = async () => {
     if (!authInitialized || !userId) {
       toast({
         title: 'Authentication Required',
-        description: 'Please log in to connect a calendar',
+        description: 'Please log in to connect Google Calendar',
         variant: 'destructive'
       });
       return;
@@ -112,7 +116,7 @@ export const useNylasIntegration = () => {
     try {
       setIsConnecting(true);
       setInfrastructureError(null);
-      console.log('[useNylasIntegration] Initializing calendar connection');
+      console.log('[useNylasIntegration] Initializing Google Calendar connection via Nylas');
 
       const { data, error } = await supabase.functions.invoke('nylas-auth', {
         body: { action: 'initialize' }
@@ -136,10 +140,10 @@ export const useNylasIntegration = () => {
       }
 
       if (data?.authUrl) {
-        console.log('[useNylasIntegration] Opening OAuth window');
+        console.log('[useNylasIntegration] Opening Google OAuth window via Nylas');
         const popup = window.open(
           data.authUrl,
-          'nylas-auth',
+          'google-calendar-auth',
           'width=500,height=600,scrollbars=yes,resizable=yes'
         );
 
@@ -158,11 +162,11 @@ export const useNylasIntegration = () => {
         throw new Error('No authorization URL received');
       }
     } catch (error: any) {
-      console.error('[useNylasIntegration] Error connecting calendar:', error);
+      console.error('[useNylasIntegration] Error connecting Google Calendar:', error);
       setInfrastructureError(`Connection failed: ${error.message}`);
       toast({
         title: 'Connection Failed',
-        description: error.message || 'Failed to initialize calendar connection',
+        description: error.message || 'Failed to initialize Google Calendar connection',
         variant: 'destructive'
       });
       setIsConnecting(false);
@@ -195,7 +199,7 @@ export const useNylasIntegration = () => {
 
       toast({
         title: 'Calendar Disconnected',
-        description: 'Calendar has been successfully disconnected'
+        description: 'Google Calendar has been successfully disconnected'
       });
 
       fetchConnections();
@@ -220,7 +224,8 @@ export const useNylasIntegration = () => {
     isLoading,
     isConnecting,
     infrastructureError,
-    connectCalendar,
+    connectCalendar: connectGoogleCalendar, // Renamed for clarity
+    connectGoogleCalendar,
     disconnectCalendar,
     refreshConnections: fetchConnections
   };

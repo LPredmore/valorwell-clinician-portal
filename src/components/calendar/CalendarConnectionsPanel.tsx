@@ -12,7 +12,7 @@ const CalendarConnectionsPanel: React.FC = () => {
     isLoading,
     isConnecting,
     infrastructureError,
-    connectCalendar,
+    connectGoogleCalendar,
     disconnectCalendar
   } = useNylasIntegration();
 
@@ -44,15 +44,25 @@ const CalendarConnectionsPanel: React.FC = () => {
     }
   };
 
+  const getConnectionStatus = (connection: any) => {
+    if (connection.grant_status === 'valid') {
+      return { label: 'Connected', variant: 'secondary' as const };
+    } else if (connection.grant_status === 'invalid') {
+      return { label: 'Needs Reauth', variant: 'destructive' as const };
+    } else {
+      return { label: 'Connected', variant: 'secondary' as const };
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Calendar className="h-5 w-5" />
-          Calendar Connections
+          Google Calendar Integration
         </CardTitle>
         <CardDescription>
-          Connect your external calendars for automatic syncing
+          Connect your Google Calendar for two-way sync via Nylas
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -76,48 +86,56 @@ const CalendarConnectionsPanel: React.FC = () => {
           <>
             {connections.length > 0 ? (
               <div className="space-y-3">
-                {connections.map((connection) => (
-                  <div
-                    key={connection.id}
-                    className="flex items-center justify-between p-3 border rounded-lg"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="text-lg">
-                        {getProviderIcon(connection.provider)}
-                      </span>
-                      <div>
-                        <div className="font-medium">
-                          {getProviderName(connection.provider)}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {connection.email}
+                {connections.map((connection) => {
+                  const status = getConnectionStatus(connection);
+                  return (
+                    <div
+                      key={connection.id}
+                      className="flex items-center justify-between p-3 border rounded-lg"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="text-lg">
+                          {getProviderIcon(connection.provider)}
+                        </span>
+                        <div>
+                          <div className="font-medium">
+                            {getProviderName(connection.provider)}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {connection.email}
+                          </div>
+                          {connection.last_sync_at && (
+                            <div className="text-xs text-gray-400">
+                              Last sync: {new Date(connection.last_sync_at).toLocaleDateString()}
+                            </div>
+                          )}
                         </div>
                       </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={status.variant}>{status.label}</Badge>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => disconnectCalendar(connection.id)}
+                          disabled={!!infrastructureError}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="secondary">Connected</Badge>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => disconnectCalendar(connection.id)}
-                        disabled={!!infrastructureError}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <div className="text-center py-6 text-gray-500">
                 <Calendar className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                <p>No calendars connected</p>
-                <p className="text-sm">Connect your external calendars to enable syncing</p>
+                <p>No Google Calendar connected</p>
+                <p className="text-sm">Connect your Google Calendar to enable two-way sync</p>
               </div>
             )}
 
             <Button
-              onClick={connectCalendar}
+              onClick={connectGoogleCalendar}
               disabled={isConnecting || !!infrastructureError}
               className="w-full"
             >
@@ -129,7 +147,7 @@ const CalendarConnectionsPanel: React.FC = () => {
               ) : (
                 <>
                   <Plus className="mr-2 h-4 w-4" />
-                  Connect Calendar
+                  Connect Google Calendar
                 </>
               )}
             </Button>

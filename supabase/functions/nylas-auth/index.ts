@@ -38,27 +38,35 @@ serve(async (req) => {
 
     const nylasClientId = Deno.env.get('NYLAS_CLIENT_ID')
     const nylasClientSecret = Deno.env.get('NYLAS_CLIENT_SECRET')
-    const nylasRedirectUri = Deno.env.get('NYLAS_REDIRECT_URI')
+    const nylasRedirectUri = 'https://ehr.valorwell.org/nylas-oauth-callback'
 
-    if (!nylasClientId || !nylasClientSecret || !nylasRedirectUri) {
+    if (!nylasClientId || !nylasClientSecret) {
       throw new Error('Nylas configuration missing')
     }
 
     switch (action) {
       case 'initialize': {
-        // Generate OAuth URL for calendar connection
+        // Generate OAuth URL for Google Calendar connection via Nylas
         const state = btoa(JSON.stringify({ 
           userId: user.id, 
           timestamp: Date.now() 
         }))
         
-        const authUrl = new URL('https://api.nylas.com/v3/connect/auth')
+        const authUrl = new URL('https://api.us.nylas.com/v3/connect/auth')
         authUrl.searchParams.set('client_id', nylasClientId)
         authUrl.searchParams.set('redirect_uri', nylasRedirectUri)
         authUrl.searchParams.set('response_type', 'code')
         authUrl.searchParams.set('state', state)
-        authUrl.searchParams.set('scope', 'https://www.googleapis.com/auth/calendar')
         authUrl.searchParams.set('provider', 'google')
+        
+        // Set the required Google scopes
+        const scopes = [
+          'openid',
+          'https://www.googleapis.com/auth/userinfo.email',
+          'https://www.googleapis.com/auth/userinfo.profile',
+          'https://www.googleapis.com/auth/calendar'
+        ]
+        authUrl.searchParams.set('scope', scopes.join(' '))
 
         return new Response(
           JSON.stringify({ authUrl: authUrl.toString() }),
@@ -79,8 +87,8 @@ serve(async (req) => {
           throw new Error('Invalid state parameter')
         }
 
-        // Exchange code for access token
-        const tokenResponse = await fetch('https://api.nylas.com/v3/connect/token', {
+        // Exchange code for access token using Nylas token endpoint
+        const tokenResponse = await fetch('https://api.us.nylas.com/v3/connect/token', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -102,32 +110,40 @@ serve(async (req) => {
 
         const tokenData = await tokenResponse.json()
 
-        // Get connection details from Nylas
-        const connectionResponse = await fetch(`https://api.nylas.com/v3/grants/${tokenData.grant_id}`, {
+        // Get grant details from Nylas
+        const grantResponse = await fetch(`https://api.us.nylas.com/v3/grants/${tokenData.grant_id}`, {
           headers: {
             'Authorization': `Bearer ${tokenData.access_token}`,
           },
         })
 
-        if (!connectionResponse.ok) {
-          throw new Error('Failed to fetch connection details')
+        if (!grantResponse.ok) {
+          throw new Error('Failed to fetch grant details')
         }
 
-        const connectionData = await connectionResponse.json()
+        const grantData = await grantResponse.json()
 
-        // Store connection in database
+        // Store connection in database with Google-specific metadata
         const { data: connection, error: dbError } = await supabaseClient
           .from('nylas_connections')
           .insert({
             id: tokenData.grant_id,
             user_id: stateData.userId,
-            email: connectionData.email,
-            provider: connectionData.provider,
+            email: grantData.email,
+            provider: 'google',
             access_token: tokenData.access_token,
             refresh_token: tokenData.refresh_token,
             token_expires_at: new Date(Date.now() + (tokenData.expires_in * 1000)).toISOString(),
             is_active: true,
-            calendar_ids: connectionData.calendar_ids || [],
+            calendar_ids: grantData.calendar_ids || [],
+            connector_id: grantData.connector_id,
+            grant_status: grantData.grant_status,
+            scopes: [
+              'openid',
+              'https://www.googleapis.com/auth/userinfo.email',
+              'https://www.googleapis.com/auth/userinfo.profile',
+              'https://www.googleapis.com/auth/calendar'
+            ]
           })
           .select()
           .single()
@@ -143,7 +159,8 @@ serve(async (req) => {
             connection: {
               id: connection.id,
               email: connection.email,
-              provider: connection.provider
+              provider: connection.provider,
+              grant_status: grantData.grant_status
             }
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
