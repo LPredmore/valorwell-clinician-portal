@@ -36,7 +36,6 @@ export const useNylasIntegration = () => {
           description: 'Successfully connected your Google Calendar via Nylas',
           variant: 'default'
         });
-        // Refresh connections
         fetchConnections();
       }
     };
@@ -66,8 +65,9 @@ export const useNylasIntegration = () => {
       if (error) {
         console.error('[useNylasIntegration] Database error:', error);
         
+        // Handle specific error cases
         if (error.code === 'PGRST301' || error.message?.includes('permission denied')) {
-          setInfrastructureError('Database permissions not configured. Please apply the RLS migration.');
+          setInfrastructureError('Database permissions not configured. Please apply the latest migration.');
           toast({
             title: 'Setup Required',
             description: 'Calendar integration requires database migration. Please contact support.',
@@ -82,7 +82,7 @@ export const useNylasIntegration = () => {
           });
         } else {
           setInfrastructureError(`Database error: ${error.message}`);
-          throw error;
+          console.error('[useNylasIntegration] Detailed error:', error);
         }
         return;
       }
@@ -132,9 +132,20 @@ export const useNylasIntegration = () => {
             description: 'Nylas edge functions need to be deployed. Please contact support.',
             variant: 'destructive'
           });
+        } else if (error.message?.includes('Nylas configuration missing')) {
+          setInfrastructureError('Nylas API credentials not configured. Please set NYLAS_CLIENT_ID, NYLAS_CLIENT_SECRET, and NYLAS_API_KEY.');
+          toast({
+            title: 'Configuration Required',
+            description: 'Nylas API credentials need to be configured in Supabase secrets.',
+            variant: 'destructive'
+          });
         } else {
           setInfrastructureError(`Connection error: ${error.message}`);
-          throw error;
+          toast({
+            title: 'Connection Failed',
+            description: error.message || 'Failed to initialize connection',
+            variant: 'destructive'
+          });
         }
         return;
       }
@@ -147,11 +158,20 @@ export const useNylasIntegration = () => {
           'width=500,height=600,scrollbars=yes,resizable=yes'
         );
 
-        // Monitor popup closure (in case user closes without completing auth)
+        if (!popup) {
+          setInfrastructureError('Popup blocked. Please allow popups for this site.');
+          toast({
+            title: 'Popup Blocked',
+            description: 'Please allow popups and try again.',
+            variant: 'destructive'
+          });
+          return;
+        }
+
+        // Monitor popup closure
         const checkClosed = setInterval(() => {
           if (popup?.closed) {
             clearInterval(checkClosed);
-            // Only set connecting to false if we haven't received a success message
             setTimeout(() => {
               setIsConnecting(false);
             }, 1000);
@@ -224,7 +244,7 @@ export const useNylasIntegration = () => {
     isLoading,
     isConnecting,
     infrastructureError,
-    connectCalendar: connectGoogleCalendar, // Renamed for clarity
+    connectCalendar: connectGoogleCalendar,
     connectGoogleCalendar,
     disconnectCalendar,
     refreshConnections: fetchConnections
