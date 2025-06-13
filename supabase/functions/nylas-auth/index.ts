@@ -25,24 +25,6 @@ serve(async (req) => {
       }
     )
 
-    // Verify JWT and get user
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      console.error('[nylas-auth] No authorization header')
-      throw new Error('No authorization header')
-    }
-
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser()
-    if (authError || !user) {
-      console.error('[nylas-auth] Authentication failed:', authError)
-      throw new Error('Authentication failed')
-    }
-
-    console.log('[nylas-auth] Authenticated user:', user.id)
-
-    const { action, code, state, connectionId } = await req.json()
-    console.log('[nylas-auth] Action:', action)
-
     // Check for required environment variables
     const nylasClientId = Deno.env.get('NYLAS_CLIENT_ID')
     const nylasClientSecret = Deno.env.get('NYLAS_CLIENT_SECRET')
@@ -50,24 +32,110 @@ serve(async (req) => {
     const nylasConnectorId = Deno.env.get('NYLAS_CONNECTOR_ID')
     const nylasRedirectUri = Deno.env.get('NYLAS_REDIRECT_URI') || 'https://ehr.valorwell.org/nylas-oauth-callback'
 
-    console.log('[nylas-auth] Environment check:', {
-      hasClientId: !!nylasClientId,
-      hasClientSecret: !!nylasClientSecret,
-      hasApiKey: !!nylasApiKey,
-      hasConnectorId: !!nylasConnectorId,
-      redirectUri: nylasRedirectUri
-    })
-
-    if (!nylasClientId || !nylasClientSecret || !nylasApiKey) {
-      throw new Error('Nylas configuration missing - check NYLAS_CLIENT_ID, NYLAS_CLIENT_SECRET, and NYLAS_API_KEY')
-    }
+    const { action, code, state, connectionId } = await req.json()
+    console.log('[nylas-auth] Action:', action)
 
     switch (action) {
+      case 'ping': {
+        // Simple health check endpoint
+        console.log('[nylas-auth] Ping request received')
+        return new Response(
+          JSON.stringify({ 
+            status: 'ok', 
+            timestamp: new Date().toISOString(),
+            environment: {
+              hasClientId: !!nylasClientId,
+              hasClientSecret: !!nylasClientSecret,
+              hasApiKey: !!nylasApiKey,
+              hasConnectorId: !!nylasConnectorId,
+              redirectUri: nylasRedirectUri
+            }
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      case 'check-config': {
+        // Configuration validation endpoint
+        console.log('[nylas-auth] Configuration check requested')
+        
+        const missingConfig = []
+        if (!nylasClientId) missingConfig.push('NYLAS_CLIENT_ID')
+        if (!nylasClientSecret) missingConfig.push('NYLAS_CLIENT_SECRET')
+        if (!nylasApiKey) missingConfig.push('NYLAS_API_KEY')
+
+        if (missingConfig.length > 0) {
+          return new Response(
+            JSON.stringify({ 
+              error: 'Nylas configuration missing',
+              missing: missingConfig,
+              details: `Missing environment variables: ${missingConfig.join(', ')}`
+            }),
+            { 
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+            }
+          )
+        }
+
+        // Test Nylas API connectivity
+        try {
+          const testResponse = await fetch('https://api.us.nylas.com/v3/grants', {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${nylasApiKey}`,
+              'Content-Type': 'application/json',
+            },
+          })
+
+          if (!testResponse.ok) {
+            throw new Error(`Nylas API test failed: ${testResponse.status}`)
+          }
+
+          return new Response(
+            JSON.stringify({ 
+              status: 'ok',
+              message: 'Nylas configuration is valid',
+              api_connectivity: 'success'
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        } catch (error) {
+          return new Response(
+            JSON.stringify({ 
+              error: 'Nylas API connectivity failed',
+              details: error.message
+            }),
+            { 
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+            }
+          )
+        }
+      }
+
       case 'initialize': {
-        console.log('[nylas-auth] Initializing Google Calendar OAuth flow')
+        // Verify JWT and get user for OAuth actions
+        const authHeader = req.headers.get('Authorization')
+        if (!authHeader) {
+          console.error('[nylas-auth] No authorization header')
+          throw new Error('No authorization header')
+        }
+
+        const { data: { user }, error: authError } = await supabaseClient.auth.getUser()
+        if (authError || !user) {
+          console.error('[nylas-auth] Authentication failed:', authError)
+          throw new Error('Authentication failed')
+        }
+
+        console.log('[nylas-auth] Initializing Google Calendar OAuth flow for user:', user.id)
+
+        if (!nylasClientId || !nylasClientSecret || !nylasApiKey) {
+          throw new Error('Nylas configuration missing - check NYLAS_CLIENT_ID, NYLAS_CLIENT_SECRET, and NYLAS_API_KEY')
+        }
         
         // Generate OAuth URL for Google Calendar connection via Nylas
-        const state = btoa(JSON.stringify({ 
+        const stateParam = btoa(JSON.stringify({ 
           userId: user.id, 
           timestamp: Date.now() 
         }))
@@ -76,10 +144,10 @@ serve(async (req) => {
         authUrl.searchParams.set('client_id', nylasClientId)
         authUrl.searchParams.set('redirect_uri', nylasRedirectUri)
         authUrl.searchParams.set('response_type', 'code')
-        authUrl.searchParams.set('state', state)
+        authUrl.searchParams.set('state', stateParam)
         authUrl.searchParams.set('provider', 'google')
         
-        // Use the connector ID if available
+        // Only use connector ID if available (optional for now)
         if (nylasConnectorId) {
           authUrl.searchParams.set('connector_id', nylasConnectorId)
         }
@@ -102,11 +170,28 @@ serve(async (req) => {
       }
 
       case 'callback': {
-        console.log('[nylas-auth] Processing OAuth callback')
+        // Verify JWT and get user
+        const authHeader = req.headers.get('Authorization')
+        if (!authHeader) {
+          console.error('[nylas-auth] No authorization header')
+          throw new Error('No authorization header')
+        }
+
+        const { data: { user }, error: authError } = await supabaseClient.auth.getUser()
+        if (authError || !user) {
+          console.error('[nylas-auth] Authentication failed:', authError)
+          throw new Error('Authentication failed')
+        }
+
+        console.log('[nylas-auth] Processing OAuth callback for user:', user.id)
         
         if (!code || !state) {
           console.error('[nylas-auth] Missing code or state:', { hasCode: !!code, hasState: !!state })
           throw new Error('Missing authorization code or state')
+        }
+
+        if (!nylasClientId || !nylasClientSecret || !nylasApiKey) {
+          throw new Error('Nylas configuration missing')
         }
 
         // Verify state parameter
@@ -168,7 +253,7 @@ serve(async (req) => {
           grant_status: grantData.grant_status
         })
 
-        // Store connection in database with Google-specific metadata
+        // Store connection in database
         const connectionData = {
           id: tokenData.grant_id,
           user_id: stateData.userId,
@@ -219,6 +304,19 @@ serve(async (req) => {
       }
 
       case 'disconnect': {
+        // Verify JWT and get user
+        const authHeader = req.headers.get('Authorization')
+        if (!authHeader) {
+          console.error('[nylas-auth] No authorization header')
+          throw new Error('No authorization header')
+        }
+
+        const { data: { user }, error: authError } = await supabaseClient.auth.getUser()
+        if (authError || !user) {
+          console.error('[nylas-auth] Authentication failed:', authError)
+          throw new Error('Authentication failed')
+        }
+
         console.log('[nylas-auth] Disconnecting connection:', connectionId)
         
         if (!connectionId) {
@@ -246,7 +344,7 @@ serve(async (req) => {
       }
 
       default:
-        throw new Error('Invalid action')
+        throw new Error(`Invalid action: ${action}`)
     }
 
   } catch (error) {
