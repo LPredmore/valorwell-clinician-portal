@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -13,6 +12,8 @@ serve(async (req) => {
   }
 
   try {
+    console.log('[nylas-events] Request received:', req.method, req.url)
+    
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -26,18 +27,64 @@ serve(async (req) => {
     // Verify JWT and get user
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
-      throw new Error('No authorization header')
+      console.error('[nylas-events] No authorization header')
+      return new Response(
+        JSON.stringify({ 
+          error: 'Authentication failed',
+          code: 'AUTH_HEADER_MISSING',
+          details: 'No authorization header provided'
+        }),
+        { 
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
     }
 
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser()
     if (authError || !user) {
-      throw new Error('Authentication failed')
+      console.error('[nylas-events] Authentication failed:', authError)
+      return new Response(
+        JSON.stringify({ 
+          error: 'Authentication failed',
+          code: 'INVALID_JWT',
+          details: authError?.message || 'Invalid or expired JWT token'
+        }),
+        { 
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
     }
+
+    console.log('[nylas-events] Authenticated user:', user.id)
 
     const { action, startDate, endDate, calendarIds } = await req.json()
 
+    // Check for ping action
+    if (action === 'ping') {
+      return new Response(
+        JSON.stringify({ 
+          status: 'ok', 
+          timestamp: new Date().toISOString(),
+          user_id: user.id
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     if (action !== 'fetch_events') {
-      throw new Error('Invalid action')
+      return new Response(
+        JSON.stringify({ 
+          error: 'Invalid action',
+          code: 'INVALID_ACTION',
+          details: `Action '${action}' is not supported. Use 'fetch_events' or 'ping'.`
+        }),
+        { 
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
     }
 
     // Get user's active connections
@@ -48,7 +95,18 @@ serve(async (req) => {
       .eq('is_active', true)
 
     if (connectionsError) {
-      throw new Error('Failed to fetch connections')
+      console.error('[nylas-events] Database error:', connectionsError)
+      return new Response(
+        JSON.stringify({ 
+          error: 'Failed to fetch connections',
+          code: 'DB_ERROR',
+          details: connectionsError.message
+        }),
+        { 
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
     }
 
     if (!connections || connections.length === 0) {
@@ -60,6 +118,7 @@ serve(async (req) => {
 
     const allEvents = []
     const connectionInfo = []
+    const errors = []
 
     // Fetch events from each connection
     for (const connection of connections) {
@@ -72,7 +131,8 @@ serve(async (req) => {
 
         if (tokenExpiresAt <= now && connection.refresh_token) {
           // Refresh token
-          const refreshResponse = await fetch('https://api.nylas.com/v3/connect/token', {
+          console.log(`[nylas-events] Refreshing token for connection ${connection.id}`)
+          const refreshResponse = await fetch('https://api.us.nylas.com/v3/connect/token', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -88,26 +148,42 @@ serve(async (req) => {
           if (refreshResponse.ok) {
             const refreshData = await refreshResponse.json()
             accessToken = refreshData.access_token
+            console.log(`[nylas-events] Token refreshed successfully for connection ${connection.id}`)
 
             // Update stored token
-            await supabaseClient
+            const { error: updateError } = await supabaseClient
               .from('nylas_connections')
               .update({
                 access_token: refreshData.access_token,
                 token_expires_at: new Date(Date.now() + (refreshData.expires_in * 1000)).toISOString(),
               })
               .eq('id', connection.id)
+              
+            if (updateError) {
+              console.error(`[nylas-events] Error updating token for connection ${connection.id}:`, updateError)
+            }
+          } else {
+            const errorText = await refreshResponse.text()
+            console.error(`[nylas-events] Token refresh failed for connection ${connection.id}:`, refreshResponse.status, errorText)
+            errors.push({
+              connection_id: connection.id,
+              error: 'Token refresh failed',
+              details: errorText
+            })
+            continue
           }
         }
 
         // Build events query
-        const eventsUrl = new URL(`https://api.nylas.com/v3/grants/${connection.id}/events`)
+        const eventsUrl = new URL(`https://api.us.nylas.com/v3/grants/${connection.id}/events`)
         if (startDate) eventsUrl.searchParams.set('start', new Date(startDate).getTime().toString())
         if (endDate) eventsUrl.searchParams.set('end', new Date(endDate).getTime().toString())
         if (calendarIds && calendarIds.length > 0) {
           eventsUrl.searchParams.set('calendar_id', calendarIds.join(','))
         }
 
+        console.log(`[nylas-events] Fetching events for connection ${connection.id}:`, eventsUrl.toString())
+        
         const eventsResponse = await fetch(eventsUrl.toString(), {
           headers: {
             'Authorization': `Bearer ${accessToken}`,
@@ -117,6 +193,7 @@ serve(async (req) => {
 
         if (eventsResponse.ok) {
           const eventsData = await eventsResponse.json()
+          console.log(`[nylas-events] Received ${eventsData.data?.length || 0} events for connection ${connection.id}`)
           
           // Transform events to consistent format
           const transformedEvents = eventsData.data?.map((event: any) => ({
@@ -139,6 +216,14 @@ serve(async (req) => {
           })) || []
 
           allEvents.push(...transformedEvents)
+        } else {
+          const errorText = await eventsResponse.text()
+          console.error(`[nylas-events] Error fetching events for connection ${connection.id}:`, eventsResponse.status, errorText)
+          errors.push({
+            connection_id: connection.id,
+            error: 'Failed to fetch events',
+            details: errorText
+          })
         }
 
         connectionInfo.push({
@@ -149,25 +234,41 @@ serve(async (req) => {
         })
 
       } catch (error) {
-        console.error(`Error fetching events for connection ${connection.id}:`, error)
+        console.error(`[nylas-events] Error processing connection ${connection.id}:`, error)
+        errors.push({
+          connection_id: connection.id,
+          error: 'Connection processing error',
+          details: error.message
+        })
         // Continue with other connections
       }
     }
 
+    const response = {
+      events: allEvents,
+      connections: connectionInfo
+    }
+    
+    // Only include errors if there are any
+    if (errors.length > 0) {
+      response.errors = errors
+    }
+
     return new Response(
-      JSON.stringify({ 
-        events: allEvents,
-        connections: connectionInfo 
-      }),
+      JSON.stringify(response),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
   } catch (error) {
-    console.error('Nylas events error:', error)
+    console.error('[nylas-events] Error:', error)
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: 'Server error',
+        code: 'SERVER_ERROR',
+        details: error.message
+      }),
       { 
-        status: 400,
+        status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     )

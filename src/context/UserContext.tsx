@@ -42,32 +42,22 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [clientStatus, setClientStatus] = useState<ClientProfile['client_status'] | null>(null);
   const [clientProfile, setClientProfile] = useState<ClientProfile | null>(null);
   
-  const [isLoading, setIsLoading] = useState(true); 
-  // CRITICAL FIX: Start with authInitialized set to false, but set it to true in multiple paths
+  // Simplified loading and initialization state
+  const [isLoading, setIsLoading] = useState(true);
   const [authInitialized, setAuthInitialized] = useState(false);
-
-  /**
-   * Safety mechanism to ensure auth state is properly initialized
-   * Sets authInitialized to true after a timeout to prevent UI deadlocks
-   */
+  
+  // Single safety timeout to prevent UI deadlocks
   useEffect(() => {
-    // Primary safety timeout (3s)
     const safetyTimeoutId = setTimeout(() => {
-      setAuthInitialized(true);
-      setIsLoading(false);
-    }, 3000);
-    
-    // Secondary backup timeout (5s)
-    const extendedTimeoutId = setTimeout(() => {
-      setAuthInitialized(true);
-      setIsLoading(false);
+      if (!authInitialized) {
+        console.warn('[UserContext] Auth initialization timed out, forcing initialized state');
+        setAuthInitialized(true);
+        setIsLoading(false);
+      }
     }, 5000);
     
-    return () => {
-      clearTimeout(safetyTimeoutId);
-      clearTimeout(extendedTimeoutId);
-    };
-  }, []);
+    return () => clearTimeout(safetyTimeoutId);
+  }, [authInitialized]);
 
   /**
    * Fetches client-specific data for an authenticated user
@@ -129,120 +119,109 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  // Main effect for initialization and auth state changes
+  // Simplified main effect for initialization and auth state changes
   useEffect(() => {
-    logInfo("[UserContext] Main useEffect: Setting up initial session check and auth listener.");
+    logInfo("[UserContext] Setting up auth initialization");
     let isMounted = true;
-    setIsLoading(true); // Overall loading starts
     
-    // CRITICAL FIX: Set authInitialized to true immediately in the main effect
-    // to prevent deadlocks, then check if we need to revert it based on actual state
-    setAuthInitialized(true);
-
-    // 1. Initial Session Check
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (!isMounted) return;
-      logInfo("[UserContext] Initial getSession completed. Session user ID:", session?.user?.id || 'null');
-      
+    // Start loading
+    setIsLoading(true);
+    
+    // Create a single async function to handle the initial auth check
+    const initializeAuth = async () => {
       try {
+        // Get the current session
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!isMounted) return;
+        
+        logInfo("[UserContext] Initial session check complete:",
+          session ? `User ID: ${session.user.id}` : "No active session");
+        
+        // Set basic user data
         setUser(session?.user || null);
         setUserId(session?.user?.id || null);
-
+        
+        // If we have a user, fetch their specific data
         if (session?.user) {
-          // fetchClientSpecificData will set isLoading true then false for its own operation
           await fetchClientSpecificData(session.user);
         } else {
-          // No initial session, reset client specific data
+          // No user, reset all user-specific state
           setUserRole(null);
           setClientStatus(null);
           setClientProfile(null);
-          setIsLoading(false); // Explicitly set loading to false when no user
         }
         
+        // Mark auth as initialized and not loading
         if (isMounted) {
-          // Ensure authInitialized is set to true and isLoading is false
           setAuthInitialized(true);
           setIsLoading(false);
-          logInfo("[UserContext] Initial auth process finished. authInitialized: true, isLoading: false");
+          logInfo("[UserContext] Auth initialization complete");
         }
       } catch (error) {
-        logError("[UserContext] Error processing session data:", error);
+        logError("[UserContext] Error during auth initialization:", error);
+        
+        // Even on error, mark auth as initialized to prevent UI deadlocks
         if (isMounted) {
-          setAuthInitialized(true); // Ensure flag is set even on error
-          setIsLoading(false); // Prevent loading state from getting stuck
+          setAuthInitialized(true);
+          setIsLoading(false);
+          
+          // Reset all user data on error
+          setUser(null);
+          setUserId(null);
+          setUserRole(null);
+          setClientStatus(null);
+          setClientProfile(null);
         }
       }
-    }).catch(async (error) => {
-      if (!isMounted) return;
-      logError("[UserContext] Error in initial getSession:", error);
-      
-      // Even on error, we need to set authInitialized to true to prevent deadlocks
-      setAuthInitialized(true);
-      setIsLoading(false);
-      
-      setUser(null); setUserId(null); setUserRole(null); setClientStatus(null); setClientProfile(null);
-      logInfo("[UserContext] Initial auth process finished (with error). authInitialized: true, isLoading: false");
-    });
-
-    // 2. Auth State Change Listener
+    };
+    
+    // Start the initialization process
+    initializeAuth();
+    
+    // Set up the auth state change listener
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event: AuthChangeEvent, session: Session | null) => {
         if (!isMounted) return;
-        logInfo(`[UserContext] onAuthStateChange event: ${event}, User: ${session?.user?.id || 'null'}`);
         
-        // CRITICAL FIX: Always ensure authInitialized is true when auth state changes
-        setAuthInitialized(true);
+        logInfo(`[UserContext] Auth state changed: ${event}`);
         
         try {
-          // Log detailed before/after state transitions for debugging
-          const prevUserId = userId;
-          logInfo(`[UserContext] Auth transition: userId ${prevUserId} → ${session?.user?.id || 'null'}`);
-          
+          // Update basic user data immediately
           setUser(session?.user || null);
           setUserId(session?.user?.id || null);
-
+          
+          // Handle session changes
           if (session?.user) {
-            // Handle the session update in a separate async function to prevent deadlocks
-            setTimeout(async () => {
-              if (isMounted) {
-                await fetchClientSpecificData(session.user);
-                // Double-check authInitialized is true after fetchClientSpecificData
-                setAuthInitialized(true);
-                logInfo(`[UserContext] onAuthStateChange: User is signed in, authInitialized is true.`);
-              }
-            }, 0);
+            // User signed in or session refreshed
+            await fetchClientSpecificData(session.user);
           } else {
-            // SIGNED_OUT or session became null
+            // User signed out
             setUserRole(null);
             setClientStatus(null);
             setClientProfile(null);
-            setIsLoading(false); // No user, so not loading user-specific data
-            logInfo("[UserContext] onAuthStateChange: User signed out or session null. isLoading set to false.");
+            setIsLoading(false);
           }
+          
+          // Ensure auth is marked as initialized
+          setAuthInitialized(true);
         } catch (error) {
-          // ENHANCED ERROR HANDLING: Handle any errors in the auth state change process
-          logError("[UserContext] Error during auth state change processing:", error);
-          setAuthInitialized(true); // Ensure flag is set even on error
-          setIsLoading(false); // Ensure we're not stuck in loading state
-        } finally {
-          // CRITICAL FIX: Final safety check to ensure flags are properly set
-          if (isMounted) {
-            setAuthInitialized(true);
-            // Only set isLoading to false if we're not in the middle of fetchClientSpecificData
-            if (!session?.user) {
-              setIsLoading(false);
-            }
-          }
+          logError("[UserContext] Error handling auth state change:", error);
+          
+          // Ensure we're not stuck in loading state
+          setIsLoading(false);
+          setAuthInitialized(true);
         }
       }
     );
-
+    
+    // Cleanup function
     return () => {
       isMounted = false;
-      logInfo("[UserContext] Cleaning up auth subscription (unmount).");
+      logInfo("[UserContext] Cleaning up auth subscription");
       authListener?.subscription?.unsubscribe();
     };
-  }, [fetchClientSpecificData]); // CRITICAL FIX: Removed authInitialized from dependency array
+  }, [fetchClientSpecificData]);
 
   const refreshUserData = useCallback(async () => {
     logInfo("[UserContext] refreshUserData explicitly called.");

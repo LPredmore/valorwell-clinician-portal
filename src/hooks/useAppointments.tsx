@@ -157,124 +157,40 @@ export const useAppointments = (
     // Include refreshTrigger in the queryKey to force refresh when it changes
     queryKey: ["appointments", formattedClinicianId, fromUTCISO, toUTCISO, refreshTrigger],
     queryFn: async (): Promise<Appointment[]> => {
-
+      // Early return if no clinician ID
       if (!formattedClinicianId) {
-        console.log("[useAppointments] STEP 1 - Returning empty array due to missing clinician ID");
         return [];
       }
       
-      console.log(
-        "[useAppointments] STEP 1 - Building Supabase Query for clinician:",
-        formattedClinicianId,
-        { from: fromUTCISO, to: toUTCISO, refreshTrigger }
-      );
-
+      // Build the query with proper date filters
       let query = supabase
         .from("appointments")
         .select(
           `id, client_id, clinician_id, start_at, end_at, type, status, appointment_recurring, recurring_group_id, video_room_url, notes, appointment_timezone, clients (client_first_name, client_last_name, client_preferred_name, client_email, client_phone, client_status, client_date_of_birth, client_gender, client_address, client_city, client_state, client_zipcode)`
         )
         .eq("clinician_id", formattedClinicianId)
-        .in("status", ["scheduled", "blocked"]); // Updated to include both scheduled and blocked appointments
-
-      console.log("[useAppointments] STEP 1 - Supabase Query Building:", {
-        baseQuery: "appointments table",
-        clinicianFilter: `clinician_id = ${formattedClinicianId}`,
-        statusFilter: "status IN (scheduled, blocked)", // Updated log message
-        fromDateFilter: fromUTCISO ? `start_at >= ${fromUTCISO}` : 'none',
-        toDateFilter: toUTCISO ? `end_at <= ${toUTCISO}` : 'none'
-      });
+        .in("status", ["scheduled", "blocked"]);
       
+      // Apply date range filters if provided
       if (fromUTCISO) query = query.gte("start_at", fromUTCISO);
       if (toUTCISO) query = query.lte("end_at", toUTCISO);
       
+      // Order by start time
       query = query.order("start_at", { ascending: true });
-        
-      console.log("[useAppointments] STEP 1 - Final Query Details:", {
-        clinician_id: formattedClinicianId,
-        start_at: fromUTCISO ? `>= ${fromUTCISO}` : 'any',
-        end_at: toUTCISO ? `<= ${toUTCISO}` : 'any',
-        status: 'scheduled OR blocked', // Updated log message
-        orderBy: 'start_at ASC'
-      });
       
-      console.log("[useAppointments] STEP 1 - EXECUTING SUPABASE QUERY NOW...");
-      
+      // Execute the query
       const { data: rawDataAny, error: queryError } = await query;
-
-      // STEP 1: COMPREHENSIVE SUPABASE RESPONSE LOGGING
-      console.log('[useAppointments] STEP 1 - Supabase Query Response:', {
-        hasData: !!rawDataAny,
-        recordCount: rawDataAny?.length || 0,
-        hasError: !!queryError,
-        errorMessage: queryError?.message || null,
-        errorDetails: queryError?.details || null,
-        errorHint: queryError?.hint || null,
-        rawResponse: rawDataAny,
-        queryExecuted: {
-          table: 'appointments',
-          clinician_id: formattedClinicianId,
-          date_range: { from: fromUTCISO, to: toUTCISO },
-          status: 'scheduled OR blocked'
-        }
-      });
-
-      // STEP 2: DATABASE VERIFICATION LOGGING
-      if (rawDataAny && rawDataAny.length > 0) {
-        console.log('[useAppointments] STEP 2 - Database Verification - Appointments Found:', {
-          totalCount: rawDataAny.length,
-          clinicianIds: [...new Set(rawDataAny.map((apt: any) => apt.clinician_id))],
-          requestedClinicianId: formattedClinicianId,
-          clinicianIdMatches: rawDataAny.every((apt: any) => apt.clinician_id === formattedClinicianId),
-          dateRange: {
-            earliest: rawDataAny.length > 0 ? Math.min(...rawDataAny.map((apt: any) => new Date(apt.start_at).getTime())) : null,
-            latest: rawDataAny.length > 0 ? Math.max(...rawDataAny.map((apt: any) => new Date(apt.start_at).getTime())) : null
-          },
-          sampleAppointments: rawDataAny.slice(0, 2).map((apt: any) => ({
-            id: apt.id,
-            clinician_id: apt.clinician_id,
-            start_at: apt.start_at,
-            end_at: apt.end_at,
-            appointment_timezone: apt.appointment_timezone,
-            status: apt.status,
-            hasValidTimes: !!(apt.start_at && apt.end_at)
-          }))
-        });
-      } else {
-        console.log('[useAppointments] STEP 2 - Database Verification - NO APPOINTMENTS FOUND:', {
-          queryParams: {
-            clinician_id: formattedClinicianId,
-            start_at_gte: fromUTCISO,
-            end_at_lte: toUTCISO,
-            status: 'scheduled OR blocked'
-          },
-          possibleIssues: [
-            'No appointments exist for this clinician',
-            'Date range excludes all appointments',
-            'Clinician ID mismatch',
-            'All appointments have different status',
-            'Timezone conversion error'
-          ]
-        });
-      }
-
+      
+      // Handle errors
       if (queryError) {
-        console.error(
-          "[useAppointments] STEP 1 - Supabase Query Error:",
-          queryError
-        );
+        console.error("Error fetching appointments:", queryError.message);
         throw new Error(queryError.message);
       }
-
-      // Cast the raw data while ensuring proper validation
-      if (!rawDataAny) {
-        console.warn("[useAppointments] STEP 1 - No data returned from Supabase");
+      
+      // Handle empty results
+      if (!rawDataAny || rawDataAny.length === 0) {
         return [];
       }
-
-      console.log(
-        `[useAppointments] STEP 1 - Processing ${rawDataAny.length || 0} raw appointments.`
-      );
 
       // Safely process the data with standardized client name formatting using our shared function
       return rawDataAny.map((rawAppt: any): Appointment => {
@@ -369,74 +285,48 @@ export const useAppointments = (
     return result;
   };
 
-  // isAppointmentToday logic
-  const isAppointmentToday = (appointment: Appointment): boolean => {
-    if (!appointment.start_at) return false;
-
+  // Optimized date comparison helper
+  const getAppointmentDateTime = (appointment: Appointment): DateTime | null => {
+    if (!appointment.start_at) return null;
+    
     try {
-      // Use the appointment's saved timezone if available, otherwise fall back to user timezone
       const appointmentTimeZone = appointment.appointment_timezone || safeUserTimeZone;
-      const now = DateTime.now().setZone(appointmentTimeZone);
-      const apptDateTime = DateTime.fromISO(appointment.start_at).setZone(appointmentTimeZone);
-
-      return now.hasSame(apptDateTime, "day");
+      return DateTime.fromISO(appointment.start_at).setZone(appointmentTimeZone);
     } catch (e) {
-      console.error("[useAppointments] Error in isAppointmentToday:", e);
-      return false;
+      console.error("Error parsing appointment date:", e);
+      return null;
     }
   };
-
-  // Memoized formatted appointments - now using each appointment's saved timezone
+  
+  // Memoized formatted appointments with optimized timezone handling
   const appointmentsWithDisplayFormatting = useMemo(() => {
     return fetchedAppointments.map((appt) => {
-      // Use the appointment's saved timezone if available, otherwise fall back to user timezone
       const appointmentTimeZone = appt.appointment_timezone || safeUserTimeZone;
       return addDisplayFormattingToAppointment(appt, appointmentTimeZone);
     });
   }, [fetchedAppointments, safeUserTimeZone]);
   
-
-  // Memoized filtered appointments
-  const todayAppointments = useMemo(() => {
-    return appointmentsWithDisplayFormatting.filter(isAppointmentToday);
-  }, [appointmentsWithDisplayFormatting]);
-
-  const upcomingAppointments = useMemo(() => {
-    return appointmentsWithDisplayFormatting.filter((appt) => {
-      if (!appt.start_at) return false;
-
-      try {
-        // Use the appointment's saved timezone if available, otherwise fall back to user timezone
-        const appointmentTimeZone = appt.appointment_timezone || safeUserTimeZone;
-        const now = DateTime.now().setZone(appointmentTimeZone);
-        const apptDateTime = DateTime.fromISO(appt.start_at).setZone(appointmentTimeZone);
-        
-        // Upcoming means: not today and in the future
-        return apptDateTime > now && !now.hasSame(apptDateTime, "day");
-      } catch (e) {
-        console.error("[useAppointments] Error filtering upcoming:", e);
-        return false;
+  // Efficiently categorize appointments in a single pass
+  const { todayAppointments, upcomingAppointments, pastAppointments } = useMemo(() => {
+    const now = DateTime.now().setZone(safeUserTimeZone);
+    const today: FormattedAppointment[] = [];
+    const upcoming: FormattedAppointment[] = [];
+    const past: FormattedAppointment[] = [];
+    
+    appointmentsWithDisplayFormatting.forEach(appt => {
+      const apptDateTime = getAppointmentDateTime(appt);
+      if (!apptDateTime) return;
+      
+      if (now.hasSame(apptDateTime, "day")) {
+        today.push(appt);
+      } else if (apptDateTime > now) {
+        upcoming.push(appt);
+      } else {
+        past.push(appt);
       }
     });
-  }, [appointmentsWithDisplayFormatting, safeUserTimeZone]);
-
-  const pastAppointments = useMemo(() => {
-    return appointmentsWithDisplayFormatting.filter((appt) => {
-      if (!appt.start_at) return false;
-
-      try {
-        // Use the appointment's saved timezone if available, otherwise fall back to user timezone
-        const appointmentTimeZone = appt.appointment_timezone || safeUserTimeZone;
-        const now = DateTime.now().setZone(appointmentTimeZone);
-        const apptDateTime = DateTime.fromISO(appt.start_at).setZone(appointmentTimeZone);
-        
-        // Past means: before now
-        return apptDateTime < now;
-      } catch (e) {
-        console.error("[useAppointments] Error filtering past:", e);
-        return false;
-      }
-    });
+    
+    return { todayAppointments: today, upcomingAppointments: upcoming, pastAppointments: past };
   }, [appointmentsWithDisplayFormatting, safeUserTimeZone]);
 
   // Session handling functions
