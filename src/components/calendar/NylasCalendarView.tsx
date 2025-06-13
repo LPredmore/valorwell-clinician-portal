@@ -28,6 +28,11 @@ const NylasCalendarView: React.FC<NylasCalendarViewProps> = ({ clinicianId }) =>
     setCurrentDate(new Date());
   };
 
+  const handleEventClick = (event: any) => {
+    console.log('Event clicked:', event);
+    // TODO: Open event details dialog
+  };
+
   return (
     <div className="space-y-6">
       {/* Navigation */}
@@ -53,12 +58,13 @@ const NylasCalendarView: React.FC<NylasCalendarViewProps> = ({ clinicianId }) =>
 
       {/* Main Content */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Calendar Display */}
+        {/* Calendar Display - Always Shows Virtual Calendar */}
         <div className="lg:col-span-3">
           <NylasHybridCalendar
             clinicianId={clinicianId}
             userTimeZone={userTimeZone}
             currentDate={currentDate}
+            onEventClick={handleEventClick}
           />
         </div>
         
