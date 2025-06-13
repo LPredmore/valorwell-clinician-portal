@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -140,7 +141,7 @@ describe('Calendar Integration Tests', () => {
 
   test('should load and display appointments', async () => {
     // Mock appointments query response
-    (supabase.from().select().eq().in().order as jest.Mock).mockResolvedValueOnce({
+    (supabase.from('appointments').select('*').eq('clinician_id', 'clinician-1').order('start_at') as jest.Mock).mockResolvedValueOnce({
       data: mockAppointments,
       error: null
     });
@@ -180,7 +181,7 @@ describe('Calendar Integration Tests', () => {
 
   test('should load and display external calendar events', async () => {
     // Mock appointments query response
-    (supabase.from().select().eq().in().order as jest.Mock).mockResolvedValueOnce({
+    (supabase.from('appointments').select('*').eq('clinician_id', 'clinician-1').order('start_at') as jest.Mock).mockResolvedValueOnce({
       data: [],
       error: null
     });
@@ -216,7 +217,7 @@ describe('Calendar Integration Tests', () => {
 
   test('should display both appointments and external events together', async () => {
     // Mock appointments query response
-    (supabase.from().select().eq().in().order as jest.Mock).mockResolvedValueOnce({
+    (supabase.from('appointments').select('*').eq('clinician_id', 'clinician-1').order('start_at') as jest.Mock).mockResolvedValueOnce({
       data: mockAppointments,
       error: null
     });
@@ -253,7 +254,7 @@ describe('Calendar Integration Tests', () => {
 
   test('should handle errors in appointments loading', async () => {
     // Mock appointments query error
-    (supabase.from().select().eq().in().order as jest.Mock).mockResolvedValueOnce({
+    (supabase.from('appointments').select('*').eq('clinician_id', 'clinician-1').order('start_at') as jest.Mock).mockResolvedValueOnce({
       data: null,
       error: { message: 'Failed to fetch appointments' }
     });
@@ -285,7 +286,7 @@ describe('Calendar Integration Tests', () => {
 
   test('should handle errors in external events loading', async () => {
     // Mock appointments query response
-    (supabase.from().select().eq().in().order as jest.Mock).mockResolvedValueOnce({
+    (supabase.from('appointments').select('*').eq('clinician_id', 'clinician-1').order('start_at') as jest.Mock).mockResolvedValueOnce({
       data: mockAppointments,
       error: null
     });

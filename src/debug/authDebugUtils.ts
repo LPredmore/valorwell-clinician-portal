@@ -1,3 +1,4 @@
+
 /**
  * Simplified Authentication Debugging Utilities
  * 
@@ -10,6 +11,24 @@ const isDev = process.env.NODE_ENV === 'development';
 const logInfo = isDev ? console.log : () => {};
 const logWarn = isDev ? console.warn : () => {};
 const logError = console.error;
+
+/**
+ * Debug wrapper for authentication operations
+ */
+export async function debugAuthOperation<T>(
+  operationName: string,
+  operation: () => Promise<T>
+): Promise<T> {
+  try {
+    logInfo(`[AuthDebug] Starting operation: ${operationName}`);
+    const result = await operation();
+    logInfo(`[AuthDebug] Operation completed: ${operationName}`);
+    return result;
+  } catch (error) {
+    logError(`[AuthDebug] Operation failed: ${operationName}`, error);
+    throw error;
+  }
+}
 
 /**
  * Logs the complete authentication state for debugging
@@ -69,6 +88,7 @@ export function checkAuthTimeout(timeoutMs: number = 5000): boolean {
 }
 
 export default {
+  debugAuthOperation,
   logAuthDebugInfo,
   performEmergencySessionCheck,
   checkAuthTimeout
