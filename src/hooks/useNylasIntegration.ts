@@ -17,11 +17,18 @@ interface NylasConnection {
   last_sync_at?: string;
 }
 
+interface DetailedError {
+  type: 'database' | 'edge_function' | 'oauth' | 'configuration' | 'unknown';
+  message: string;
+  details?: string;
+  actionRequired?: string;
+}
+
 export const useNylasIntegration = () => {
   const [connections, setConnections] = useState<NylasConnection[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [infrastructureError, setInfrastructureError] = useState<string | null>(null);
+  const [lastError, setLastError] = useState<DetailedError | null>(null);
   const { toast } = useToast();
   const { userId, authInitialized } = useUser();
 
@@ -31,6 +38,7 @@ export const useNylasIntegration = () => {
       if (event.data?.type === 'NYLAS_AUTH_SUCCESS') {
         console.log('[useNylasIntegration] Received Google Calendar auth success message');
         setIsConnecting(false);
+        setLastError(null);
         toast({
           title: 'Google Calendar Connected',
           description: 'Successfully connected your Google Calendar via Nylas',
@@ -44,6 +52,69 @@ export const useNylasIntegration = () => {
     return () => window.removeEventListener('message', handleMessage);
   }, []);
 
+  // Enhanced error categorization
+  const categorizeError = (error: any, context: string): DetailedError => {
+    console.error(`[useNylasIntegration] ${context} error:`, error);
+
+    const errorMessage = error?.message || error?.toString() || 'Unknown error';
+
+    // Database errors
+    if (error.code === 'PGRST301' || errorMessage.includes('permission denied')) {
+      return {
+        type: 'database',
+        message: 'Database permission denied',
+        details: 'RLS policies may not be configured correctly',
+        actionRequired: 'Run database migration to fix RLS policies'
+      };
+    }
+
+    if (errorMessage.includes('does not exist') && context === 'database') {
+      return {
+        type: 'database',
+        message: 'Database tables missing',
+        details: 'Nylas tables do not exist',
+        actionRequired: 'Apply Nylas database migration'
+      };
+    }
+
+    // Edge function errors
+    if (errorMessage.includes('Failed to send a request') || errorMessage.includes('does not exist')) {
+      return {
+        type: 'edge_function',
+        message: 'Edge function not available',
+        details: 'nylas-auth function is not deployed',
+        actionRequired: 'Deploy nylas-auth edge function'
+      };
+    }
+
+    if (errorMessage.includes('Nylas configuration missing')) {
+      return {
+        type: 'configuration',
+        message: 'Nylas credentials missing',
+        details: 'API credentials not configured in Supabase secrets',
+        actionRequired: 'Set NYLAS_CLIENT_ID, NYLAS_CLIENT_SECRET, NYLAS_API_KEY in Supabase secrets'
+      };
+    }
+
+    // OAuth errors
+    if (errorMessage.includes('authorization') || errorMessage.includes('oauth')) {
+      return {
+        type: 'oauth',
+        message: 'OAuth authorization failed',
+        details: errorMessage,
+        actionRequired: 'Check OAuth configuration and redirect URLs'
+      };
+    }
+
+    // Default categorization
+    return {
+      type: 'unknown',
+      message: `${context} failed`,
+      details: errorMessage,
+      actionRequired: 'Check logs for more details'
+    };
+  };
+
   // Fetch user's calendar connections
   const fetchConnections = async () => {
     if (!authInitialized || !userId) {
@@ -53,7 +124,7 @@ export const useNylasIntegration = () => {
 
     try {
       setIsLoading(true);
-      setInfrastructureError(null);
+      setLastError(null);
       console.log('[useNylasIntegration] Fetching connections for user:', userId);
       
       const { data, error } = await supabase
@@ -63,35 +134,23 @@ export const useNylasIntegration = () => {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('[useNylasIntegration] Database error:', error);
+        const categorizedError = categorizeError(error, 'database');
+        setLastError(categorizedError);
         
-        // Handle specific error cases
-        if (error.code === 'PGRST301' || error.message?.includes('permission denied')) {
-          setInfrastructureError('Database permissions not configured. Please apply the latest migration.');
-          toast({
-            title: 'Setup Required',
-            description: 'Calendar integration requires database migration. Please contact support.',
-            variant: 'destructive'
-          });
-        } else if (error.message?.includes('does not exist')) {
-          setInfrastructureError('Database tables missing. Please apply Nylas migrations.');
-          toast({
-            title: 'Database Setup Required',
-            description: 'Nylas tables are missing. Please apply migrations.',
-            variant: 'destructive'
-          });
-        } else {
-          setInfrastructureError(`Database error: ${error.message}`);
-          console.error('[useNylasIntegration] Detailed error:', error);
-        }
+        toast({
+          title: 'Database Error',
+          description: categorizedError.message,
+          variant: 'destructive'
+        });
         return;
       }
 
       console.log('[useNylasIntegration] Fetched connections:', data);
       setConnections(data || []);
     } catch (error: any) {
-      console.error('[useNylasIntegration] Error fetching connections:', error);
-      setInfrastructureError(`Failed to load connections: ${error.message}`);
+      const categorizedError = categorizeError(error, 'connection fetch');
+      setLastError(categorizedError);
+      
       toast({
         title: 'Error',
         description: 'Failed to load calendar connections',
@@ -105,6 +164,13 @@ export const useNylasIntegration = () => {
   // Initialize Google Calendar connection via Nylas
   const connectGoogleCalendar = async () => {
     if (!authInitialized || !userId) {
+      const error = {
+        type: 'oauth' as const,
+        message: 'Authentication required',
+        details: 'User must be logged in to connect calendar',
+        actionRequired: 'Please log in first'
+      };
+      setLastError(error);
       toast({
         title: 'Authentication Required',
         description: 'Please log in to connect Google Calendar',
@@ -115,7 +181,7 @@ export const useNylasIntegration = () => {
 
     try {
       setIsConnecting(true);
-      setInfrastructureError(null);
+      setLastError(null);
       console.log('[useNylasIntegration] Initializing Google Calendar connection via Nylas');
 
       const { data, error } = await supabase.functions.invoke('nylas-auth', {
@@ -123,30 +189,14 @@ export const useNylasIntegration = () => {
       });
 
       if (error) {
-        console.error('[useNylasIntegration] Function error:', error);
+        const categorizedError = categorizeError(error, 'edge function');
+        setLastError(categorizedError);
         
-        if (error.message?.includes('Failed to send a request') || error.message?.includes('does not exist')) {
-          setInfrastructureError('Edge function not deployed. Please deploy nylas-auth function.');
-          toast({
-            title: 'Infrastructure Required',
-            description: 'Nylas edge functions need to be deployed. Please contact support.',
-            variant: 'destructive'
-          });
-        } else if (error.message?.includes('Nylas configuration missing')) {
-          setInfrastructureError('Nylas API credentials not configured. Please set NYLAS_CLIENT_ID, NYLAS_CLIENT_SECRET, and NYLAS_API_KEY.');
-          toast({
-            title: 'Configuration Required',
-            description: 'Nylas API credentials need to be configured in Supabase secrets.',
-            variant: 'destructive'
-          });
-        } else {
-          setInfrastructureError(`Connection error: ${error.message}`);
-          toast({
-            title: 'Connection Failed',
-            description: error.message || 'Failed to initialize connection',
-            variant: 'destructive'
-          });
-        }
+        toast({
+          title: 'Connection Failed',
+          description: categorizedError.message,
+          variant: 'destructive'
+        });
         return;
       }
 
@@ -159,7 +209,13 @@ export const useNylasIntegration = () => {
         );
 
         if (!popup) {
-          setInfrastructureError('Popup blocked. Please allow popups for this site.');
+          const error = {
+            type: 'oauth' as const,
+            message: 'Popup blocked',
+            details: 'Browser blocked the popup window',
+            actionRequired: 'Allow popups for this site and try again'
+          };
+          setLastError(error);
           toast({
             title: 'Popup Blocked',
             description: 'Please allow popups and try again.',
@@ -178,15 +234,22 @@ export const useNylasIntegration = () => {
           }
         }, 1000);
       } else {
-        setInfrastructureError('No authorization URL received from server');
+        const error = {
+          type: 'edge_function' as const,
+          message: 'No authorization URL received',
+          details: 'Edge function did not return auth URL',
+          actionRequired: 'Check edge function logs'
+        };
+        setLastError(error);
         throw new Error('No authorization URL received');
       }
     } catch (error: any) {
-      console.error('[useNylasIntegration] Error connecting Google Calendar:', error);
-      setInfrastructureError(`Connection failed: ${error.message}`);
+      const categorizedError = categorizeError(error, 'OAuth initialization');
+      setLastError(categorizedError);
+      
       toast({
         title: 'Connection Failed',
-        description: error.message || 'Failed to initialize Google Calendar connection',
+        description: categorizedError.message,
         variant: 'destructive'
       });
       setIsConnecting(false);
@@ -206,17 +269,12 @@ export const useNylasIntegration = () => {
       });
 
       if (error) {
-        if (error.message?.includes('Failed to send a request')) {
-          setInfrastructureError('Edge function not available for disconnect');
-          toast({
-            title: 'Infrastructure Error',
-            description: 'Cannot disconnect - edge functions not deployed',
-            variant: 'destructive'
-          });
-        }
+        const categorizedError = categorizeError(error, 'disconnect');
+        setLastError(categorizedError);
         throw error;
       }
 
+      setLastError(null);
       toast({
         title: 'Calendar Disconnected',
         description: 'Google Calendar has been successfully disconnected'
@@ -233,6 +291,11 @@ export const useNylasIntegration = () => {
     }
   };
 
+  // Clear error state
+  const clearError = () => {
+    setLastError(null);
+  };
+
   useEffect(() => {
     if (authInitialized && userId) {
       fetchConnections();
@@ -243,10 +306,13 @@ export const useNylasIntegration = () => {
     connections,
     isLoading,
     isConnecting,
-    infrastructureError,
+    lastError,
+    clearError,
     connectCalendar: connectGoogleCalendar,
     connectGoogleCalendar,
     disconnectCalendar,
-    refreshConnections: fetchConnections
+    refreshConnections: fetchConnections,
+    // Legacy compatibility
+    infrastructureError: lastError?.message || null
   };
 };
