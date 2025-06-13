@@ -1,4 +1,3 @@
-
 import React, { useMemo, useState } from 'react';
 import { useAppointments } from '@/hooks/useAppointments';
 import { format, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay } from 'date-fns';
@@ -32,7 +31,7 @@ const VirtualCalendar: React.FC<VirtualCalendarProps> = ({
     isLoading, 
     error,
     refetch 
-  } = useAppointments(clinicianId || '', userTimeZone, 0);
+  } = useAppointments(clinicianId || '', startDate, endDate, userTimeZone, 0);
 
   // Generate week days for the calendar grid
   const weekDays = useMemo(() => {
