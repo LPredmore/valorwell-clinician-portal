@@ -13,6 +13,7 @@ export interface ClientProfile {
   client_phone: string | null;
   client_status: 'Active' | 'Inactive' | 'Pending' | null;
   client_date_of_birth: string | null;
+  client_age: number | null;
   client_gender: string | null;
   client_address: string | null;
   client_city: string | null;
