@@ -1,11 +1,53 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { crypto } from "https://deno.land/std@0.168.0/crypto/mod.ts";
+import { timingSafeEqual } from "https://deno.land/std@0.168.0/crypto/timing_safe_equal.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-nylas-signature',
+}
+
+// Function to verify Nylas webhook signature
+async function verifyNylasSignature(secret: string, signatureHeader: string, body: string): Promise<boolean> {
+  if (!signatureHeader) {
+    return false;
+  }
+  
+  // Extract timestamp and signature from header
+  const parts = signatureHeader.split(',');
+  const timestampStr = parts.find(part => part.startsWith('t='))?.split('=')[1];
+  const signature = parts.find(part => part.startsWith('v1='))?.split('=')[1];
+
+  if (!timestampStr || !signature) {
+    console.error('[nylas-webhook-handler] Signature header has invalid format.');
+    return false;
+  }
+  
+  const timestamp = parseInt(timestampStr, 10);
+  const now = Math.floor(Date.now() / 1000);
+
+  // Prevent replay attacks by checking if the timestamp is recent (e.g., within 5 minutes)
+  if (Math.abs(now - timestamp) > 300) {
+    console.warn('[nylas-webhook-handler] Received webhook with old timestamp.');
+    return false;
+  }
+
+  // Construct the message to sign
+  const message = `${timestamp}.${body}`;
+  
+  const keyData = new TextEncoder().encode(secret);
+  const key = await crypto.subtle.importKey("raw", keyData, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  
+  const hmac = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(message));
+  
+  // Convert hex signature from Nylas to Uint8Array for comparison
+  // NOTE: Nylas docs say hex, but some implementations show Base64. Let's assume hex and be ready to change.
+  // UPDATE: The v3 signature is a hex digest of the HMAC.
+  const expectedSignature = Array.from(new Uint8Array(hmac)).map(b => b.toString(16).padStart(2, '0')).join('');
+  
+  // Use a constant-time comparison to prevent timing attacks
+  return timingSafeEqual(new TextEncoder().encode(signature), new TextEncoder().encode(expectedSignature));
 }
 
 serve(async (req) => {
@@ -17,7 +59,7 @@ serve(async (req) => {
     const nylasClientSecret = Deno.env.get('NYLAS_CLIENT_SECRET');
     if (!nylasClientSecret) {
       console.error('[nylas-webhook-handler] NYLAS_CLIENT_SECRET is not set.');
-      return new Response(JSON.stringify({ error: 'Configuration error' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      return new Response(JSON.stringify({ error: 'Configuration error' }), { status: 500 });
     }
 
     const signature = req.headers.get('x-nylas-signature');
@@ -25,47 +67,14 @@ serve(async (req) => {
 
     if (!signature) {
       console.warn('[nylas-webhook-handler] Received request without signature.');
-      return new Response(JSON.stringify({ error: 'Signature missing' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ error: 'Signature missing' }), { status: 401 });
     }
 
     // Verify signature
-    const keyData = new TextEncoder().encode(nylasClientSecret);
-    const key = await crypto.subtle.importKey("raw", keyData, { name: "HMAC", hash: "SHA-256" }, false, ["verify"]);
-    const receivedSignature = Uint8Array.from(atob(signature), c => c.charCodeAt(0));
-    const hmac = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(requestBody));
-
-    // A simple constant-time comparison
-    let valid = true;
-    if (receivedSignature.length !== hmac.byteLength) {
-      valid = false;
-    } else {
-      for (let i = 0; i < receivedSignature.length; i++) {
-        if (receivedSignature[i] !== new Uint8Array(hmac)[i]) {
-          valid = false;
-          break;
-        }
-      }
-    }
-    
-    // The signature provided by Nylas v3 is Base64 encoded, not hex.
-    // The verification logic needs to be adjusted.
-    // Let's use the X-Nylas-Signature header verification example from Nylas docs.
-    const isSignatureValid = await crypto.subtle.verify(
-        'HMAC',
-        key,
-        receivedSignature,
-        new TextEncoder().encode(requestBody)
-    );
-    
-    // NOTE: The Nylas docs for v3 webhooks have some ambiguity on signature verification.
-    // Re-checking the hash calculation against documentation for robustness.
-    // For now, let's trust the direct verification method.
-    // If issues persist, we may need to fall back to comparing hex strings.
-    const hmacHex = Array.from(new Uint8Array(hmac)).map(b => b.toString(16).padStart(2, '0')).join('');
-    if (signature !== hmacHex) {
-         console.error('[nylas-webhook-handler] Invalid signature.');
-         // Temporarily disabling signature check for debugging if needed, but should be enabled in production.
-         // return new Response(JSON.stringify({ error: 'Invalid signature' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    const isValid = await verifyNylasSignature(nylasClientSecret, signature, requestBody);
+    if (!isValid) {
+      console.error('[nylas-webhook-handler] Invalid signature.');
+      return new Response(JSON.stringify({ error: 'Invalid signature' }), { status: 401 });
     }
 
     const body = JSON.parse(requestBody);
@@ -100,24 +109,26 @@ serve(async (req) => {
 
         const clinicianId = connection.user_id;
         const today = new Date();
+        // Sync a wider range to be safe, e.g., this month and next month
         const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-        const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        const endOfNextMonth = new Date(today.getFullYear(), today.getMonth() + 2, 0);
 
-        console.log(`[nylas-webhook-handler] Invoking sync for clinician ${clinicianId}`);
+        console.log(`[nylas-webhook-handler] Invoking bidirectional sync for clinician ${clinicianId}`);
         
+        // Invoke the new bidirectional sync action
         await supabaseAdmin.functions.invoke('nylas-sync-appointments', {
           headers: { 'x-internal-call-secret': Deno.env.get('INTERNAL_FUNCTIONS_SECRET')! },
           body: {
-            action: 'sync_calendar_to_appointments',
+            action: 'sync_bidirectional', // Use the robust bidirectional sync
             clinicianId: clinicianId,
             startDate: startOfMonth.toISOString(),
-            endDate: endOfMonth.toISOString(),
+            endDate: endOfNextMonth.toISOString(),
           },
         });
       }
     }
     
-    return new Response(JSON.stringify({ success: true, message: 'Webhook received' }), {
+    return new Response(JSON.stringify({ success: true, message: 'Webhook received and processed' }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
