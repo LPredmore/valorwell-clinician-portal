@@ -1,85 +1,13 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { createHash } from "https://deno.land/std@0.168.0/hash/mod.ts";
+import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createEventHash, getRefreshedNylasConnection, NylasConnection } from './utils.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Helper to create a consistent hash for an event
-const createEventHash = (event: any): string => {
-  const data = {
-    title: event.title,
-    start: event.when.start_time,
-    end: event.when.end_time,
-    description: event.description,
-    location: event.location,
-    participants: event.participants?.map((p: any) => p.email).sort()
-  };
-  const hash = createHash("sha-256");
-  hash.update(JSON.stringify(data));
-  return hash.toString();
-}
-
-// Helper to refresh Nylas token if expired
-const getRefreshedNylasConnection = async (connection: any, supabaseAdmin: any) => {
-  const tokenExpiresAt = new Date(connection.token_expires_at || 0).getTime();
-  const now = Date.now();
-  const buffer = 5 * 60 * 1000; // 5 minutes buffer
-
-  if (tokenExpiresAt < now + buffer) {
-    console.log(`[nylas-sync-appointments] Token for connection ${connection.id} is expiring or expired. Refreshing...`);
-    
-    const nylasClientId = Deno.env.get('NYLAS_CLIENT_ID');
-    const nylasClientSecret = Deno.env.get('NYLAS_CLIENT_SECRET');
-
-    if (!nylasClientId || !nylasClientSecret) {
-      throw new Error('Nylas client credentials are not configured.');
-    }
-
-    const response = await fetch('https://api.us.nylas.com/v3/connect/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        client_id: nylasClientId,
-        client_secret: nylasClientSecret,
-        refresh_token: connection.refresh_token,
-        grant_type: 'refresh_token',
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`[nylas-sync-appointments] Failed to refresh token for grant ${connection.id}:`, errorText);
-      throw new Error('Failed to refresh Nylas token.');
-    }
-
-    const tokenData = await response.json();
-    const newExpiresAt = new Date(Date.now() + tokenData.expires_in * 1000).toISOString();
-
-    const { data: updatedConnection, error: updateError } = await supabaseAdmin
-      .from('nylas_connections')
-      .update({
-        access_token: tokenData.access_token,
-        refresh_token: tokenData.refresh_token, // Nylas might return a new refresh token
-        token_expires_at: newExpiresAt,
-      })
-      .eq('id', connection.id)
-      .select()
-      .single();
-
-    if (updateError) {
-      console.error(`[nylas-sync-appointments] Failed to update connection with new token:`, updateError);
-      throw updateError;
-    }
-    
-    console.log(`[nylas-sync-appointments] Token refreshed and updated successfully for connection ${connection.id}.`);
-    return updatedConnection;
-  }
-
-  return connection;
-};
+// NOTE: createEventHash and getRefreshedNylasConnection have been moved to utils.ts
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -89,62 +17,51 @@ serve(async (req) => {
   try {
     console.log('[nylas-sync-appointments] Request received:', req.method, req.url)
     
-    // --- Start: Internal Call Authorization ---
+    // --- Start: Internal Call Authorization & Client Initialization ---
     const internalCallSecret = req.headers.get('x-internal-call-secret');
     const INTERNAL_FUNCTIONS_SECRET = Deno.env.get('INTERNAL_FUNCTIONS_SECRET');
-    let isInternalCall = false;
+    const isInternalCall = internalCallSecret && INTERNAL_FUNCTIONS_SECRET && internalCallSecret === INTERNAL_FUNCTIONS_SECRET;
 
-    if (internalCallSecret && INTERNAL_FUNCTIONS_SECRET && internalCallSecret === INTERNAL_FUNCTIONS_SECRET) {
-      console.log('[nylas-sync-appointments] Internal call authorized.');
-      isInternalCall = true;
-    }
-    // --- End: Internal Call Authorization ---
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    let supabaseClient: SupabaseClient;
+    let userId: string | null = null;
 
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
-        },
+    if (isInternalCall) {
+      console.log('[nylas-sync-appointments] Internal call authorized. Using admin client.');
+      const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+      if (!supabaseServiceRoleKey) {
+        throw new Error("SUPABASE_SERVICE_ROLE_KEY is not set for internal call.");
       }
-    )
-
-    // Bypass JWT check for internal calls, as they are pre-authorized
-    if (!isInternalCall) {
+      supabaseClient = createClient(supabaseUrl, supabaseServiceRoleKey);
+    } else {
       const authHeader = req.headers.get('Authorization')
       if (!authHeader) {
         console.error('[nylas-sync-appointments] No authorization header')
         return new Response(
-          JSON.stringify({ 
-            error: 'Authentication failed',
-            code: 'AUTH_HEADER_MISSING',
-            details: 'No authorization header provided'
-          }),
-          { 
-            status: 401,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-          }
+          JSON.stringify({ error: 'Authentication failed', code: 'AUTH_HEADER_MISSING' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
 
+      const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+      supabaseClient = createClient(
+        supabaseUrl,
+        supabaseAnonKey,
+        { global: { headers: { Authorization: authHeader } } }
+      )
+      
       const { data: { user }, error: authError } = await supabaseClient.auth.getUser()
       if (authError || !user) {
         console.error('[nylas-sync-appointments] Authentication failed:', authError)
         return new Response(
-          JSON.stringify({ 
-            error: 'Authentication failed',
-            code: 'INVALID_JWT',
-            details: authError?.message || 'Invalid or expired JWT token'
-          }),
-          { 
-            status: 401,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-          }
+          JSON.stringify({ error: 'Authentication failed', code: 'INVALID_JWT', details: authError?.message }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
-      console.log('[nylas-sync-appointments] Authenticated user:', user.id)
+      userId = user.id;
+      console.log('[nylas-sync-appointments] Authenticated user:', userId);
     }
+    // --- End: Internal Call Authorization & Client Initialization ---
 
     const { 
       action, 
@@ -161,7 +78,7 @@ serve(async (req) => {
         JSON.stringify({ 
           status: 'ok', 
           timestamp: new Date().toISOString(),
-          user_id: user.id
+          user_id: userId // Use the authenticated user ID
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
@@ -583,7 +500,7 @@ serve(async (req) => {
         let totalCreatedRemote = 0;
         const errors = [];
 
-        for (const rawConnection of connections) {
+        for (const rawConnection of (connections as NylasConnection[])) {
           try {
             const connection = await getRefreshedNylasConnection(rawConnection, supabaseClient);
             console.log(`[nylas-sync-appointments] Processing connection ${connection.id} for clinician ${clinicianId}`);
