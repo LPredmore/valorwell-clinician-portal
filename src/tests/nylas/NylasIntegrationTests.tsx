@@ -59,7 +59,7 @@ const TestComponent = () => {
           Disconnect Calendar
         </button>
       )}
-      <button data-testid="refresh-button" onClick={refreshConnections}>
+      <button data-testid="refresh-button" onClick={() => refreshConnections(true)}>
         Refresh Connections
       </button>
     </div>
