@@ -21,7 +21,7 @@ import InsuranceTab from "@/components/client/InsuranceTab";
 import TreatmentTab from "@/components/client/TreatmentTab";
 import DocumentationTab from "@/components/client/DocumentationTab";
 import { ClientDetails as ClientDetailsType, Clinician } from "@/types/client";
-import { useUser } from "@/context/UserContext";
+import { useAuth } from "@/context/AuthProvider";
 
 const ClientDetails = () => {
   const { clientId } = useParams();
@@ -33,7 +33,7 @@ const ClientDetails = () => {
   const [error, setError] = useState<Error | null>(null);
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("personal");
-  const { userRole } = useUser();
+  const { userRole } = useAuth();
 
   useEffect(() => {
     const fetchClient = async () => {

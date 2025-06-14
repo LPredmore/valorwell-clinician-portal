@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, AlertCircle } from 'lucide-react';
-import { useUser } from '@/context/UserContext';
+import { useAuth } from '@/context/AuthProvider';
 import { supabase } from '@/integrations/supabase/client';
 import Layout from '@/components/layout/Layout';
 import VideoChat from '@/components/video/VideoChat';
@@ -14,8 +14,7 @@ import { Appointment } from '@/types/appointment';
 import { ClientDetails } from '@/types/client';
 
 const ClinicianDashboard = () => {
-  const { userRole, userId } = useUser();
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const { userId } = useAuth();
   const [clinicianTimeZone, setClinicianTimeZone] = useState<string>(TimeZoneService.DEFAULT_TIMEZONE);
   const [isLoadingTimeZone, setIsLoadingTimeZone] = useState(true);
   
@@ -30,23 +29,11 @@ const ClinicianDashboard = () => {
   const [selectedAppointmentForNoShow, setSelectedAppointmentForNoShow] = useState<Appointment | null>(null);
 
   useEffect(() => {
-    const fetchUserId = async () => {
-      const { data } = await supabase.auth.getUser();
-      if (data?.user) {
-        setCurrentUserId(data.user.id);
-      }
-    };
-    
-    fetchUserId();
-  }, []);
-
-  // Fetch clinician's timezone
-  useEffect(() => {
     const fetchClinicianTimeZone = async () => {
-      if (currentUserId) {
+      if (userId) {
         setIsLoadingTimeZone(true);
         try {
-          const timeZone = await getClinicianTimeZone(currentUserId);
+          const timeZone = await getClinicianTimeZone(userId);
           console.log("[ClinicianDashboard] STEP 3 - Fetched clinician timezone:", { timeZone, type: typeof timeZone, isArray: Array.isArray(timeZone) });
           
           // Ensure timezone is a string
@@ -65,16 +52,16 @@ const ClinicianDashboard = () => {
     };
     
     fetchClinicianTimeZone();
-  }, [currentUserId]);
+  }, [userId]);
 
   // STEP 3: FIX - Correct useAppointments call with proper parameter order
   console.log("[ClinicianDashboard] STEP 3 FIX - Calling useAppointments with corrected parameters:", {
-    currentUserId,
+    userId,
     safeClinicianTimeZone,
     refreshTrigger,
     parameterOrder: "useAppointments(clinicianId, undefined, undefined, clinicianTimeZone, refreshTrigger)",
     parameterTypes: {
-      currentUserId: typeof currentUserId,
+      currentUserId: typeof userId,
       safeClinicianTimeZone: typeof safeClinicianTimeZone,
       refreshTrigger: typeof refreshTrigger
     }
@@ -99,7 +86,7 @@ const ClinicianDashboard = () => {
     closeSessionTemplate,
     closeVideoSession
   } = useAppointments(
-    currentUserId, 
+    userId, 
     undefined, 
     undefined, 
     safeClinicianTimeZone, 
@@ -108,7 +95,7 @@ const ClinicianDashboard = () => {
 
   // STEP 3: Enhanced logging for duplicate card debugging
   console.log("[ClinicianDashboard] STEP 3 - Data validation for duplicate prevention:", {
-    currentUserId,
+    userId,
     refreshTrigger,
     totalAppointments: appointments?.length || 0,
     todayAppointments: todayAppointments?.length || 0,

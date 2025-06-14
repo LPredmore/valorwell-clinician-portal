@@ -13,13 +13,13 @@ import {
   LayoutDashboard,
   User
 } from 'lucide-react';
-import { useUser } from '@/context/UserContext';
+import { useAuth } from '@/context/AuthProvider';
 import { useState, useEffect } from 'react';
 
 const Sidebar = () => {
   const location = useLocation();
   const currentPath = location.pathname;
-  const { userRole, isLoading, userId, authInitialized } = useUser();
+  const { userRole, isLoading, userId, authInitialized } = useAuth();
   const isClinician = userRole === 'clinician';
   const isAdmin = userRole === 'admin';
   const [loadingTimeout, setLoadingTimeout] = useState(false);

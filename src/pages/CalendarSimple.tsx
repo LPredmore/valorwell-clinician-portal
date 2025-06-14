@@ -2,13 +2,13 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "../components/layout/Layout";
-import { useUser } from "@/context/UserContext";
+import { useAuth } from "@/context/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
 import CalendarErrorBoundary from "../components/calendar/CalendarErrorBoundary";
 import NylasCalendarView from "../components/calendar/NylasCalendarView";
 
 const CalendarSimple = React.memo(() => {
-  const { userId, authInitialized, userRole } = useUser();
+  const { userId, authInitialized, userRole } = useAuth();
   const [isReady, setIsReady] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();

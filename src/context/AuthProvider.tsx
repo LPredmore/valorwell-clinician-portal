@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -57,19 +56,24 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setAuthInitialized(true);
   };
 
-  const fetchClientProfile = async (userId: string) => {
+  const fetchClientProfile = async (userId: string): Promise<ClientProfile | null> => {
     try {
-      // Match the actual clients table schema
+      // FIX: Use correct Supabase aliasing `new_name:column_name` instead of SQL `AS`
       const { data, error } = await supabase
         .from('clients')
         .select(
-          `id as client_id, first_name as client_first_name, last_name as client_last_name, preferred_name as client_preferred_name, email as client_email, phone as client_phone, status as client_status, date_of_birth as client_date_of_birth, age as client_age, gender as client_gender, address as client_address, city as client_city, state as client_state, zipcode as client_zipcode`
+          'client_id:id, client_first_name:first_name, client_last_name:last_name, client_preferred_name:preferred_name, client_email:email, client_phone:phone, client_status:status, client_date_of_birth:date_of_birth, client_age:age, client_gender:gender, client_address:address, client_city:city, client_state:state, client_zipcode:zipcode'
         )
         .eq('id', userId)
         .single();
-      if (error) return null;
-      return data;
-    } catch {
+
+      if (error) {
+        console.error('Error fetching client profile:', error);
+        return null;
+      }
+      return data as ClientProfile;
+    } catch (e) {
+      console.error('Exception while fetching client profile:', e);
       return null;
     }
   };
@@ -130,7 +134,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setIsLoading(false);
         if (session.user.user_metadata?.role === 'client') {
           const profile = await fetchClientProfile(session.user.id);
-          setClientProfile(profile || null);
+          setClientProfile(profile); // profile can be null, which is handled
         } else {
           setClientProfile(null);
         }
