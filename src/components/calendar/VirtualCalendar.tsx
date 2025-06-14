@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useAppointments } from '@/hooks/useAppointments';
 import { useAvailability, ProcessedAvailability } from '@/hooks/useAvailability';
 import { format, startOfWeek, endOfWeek, eachDayOfInterval } from 'date-fns';
-import { Plus, Calendar } from 'lucide-react';
+import { Plus, Calendar, Cloud } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import InternalAppointmentCard from './InternalAppointmentCard';
 import CalendarLoadingState from './CalendarLoadingState';
@@ -10,6 +10,8 @@ import CalendarErrorState from './CalendarErrorState';
 import { cn } from '@/lib/utils';
 import AvailabilityEditDialog from './AvailabilityEditDialog';
 import { AvailabilityBlock } from './availability-edit/types';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 interface VirtualCalendarProps {
   clinicianId: string | null;
@@ -46,6 +48,28 @@ const VirtualCalendar: React.FC<VirtualCalendarProps> = ({
     isLoading: isLoadingAvailability,
     error: availabilityError,
   } = useAvailability(clinicianId, startDate, endDate, refreshTrigger);
+
+  // --- Start: Fetch external calendar mappings for visual indicators ---
+  const appointmentIds = useMemo(() => appointments.map(a => a.id), [appointments]);
+
+  const { data: mappings } = useQuery({
+    queryKey: ['calendarMappings', appointmentIds, refreshTrigger],
+    queryFn: async () => {
+      if (!appointmentIds || appointmentIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from('external_calendar_mappings')
+        .select('appointment_id')
+        .in('appointment_id', appointmentIds);
+      if (error) throw new Error(error.message);
+      return data;
+    },
+    enabled: !!clinicianId && appointmentIds.length > 0,
+  });
+
+  const syncedAppointmentIds = useMemo(() => {
+    return new Set(mappings?.map(m => m.appointment_id));
+  }, [mappings]);
+  // --- End: Fetch external calendar mappings ---
 
   const [isEditAvailabilityOpen, setIsEditAvailabilityOpen] = useState(false);
   const [selectedAvailability, setSelectedAvailability] = useState<{ block: AvailabilityBlock, date: Date } | null>(null);
@@ -212,23 +236,32 @@ const VirtualCalendar: React.FC<VirtualCalendarProps> = ({
                 <div 
                   key={`${day.toISOString()}-${hour}`} 
                   className={cn(
-                    "min-h-[60px] border-r last:border-r-0 p-1 relative hover:bg-gray-50 cursor-pointer",
-                    availabilityBlockForSlot && !hourAppointments.length && "bg-green-50"
+                    "min-h-[60px] border-r last:border-r-0 p-1 relative hover:bg-gray-50",
+                    availabilityBlockForSlot && !hourAppointments.length && "bg-green-50 cursor-pointer"
                   )}
                   onClick={() => {
-                    if (availabilityBlockForSlot) {
-                      handleAvailabilityClick(availabilityBlockForSlot, day);
-                    } else {
-                      handleTimeSlotClick(day, hour)
+                    if (!hourAppointments.length) {
+                       if (availabilityBlockForSlot) {
+                         handleAvailabilityClick(availabilityBlockForSlot, day);
+                       } else {
+                         handleTimeSlotClick(day, hour)
+                       }
                     }
                   }}
                 >
                   {hourAppointments.map((appointment) => (
-                    <InternalAppointmentCard
-                      key={appointment.id}
-                      appointment={appointment}
-                      onClick={() => onAppointmentClick?.(appointment)}
-                    />
+                    <div key={appointment.id} className="relative mb-1">
+                      <InternalAppointmentCard
+                        appointment={appointment}
+                        onClick={() => onAppointmentClick?.(appointment)}
+                      />
+                      {syncedAppointmentIds.has(appointment.id) && (
+                        <Cloud
+                          className="absolute top-1 right-1 h-3 w-3 text-gray-400"
+                          title="Synced with external calendar"
+                        />
+                      )}
+                    </div>
                   ))}
                 </div>
               );
