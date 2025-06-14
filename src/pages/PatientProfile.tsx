@@ -1,22 +1,19 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Layout from '@/components/layout/Layout';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
-import { getCurrentUser, getClientByUserId, updateClientProfile } from '@/integrations/supabase/client';
+import { updateClientProfile } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import MyProfile from '@/components/patient/MyProfile';
 import { useAuth } from '@/context/AuthProvider';
 import { timezoneOptions } from '@/utils/timezoneOptions';
 
 const PatientProfile: React.FC = () => {
-  const [loading, setLoading] = useState<boolean>(true);
+  const { clientProfile, isLoading: authLoading, refreshUserData, userId } = useAuth();
   const [isSaving, setIsSaving] = useState<boolean>(false);
-  const [clientData, setClientData] = useState<any>(null);
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { userId } = useAuth();
 
   const genderOptions = ['Male', 'Female', 'Non-Binary', 'Other', 'Prefer not to say'];
   const genderIdentityOptions = ['Male', 'Female', 'Trans Man', 'Trans Woman', 'Non-Binary', 'Other', 'Prefer not to say'];
@@ -49,80 +46,65 @@ const PatientProfile: React.FC = () => {
     }
   });
 
-  const fetchClientData = async () => {
-    setLoading(true);
-
-    try {
-      const user = await getCurrentUser();
-
-      if (!user) {
-        toast({
-          title: "Authentication required",
-          description: "Please sign in to view your profile",
-          variant: "destructive"
-        });
-        navigate('/login');
-        return;
+  const resetFormWithProfileData = useCallback(() => {
+    if (clientProfile) {
+      let age = '';
+      if (clientProfile.client_date_of_birth) {
+        const dob = new Date(clientProfile.client_date_of_birth);
+        const today = new Date();
+        age = String(today.getFullYear() - dob.getFullYear());
       }
 
-      console.log("Current user:", user);
-      const client = await getClientByUserId(user.id);
-      console.log("Retrieved client data:", client);
-
-      if (client) {
-        setClientData(client);
-
-        let age = '';
-        if (client.client_date_of_birth) {
-          const dob = new Date(client.client_date_of_birth);
-          const today = new Date();
-          age = String(today.getFullYear() - dob.getFullYear());
-        }
-
-        let formattedDob = '';
-        if (client.client_date_of_birth) {
-          const dob = new Date(client.client_date_of_birth);
-          formattedDob = dob.toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-          });
-        }
-
-        form.reset({
-          firstName: client.client_first_name || '',
-          lastName: client.client_last_name || '',
-          preferredName: client.client_preferred_name || '',
-          email: client.client_email || '',
-          phone: client.client_phone || '',
-          dateOfBirth: formattedDob,
-          age: age,
-          gender: client.client_gender || '',
-          genderIdentity: client.client_gender_identity || '',
-          state: client.client_state || '',
-          timeZone: client.client_time_zone || 'America/New_York' // Default to Eastern Time
-        });
-      } else {
-        toast({
-          title: "Profile not found",
-          description: "We couldn't find your client profile",
-          variant: "destructive"
+      let formattedDob = '';
+      if (clientProfile.client_date_of_birth) {
+        const dob = new Date(clientProfile.client_date_of_birth);
+        formattedDob = dob.toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
         });
       }
-    } catch (error) {
-      console.error("Error fetching client data:", error);
+
+      form.reset({
+        firstName: clientProfile.client_first_name || '',
+        lastName: clientProfile.client_last_name || '',
+        preferredName: clientProfile.client_preferred_name || '',
+        email: clientProfile.client_email || '',
+        phone: clientProfile.client_phone || '',
+        dateOfBirth: formattedDob,
+        age: age,
+        gender: clientProfile.client_gender || '',
+        genderIdentity: clientProfile.client_gender_identity || '',
+        state: clientProfile.client_state || '',
+        timeZone: clientProfile.client_time_zone || 'America/New_York'
+      });
+    }
+  }, [clientProfile, form]);
+
+  useEffect(() => {
+    if (!authLoading && !userId) {
       toast({
-        title: "Error",
-        description: "Failed to load your profile data",
+        title: "Authentication required",
+        description: "Please sign in to view your profile",
         variant: "destructive"
       });
-    } finally {
-      setLoading(false);
+      navigate('/login');
+      return;
     }
-  };
+
+    if (!authLoading && !clientProfile) {
+      toast({
+        title: "Profile not found",
+        description: "We couldn't find your client profile",
+        variant: "destructive"
+      });
+    }
+    
+    resetFormWithProfileData();
+  }, [clientProfile, authLoading, userId, navigate, toast, resetFormWithProfileData]);
 
   const handleSaveProfile = async () => {
-    if (!clientData) {
+    if (!clientProfile) {
       console.error("Cannot save: No client data available");
       toast({
         title: "Error",
@@ -132,7 +114,7 @@ const PatientProfile: React.FC = () => {
       return;
     }
 
-    console.log("Starting save process for client ID:", clientData.id);
+    console.log("Starting save process for client ID:", clientProfile.id);
     setIsSaving(true);
 
     try {
@@ -149,19 +131,19 @@ const PatientProfile: React.FC = () => {
       };
 
       console.log("Sending updates to database:", updates);
-      const result = await updateClientProfile(clientData.id, updates);
+      const { success, error } = await updateClientProfile(clientProfile.id, updates);
 
-      if (result.success) {
+      if (success) {
         console.log("Profile update successful");
         toast({
           title: "Success",
           description: "Your profile has been updated successfully",
         });
         setIsEditing(false);
-        fetchClientData();
+        await refreshUserData();
       } else {
-        console.error("Profile update failed:", result.error);
-        throw new Error("Failed to update profile: " + JSON.stringify(result.error));
+        console.error("Profile update failed:", error);
+        throw new Error("Failed to update profile: " + JSON.stringify(error));
       }
     } catch (error) {
       console.error("Error saving profile:", error);
@@ -178,13 +160,8 @@ const PatientProfile: React.FC = () => {
   const handleCancelEdit = () => {
     console.log("Edit cancelled");
     setIsEditing(false);
-    fetchClientData();
+    resetFormWithProfileData();
   };
-
-  useEffect(() => {
-    console.log("PatientProfile component mounted");
-    fetchClientData();
-  }, []);
 
   return (
     <Layout>
@@ -194,8 +171,8 @@ const PatientProfile: React.FC = () => {
         </div>
 
         <MyProfile 
-          clientData={clientData}
-          loading={loading}
+          clientData={clientProfile}
+          loading={authLoading}
           isEditing={isEditing}
           setIsEditing={setIsEditing}
           form={form}

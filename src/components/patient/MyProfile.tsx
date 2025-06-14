@@ -6,9 +6,10 @@ import { X, Save, Edit } from 'lucide-react';
 import { Form } from '@/components/ui/form';
 import FormFieldWrapper from '@/components/ui/FormFieldWrapper';
 import { getTimezoneLabel } from '@/utils/timezoneOptions';
+import { Client } from '@/types/client';
 
 interface MyProfileProps {
-  clientData: any | null;
+  clientData: Client | null;
   loading: boolean;
   isEditing: boolean;
   setIsEditing: (isEditing: boolean) => void;

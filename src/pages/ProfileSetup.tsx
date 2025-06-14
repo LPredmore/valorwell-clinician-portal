@@ -312,7 +312,7 @@ const ProfileSetup = () => {
       const subscriberDobPrimary = parseDateString(clientProfile.client_subscriber_dob_primary);
       const subscriberDobSecondary = parseDateString(clientProfile.client_subscriber_dob_secondary);
 
-      const formValues: ClientFormData = {
+      const formValues: ProfileFormValues = {
         client_first_name: clientProfile.client_first_name || '',
         client_preferred_name: clientProfile.client_preferred_name || '',
         client_last_name: clientProfile.client_last_name || '',
@@ -364,7 +364,7 @@ const ProfileSetup = () => {
         client_self_goal: clientProfile.client_self_goal || '',
         client_referral_source: clientProfile.client_referral_source || '',
       };
-      form.reset(formValues as ProfileFormValues);
+      form.reset(formValues);
       initialDataLoadedForUser.current = userId;
     } else {
       console.warn("[ProfileSetup] No client data found in context. Using defaults.");
