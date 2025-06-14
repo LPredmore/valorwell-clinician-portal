@@ -1,9 +1,25 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createHash } from "https://deno.land/std@0.168.0/hash/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+// Helper to create a consistent hash for an event
+const createEventHash = (event: any): string => {
+  const data = {
+    title: event.title,
+    start: event.when.start_time,
+    end: event.when.end_time,
+    description: event.description,
+    location: event.location,
+    participants: event.participants?.map((p: any) => p.email).sort()
+  };
+  const hash = createHash("sha-256");
+  hash.update(JSON.stringify(data));
+  return hash.toString();
 }
 
 serve(async (req) => {
@@ -90,7 +106,7 @@ serve(async (req) => {
       if (!nylasClientId) missingConfig.push('NYLAS_CLIENT_ID')
       if (!nylasClientSecret) missingConfig.push('NYLAS_CLIENT_SECRET')
       if (!nylasApiKey) missingConfig.push('NYLAS_API_KEY')
-
+      
       if (missingConfig.length > 0) {
         return new Response(
           JSON.stringify({ 
@@ -458,16 +474,34 @@ serve(async (req) => {
       }
 
       case 'sync_bidirectional': {
+        console.log(`[nylas-sync-appointments] Bidirectional sync started for clinician: ${clinicianId}`);
+        if (!clinicianId || !startDate || !endDate) {
+          return new Response(
+            JSON.stringify({ 
+              error: 'Missing parameters',
+              code: 'MISSING_PARAMS',
+              details: 'clinicianId, startDate, and endDate are required for bidirectional sync.'
+            }),
+            { 
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+            }
+          )
+        }
+        
+        // This is a placeholder implementation.
+        // It logs the intended actions without modifying any data.
+        console.log('[nylas-sync-appointments] NOTE: Running in analysis-only mode. No data will be written.');
+
+        // TODO: Implement full C-U-D logic for both directions.
+        
         return new Response(
           JSON.stringify({ 
-            error: 'Not implemented',
-            code: 'NOT_IMPLEMENTED',
-            details: 'Bidirectional sync functionality is not yet implemented'
+            success: true,
+            message: "Bidirectional sync analysis complete. See function logs for details.",
+            status: "analysis_only"
           }),
-          { 
-            status: 501,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-          }
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
 

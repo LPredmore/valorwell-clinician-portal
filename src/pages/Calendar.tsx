@@ -6,9 +6,12 @@ import ErrorBoundary from "@/components/common/ErrorBoundary";
 import VirtualCalendar from "../components/calendar/VirtualCalendar";
 import { getUserTimeZone } from "@/utils/timeZoneUtils";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { addWeeks, subWeeks } from "date-fns";
+import { ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
+import { addWeeks, subWeeks, startOfWeek, endOfWeek } from "date-fns";
 import ClinicianAvailabilityPanel from "../components/calendar/ClinicianAvailabilityPanel";
+import { useMutation } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/components/ui/use-toast";
 
 /**
  * Calendar component - Main calendar view for clinicians
@@ -19,6 +22,43 @@ const Calendar = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const userTimeZone = getUserTimeZone();
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const { toast } = useToast();
+
+  const syncCalendarMutation = useMutation({
+    mutationFn: async () => {
+      const startOfView = startOfWeek(currentDate);
+      const endOfView = endOfWeek(currentDate);
+
+      const { data, error } = await supabase.functions.invoke('nylas-sync-appointments', {
+        body: {
+          action: 'sync_bidirectional',
+          clinicianId: userId,
+          startDate: startOfView.toISOString(),
+          endDate: endOfView.toISOString(),
+        },
+      });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+      return data;
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: 'Sync Kicked Off',
+        description: data.message || 'Calendar sync analysis has started.',
+      });
+      // Refresh calendar view after a short delay to allow sync to process
+      setTimeout(() => handleAvailabilityUpdated(), 2000);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Sync Failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
 
   // Navigation functions
   const navigatePrevious = () => setCurrentDate(subWeeks(currentDate, 1));
@@ -67,6 +107,14 @@ const Calendar = () => {
                     </Button>
                     <Button variant="outline" onClick={navigateNext}>
                       <ChevronRight className="h-4 w-4" />
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => syncCalendarMutation.mutate()} 
+                      disabled={syncCalendarMutation.isPending}
+                    >
+                      <RefreshCw className={`h-4 w-4 mr-2 ${syncCalendarMutation.isPending ? 'animate-spin' : ''}`} />
+                      Sync Calendars
                     </Button>
                   </div>
                   <h2 className="text-lg font-semibold">
