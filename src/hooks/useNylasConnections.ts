@@ -1,5 +1,4 @@
-
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, MutableRefObject } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthProvider';
@@ -10,7 +9,7 @@ interface UseNylasConnectionsProps {
   categorizeError: (error: any, context: string) => DetailedError;
   retryCount: number;
   setRetryCount: React.Dispatch<React.SetStateAction<number>>;
-  retryTimeoutRef: React.RefObject<NodeJS.Timeout | null>;
+  retryTimeoutRef: MutableRefObject<NodeJS.Timeout | null>;
 }
 
 export const useNylasConnections = ({
@@ -83,7 +82,7 @@ export const useNylasConnections = ({
           retryTimeoutRef.current = setTimeout(() => {
             setRetryCount(prev => prev + 1);
             fetchConnections(true);
-            if(retryTimeoutRef.current) retryTimeoutRef.current = null;
+            retryTimeoutRef.current = null;
           }, nextRetry);
         }
         return;
@@ -106,7 +105,7 @@ export const useNylasConnections = ({
         retryTimeoutRef.current = setTimeout(() => {
           setRetryCount(prev => prev + 1);
           fetchConnections(true);
-          if(retryTimeoutRef.current) retryTimeoutRef.current = null;
+          retryTimeoutRef.current = null;
         }, nextRetry);
       }
     } finally {
@@ -128,4 +127,3 @@ export const useNylasConnections = ({
     refreshConnections: fetchConnections,
   };
 };
-
