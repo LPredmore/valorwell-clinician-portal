@@ -1,11 +1,15 @@
 import React, { useMemo, useState } from 'react';
 import { useAppointments } from '@/hooks/useAppointments';
-import { format, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay } from 'date-fns';
+import { useAvailability, ProcessedAvailability } from '@/hooks/useAvailability';
+import { format, startOfWeek, endOfWeek, eachDayOfInterval } from 'date-fns';
 import { Plus, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import InternalAppointmentCard from './InternalAppointmentCard';
 import CalendarLoadingState from './CalendarLoadingState';
 import CalendarErrorState from './CalendarErrorState';
+import { cn } from '@/lib/utils';
+import AvailabilityEditDialog from './AvailabilityEditDialog';
+import { AvailabilityBlock } from './availability-edit/types';
 
 interface VirtualCalendarProps {
   clinicianId: string | null;
@@ -13,6 +17,8 @@ interface VirtualCalendarProps {
   userTimeZone: string;
   onNewAppointment?: (date: Date, time?: string) => void;
   onAppointmentClick?: (appointment: any) => void;
+  refreshTrigger: number;
+  onAvailabilityUpdated: () => void;
 }
 
 const VirtualCalendar: React.FC<VirtualCalendarProps> = ({
@@ -21,6 +27,8 @@ const VirtualCalendar: React.FC<VirtualCalendarProps> = ({
   userTimeZone,
   onNewAppointment,
   onAppointmentClick,
+  refreshTrigger,
+  onAvailabilityUpdated,
 }) => {
   // Calculate date range for fetching appointments (current week)
   const startDate = useMemo(() => startOfWeek(currentDate), [currentDate]);
@@ -28,10 +36,19 @@ const VirtualCalendar: React.FC<VirtualCalendarProps> = ({
   
   const { 
     appointments, 
-    isLoading, 
-    error,
+    isLoading: isLoadingAppointments, 
+    error: appointmentsError,
     refetch 
-  } = useAppointments(clinicianId || '', startDate, endDate, userTimeZone, 0);
+  } = useAppointments(clinicianId || '', startDate, endDate, userTimeZone, refreshTrigger);
+
+  const {
+    data: availability,
+    isLoading: isLoadingAvailability,
+    error: availabilityError,
+  } = useAvailability(clinicianId, startDate, endDate, refreshTrigger);
+
+  const [isEditAvailabilityOpen, setIsEditAvailabilityOpen] = useState(false);
+  const [selectedAvailability, setSelectedAvailability] = useState<{ block: AvailabilityBlock, date: Date } | null>(null);
 
   // Generate week days for the calendar grid
   const weekDays = useMemo(() => {
@@ -68,17 +85,46 @@ const VirtualCalendar: React.FC<VirtualCalendarProps> = ({
     return grouped;
   }, [appointments, startDate, endDate]);
 
+  const availabilityByDate = useMemo(() => {
+    const grouped: { [key: string]: ProcessedAvailability[] } = {};
+    if (!availability) return grouped;
+
+    availability.forEach(block => {
+      const dateKey = format(block.date, 'yyyy-MM-dd');
+      if (!grouped[dateKey]) {
+        grouped[dateKey] = [];
+      }
+      grouped[dateKey].push(block);
+    });
+    return grouped;
+  }, [availability]);
+
+  const handleAvailabilityClick = (block: ProcessedAvailability, day: Date) => {
+    const availabilityBlockForDialog: AvailabilityBlock = {
+      id: block.id,
+      day_of_week: block.day_of_week,
+      start_time: block.start_time,
+      end_time: block.end_time,
+      isException: block.isException,
+    };
+    setSelectedAvailability({ block: availabilityBlockForDialog, date: day });
+    setIsEditAvailabilityOpen(true);
+  };
+
   const handleTimeSlotClick = (day: Date, hour: number) => {
     const appointmentTime = new Date(day);
     appointmentTime.setHours(hour, 0, 0, 0);
     onNewAppointment?.(appointmentTime, `${hour.toString().padStart(2, '0')}:00`);
   };
 
+  const error = appointmentsError || availabilityError;
+  const isLoading = isLoadingAppointments || isLoadingAvailability;
+
   // Show error state
   if (error) {
     return (
       <CalendarErrorState
-        message={`Error loading appointments: ${error}`}
+        message={`Error loading calendar data: ${error.message}`}
         onRetry={refetch}
       />
     );
@@ -86,7 +132,7 @@ const VirtualCalendar: React.FC<VirtualCalendarProps> = ({
 
   // Show loading state
   if (isLoading) {
-    return <CalendarLoadingState message="Loading appointments..." />;
+    return <CalendarLoadingState message="Loading schedule..." />;
   }
 
   // Time slots for the day (8 AM to 6 PM)
@@ -136,18 +182,46 @@ const VirtualCalendar: React.FC<VirtualCalendarProps> = ({
             {weekDays.map((day) => {
               const dateKey = format(day, 'yyyy-MM-dd');
               const dayAppointments = appointmentsByDate[dateKey] || [];
+              const dayAvailability = availabilityByDate[dateKey] || [];
               
-              // Find appointments for this hour
               const hourAppointments = dayAppointments.filter(appointment => {
                 const appointmentHour = new Date(appointment.start_at).getHours();
                 return appointmentHour === hour;
               });
 
+              const currentSlotTime = new Date(day);
+              currentSlotTime.setHours(hour, 0, 0, 0);
+
+              let availabilityBlockForSlot: ProcessedAvailability | null = null;
+              for (const block of dayAvailability) {
+                  const start = new Date(day);
+                  const [startH, startM] = block.start_time.split(':');
+                  start.setHours(parseInt(startH), parseInt(startM), 0, 0);
+
+                  const end = new Date(day);
+                  const [endH, endM] = block.end_time.split(':');
+                  end.setHours(parseInt(endH), parseInt(endM), 0, 0);
+                  
+                  if (currentSlotTime >= start && currentSlotTime < end) {
+                      availabilityBlockForSlot = block;
+                      break;
+                  }
+              }
+
               return (
                 <div 
                   key={`${day.toISOString()}-${hour}`} 
-                  className="min-h-[60px] border-r last:border-r-0 p-1 relative hover:bg-gray-50 cursor-pointer"
-                  onClick={() => handleTimeSlotClick(day, hour)}
+                  className={cn(
+                    "min-h-[60px] border-r last:border-r-0 p-1 relative hover:bg-gray-50 cursor-pointer",
+                    availabilityBlockForSlot && !hourAppointments.length && "bg-green-50"
+                  )}
+                  onClick={() => {
+                    if (availabilityBlockForSlot) {
+                      handleAvailabilityClick(availabilityBlockForSlot, day);
+                    } else {
+                      handleTimeSlotClick(day, hour)
+                    }
+                  }}
                 >
                   {hourAppointments.map((appointment) => (
                     <InternalAppointmentCard
@@ -165,8 +239,22 @@ const VirtualCalendar: React.FC<VirtualCalendarProps> = ({
 
       {/* Appointments summary */}
       <div className="text-sm text-gray-600">
-        Showing {appointments.length} appointments for this week
+        Showing {appointments.length} appointments and {availability?.length || 0} availability blocks for this week.
       </div>
+
+      {selectedAvailability && (
+        <AvailabilityEditDialog
+          isOpen={isEditAvailabilityOpen}
+          onClose={() => setIsEditAvailabilityOpen(false)}
+          availabilityBlock={selectedAvailability.block}
+          specificDate={selectedAvailability.date}
+          clinicianId={clinicianId}
+          onAvailabilityUpdated={() => {
+            setIsEditAvailabilityOpen(false);
+            onAvailabilityUpdated();
+          }}
+        />
+      )}
     </div>
   );
 };
