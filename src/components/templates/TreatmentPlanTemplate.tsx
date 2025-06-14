@@ -11,7 +11,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ClientDetails } from "@/types/client";
+import { Client } from "@/types/client";
 import { useToast } from "@/hooks/use-toast";
 import { supabase, formatDateForDB, getCurrentUser } from "@/integrations/supabase/client";
 import { DiagnosisSelector } from "@/components/DiagnosisSelector";
@@ -22,7 +22,7 @@ interface TreatmentPlanTemplateProps {
   clinicianName?: string;
   clientName?: string;
   clientDob?: string;
-  clientData?: ClientDetails | null;
+  clientData?: Client | null;
 }
 
 const TreatmentPlanTemplate: React.FC<TreatmentPlanTemplateProps> = ({ 
