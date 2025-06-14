@@ -22,7 +22,7 @@ import SignupNotAVeteran from '@/components/signup/SignupNotAVeteran';
 import AdditionalInsurance from '@/components/signup/AdditionalInsurance';
 import MoreAdditionalInsurance from '@/components/signup/MoreAdditionalInsurance';
 import SignupLast from '@/components/signup/SignupLast';
-import { useUser } from '@/context/UserContext';
+import { useAuth } from '@/context/AuthProvider'; // FIX: Replaced useUser with useAuth
 import { parseDateString, calculateAge, formatDateForDB } from '@/utils/dateUtils';
 
 type ClientFormData = {
@@ -143,7 +143,7 @@ type ProfileFormValues = z.infer<typeof profileStep1Schema> &
 const ProfileSetup = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { user, isLoading: isUserContextLoading, authInitialized, userId, refreshUserData } = useUser();
+  const { user, isLoading: isUserContextLoading, authInitialized, userId, refreshUserData } = useAuth(); // FIX: useAuth hook instead of useUser
 
   const [clientId, setClientId] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState(1);

@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useCallback } from 'react'; // Added useCallback
 import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -40,7 +41,7 @@ const TherapistSelection = () => {
     isLoading: isAuthLoading, 
     authInitialized, 
     clientProfile, 
-    refreshUserProfile 
+    refreshUserData // FIX: Was refreshUserProfile
   } = useAuth();
   const [authError, setAuthError] = useState<string | null>(null);
 
@@ -252,11 +253,11 @@ const TherapistSelection = () => {
       });
 
       // Refresh user context to get updated client_status
-      if (refreshUserProfile) {
+      if (refreshUserData) { // FIX: Was refreshUserProfile
         console.log("[TherapistSelection] Refreshing user data after therapist selection");
-        await refreshUserProfile();
+        await refreshUserData(); // FIX: Was refreshUserProfile
       } else {
-        console.warn("[TherapistSelection] refreshUserProfile function not available from AuthProvider");
+        console.warn("[TherapistSelection] refreshUserData function not available from AuthProvider");
       }
 
       navigate('/patient-dashboard'); // Or to a confirmation page
