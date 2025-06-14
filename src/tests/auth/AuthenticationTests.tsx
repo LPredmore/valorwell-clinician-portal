@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { BrowserRouter } from 'react-router-dom';
-import { UserProvider, useUser } from '@/context/UserContext';
+import { AuthProvider, useAuth } from '@/context/AuthProvider';
 import Login from '@/pages/Login';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { supabase } from '@/integrations/supabase/client';
@@ -34,7 +34,7 @@ jest.mock('react-router-dom', () => ({
 
 // Test component to verify user context
 const TestComponent = () => {
-  const { user, authInitialized, isLoading } = useUser();
+  const { user, authInitialized, isLoading } = useAuth();
   return (
     <div>
       <div data-testid="auth-initialized">{authInitialized.toString()}</div>
@@ -49,7 +49,7 @@ describe('Authentication Tests', () => {
     jest.clearAllMocks();
   });
 
-  describe('UserContext', () => {
+  describe('Authentication Context', () => {
     test('should initialize with loading state', () => {
       // Mock initial session check
       (supabase.auth.getSession as jest.Mock).mockResolvedValue({
@@ -59,9 +59,9 @@ describe('Authentication Tests', () => {
 
       render(
         <BrowserRouter>
-          <UserProvider>
+          <AuthProvider>
             <TestComponent />
-          </UserProvider>
+          </AuthProvider>
         </BrowserRouter>
       );
 
@@ -78,9 +78,9 @@ describe('Authentication Tests', () => {
 
       render(
         <BrowserRouter>
-          <UserProvider>
+          <AuthProvider>
             <TestComponent />
-          </UserProvider>
+          </AuthProvider>
         </BrowserRouter>
       );
 
@@ -105,9 +105,9 @@ describe('Authentication Tests', () => {
 
       render(
         <BrowserRouter>
-          <UserProvider>
+          <AuthProvider>
             <TestComponent />
-          </UserProvider>
+          </AuthProvider>
         </BrowserRouter>
       );
 
@@ -125,9 +125,9 @@ describe('Authentication Tests', () => {
 
       render(
         <BrowserRouter>
-          <UserProvider>
+          <AuthProvider>
             <TestComponent />
-          </UserProvider>
+          </AuthProvider>
         </BrowserRouter>
       );
 
@@ -150,9 +150,9 @@ describe('Authentication Tests', () => {
 
       render(
         <BrowserRouter>
-          <UserProvider>
+          <AuthProvider>
             <Login />
-          </UserProvider>
+          </AuthProvider>
         </BrowserRouter>
       );
 
@@ -181,9 +181,9 @@ describe('Authentication Tests', () => {
 
       render(
         <BrowserRouter>
-          <UserProvider>
+          <AuthProvider>
             <Login />
-          </UserProvider>
+          </AuthProvider>
         </BrowserRouter>
       );
 
@@ -216,9 +216,9 @@ describe('Authentication Tests', () => {
 
       render(
         <BrowserRouter>
-          <UserProvider>
+          <AuthProvider>
             <Login />
-          </UserProvider>
+          </AuthProvider>
         </BrowserRouter>
       );
 
@@ -251,11 +251,11 @@ describe('Authentication Tests', () => {
 
       render(
         <BrowserRouter>
-          <UserProvider>
+          <AuthProvider>
             <ProtectedRoute allowedRoles={['clinician', 'admin']}>
               <div data-testid="protected-content">Protected Content</div>
             </ProtectedRoute>
-          </UserProvider>
+          </AuthProvider>
         </BrowserRouter>
       );
 
@@ -274,11 +274,11 @@ describe('Authentication Tests', () => {
 
       render(
         <BrowserRouter>
-          <UserProvider>
+          <AuthProvider>
             <ProtectedRoute allowedRoles={['clinician', 'admin']}>
               <div data-testid="protected-content">Protected Content</div>
             </ProtectedRoute>
-          </UserProvider>
+          </AuthProvider>
         </BrowserRouter>
       );
 
@@ -302,11 +302,11 @@ describe('Authentication Tests', () => {
 
       render(
         <BrowserRouter>
-          <UserProvider>
+          <AuthProvider>
             <ProtectedRoute allowedRoles={['clinician', 'admin']}>
               <div data-testid="protected-content">Protected Content</div>
             </ProtectedRoute>
-          </UserProvider>
+          </AuthProvider>
         </BrowserRouter>
       );
 

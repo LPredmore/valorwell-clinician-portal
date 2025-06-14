@@ -1,8 +1,7 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useUser } from '@/context/UserContext';
+import { useAuth } from '@/context/AuthProvider';
 
 interface SchedulerConfig {
   id: string;
@@ -18,7 +17,7 @@ export const useNylasScheduler = (clinicianId: string | null) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const { toast } = useToast();
-  const { authInitialized } = useUser();
+  const { authInitialized } = useAuth();
 
   // Fetch existing scheduler configuration
   const fetchSchedulerConfig = async () => {

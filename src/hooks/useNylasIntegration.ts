@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useUser } from '@/context/UserContext';
+import { useAuth } from '@/context/AuthProvider';
 import { TimeZoneService } from '@/utils/timeZoneService';
 
 /**
@@ -59,7 +59,7 @@ export const useNylasIntegration = () => {
   const [retryCount, setRetryCount] = useState(0);
   const [lastFetchTime, setLastFetchTime] = useState<Date | null>(null);
   const { toast } = useToast();
-  const { userId, authInitialized } = useUser();
+  const { userId, authInitialized } = useAuth();
   
   // Ref to track active retries
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);

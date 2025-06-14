@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import Layout from '@/components/layout/Layout';
 import { useForm } from 'react-hook-form';
@@ -5,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { getCurrentUser, getClientByUserId, updateClientProfile } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import MyProfile from '@/components/patient/MyProfile';
-import { useUser } from '@/context/UserContext';
+import { useAuth } from '@/context/AuthProvider';
 import { timezoneOptions } from '@/utils/timezoneOptions';
 
 const PatientProfile: React.FC = () => {
@@ -15,7 +16,7 @@ const PatientProfile: React.FC = () => {
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { userId } = useUser();
+  const { userId } = useAuth();
 
   const genderOptions = ['Male', 'Female', 'Non-Binary', 'Other', 'Prefer not to say'];
   const genderIdentityOptions = ['Male', 'Female', 'Trans Man', 'Trans Woman', 'Non-Binary', 'Other', 'Prefer not to say'];
