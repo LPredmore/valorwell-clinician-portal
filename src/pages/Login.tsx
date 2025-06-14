@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useForm } from 'react-hook-form';
@@ -10,7 +9,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
-import { useUser } from '@/context/UserContext';
+import { useAuth } from '@/context/AuthProvider';
 
 const Login = React.memo(() => {
   const [loading, setLoading] = useState<boolean>(false);
@@ -23,7 +22,7 @@ const Login = React.memo(() => {
     },
   });
   const { toast } = useToast();
-  const { userId, userRole, authInitialized } = useUser();
+  const { userId, userRole, authInitialized } = useAuth();
 
   // Handle runtime connection errors
   useEffect(() => {

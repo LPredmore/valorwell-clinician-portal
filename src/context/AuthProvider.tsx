@@ -1,10 +1,9 @@
-console.log('🚀 [EMERGENCY DEBUG] AuthProvider file loaded');
 
-import React, { createContext, useContext, useEffect, ReactNode, useReducer } from 'react';
-import { AuthChangeEvent, Session, User as SupabaseUser } from '@supabase/supabase-js';
+import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
-// Define client profile interface
+// Types for client profile (matching main clients table)
 export interface ClientProfile {
   client_id: string;
   client_first_name: string | null;
@@ -22,474 +21,150 @@ export interface ClientProfile {
   client_zipcode: string | null;
 }
 
-// Define auth state machine states
-export type AuthState = 'initializing' | 'checking_session' | 'fetching_profile' | 'authenticated' | 'unauthenticated' | 'error' | 'logging_out';
+type AuthState = 'initializing' | 'authenticated' | 'unauthenticated' | 'error';
 
-// Define auth state machine events
-type AuthEvent =
-  | { type: 'INITIALIZE' }
-  | { type: 'SESSION_CHECKED', session: Session | null, error?: Error }
-  | { type: 'PROFILE_FETCHED', profile: ClientProfile | null }
-  | { type: 'AUTH_ERROR', error: Error }
-  | { type: 'LOGOUT' }
-  | { type: 'LOGOUT_SUCCESS' }
-  | { type: 'LOGOUT_ERROR', error: Error }
-  | { type: 'REFRESH' };
-
-// Define auth state machine context
-interface AuthMachineContext {
+interface AuthContextType {
   user: SupabaseUser | null;
+  userId: string | null;
   userRole: string | null;
   clientProfile: ClientProfile | null;
-  authError: Error | null;
+  clientStatus: ClientProfile['client_status'] | null;
   isLoading: boolean;
   authInitialized: boolean;
-}
-
-// Define auth state machine state
-interface AuthMachineState {
-  state: AuthState;
-  context: AuthMachineContext;
-}
-
-// Define initial state
-const initialState: AuthMachineState = {
-  state: 'initializing',
-  context: {
-    user: null,
-    userRole: null,
-    clientProfile: null,
-    authError: null,
-    isLoading: true,
-    authInitialized: false
-  }
-};
-
-// Define auth state machine reducer
-const authReducer = (state: AuthMachineState, event: AuthEvent): AuthMachineState => {
-  console.log(`🚀 [AUTH STATE MACHINE] Current state: ${state.state}, Event: ${event.type}`);
-  
-  switch (state.state) {
-    case 'initializing':
-      if (event.type === 'INITIALIZE') {
-        return {
-          state: 'checking_session',
-          context: {
-            ...state.context,
-            authInitialized: true
-          }
-        };
-      }
-      return state;
-      
-    case 'checking_session':
-      if (event.type === 'SESSION_CHECKED') {
-        if (event.error) {
-          return {
-            state: 'error',
-            context: {
-              ...state.context,
-              authError: event.error,
-              isLoading: false
-            }
-          };
-        }
-        
-        if (event.session?.user) {
-          return {
-            state: 'fetching_profile',
-            context: {
-              ...state.context,
-              user: event.session.user,
-              userRole: event.session.user.user_metadata?.role || null
-            }
-          };
-        }
-        
-        return {
-          state: 'unauthenticated',
-          context: {
-            ...state.context,
-            isLoading: false
-          }
-        };
-      }
-      return state;
-      
-    case 'fetching_profile':
-      if (event.type === 'PROFILE_FETCHED') {
-        return {
-          state: 'authenticated',
-          context: {
-            ...state.context,
-            clientProfile: event.profile,
-            isLoading: false
-          }
-        };
-      }
-      
-      if (event.type === 'AUTH_ERROR') {
-        return {
-          state: 'error',
-          context: {
-            ...state.context,
-            authError: event.error,
-            isLoading: false
-          }
-        };
-      }
-      return state;
-      
-    case 'authenticated':
-      if (event.type === 'LOGOUT') {
-        return {
-          state: 'logging_out',
-          context: {
-            ...state.context,
-            isLoading: true
-          }
-        };
-      }
-      
-      if (event.type === 'REFRESH') {
-        return {
-          state: 'checking_session',
-          context: {
-            ...state.context,
-            isLoading: true
-          }
-        };
-      }
-      return state;
-      
-    case 'unauthenticated':
-      if (event.type === 'REFRESH') {
-        return {
-          state: 'checking_session',
-          context: {
-            ...state.context,
-            isLoading: true
-          }
-        };
-      }
-      return state;
-      
-    case 'logging_out':
-      if (event.type === 'LOGOUT_SUCCESS') {
-        return {
-          state: 'unauthenticated',
-          context: {
-            ...initialState.context,
-            authInitialized: true,
-            isLoading: false
-          }
-        };
-      }
-      
-      if (event.type === 'LOGOUT_ERROR') {
-        return {
-          state: 'error',
-          context: {
-            ...state.context,
-            authError: event.error,
-            isLoading: false
-          }
-        };
-      }
-      return state;
-      
-    case 'error':
-      if (event.type === 'REFRESH') {
-        return {
-          state: 'checking_session',
-          context: {
-            ...state.context,
-            authError: null,
-            isLoading: true
-          }
-        };
-      }
-      return state;
-      
-    default:
-      return state;
-  }
-};
-
-// Define auth context type
-interface AuthContextType extends AuthMachineContext {
   authState: AuthState;
-  userId: string | null;
-  clientStatus: ClientProfile['client_status'] | null;
+  authError: Error | null;
   refreshUserData: () => void;
   logout: () => Promise<void>;
 }
 
-// Create auth context
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Define timeout for safety
-const SAFETY_TIMEOUT = 10000; // 10 seconds
-
-// Create auth provider component
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  console.log('🚀 [EMERGENCY DEBUG] AuthProvider component rendering');
-  
-  // Initialize auth state machine
-  const [machine, dispatch] = useReducer(authReducer, initialState);
-  
-  // Extract values from state machine
-  const { state: authState, context } = machine;
-  const { user, userRole, clientProfile, authError, isLoading, authInitialized } = context;
-  
-  // Define fetch client profile function
-  const fetchClientProfile = async (userId: string): Promise<ClientProfile | null> => {
+  const [user, setUser] = useState<SupabaseUser | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [clientProfile, setClientProfile] = useState<ClientProfile | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [authInitialized, setAuthInitialized] = useState(false);
+  const [authState, setAuthState] = useState<AuthState>('initializing');
+  const [authError, setAuthError] = useState<Error | null>(null);
+
+  const clearState = () => {
+    setUser(null);
+    setUserRole(null);
+    setClientProfile(null);
+    setIsLoading(false);
+    setAuthState('unauthenticated');
+    setAuthInitialized(true);
+  };
+
+  const fetchClientProfile = async (userId: string) => {
     try {
-      console.log('🚀 [EMERGENCY DEBUG] Fetching client profile for user:', userId);
-      
-      // Create a timeout promise
-      const timeoutPromise = new Promise<null>((_, reject) => {
-        setTimeout(() => reject(new Error('Client profile fetch timeout')), SAFETY_TIMEOUT);
-      });
-      
-      // Create the fetch promise
-      const fetchPromise = supabase
-        .from('clients_compatibility_view')
-        .select('*')
+      // Match the actual clients table schema
+      const { data, error } = await supabase
+        .from('clients')
+        .select(
+          `id as client_id, first_name as client_first_name, last_name as client_last_name, preferred_name as client_preferred_name, email as client_email, phone as client_phone, status as client_status, date_of_birth as client_date_of_birth, age as client_age, gender as client_gender, address as client_address, city as client_city, state as client_state, zipcode as client_zipcode`
+        )
         .eq('id', userId)
         .single();
-      
-      // Race the promises
-      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any;
-      
-      if (error) {
-        console.warn('⚠️ [EMERGENCY DEBUG] No client profile found (this is normal for non-client users)');
-        return null;
-      }
-      
-      console.log('🚀 [EMERGENCY DEBUG] Client profile fetched successfully');
+      if (error) return null;
       return data;
-    } catch (error) {
-      console.error('❌ [EMERGENCY DEBUG] Error fetching client profile:', error);
-      throw error;
+    } catch {
+      return null;
     }
   };
-  
-  // Define refresh user data function
-  const refreshUserData = (): void => {
-    console.log('🚀 [EMERGENCY DEBUG] Refreshing user data...');
-    dispatch({ type: 'REFRESH' });
+
+  const refreshUserData = async () => {
+    setIsLoading(true);
+    setAuthState('initializing');
+    setAuthError(null);
+    // Triggers useEffect below to recheck
+    await checkSession();
   };
-  
-  // Define logout function
-  const logout = async (): Promise<void> => {
+
+  const logout = async () => {
+    setIsLoading(true);
+    setAuthError(null);
+    await supabase.auth.signOut();
+    clearState();
+  };
+
+  const checkSession = async () => {
+    setIsLoading(true);
     try {
-      console.log('🚀 [EMERGENCY DEBUG] Logging out user...');
-      dispatch({ type: 'LOGOUT' });
-      
-      // Create a timeout promise
-      const timeoutPromise = new Promise<{ error: Error }>((_, reject) => {
-        setTimeout(() => reject(new Error('Logout timeout')), SAFETY_TIMEOUT);
-      });
-      
-      // Create the logout promise
-      const logoutPromise = supabase.auth.signOut();
-      
-      // Race the promises
-      const { error } = await Promise.race([logoutPromise, timeoutPromise]);
-      
-      if (error) {
-        console.error('❌ [EMERGENCY DEBUG] Logout error:', error);
-        dispatch({ type: 'LOGOUT_ERROR', error });
-        throw error;
+      const { data: { session }, error } = await supabase.auth.getSession();
+      if (error || !session?.user) {
+        clearState();
+        return;
       }
-      
-      console.log('🚀 [EMERGENCY DEBUG] Logout successful');
-      dispatch({ type: 'LOGOUT_SUCCESS' });
-    } catch (error) {
-      console.error('❌ [EMERGENCY DEBUG] Error during logout:', error);
-      dispatch({ type: 'LOGOUT_ERROR', error: error as Error });
-      throw error;
+      setUser(session.user);
+      setUserRole(session.user.user_metadata?.role || null);
+      setAuthState('authenticated');
+      setIsLoading(false);
+      setAuthInitialized(true);
+
+      // Only try to fetch client profile for client users
+      if (session.user.user_metadata?.role === 'client') {
+        const profile = await fetchClientProfile(session.user.id);
+        setClientProfile(profile || null);
+      } else {
+        setClientProfile(null);
+      }
+    } catch (e: any) {
+      setAuthError(e);
+      setAuthState('error');
+      setIsLoading(false);
+      setAuthInitialized(true);
     }
   };
-  
-  // Initialize authentication
+
   useEffect(() => {
-    console.log('🚀 [EMERGENCY DEBUG] AuthProvider useEffect - Setting up auth initialization');
-    
-    let mounted = true;
-    let sessionTimeoutId: NodeJS.Timeout | null = null;
-    let profileTimeoutId: NodeJS.Timeout | null = null;
-    
-    const initializeAuth = async () => {
-      try {
-        console.log('🚀 [EMERGENCY DEBUG] Starting auth initialization...');
-        
-        // Initialize the state machine
-        dispatch({ type: 'INITIALIZE' });
-        
-        // Set up safety timeout for session check
-        sessionTimeoutId = setTimeout(() => {
-          if (mounted) {
-            console.error('❌ [EMERGENCY DEBUG] Session check timed out');
-            dispatch({
-              type: 'SESSION_CHECKED',
-              session: null,
-              error: new Error('Session check timed out')
-            });
-          }
-        }, SAFETY_TIMEOUT);
-        
-        // Get initial session
-        const { data: { session }, error } = await supabase.auth.getSession();
-        
-        // Clear timeout
-        if (sessionTimeoutId) {
-          clearTimeout(sessionTimeoutId);
-          sessionTimeoutId = null;
+    checkSession();
+    // Auth change handler
+    const { data: listener } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (session?.user) {
+        setUser(session.user);
+        setUserRole(session.user.user_metadata?.role || null);
+        setAuthState('authenticated');
+        setAuthInitialized(true);
+        setIsLoading(false);
+        if (session.user.user_metadata?.role === 'client') {
+          const profile = await fetchClientProfile(session.user.id);
+          setClientProfile(profile || null);
+        } else {
+          setClientProfile(null);
         }
-        
-        if (!mounted) return;
-        
-        if (error) {
-          console.error('❌ [EMERGENCY DEBUG] Error getting initial session:', error);
-          dispatch({ type: 'SESSION_CHECKED', session: null, error });
-          return;
-        }
-        
-        // Update state with session result
-        dispatch({ type: 'SESSION_CHECKED', session });
-        
-        // If we have a user, fetch their profile
-        if (session?.user) {
-          try {
-            // Set up safety timeout for profile fetch
-            profileTimeoutId = setTimeout(() => {
-              if (mounted) {
-                console.error('❌ [EMERGENCY DEBUG] Profile fetch timed out');
-                dispatch({
-                  type: 'AUTH_ERROR',
-                  error: new Error('Profile fetch timed out')
-                });
-              }
-            }, SAFETY_TIMEOUT);
-            
-            const profile = await fetchClientProfile(session.user.id);
-            
-            // Clear timeout
-            if (profileTimeoutId) {
-              clearTimeout(profileTimeoutId);
-              profileTimeoutId = null;
-            }
-            
-            if (mounted) {
-              dispatch({ type: 'PROFILE_FETCHED', profile });
-            }
-          } catch (profileError) {
-            console.warn('⚠️ [EMERGENCY DEBUG] Error fetching client profile during init:', profileError);
-            if (mounted) {
-              dispatch({ type: 'AUTH_ERROR', error: profileError as Error });
-            }
-          }
-        }
-      } catch (error) {
-        console.error('❌ [EMERGENCY DEBUG] Error in auth initialization:', error);
-        if (mounted) {
-          dispatch({ type: 'AUTH_ERROR', error: error as Error });
-        }
+      } else {
+        clearState();
       }
-    };
-    
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event: AuthChangeEvent, session: Session | null) => {
-        console.log('🚀 [EMERGENCY DEBUG] Auth state change event:', event);
-        
-        if (!mounted) return;
-        
-        try {
-          // Update state with session result
-          dispatch({ type: 'SESSION_CHECKED', session });
-          
-          // If we have a user, fetch their profile
-          if (session?.user) {
-            try {
-              const profile = await fetchClientProfile(session.user.id);
-              if (mounted) {
-                dispatch({ type: 'PROFILE_FETCHED', profile });
-              }
-            } catch (profileError) {
-              console.warn('⚠️ [EMERGENCY DEBUG] Error fetching client profile on auth change:', profileError);
-              if (mounted) {
-                dispatch({ type: 'AUTH_ERROR', error: profileError as Error });
-              }
-            }
-          }
-        } catch (error) {
-          console.error('❌ [EMERGENCY DEBUG] Error handling auth state change:', error);
-          if (mounted) {
-            dispatch({ type: 'AUTH_ERROR', error: error as Error });
-          }
-        }
-      }
-    );
-    
-    // Initialize
-    initializeAuth();
-    
-    // Cleanup
-    return () => {
-      console.log('🚀 [EMERGENCY DEBUG] AuthProvider cleanup');
-      mounted = false;
-      
-      if (sessionTimeoutId) {
-        clearTimeout(sessionTimeoutId);
-      }
-      
-      if (profileTimeoutId) {
-        clearTimeout(profileTimeoutId);
-      }
-      
-      subscription.unsubscribe();
-    };
+    });
+    return () => { listener.subscription?.unsubscribe(); };
+    // eslint-disable-next-line
   }, []);
-  
-  // Create context value
-  const value: AuthContextType = {
-    user,
-    userId: user?.id || null,
-    userRole,
-    clientStatus: clientProfile?.client_status || null,
-    clientProfile,
-    isLoading,
-    authInitialized,
-    refreshUserData,
-    logout,
-    authState,
-    authError,
-  };
-  
-  console.log('🚀 [EMERGENCY DEBUG] AuthProvider rendering with state:', {
-    authState,
-    hasUser: !!user,
-    userRole,
-    isLoading,
-    authInitialized
-  });
-  
+
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider
+      value={{
+        user,
+        userId: user?.id || null,
+        userRole,
+        clientProfile,
+        clientStatus: clientProfile?.client_status || null,
+        isLoading,
+        authInitialized,
+        authState,
+        authError,
+        refreshUserData,
+        logout,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
 };
 
-// Create auth hook
-export const useAuth = (): AuthContextType => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    console.error('❌ [EMERGENCY DEBUG] useAuth must be used within an AuthProvider');
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
+export function useAuth(): AuthContextType {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used within an AuthProvider');
+  return ctx;
+}
