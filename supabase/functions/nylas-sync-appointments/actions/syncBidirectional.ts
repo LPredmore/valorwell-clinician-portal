@@ -1,4 +1,3 @@
-
 import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { createEventHash, getRefreshedNylasConnection, NylasConnection } from '../utils.ts'
 
@@ -37,7 +36,7 @@ export async function syncBidirectional(supabaseClient: SupabaseClient, body: an
   }
 
   let totalCreatedLocal = 0, totalUpdatedLocal = 0, totalDeletedLocal = 0;
-  let totalCreatedRemote = 0;
+  let totalCreatedRemote = 0, totalDeletedRemote = 0; // Added totalDeletedRemote
   const errors: any[] = [];
 
   for (const rawConnection of (connections as NylasConnection[])) {
@@ -120,14 +119,59 @@ export async function syncBidirectional(supabaseClient: SupabaseClient, body: an
         }
       }
 
-      // Step 4: Reconcile Local -> Remote (Creations only)
+      // Step 4: Reconcile Local -> Remote
+      
+      // Step 4a: Handle local cancellations to be pushed to remote
+      const { data: cancelledAppointments, error: cancelledError } = await supabaseClient
+        .from('appointments')
+        .select(`id, external_calendar_mappings!inner(id, external_event_id)`)
+        .eq('clinician_id', clinicianId)
+        .eq('status', 'cancelled')
+        .eq('external_calendar_mappings.connection_id', connection.id);
+
+      if (cancelledError) {
+          console.error(`[syncBidirectional] Error fetching cancelled appointments:`, cancelledError);
+          errors.push({ type: 'local_delete_fetch', error: cancelledError.message });
+      } else {
+          for (const appointment of cancelledAppointments) {
+              const mapping = appointment.external_calendar_mappings[0];
+              if (mapping && mapping.external_event_id) {
+                  console.log(`[syncBidirectional] Deleting remote event ${mapping.external_event_id} for cancelled appointment ${appointment.id}`);
+                  
+                  const deleteResponse = await fetch(`https://api.us.nylas.com/v3/grants/${connection.id}/events/${mapping.external_event_id}`, {
+                      method: 'DELETE',
+                      headers: { 'Authorization': `Bearer ${connection.access_token}` },
+                  });
+
+                  // If OK, or if it was already gone, we can delete our mapping
+                  if (deleteResponse.ok || deleteResponse.status === 404) {
+                      const { error: deleteMappingError } = await supabaseClient
+                          .from('external_calendar_mappings')
+                          .delete()
+                          .eq('id', mapping.id);
+                      
+                      if (deleteMappingError) {
+                          errors.push({ appointment_id: appointment.id, error: `Failed to delete local mapping: ${deleteMappingError.message}` });
+                      } else {
+                          totalDeletedRemote++;
+                      }
+                  } else {
+                      const errorText = await deleteResponse.text();
+                      errors.push({ appointment_id: appointment.id, error: `Failed to delete remote event: ${errorText}` });
+                  }
+              }
+          }
+      }
+
+      // Step 4b: Handle local creations to be pushed to remote
       const { data: localAppointments, error: localApptError } = await supabaseClient
         .from('appointments')
         .select(`*, external_calendar_mappings(appointment_id)`)
         .eq('clinician_id', clinicianId)
         .is('external_calendar_mappings.appointment_id', null) // only those not yet synced
         .gte('start_at', new Date(startDate).toISOString())
-        .lte('start_at', new Date(endDate).toISOString());
+        .lte('start_at', new Date(endDate).toISOString())
+        .neq('status', 'cancelled'); // Don't sync new cancelled appointments
       
       if (localApptError) throw localApptError;
 
@@ -168,6 +212,6 @@ export async function syncBidirectional(supabaseClient: SupabaseClient, body: an
     }
   }
 
-  const summary = `Sync complete. Local: ${totalCreatedLocal} created, ${totalUpdatedLocal} updated, ${totalDeletedLocal} deleted. Remote: ${totalCreatedRemote} created.`;
+  const summary = `Sync complete. Local: ${totalCreatedLocal} created, ${totalUpdatedLocal} updated, ${totalDeletedLocal} deleted. Remote: ${totalCreatedRemote} created, ${totalDeletedRemote} deleted.`;
   return new Response(JSON.stringify({ success: true, message: summary, errors: errors.length > 0 ? errors : undefined }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 }
