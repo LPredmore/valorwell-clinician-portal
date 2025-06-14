@@ -1,4 +1,3 @@
-
 import React, { useMemo, useState } from 'react';
 import { useNylasIntegration } from '@/hooks/useNylasIntegration';
 import { useNylasEvents } from '@/hooks/useNylasEvents';
@@ -26,6 +25,7 @@ const NylasHybridCalendar: React.FC<NylasHybridCalendarProps> = ({
 }) => {
   const { connections, isLoading: isLoadingConnections, connectGoogleCalendar } = useNylasIntegration();
   const [showExternalOverlay, setShowExternalOverlay] = useState(true);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   
   // Calculate date range for fetching external events (current week)
   const startDate = useMemo(() => startOfWeek(currentDate), [currentDate]);
@@ -45,6 +45,11 @@ const NylasHybridCalendar: React.FC<NylasHybridCalendarProps> = ({
   const handleAppointmentClick = (appointment: any) => {
     console.log('Appointment clicked:', appointment);
     onEventClick?.(appointment);
+  };
+
+  const handleAvailabilityUpdated = () => {
+    console.log('Availability updated, refreshing hybrid calendar view...');
+    setRefreshTrigger(prev => prev + 1);
   };
 
   const handleConnectCalendar = async () => {
@@ -110,6 +115,8 @@ const NylasHybridCalendar: React.FC<NylasHybridCalendarProps> = ({
         userTimeZone={userTimeZone}
         onNewAppointment={handleNewAppointment}
         onAppointmentClick={handleAppointmentClick}
+        refreshTrigger={refreshTrigger}
+        onAvailabilityUpdated={handleAvailabilityUpdated}
       />
 
       {/* External Events Overlay */}
