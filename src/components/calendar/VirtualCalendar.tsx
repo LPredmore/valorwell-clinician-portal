@@ -12,6 +12,12 @@ import AvailabilityEditDialog from './AvailabilityEditDialog';
 import { AvailabilityBlock } from './availability-edit/types';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface VirtualCalendarProps {
   clinicianId: string | null;
@@ -181,94 +187,102 @@ const VirtualCalendar: React.FC<VirtualCalendarProps> = ({
       </div>
 
       {/* Week view calendar grid */}
-      <div className="border rounded-lg overflow-hidden bg-white">
-        {/* Day headers */}
-        <div className="grid grid-cols-8 bg-gray-50 border-b">
-          <div className="p-3 text-center border-r font-medium text-sm">Time</div>
-          {weekDays.map((day) => (
-            <div key={day.toISOString()} className="p-3 text-center border-r last:border-r-0">
-              <div className="font-medium text-sm">{format(day, 'EEE')}</div>
-              <div className="text-lg">{format(day, 'd')}</div>
-              <div className="text-xs text-gray-500">{format(day, 'MMM')}</div>
+      <TooltipProvider>
+        <div className="border rounded-lg overflow-hidden bg-white">
+          {/* Day headers */}
+          <div className="grid grid-cols-8 bg-gray-50 border-b">
+            <div className="p-3 text-center border-r font-medium text-sm">Time</div>
+            {weekDays.map((day) => (
+              <div key={day.toISOString()} className="p-3 text-center border-r last:border-r-0">
+                <div className="font-medium text-sm">{format(day, 'EEE')}</div>
+                <div className="text-lg">{format(day, 'd')}</div>
+                <div className="text-xs text-gray-500">{format(day, 'MMM')}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Time slots grid */}
+          {timeSlots.map((hour) => (
+            <div key={hour} className="grid grid-cols-8 border-b last:border-b-0">
+              {/* Time label */}
+              <div className="p-3 border-r bg-gray-50 text-sm font-medium text-center">
+                {format(new Date().setHours(hour, 0, 0, 0), 'h a')}
+              </div>
+              
+              {/* Day cells */}
+              {weekDays.map((day) => {
+                const dateKey = format(day, 'yyyy-MM-dd');
+                const dayAppointments = appointmentsByDate[dateKey] || [];
+                const dayAvailability = availabilityByDate[dateKey] || [];
+                
+                const hourAppointments = dayAppointments.filter(appointment => {
+                  const appointmentHour = new Date(appointment.start_at).getHours();
+                  return appointmentHour === hour;
+                });
+
+                const currentSlotTime = new Date(day);
+                currentSlotTime.setHours(hour, 0, 0, 0);
+
+                let availabilityBlockForSlot: ProcessedAvailability | null = null;
+                for (const block of dayAvailability) {
+                    const start = new Date(day);
+                    const [startH, startM] = block.start_time.split(':');
+                    start.setHours(parseInt(startH), parseInt(startM), 0, 0);
+
+                    const end = new Date(day);
+                    const [endH, endM] = block.end_time.split(':');
+                    end.setHours(parseInt(endH), parseInt(endM), 0, 0);
+                    
+                    if (currentSlotTime >= start && currentSlotTime < end) {
+                        availabilityBlockForSlot = block;
+                        break;
+                    }
+                }
+
+                return (
+                  <div 
+                    key={`${day.toISOString()}-${hour}`} 
+                    className={cn(
+                      "min-h-[60px] border-r last:border-r-0 p-1 relative hover:bg-gray-50",
+                      availabilityBlockForSlot && !hourAppointments.length && "bg-green-50 cursor-pointer"
+                    )}
+                    onClick={() => {
+                      if (!hourAppointments.length) {
+                         if (availabilityBlockForSlot) {
+                           handleAvailabilityClick(availabilityBlockForSlot, day);
+                         } else {
+                           handleTimeSlotClick(day, hour)
+                         }
+                      }
+                    }}
+                  >
+                    {hourAppointments.map((appointment) => (
+                      <div key={appointment.id} className="relative mb-1">
+                        <InternalAppointmentCard
+                          appointment={appointment}
+                          onClick={() => onAppointmentClick?.(appointment)}
+                        />
+                        {syncedAppointmentIds.has(appointment.id) && (
+                          <Tooltip>
+                            <TooltipTrigger className="absolute top-1 right-1">
+                              <Cloud
+                                className="h-3 w-3 text-gray-400"
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Synced with external calendar</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
             </div>
           ))}
         </div>
-
-        {/* Time slots grid */}
-        {timeSlots.map((hour) => (
-          <div key={hour} className="grid grid-cols-8 border-b last:border-b-0">
-            {/* Time label */}
-            <div className="p-3 border-r bg-gray-50 text-sm font-medium text-center">
-              {format(new Date().setHours(hour, 0, 0, 0), 'h a')}
-            </div>
-            
-            {/* Day cells */}
-            {weekDays.map((day) => {
-              const dateKey = format(day, 'yyyy-MM-dd');
-              const dayAppointments = appointmentsByDate[dateKey] || [];
-              const dayAvailability = availabilityByDate[dateKey] || [];
-              
-              const hourAppointments = dayAppointments.filter(appointment => {
-                const appointmentHour = new Date(appointment.start_at).getHours();
-                return appointmentHour === hour;
-              });
-
-              const currentSlotTime = new Date(day);
-              currentSlotTime.setHours(hour, 0, 0, 0);
-
-              let availabilityBlockForSlot: ProcessedAvailability | null = null;
-              for (const block of dayAvailability) {
-                  const start = new Date(day);
-                  const [startH, startM] = block.start_time.split(':');
-                  start.setHours(parseInt(startH), parseInt(startM), 0, 0);
-
-                  const end = new Date(day);
-                  const [endH, endM] = block.end_time.split(':');
-                  end.setHours(parseInt(endH), parseInt(endM), 0, 0);
-                  
-                  if (currentSlotTime >= start && currentSlotTime < end) {
-                      availabilityBlockForSlot = block;
-                      break;
-                  }
-              }
-
-              return (
-                <div 
-                  key={`${day.toISOString()}-${hour}`} 
-                  className={cn(
-                    "min-h-[60px] border-r last:border-r-0 p-1 relative hover:bg-gray-50",
-                    availabilityBlockForSlot && !hourAppointments.length && "bg-green-50 cursor-pointer"
-                  )}
-                  onClick={() => {
-                    if (!hourAppointments.length) {
-                       if (availabilityBlockForSlot) {
-                         handleAvailabilityClick(availabilityBlockForSlot, day);
-                       } else {
-                         handleTimeSlotClick(day, hour)
-                       }
-                    }
-                  }}
-                >
-                  {hourAppointments.map((appointment) => (
-                    <div key={appointment.id} className="relative mb-1">
-                      <InternalAppointmentCard
-                        appointment={appointment}
-                        onClick={() => onAppointmentClick?.(appointment)}
-                      />
-                      {syncedAppointmentIds.has(appointment.id) && (
-                        <Cloud
-                          className="absolute top-1 right-1 h-3 w-3 text-gray-400"
-                          title="Synced with external calendar"
-                        />
-                      )}
-                    </div>
-                  ))}
-                </div>
-              );
-            })}
-          </div>
-        ))}
-      </div>
+      </TooltipProvider>
 
       {/* Appointments summary */}
       <div className="text-sm text-gray-600">
