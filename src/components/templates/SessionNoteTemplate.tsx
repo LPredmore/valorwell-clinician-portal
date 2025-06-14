@@ -2,7 +2,7 @@
 import React, { useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { X, FileText } from 'lucide-react';
-import { ClientDetails, SessionNoteTemplateProps } from '@/types/client';
+import { SessionNoteTemplateProps } from '@/types/client';
 import { useSessionNoteForm } from './sessionNote/useSessionNoteForm';
 import { ClientInfoSection } from './sessionNote/ClientInfoSection';
 import { MentalStatusSection } from './sessionNote/MentalStatusSection';

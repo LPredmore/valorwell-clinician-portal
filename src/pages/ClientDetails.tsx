@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase, parseDateString, formatDateForDB } from "@/integrations/supabase/client";
@@ -20,7 +21,7 @@ import PersonalInfoTab from "@/components/client/PersonalInfoTab";
 import InsuranceTab from "@/components/client/InsuranceTab";
 import TreatmentTab from "@/components/client/TreatmentTab";
 import DocumentationTab from "@/components/client/DocumentationTab";
-import { ClientDetails as ClientDetailsType, Clinician } from "@/types/client";
+import { Client as ClientDetailsType, Clinician } from "@/types/client";
 import { useAuth } from "@/context/AuthProvider";
 
 const ClientDetails = () => {

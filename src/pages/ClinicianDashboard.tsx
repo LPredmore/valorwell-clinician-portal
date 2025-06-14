@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/context/AuthProvider';
@@ -11,7 +12,7 @@ import { useAppointments } from '@/hooks/useAppointments';
 import { getClinicianTimeZone } from '@/hooks/useClinicianData';
 import { SessionDidNotOccurDialog } from '@/components/dashboard/SessionDidNotOccurDialog';
 import { Appointment } from '@/types/appointment';
-import { ClientDetails } from '@/types/client';
+import { Client } from '@/types/client';
 
 const ClinicianDashboard = () => {
   const { userId } = useAuth();
@@ -133,7 +134,7 @@ const ClinicianDashboard = () => {
   };
 
   // Create a type adapter function to ensure clientData is handled properly by SessionNoteTemplate
-  const prepareClientDataForTemplate = (): ClientDetails | null => {
+  const prepareClientDataForTemplate = (): Client | null => {
     if (!clientData) return null;
     
     // Create a ClientDetails object with the available data

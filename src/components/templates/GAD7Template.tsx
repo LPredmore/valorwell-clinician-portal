@@ -1,15 +1,14 @@
-
 import React, { useState } from 'react';
 import { X, CheckCircle } from 'lucide-react';
-import { ClientDetails } from '@/types/client';
+import { Client } from '@/types/client';
 
 interface GAD7TemplateProps {
   onClose: () => void;
   clinicianName: string;
-  clientDetails?: ClientDetails;
+  clientData?: Client;
 }
 
-const GAD7Template = ({ onClose, clinicianName, clientDetails }: GAD7TemplateProps) => {
+const GAD7Template = ({ onClose, clinicianName, clientData }: GAD7TemplateProps) => {
   const [responses, setResponses] = useState<number[]>(Array(7).fill(0));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
@@ -91,7 +90,7 @@ const GAD7Template = ({ onClose, clinicianName, clientDetails }: GAD7TemplatePro
           <div>
             <label className="block text-sm font-medium text-gray-700">Patient Name</label>
             <p className="p-2 border rounded-md bg-gray-50">
-              {clientDetails ? `${clientDetails.client_first_name} ${clientDetails.client_last_name}` : "Not specified"}
+              {clientData ? `${clientData.client_first_name} ${clientData.client_last_name}` : "Not specified"}
             </p>
           </div>
           <div>

@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import {
   Dialog,
@@ -11,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { ClientDetails } from "@/types/client";
+import { Client } from "@/types/client";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Form, FormField, FormItem, FormControl } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
@@ -23,7 +24,7 @@ import { savePHQ9Assessment } from "@/integrations/supabase/client";
 interface PHQ9TemplateProps {
   onClose: () => void;
   clinicianName: string;
-  clientData?: ClientDetails | null;
+  clientData?: Client | null;
   onComplete?: () => void; // Callback for when assessment is completed
 }
 
