@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { format, addDays, isSameDay, parseISO } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
@@ -7,7 +6,7 @@ import { getUserTimeZone } from '@/utils/timeZoneUtils';
 import { TimeZoneService } from '@/utils/timeZoneService';
 import { DateTime } from 'luxon';
 import { useNavigate } from 'react-router-dom';
-import { useUser } from '@/context/UserContext';
+import { useAuth } from '@/context/AuthProvider';
 
 import { 
   Dialog, 
@@ -145,9 +144,8 @@ export const AppointmentBookingDialog: React.FC<AppointmentBookingDialogProps> =
   const { toast } = useToast();
   const navigate = useNavigate();
   
-  const { userId, isLoading: userIsLoading, authInitialized } = useUser();
+  const { userId, isLoading: authLoading, authInitialized } = useAuth();
   const [authError, setAuthError] = useState<string | null>(null);
-  const [loadingTimeout, setLoadingTimeout] = useState(false);
   
   const clientTimeZone = useMemo(() => {
     return TimeZoneService.ensureIANATimeZone(
@@ -383,31 +381,31 @@ export const AppointmentBookingDialog: React.FC<AppointmentBookingDialogProps> =
 
   // Fetch settings once when dialog opens
   useEffect(() => {
-    if (open && clinicianId && !userIsLoading) {
+    if (open && clinicianId && !authLoading) {
       fetchAvailabilitySettings();
     }
-  }, [open, clinicianId, fetchAvailabilitySettings, userIsLoading]);
+  }, [open, clinicianId, fetchAvailabilitySettings, authLoading]);
 
   useEffect(() => {
-    if (open && selectedDate && clinicianId && !userIsLoading && authInitialized) {
+    if (open && selectedDate && clinicianId && !authLoading && authInitialized) {
       console.log("[BookingDialog] Auth initialized and not loading, fetching availability blocks");
       fetchAvailabilityBlocks();
     }
-  }, [open, selectedDate, clinicianId, fetchAvailabilityBlocks, userIsLoading, authInitialized]);
+  }, [open, selectedDate, clinicianId, fetchAvailabilityBlocks, authLoading, authInitialized]);
 
   useEffect(() => {
-    if (open && selectedDate && clinicianId && (clientId || userId) && !userIsLoading && authInitialized) {
+    if (open && selectedDate && clinicianId && (clientId || userId) && !authLoading && authInitialized) {
       console.log("[BookingDialog] Auth initialized and not loading, fetching existing appointments");
       fetchExistingAppointments();
     }
-  }, [open, selectedDate, clinicianId, userId, clientId, fetchExistingAppointments, userIsLoading, authInitialized]);
+  }, [open, selectedDate, clinicianId, userId, clientId, fetchExistingAppointments, authLoading, authInitialized]);
 
   useEffect(() => {
-    if (open && selectedDate && !userIsLoading && authInitialized) {
+    if (open && selectedDate && !authLoading && authInitialized) {
       console.log("[BookingDialog] Auth initialized and not loading, generating time slots");
       generateTimeSlots();
     }
-  }, [open, selectedDate, availabilityBlocks, existingAppointments, generateTimeSlots, userIsLoading, authInitialized]);
+  }, [open, selectedDate, availabilityBlocks, existingAppointments, generateTimeSlots, authLoading, authInitialized]);
 
   useEffect(() => {
     if (!open) {
@@ -591,15 +589,10 @@ export const AppointmentBookingDialog: React.FC<AppointmentBookingDialogProps> =
               <div className="flex flex-col justify-center items-center h-40">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mb-2"></div>
                 <p className="text-sm text-gray-600">
-                  {userIsLoading || !authInitialized
+                  {authLoading || !authInitialized
                     ? "Initializing authentication..."
                     : "Loading available times..."}
                 </p>
-                {loadingTimeout && (
-                  <p className="text-xs text-amber-600 mt-2">
-                    This is taking longer than expected...
-                  </p>
-                )}
               </div>
             )}
             

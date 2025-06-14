@@ -8,7 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Info, Loader2 } from 'lucide-react'; // Added Loader2 for visual feedback
 import { useNavigate } from 'react-router-dom';
-import { useUser } from '@/context/UserContext'; // Import useUser
+import { useAuth } from '@/context/AuthProvider'; // Import useAuth
 
 interface Client {
   client_state: string | null;
@@ -34,9 +34,15 @@ interface Therapist {
 const TherapistSelection = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { user, userId: authUserId, isLoading: isUserContextLoading, authInitialized, clientProfile: userClientProfile, refreshUserData } = useUser(); // Use UserContext with refreshUserData
+  const { 
+    user, 
+    userId, 
+    isLoading: isAuthLoading, 
+    authInitialized, 
+    clientProfile, 
+    refreshUserProfile 
+  } = useAuth();
   const [authError, setAuthError] = useState<string | null>(null);
-  const [loadingTimeout, setLoadingTimeout] = useState(false);
 
   const [loadingTherapists, setLoadingTherapists] = useState(true); // For therapist list
   const [clientData, setClientData] = useState<Client | null>(null);
@@ -45,25 +51,11 @@ const TherapistSelection = () => {
   const [filteringApplied, setFilteringApplied] = useState(false); // To track if filters were active
   const [selectingTherapistId, setSelectingTherapistId] = useState<string | null>(null);
 
-
-  // Add timeout mechanism to prevent indefinite loading
+  // Effect to handle auth errors
   useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
-    
-    if ((isUserContextLoading || !authInitialized) && !authError) {
-      console.log("[TherapistSelection] Starting loading timeout check");
-      timeoutId = setTimeout(() => {
-        console.log("[TherapistSelection] Loading timeout reached after 10 seconds");
-        setLoadingTimeout(true);
-        toast({
-          title: "Loading Delay",
-          description: "User data is taking longer than expected to load.",
-          variant: "default"
-        });
-      }, 10000); // 10 seconds timeout
-      
-      // Add a second timeout for critical failure
-      const criticalTimeoutId = setTimeout(() => {
+    let criticalTimeoutId: NodeJS.Timeout;
+    if (isAuthLoading) {
+      criticalTimeoutId = setTimeout(() => {
         console.log("[TherapistSelection] Critical loading timeout reached after 30 seconds");
         setAuthError("Authentication process is taking too long. Please refresh the page.");
         toast({
@@ -72,50 +64,41 @@ const TherapistSelection = () => {
           variant: "destructive"
         });
       }, 30000); // 30 seconds for critical timeout
-      
-      return () => {
-        clearTimeout(timeoutId);
-        clearTimeout(criticalTimeoutId);
-      };
     }
-    
     return () => {
-      if (timeoutId) clearTimeout(timeoutId);
+      if (criticalTimeoutId) clearTimeout(criticalTimeoutId);
     };
-  }, [isUserContextLoading, authInitialized, authError, toast]);
+  }, [isAuthLoading, toast]);
 
-  // Effect to set clientData from UserContext once available
+
+  // Effect to set clientData from AuthProvider once available
   useEffect(() => {
-    if (!isUserContextLoading && authInitialized && authUserId) {
-      // Add the requested debug logging
-      console.log('[TherapistSelection DEBUG] userClientProfile from UserContext:', JSON.stringify(userClientProfile, null, 2));
+    if (!isAuthLoading && authInitialized && userId) {
+      console.log('[TherapistSelection DEBUG] clientProfile from AuthProvider:', JSON.stringify(clientProfile, null, 2));
       
-      if (userClientProfile) {
-        console.log(`[TherapistSelection DEBUG] userClientProfile.client_age: ${userClientProfile.client_age} (Type: ${typeof userClientProfile.client_age})`);
-        console.log(`[TherapistSelection DEBUG] userClientProfile.client_state: ${userClientProfile.client_state} (Type: ${typeof userClientProfile.client_state})`);
+      if (clientProfile) {
+        console.log(`[TherapistSelection DEBUG] clientProfile.client_age: ${clientProfile.client_age} (Type: ${typeof clientProfile.client_age})`);
+        console.log(`[TherapistSelection DEBUG] clientProfile.client_state: ${clientProfile.client_state} (Type: ${typeof clientProfile.client_state})`);
         
         setClientData({
-          client_state: userClientProfile.client_state || null,
-          client_age: userClientProfile.client_age === undefined || userClientProfile.client_age === null ? null : Number(userClientProfile.client_age), // Ensure age is number or null
+          client_state: clientProfile.client_state || null,
+          client_age: clientProfile.client_age === undefined || clientProfile.client_age === null ? null : Number(clientProfile.client_age), // Ensure age is number or null
         });
         
-        console.log('[TherapistSelection] Using clientProfile from UserContext:', JSON.stringify({
-          client_state: userClientProfile.client_state,
-          client_age: userClientProfile.client_age
+        console.log('[TherapistSelection] Using clientProfile from AuthProvider:', JSON.stringify({
+          client_state: clientProfile.client_state,
+          client_age: clientProfile.client_age
         }, null, 2));
       } else {
-        // This case might indicate profile setup isn't complete or UserContext isn't fully synced
-        console.warn('[TherapistSelection DEBUG] userClientProfile from UserContext is null/undefined.');
+        console.warn('[TherapistSelection DEBUG] clientProfile from AuthProvider is null/undefined.');
         toast({
             title: "Profile Incomplete",
             description: "Please complete your profile setup to select a therapist.",
             variant: "destructive",
         });
-        // Optionally navigate to profile setup if status indicates 'New'
-        // if (userClientProfile?.client_status === 'New') navigate('/profile-setup');
         setClientData(null); // Ensure clientData is null if no profile
       }
-    } else if (!isUserContextLoading && !authUserId) {
+    } else if (!isAuthLoading && !userId) {
         console.log("[TherapistSelection] No authenticated user. Redirecting to login.");
         toast({
             title: "Authentication Required",
@@ -124,15 +107,13 @@ const TherapistSelection = () => {
         });
         navigate('/login');
     }
-  }, [authUserId, isUserContextLoading, userClientProfile, navigate, toast]);
+  }, [userId, isAuthLoading, authInitialized, clientProfile, navigate, toast]);
 
 
   // Effect to fetch therapists and apply filters
   useEffect(() => {
-    // Only fetch therapists if clientData has been determined (even if null, indicating no specific filters apply)
-    // and user context is no longer loading.
-    if (isUserContextLoading) {
-        console.log("[TherapistSelection] Waiting for UserContext to load before fetching therapists.");
+    if (isAuthLoading) {
+        console.log("[TherapistSelection] Waiting for AuthProvider to load before fetching therapists.");
         return;
     }
 
@@ -239,15 +220,15 @@ const TherapistSelection = () => {
       }
     };
 
-    // Only run if UserContext is initialized and we have clientData (or know it's null)
-    if (!isUserContextLoading) {
+    // Only run if AuthProvider is initialized and we have clientData (or know it's null)
+    if (!isAuthLoading) {
         fetchAndFilterTherapists();
     }
 
-  }, [isUserContextLoading, clientData, toast]); // Removed filteringEnabled as it was causing loops
+  }, [isAuthLoading, clientData, toast]); // Removed filteringEnabled as it was causing loops
 
   const handleSelectTherapist = async (therapist: Therapist) => {
-    if (!authUserId) {
+    if (!userId) {
       toast({ title: "Authentication required", description: "Please log in to select a therapist", variant: "destructive" });
       navigate('/login');
       return;
@@ -257,7 +238,7 @@ const TherapistSelection = () => {
       const { error } = await supabase
         .from('clients')
         .update({ client_assigned_therapist: therapist.id, client_status: 'Therapist Selected' }) // Optionally update status
-        .eq('id', authUserId);
+        .eq('user_id', userId); // Corrected to use user_id which is the FK to auth.users
 
       if (error) {
         console.error("Error selecting therapist:", error);
@@ -271,11 +252,11 @@ const TherapistSelection = () => {
       });
 
       // Refresh user context to get updated client_status
-      if (refreshUserData) {
+      if (refreshUserProfile) {
         console.log("[TherapistSelection] Refreshing user data after therapist selection");
-        await refreshUserData();
+        await refreshUserProfile();
       } else {
-        console.warn("[TherapistSelection] refreshUserData function not available from UserContext");
+        console.warn("[TherapistSelection] refreshUserProfile function not available from AuthProvider");
       }
 
       navigate('/patient-dashboard'); // Or to a confirmation page
@@ -291,22 +272,17 @@ const TherapistSelection = () => {
     return therapist.clinician_professional_name || `${therapist.clinician_first_name || ''} ${therapist.clinician_last_name || ''}`.trim();
   };
 
-  if (isUserContextLoading || !authInitialized) {
+  if (isAuthLoading || !authInitialized) {
     return (
       <Layout>
         <div className="container max-w-6xl mx-auto py-6 flex justify-center items-center min-h-[calc(100vh-200px)]">
-          <Loader2 className="h-12 w-12 animate-spin text-valorwell-600 mb-4" />
+          <Loader2 className="h-12 w-12 animate-spin text-valorwell-600 mr-4" />
           <div className="text-center">
-            <p className="text-lg text-valorwell-600 mb-2">
+            <p className="text-lg text-valorwell-600">
               {!authInitialized
                 ? "Initializing authentication..."
                 : "Loading user information..."}
             </p>
-            {loadingTimeout && !authError && (
-              <p className="text-sm text-amber-600">
-                This is taking longer than expected. Please wait...
-              </p>
-            )}
           </div>
         </div>
       </Layout>
@@ -446,7 +422,7 @@ const TherapistSelection = () => {
                                     if (!state || !clientData.client_state) return false;
                                     const stateNorm = state.toLowerCase().trim();
                                     const clientStateNorm = clientData.client_state.toLowerCase().trim();
-                                    return stateNorm.includes(clientStateNorm) || clientStateNorm.includes(stateNorm);
+                                    return stateNorm.includes(clientStateNorm) || clientStateNorm.includes(clientStateNorm);
                                   }
                                 ) && (
                                   <div className="mt-4">

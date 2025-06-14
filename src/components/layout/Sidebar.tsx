@@ -14,7 +14,6 @@ import {
   User
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthProvider';
-import { useState, useEffect } from 'react';
 
 const Sidebar = () => {
   const location = useLocation();
@@ -22,26 +21,6 @@ const Sidebar = () => {
   const { userRole, isLoading, userId, authInitialized } = useAuth();
   const isClinician = userRole === 'clinician';
   const isAdmin = userRole === 'admin';
-  const [loadingTimeout, setLoadingTimeout] = useState(false);
-  
-  // Add timeout mechanism to prevent indefinite loading
-  useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
-    
-    if (isLoading || !authInitialized) {
-      console.log("[Sidebar] Starting loading timeout check");
-      timeoutId = setTimeout(() => {
-        console.log("[Sidebar] Loading timeout reached after 10 seconds");
-        setLoadingTimeout(true);
-      }, 10000); // 10 seconds timeout
-    }
-    
-    return () => {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-    };
-  }, [isLoading, authInitialized]);
   
   const isActive = (path: string) => {
     return currentPath === path;
@@ -51,9 +30,7 @@ const Sidebar = () => {
     return (
       <div className="w-[220px] min-h-screen border-r bg-white flex flex-col items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-valorwell-600 mb-4"></div>
-        <p className="text-sm text-valorwell-600">
-          {loadingTimeout ? "Taking longer than expected..." : "Loading..."}
-        </p>
+        <p className="text-sm text-valorwell-600">Loading...</p>
       </div>
     );
   }
