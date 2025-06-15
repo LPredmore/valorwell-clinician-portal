@@ -64,7 +64,7 @@ export const useNylasAuthFlow = ({
     try {
       setIsConnecting(true);
       setLastError(null);
-      console.log('[useNylasIntegration] Initializing Google Calendar connection via Nylas');
+      console.log('[useNylasIntegration] Step 1: Initializing Google Calendar connection.');
 
       let timeoutId: NodeJS.Timeout;
       const timeoutPromise = new Promise<{data: null, error: DetailedError}>((_, reject) => {
@@ -82,37 +82,56 @@ export const useNylasAuthFlow = ({
       if (error) throw error;
 
       if (data?.authUrl) {
-        console.log('[useNylasIntegration] Opening Google OAuth window via Nylas');
+        console.log('[useNylasIntegration] Step 2: Received authorization URL:', data.authUrl);
+        console.log('[useNylasIntegration] Step 3: Attempting to open popup window.');
         const popup = window.open(data.authUrl, 'google-calendar-auth', 'width=500,height=600,scrollbars=yes,resizable=yes');
-        if (!popup) {
-           throw new Error('Popup blocked');
-        }
-        const checkClosed = setInterval(() => {
-          try {
-            if (popup?.closed) {
-              clearInterval(checkClosed);
-              setTimeout(() => {
-                if (isConnecting) {
-                  setIsConnecting(false);
-                  if (!connections.some(conn => conn.provider === 'google')) {
-                    toast({ title: 'Connection Cancelled', description: 'Calendar connection was cancelled or unsuccessful', variant: 'default' });
+        
+        if (popup) {
+          console.log('[useNylasIntegration] Step 4: Popup window opened successfully. Monitoring for close.');
+          const checkClosed = setInterval(() => {
+            try {
+              if (popup?.closed) {
+                clearInterval(checkClosed);
+                console.log('[useNylasIntegration] Popup closed.');
+                setTimeout(() => {
+                  if (isConnecting) {
+                    setIsConnecting(false);
+                    if (!connections.some(conn => conn.provider === 'google')) {
+                       console.log('[useNylasIntegration] Connection flow ended without a new connection being established.');
+                       toast({ title: 'Connection Incomplete', description: 'The calendar connection process was closed before completion.', variant: 'default' });
+                    }
                   }
-                }
-              }, 1000);
+                }, 1500);
+              }
+            } catch (e) {
+              console.error('[useNylasIntegration] Error checking popup state (this can happen with cross-origin popups and is often safe to ignore):', e);
+              clearInterval(checkClosed);
             }
-          } catch (e) {
-            console.error('[useNylasIntegration] Error checking popup state:', e);
-            clearInterval(checkClosed);
-            setIsConnecting(false);
-          }
-        }, 1000);
+          }, 1000);
+        } else {
+          console.error('[useNylasIntegration] Step 4 FAILED: Popup was blocked by the browser.');
+          throw new Error('Your browser blocked the popup window. Please allow popups for this site and try again.');
+        }
       } else {
-        throw new Error('No authorization URL received');
+        throw new Error('No authorization URL was received from the server. Please check the backend configuration.');
       }
     } catch (error: any) {
-      const categorizedError = categorizeError(error.message.includes('Popup blocked') ? { type: NylasErrorType.OAUTH, message: 'Popup blocked', details: 'Browser blocked the popup window', actionRequired: 'Allow popups for this site and try again', retryable: true } : error, 'OAuth initialization');
+      console.error('[useNylasIntegration] A critical error occurred during the connection process:', error);
+      const categorizedError = categorizeError(error, 'OAuth initialization');
+      
+      if (error.message?.toLowerCase().includes('popup')) {
+        categorizedError.message = 'Popup Blocked';
+        categorizedError.details = 'Your browser is blocking the Google authentication popup.';
+        categorizedError.actionRequired = 'Please allow popups for this site in your browser settings and try again.';
+      }
+
       setLastError(categorizedError);
-      toast({ title: 'Connection Failed', description: categorizedError.message, variant: 'destructive' });
+      toast({ 
+        title: categorizedError.message, 
+        description: categorizedError.actionRequired || categorizedError.details, 
+        variant: 'destructive',
+        duration: 9000,
+      });
       setIsConnecting(false);
     }
   }, [authInitialized, userId, isConnecting, connections, categorizeError, toast, setLastError, clearError]);
