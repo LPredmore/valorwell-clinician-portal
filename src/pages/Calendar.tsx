@@ -10,6 +10,7 @@ import { ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import { addWeeks, subWeeks, startOfWeek, endOfWeek } from "date-fns";
 import ClinicianAvailabilityPanel from "../components/calendar/ClinicianAvailabilityPanel";
 import SchedulerManagementPanel from "../components/calendar/SchedulerManagementPanel";
+import CalendarConnectionsPanel from "../components/calendar/CalendarConnectionsPanel";
 import { useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
@@ -143,6 +144,7 @@ const Calendar = () => {
           </ErrorBoundary>
         </div>
         <div className="space-y-6">
+          <CalendarConnectionsPanel />
           <ClinicianAvailabilityPanel
             clinicianId={userId}
             onAvailabilityUpdated={handleAvailabilityUpdated}
