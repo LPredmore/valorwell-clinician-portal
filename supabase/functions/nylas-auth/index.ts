@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -14,6 +15,14 @@ serve(async (req) => {
   try {
     console.log('[nylas-auth] Request received:', req.method, req.url)
 
+    const requestOrigin = req.headers.get('origin');
+    if (!requestOrigin) {
+      // This should not happen in a browser context, but handle it just in case
+      return new Response(JSON.stringify({ error: 'Missing origin header' }), { status: 400, headers: corsHeaders });
+    }
+    const nylasRedirectUri = `${requestOrigin}/nylas-oauth-callback`;
+
+
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -29,7 +38,6 @@ serve(async (req) => {
     const nylasClientSecret = Deno.env.get('NYLAS_CLIENT_SECRET')
     const nylasApiKey = Deno.env.get('NYLAS_API_KEY')
     const nylasConnectorId = Deno.env.get('NYLAS_CONNECTOR_ID')
-    const nylasRedirectUri = Deno.env.get('NYLAS_REDIRECT_URI') || 'https://ehr.valorwell.org/nylas-oauth-callback'
 
     const { action, code, state, connectionId } = await req.json()
     console.log('[nylas-auth] Action:', action)

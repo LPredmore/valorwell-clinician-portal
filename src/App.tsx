@@ -1,4 +1,3 @@
-
 import React, { lazy, Suspense, useState, useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
@@ -11,6 +10,8 @@ const LazyIndex = lazy(() => import("./pages/Index"));
 const LazyCalendar = lazy(() => import("./pages/Calendar"));
 const LazyLogin = lazy(() => import("./pages/Login"));
 const LazyNotFound = lazy(() => import("./pages/NotFound"));
+const LazyNylasCallback = lazy(() => import("./pages/NylasCallback"));
+const LazyNylasOAuthCallback = lazy(() => import("./pages/NylasOAuthCallback"));
 
 // Component to display when environment variables are missing
 const ConfigurationErrorComponent = ({ errors }: { errors: Record<string, string> }) => (
@@ -190,6 +191,22 @@ const App = () => {
                     fallback={<ChunkErrorComponent onRetry={handleRetry} />}
                   >
                     <LazyLogin />
+                  </ErrorBoundary>
+                } />
+                <Route path="/nylas-callback" element={
+                  <ErrorBoundary
+                    componentName="NylasCallback"
+                    fallback={<ChunkErrorComponent onRetry={handleRetry} />}
+                  >
+                    <LazyNylasCallback />
+                  </ErrorBoundary>
+                } />
+                <Route path="/nylas-oauth-callback" element={
+                  <ErrorBoundary
+                    componentName="NylasOAuthCallback"
+                    fallback={<ChunkErrorComponent onRetry={handleRetry} />}
+                  >
+                    <LazyNylasOAuthCallback />
                   </ErrorBoundary>
                 } />
                 <Route path="*" element={
