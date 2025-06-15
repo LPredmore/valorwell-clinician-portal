@@ -59,7 +59,7 @@ export const useNylasConnections = ({
       const result = await Promise.race([
         supabase
           .from('nylas_connections')
-          .select('id, email, provider, is_active, created_at, calendar_ids, connector_id, grant_status, scopes, last_sync_at, last_error, sync_state')
+          .select('id, email, provider, is_active, created_at, calendar_ids, connector_id, grant_status, scopes, last_sync_at')
           .eq('is_active', true)
           .order('created_at', { ascending: false }),
         timeoutPromise

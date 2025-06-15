@@ -1,4 +1,3 @@
-
 /**
  * Interface for Nylas calendar connections
  */
@@ -13,8 +12,6 @@ export interface NylasConnection {
   grant_status?: string;
   scopes?: string[];
   last_sync_at?: string;
-  last_error?: string;
-  sync_state?: 'running' | 'stopped' | 'error';
 }
 
 /**
@@ -42,4 +39,3 @@ export interface DetailedError {
   retryable: boolean;
   originalError?: any;
 }
-
