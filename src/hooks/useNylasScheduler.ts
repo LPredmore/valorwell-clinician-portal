@@ -35,9 +35,10 @@ export const useNylasScheduler = (clinicianId: string | null) => {
         .select('*')
         .eq('clinician_id', clinicianId)
         .eq('is_active', true)
-        .single();
+        .limit(1)
+        .maybeSingle();
 
-      if (error && error.code !== 'PGRST116') {
+      if (error) {
         console.error('[useNylasScheduler] Database error:', error);
         if (error.code === 'PGRST301' || error.message?.includes('permission denied')) {
           toast({
