@@ -1,40 +1,31 @@
+
 import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { createEventHash, getRefreshedNylasConnection, NylasConnection } from '../utils.ts'
+import { getRefreshedNylasConnection, NylasConnection } from '../utils.ts'
+import { reconcileRemoteToLocal } from './reconcileRemoteToLocal.ts'
+import { reconcileLocalToRemote } from './reconcileLocalToRemote.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Helper to create a standardized object from a local appointment for consistent hashing
-function createStandardizedEventObject(appointment: any): any {
-  return {
-    title: `Appointment: ${appointment.type}`,
-    description: appointment.notes || '',
-    when: {
-      start_time: Math.floor(new Date(appointment.start_at).getTime() / 1000),
-      end_time: Math.floor(new Date(appointment.end_at).getTime() / 1000),
-    },
-    // We don't include participants here for hash comparison to avoid mismatches
-    // based on data not stored locally or differences in participant lists.
-  };
-}
-
-
 export async function syncBidirectional(supabaseClient: SupabaseClient, body: any): Promise<Response> {
   const { clinicianId, startDate, endDate } = body;
-  console.log(`[syncBidirectional] Bidirectional sync started for clinician: ${clinicianId}`);
+  const logPrefix = `[SyncService][Clinician:${clinicianId}]`;
+  console.log(`${logPrefix} Bidirectional sync triggered for period: ${startDate} to ${endDate}`);
+
   if (!clinicianId || !startDate || !endDate) {
     return new Response(
       JSON.stringify({ 
         error: 'Missing parameters',
         code: 'MISSING_PARAMS',
-        details: 'clinicianId, startDate, and endDate are required for bidirectional sync.'
+        details: 'clinicianId, startDate, and endDate are required.'
       }),
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
   
+  // 1. Fetch active connections
   const { data: connections, error: connectionsError } = await supabaseClient
     .from('nylas_connections')
     .select('*')
@@ -42,24 +33,30 @@ export async function syncBidirectional(supabaseClient: SupabaseClient, body: an
     .eq('is_active', true);
 
   if (connectionsError) {
-    console.error('[syncBidirectional] DB error fetching connections:', connectionsError);
+    console.error(`${logPrefix} DB error fetching connections:`, connectionsError);
     return new Response(JSON.stringify({ error: 'Failed to fetch connections' }), { status: 500 });
   }
 
   if (!connections || connections.length === 0) {
+    console.log(`${logPrefix} No active connections to sync.`);
     return new Response(JSON.stringify({ success: true, message: "No active connections to sync." }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
+  console.log(`${logPrefix} Found ${connections.length} active connections.`);
 
+  // 2. Initialize aggregate statistics and errors
   let totalCreatedLocal = 0, totalUpdatedLocal = 0, totalDeletedLocal = 0;
   let totalCreatedRemote = 0, totalUpdatedRemote = 0, totalDeletedRemote = 0;
-  const errors: any[] = [];
+  const allErrors: any[] = [];
 
+  // 3. Process each connection sequentially
   for (const rawConnection of (connections as NylasConnection[])) {
+    const connLogPrefix = `${logPrefix}[Conn:${rawConnection.id}]`;
     try {
+      // 3a. Refresh connection token
       const connection = await getRefreshedNylasConnection(rawConnection, supabaseClient);
-      console.log(`[syncBidirectional] Processing connection ${connection.id} for clinician ${clinicianId}`);
+      console.log(`${connLogPrefix} Processing connection for ${connection.email}`);
       
-      // Step 1: Fetch Remote Events from Nylas
+      // 3b. Fetch all remote events for the time range
       const eventsUrl = new URL(`https://api.us.nylas.com/v3/grants/${connection.id}/events`);
       eventsUrl.searchParams.set('start', (new Date(startDate).getTime() / 1000).toString());
       eventsUrl.searchParams.set('end', (new Date(endDate).getTime() / 1000).toString());
@@ -73,263 +70,45 @@ export async function syncBidirectional(supabaseClient: SupabaseClient, body: an
       }
       const { data: nylasEvents } = await eventsResponse.json();
       const nylasEventIds = new Set(nylasEvents.map((e: any) => e.id));
-      console.log(`[syncBidirectional] Found ${nylasEvents.length} events in external calendar.`);
+      console.log(`${connLogPrefix} Found ${nylasEvents.length} events in external calendar.`);
 
-      // Step 2: Fetch Local Data
-      const { data: existingMappings, error: mappingError } = await supabaseClient
-        .from('external_calendar_mappings')
-        .select('*, appointments(id, start_at, end_at, notes, status)')
-        .eq('connection_id', connection.id);
+      // 3c. Sync remote changes to local database
+      const remoteToLocalResult = await reconcileRemoteToLocal(supabaseClient, connection, nylasEvents, clinicianId, startDate, endDate);
+      totalCreatedLocal += remoteToLocalResult.created;
+      totalUpdatedLocal += remoteToLocalResult.updated;
+      totalDeletedLocal += remoteToLocalResult.deleted;
+      allErrors.push(...remoteToLocalResult.errors.map(e => ({ ...e, connection_id: connection.id, direction: 'remote->local' })));
 
-      if (mappingError) throw mappingError;
-      const mappingsByExternalId = new Map(existingMappings.map((m: any) => [m.external_event_id, m]));
-
-      // Step 3: Reconcile Remote -> Local
-      for (const event of nylasEvents) {
-        const eventHash = createEventHash(event);
-        const existingMapping = mappingsByExternalId.get(event.id);
-
-        if (existingMapping) { // Update existing
-          if (existingMapping.last_sync_hash !== eventHash) {
-            console.log(`[syncBidirectional] Remote changes detected for event ${event.id}. Syncing to local appointment ${existingMapping.appointment_id}.`);
-            const { error } = await supabaseClient.rpc('update_appointment_and_mapping', {
-                p_appointment_id: existingMapping.appointment_id,
-                p_start_at: new Date(event.when.start_time * 1000).toISOString(),
-                p_end_at: new Date(event.when.end_time * 1000).toISOString(),
-                p_notes: `(Updated) Synced from ${connection.provider}: ${event.title}`,
-                p_mapping_id: existingMapping.id,
-                p_last_sync_hash: eventHash
-            });
-
-            if (error) {
-              console.error(`[syncBidirectional] Transactional update failed for event ${event.id}:`, error);
-              errors.push({ id: event.id, error: 'Failed to update appointment transactionally', details: error.message });
-            } else {
-              console.log(`[syncBidirectional] Successfully updated local appointment ${existingMapping.appointment_id}.`);
-              totalUpdatedLocal++;
-            }
-          }
-        } else { // Create new
-          console.log(`[syncBidirectional] New remote event ${event.id} found. Creating local appointment.`);
-          const { error } = await supabaseClient.rpc('create_appointment_and_mapping', {
-            p_clinician_id: clinicianId,
-            p_type: 'External Event',
-            p_status: 'scheduled',
-            p_start_at: new Date(event.when.start_time * 1000).toISOString(),
-            p_end_at: new Date(event.when.end_time * 1000).toISOString(),
-            p_notes: `Synced from ${connection.provider}: ${event.title}`,
-            p_external_event_id: event.id,
-            p_connection_id: connection.id,
-            p_sync_direction: 'inbound',
-            p_last_sync_hash: eventHash
-          });
-          
-          if (error) {
-            console.error(`[syncBidirectional] Transactional creation failed for event ${event.id}:`, error);
-            errors.push({ id: event.id, error: 'Failed to create appointment transactionally', details: error.message });
-          } else {
-            console.log(`[syncBidirectional] Successfully created local appointment for remote event ${event.id}.`);
-            totalCreatedLocal++;
-          }
-        }
-      }
-      // Handle deletes
-      for (const mapping of existingMappings) {
-        if (!mapping.appointments) continue; // Safety check
-        const apptDate = new Date(mapping.appointments.start_at);
-        const isInRange = apptDate >= new Date(startDate) && apptDate <= new Date(endDate);
-        if (isInRange && !nylasEventIds.has(mapping.external_event_id)) {
-          console.log(`[syncBidirectional] Remote event ${mapping.external_event_id} deleted. Cancelling local appointment ${mapping.appointment_id}.`);
-          const { error } = await supabaseClient.rpc('cancel_appointment_and_delete_mapping', {
-            p_appointment_id: mapping.appointment_id,
-            p_mapping_id: mapping.id,
-            p_notes: 'Cancelled: Event deleted from external calendar.'
-          });
-
-          if (error) {
-            console.error(`[syncBidirectional] Transactional cancellation failed for appointment ${mapping.appointment_id}:`, error);
-            errors.push({ id: mapping.appointment_id, error: 'Failed to cancel appointment transactionally', details: error.message });
-          } else {
-            console.log(`[syncBidirectional] Successfully cancelled local appointment ${mapping.appointment_id}.`);
-            totalDeletedLocal++;
-          }
-        }
-      }
-
-      // Step 4: Reconcile Local -> Remote
+      // 3d. Sync local changes to remote calendar
+      const localToRemoteResult = await reconcileLocalToRemote(supabaseClient, connection, nylasEventIds, clinicianId, startDate, endDate);
+      totalCreatedRemote += localToRemoteResult.created;
+      totalUpdatedRemote += localToRemoteResult.updated;
+      totalDeletedRemote += localToRemoteResult.deleted;
+      allErrors.push(...localToRemoteResult.errors.map(e => ({ ...e, connection_id: connection.id, direction: 'local->remote' })));
       
-      // Step 4a: Handle local UPDATES to be pushed to remote
-      const { data: mappedAppointments, error: mappedApptError } = await supabaseClient
-        .from('appointments')
-        .select(`*, external_calendar_mappings!inner(id, external_event_id, last_sync_hash)`)
-        .eq('clinician_id', clinicianId)
-        .eq('external_calendar_mappings.connection_id', connection.id)
-        .gte('start_at', new Date(startDate).toISOString())
-        .lte('start_at', new Date(endDate).toISOString())
-        .neq('status', 'cancelled');
-
-      if (mappedApptError) {
-          console.error(`[syncBidirectional] Error fetching mapped appointments for update check:`, mappedApptError);
-          errors.push({ type: 'local_update_fetch', error: mappedApptError.message });
-      } else {
-          const updatePromises = mappedAppointments.map(async (appointment) => {
-            const mapping = appointment.external_calendar_mappings[0];
-            const standardObject = createStandardizedEventObject(appointment);
-            const localAppointmentHash = createEventHash(standardObject);
-
-            if (mapping.last_sync_hash !== localAppointmentHash && nylasEventIds.has(mapping.external_event_id)) {
-                console.log(`[syncBidirectional] Local changes detected for appointment ${appointment.id}. Syncing to remote.`);
-                const eventData = {
-                    title: `Appointment: ${appointment.type}`,
-                    description: appointment.notes || '',
-                    when: {
-                        start_time: Math.floor(new Date(appointment.start_at).getTime() / 1000),
-                        end_time: Math.floor(new Date(appointment.end_at).getTime() / 1000),
-                    },
-                };
-                try {
-                    const updateResponse = await fetch(`https://api.us.nylas.com/v3/grants/${connection.id}/events/${mapping.external_event_id}`, {
-                        method: 'PUT',
-                        headers: { 'Authorization': `Bearer ${connection.access_token}`, 'Content-Type': 'application/json' },
-                        body: JSON.stringify(eventData),
-                    });
-                    if (updateResponse.ok) {
-                        const updatedEventResult = await updateResponse.json();
-                        const newHash = createEventHash(updatedEventResult.data);
-                        await supabaseClient.from('external_calendar_mappings').update({ last_sync_hash: newHash }).eq('id', mapping.id);
-                        return { status: 'updated' };
-                    } else {
-                        const errorText = await updateResponse.text();
-                        return { status: 'error', error: { appointment_id: appointment.id, error: `Failed to update remote event: ${errorText}` } };
-                    }
-                } catch(e) {
-                    return { status: 'error', error: { appointment_id: appointment.id, error: `Failed to update remote event: ${e.message}` } };
-                }
-            }
-            return { status: 'skipped' };
-          });
-          
-          const updateResults = await Promise.all(updatePromises);
-          updateResults.forEach(result => {
-              if (result.status === 'updated') totalUpdatedRemote++;
-              if (result.status === 'error' && result.error) errors.push(result.error);
-          });
-      }
-
-      // Step 4b: Handle local cancellations to be pushed to remote
-      const { data: cancelledAppointments, error: cancelledError } = await supabaseClient
-        .from('appointments')
-        .select(`id, external_calendar_mappings!inner(id, external_event_id)`)
-        .eq('clinician_id', clinicianId)
-        .eq('status', 'cancelled')
-        .eq('external_calendar_mappings.connection_id', connection.id);
-
-      if (cancelledError) {
-          console.error(`[syncBidirectional] Error fetching cancelled appointments:`, cancelledError);
-          errors.push({ type: 'local_delete_fetch', error: cancelledError.message });
-      } else {
-          const deletePromises = cancelledAppointments.map(async (appointment) => {
-            const mapping = appointment.external_calendar_mappings[0];
-            if (mapping && mapping.external_event_id) {
-                console.log(`[syncBidirectional] Deleting remote event ${mapping.external_event_id} for cancelled appointment ${appointment.id}`);
-                try {
-                    const deleteResponse = await fetch(`https://api.us.nylas.com/v3/grants/${connection.id}/events/${mapping.external_event_id}`, {
-                        method: 'DELETE',
-                        headers: { 'Authorization': `Bearer ${connection.access_token}` },
-                    });
-
-                    if (deleteResponse.ok || deleteResponse.status === 404) {
-                        const { error: deleteMappingError } = await supabaseClient
-                            .from('external_calendar_mappings')
-                            .delete()
-                            .eq('id', mapping.id);
-                        
-                        if (deleteMappingError) {
-                            return { status: 'error', error: { appointment_id: appointment.id, error: `Failed to delete local mapping: ${deleteMappingError.message}` } };
-                        } else {
-                            return { status: 'deleted' };
-                        }
-                    } else {
-                        const errorText = await deleteResponse.text();
-                        return { status: 'error', error: { appointment_id: appointment.id, error: `Failed to delete remote event: ${errorText}` } };
-                    }
-                } catch (e) {
-                    return { status: 'error', error: { appointment_id: appointment.id, error: `Failed to delete remote event: ${e.message}` } };
-                }
-            }
-            return { status: 'skipped' };
-          });
-
-          const deleteResults = await Promise.all(deletePromises);
-          deleteResults.forEach(result => {
-              if (result.status === 'deleted') totalDeletedRemote++;
-              if (result.status === 'error' && result.error) errors.push(result.error);
-          });
-      }
-
-      // Step 4c: Handle local creations to be pushed to remote
-      const { data: localAppointments, error: localApptError } = await supabaseClient
-        .from('appointments')
-        .select(`*, external_calendar_mappings(appointment_id)`)
-        .eq('clinician_id', clinicianId)
-        .is('external_calendar_mappings.appointment_id', null) // only those not yet synced
-        .gte('start_at', new Date(startDate).toISOString())
-        .lte('start_at', new Date(endDate).toISOString())
-        .neq('status', 'cancelled'); // Don't sync new cancelled appointments
-      
-      if (localApptError) throw localApptError;
-
-      const createPromises = localAppointments.map(async (appointment) => {
-        const eventData = {
-            title: `Appointment: ${appointment.type}`,
-            description: appointment.notes || '',
-            when: {
-                start_time: Math.floor(new Date(appointment.start_at).getTime() / 1000),
-                end_time: Math.floor(new Date(appointment.end_at).getTime() / 1000),
-            },
-            calendar_id: connection.calendar_ids?.[0] || 'primary',
-        };
-        try {
-            const eventResponse = await fetch(`https://api.us.nylas.com/v3/grants/${connection.id}/events`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${connection.access_token}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify(eventData),
-            });
-
-            if (eventResponse.ok) {
-                const eventResult = await eventResponse.json();
-                await supabaseClient.from('external_calendar_mappings').insert({
-                    appointment_id: appointment.id,
-                    external_event_id: eventResult.data.id,
-                    connection_id: connection.id,
-                    sync_direction: 'outbound',
-                    last_sync_hash: createEventHash(eventResult.data),
-                });
-                return { status: 'created' };
-            } else {
-                return { status: 'error', error: { id: appointment.id, error: `Failed to create remote event: ${await eventResponse.text()}` } };
-            }
-        } catch (e) {
-            return { status: 'error', error: { id: appointment.id, error: `Failed to create remote event: ${e.message}` } };
-        }
-      });
-
-      const createResults = await Promise.all(createPromises);
-      createResults.forEach(result => {
-          if (result.status === 'created') totalCreatedRemote++;
-          if (result.status === 'error' && result.error) errors.push(result.error);
-      });
+      console.log(`${connLogPrefix} Finished processing connection.`);
 
     } catch (connError) {
-      console.error(`[syncBidirectional] Error processing connection ${rawConnection.id}:`, connError)
-      errors.push({ connection_id: rawConnection.id, error: connError.message });
+      console.error(`${connLogPrefix} Unrecoverable error processing connection:`, connError)
+      allErrors.push({ connection_id: rawConnection.id, error: connError.message, details: 'This connection was skipped.' });
     }
   }
 
+  // 4. Compile and return summary
   const summary = `Sync complete. Local: ${totalCreatedLocal} created, ${totalUpdatedLocal} updated, ${totalDeletedLocal} deleted. Remote: ${totalCreatedRemote} created, ${totalUpdatedRemote} updated, ${totalDeletedRemote} deleted.`;
-  console.log(`[syncBidirectional] Sync summary for clinician ${clinicianId}: ${summary}`);
-  if(errors.length > 0) {
-    console.warn(`[syncBidirectional] Sync for clinician ${clinicianId} completed with ${errors.length} errors.`);
+  console.log(`${logPrefix} ${summary}`);
+
+  if(allErrors.length > 0) {
+    console.warn(`${logPrefix} Sync completed with ${allErrors.length} errors. See response for details.`);
   }
-  return new Response(JSON.stringify({ success: true, message: summary, errors: errors.length > 0 ? errors : undefined }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+
+  return new Response(JSON.stringify({ 
+    success: true, 
+    message: summary, 
+    errors: allErrors.length > 0 ? allErrors : undefined,
+    stats: {
+      local: { created: totalCreatedLocal, updated: totalUpdatedLocal, deleted: totalDeletedLocal },
+      remote: { created: totalCreatedRemote, updated: totalUpdatedRemote, deleted: totalDeletedRemote }
+    }
+  }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 }
