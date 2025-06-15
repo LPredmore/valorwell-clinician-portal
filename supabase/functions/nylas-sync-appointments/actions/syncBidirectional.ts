@@ -1,4 +1,3 @@
-
 import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { createEventHash, getRefreshedNylasConnection, NylasConnection } from '../utils.ts'
 
@@ -92,30 +91,44 @@ export async function syncBidirectional(supabaseClient: SupabaseClient, body: an
 
         if (existingMapping) { // Update existing
           if (existingMapping.last_sync_hash !== eventHash) {
-            const { error } = await supabaseClient.from('appointments').update({
-              start_at: new Date(event.when.start_time * 1000).toISOString(),
-              end_at: new Date(event.when.end_time * 1000).toISOString(),
-              notes: `(Updated) Synced from ${connection.provider}: ${event.title}`,
-            }).eq('id', existingMapping.appointment_id);
-            if (error) errors.push({ id: event.id, error: 'Failed to update appointment' });
-            else {
-              await supabaseClient.from('external_calendar_mappings').update({ last_sync_hash: eventHash }).eq('id', existingMapping.id);
+            console.log(`[syncBidirectional] Remote changes detected for event ${event.id}. Syncing to local appointment ${existingMapping.appointment_id}.`);
+            const { error } = await supabaseClient.rpc('update_appointment_and_mapping', {
+                p_appointment_id: existingMapping.appointment_id,
+                p_start_at: new Date(event.when.start_time * 1000).toISOString(),
+                p_end_at: new Date(event.when.end_time * 1000).toISOString(),
+                p_notes: `(Updated) Synced from ${connection.provider}: ${event.title}`,
+                p_mapping_id: existingMapping.id,
+                p_last_sync_hash: eventHash
+            });
+
+            if (error) {
+              console.error(`[syncBidirectional] Transactional update failed for event ${event.id}:`, error);
+              errors.push({ id: event.id, error: 'Failed to update appointment transactionally', details: error.message });
+            } else {
+              console.log(`[syncBidirectional] Successfully updated local appointment ${existingMapping.appointment_id}.`);
               totalUpdatedLocal++;
             }
           }
         } else { // Create new
-          const { data: newAppt, error } = await supabaseClient.from('appointments').insert({
-            clinician_id: clinicianId, type: 'External Event', status: 'scheduled',
-            start_at: new Date(event.when.start_time * 1000).toISOString(),
-            end_at: new Date(event.when.end_time * 1000).toISOString(),
-            notes: `Synced from ${connection.provider}: ${event.title}`,
-          }).select().single();
-          if (error) errors.push({ id: event.id, error: 'Failed to create appointment' });
-          else {
-            await supabaseClient.from('external_calendar_mappings').insert({
-              appointment_id: newAppt.id, external_event_id: event.id, connection_id: connection.id,
-              sync_direction: 'inbound', last_sync_hash: eventHash,
-            });
+          console.log(`[syncBidirectional] New remote event ${event.id} found. Creating local appointment.`);
+          const { error } = await supabaseClient.rpc('create_appointment_and_mapping', {
+            p_clinician_id: clinicianId,
+            p_type: 'External Event',
+            p_status: 'scheduled',
+            p_start_at: new Date(event.when.start_time * 1000).toISOString(),
+            p_end_at: new Date(event.when.end_time * 1000).toISOString(),
+            p_notes: `Synced from ${connection.provider}: ${event.title}`,
+            p_external_event_id: event.id,
+            p_connection_id: connection.id,
+            p_sync_direction: 'inbound',
+            p_last_sync_hash: eventHash
+          });
+          
+          if (error) {
+            console.error(`[syncBidirectional] Transactional creation failed for event ${event.id}:`, error);
+            errors.push({ id: event.id, error: 'Failed to create appointment transactionally', details: error.message });
+          } else {
+            console.log(`[syncBidirectional] Successfully created local appointment for remote event ${event.id}.`);
             totalCreatedLocal++;
           }
         }
@@ -126,10 +139,18 @@ export async function syncBidirectional(supabaseClient: SupabaseClient, body: an
         const apptDate = new Date(mapping.appointments.start_at);
         const isInRange = apptDate >= new Date(startDate) && apptDate <= new Date(endDate);
         if (isInRange && !nylasEventIds.has(mapping.external_event_id)) {
-          const { error } = await supabaseClient.from('appointments').update({ status: 'cancelled', notes: 'Cancelled: Event deleted from external calendar.' }).eq('id', mapping.appointment_id);
-          if (error) errors.push({ id: mapping.appointment_id, error: 'Failed to cancel appointment' });
-          else {
-            await supabaseClient.from('external_calendar_mappings').delete().eq('id', mapping.id);
+          console.log(`[syncBidirectional] Remote event ${mapping.external_event_id} deleted. Cancelling local appointment ${mapping.appointment_id}.`);
+          const { error } = await supabaseClient.rpc('cancel_appointment_and_delete_mapping', {
+            p_appointment_id: mapping.appointment_id,
+            p_mapping_id: mapping.id,
+            p_notes: 'Cancelled: Event deleted from external calendar.'
+          });
+
+          if (error) {
+            console.error(`[syncBidirectional] Transactional cancellation failed for appointment ${mapping.appointment_id}:`, error);
+            errors.push({ id: mapping.appointment_id, error: 'Failed to cancel appointment transactionally', details: error.message });
+          } else {
+            console.log(`[syncBidirectional] Successfully cancelled local appointment ${mapping.appointment_id}.`);
             totalDeletedLocal++;
           }
         }
@@ -306,5 +327,9 @@ export async function syncBidirectional(supabaseClient: SupabaseClient, body: an
   }
 
   const summary = `Sync complete. Local: ${totalCreatedLocal} created, ${totalUpdatedLocal} updated, ${totalDeletedLocal} deleted. Remote: ${totalCreatedRemote} created, ${totalUpdatedRemote} updated, ${totalDeletedRemote} deleted.`;
+  console.log(`[syncBidirectional] Sync summary for clinician ${clinicianId}: ${summary}`);
+  if(errors.length > 0) {
+    console.warn(`[syncBidirectional] Sync for clinician ${clinicianId} completed with ${errors.length} errors.`);
+  }
   return new Response(JSON.stringify({ success: true, message: summary, errors: errors.length > 0 ? errors : undefined }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 }
