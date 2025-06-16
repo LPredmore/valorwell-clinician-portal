@@ -1,6 +1,7 @@
 
 import { useState } from 'react';
 import { useToast } from '@/components/ui/use-toast';
+import { validateTemplate } from './utils/templateValidation';
 
 export interface TemplateManagerConfig {
   templateId: string;
@@ -22,6 +23,17 @@ export const useTemplateManager = (config: TemplateManagerConfig) => {
       toast({
         title: "Error",
         description: "Client ID is required.",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    // Validate the data before saving
+    const validation = validateTemplate(config.templateId, data);
+    if (!validation.isValid) {
+      toast({
+        title: "Validation Error",
+        description: `Please fix the following errors: ${validation.errors?.join(', ')}`,
         variant: "destructive",
       });
       return false;

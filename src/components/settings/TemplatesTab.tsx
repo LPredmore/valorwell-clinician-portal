@@ -101,14 +101,15 @@ const TemplatesTab = () => {
     // All templates get these common props
     const commonProps = {
       onClose: handleCloseDialog,
+      clinicianName,
     };
 
-    // Templates that require clinicianName (GAD7 and PCL5)
-    if (selectedTemplate === 'gad7' || selectedTemplate === 'pcl5') {
-      return <Component {...commonProps} clinicianName={clinicianName} />;
+    // Templates that don't require special handling (SessionNote and TreatmentPlan only need onClose)
+    if (selectedTemplate === 'session-note' || selectedTemplate === 'treatment-plan') {
+      return <Component onClose={handleCloseDialog} />;
     }
 
-    // Templates that don't require clinicianName
+    // Assessment templates that require clinicianName
     return <Component {...commonProps} />;
   };
 
