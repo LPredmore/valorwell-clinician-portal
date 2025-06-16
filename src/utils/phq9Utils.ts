@@ -23,61 +23,76 @@ export interface PHQ9Assessment {
 export const savePHQ9Assessment = async (responses: Record<string, number>, clientId: string, additionalNotes?: string): Promise<PHQ9Assessment> => {
   const totalScore = calculatePHQ9Score(responses);
   
-  const { data, error } = await supabase
-    .from('phq9_assessments' as any)
-    .insert([{
-      client_id: clientId,
-      assessment_date: new Date().toISOString().split('T')[0],
-      question_1: responses.question_1 || 0,
-      question_2: responses.question_2 || 0,
-      question_3: responses.question_3 || 0,
-      question_4: responses.question_4 || 0,
-      question_5: responses.question_5 || 0,
-      question_6: responses.question_6 || 0,
-      question_7: responses.question_7 || 0,
-      question_8: responses.question_8 || 0,
-      question_9: responses.question_9 || 0,
-      total_score: totalScore,
-      additional_notes: additionalNotes
-    }])
-    .select()
-    .single();
+  try {
+    const { data, error } = await supabase
+      .from('phq9_assessments' as any)
+      .insert([{
+        client_id: clientId,
+        assessment_date: new Date().toISOString().split('T')[0],
+        question_1: responses.question_1 || 0,
+        question_2: responses.question_2 || 0,
+        question_3: responses.question_3 || 0,
+        question_4: responses.question_4 || 0,
+        question_5: responses.question_5 || 0,
+        question_6: responses.question_6 || 0,
+        question_7: responses.question_7 || 0,
+        question_8: responses.question_8 || 0,
+        question_9: responses.question_9 || 0,
+        total_score: totalScore,
+        additional_notes: additionalNotes
+      }])
+      .select()
+      .single();
 
-  if (error) {
-    throw new Error(`Failed to save PHQ-9 assessment: ${error.message}`);
+    if (error) {
+      throw new Error(`Failed to save PHQ-9 assessment: ${error.message}`);
+    }
+
+    return data as PHQ9Assessment;
+  } catch (error) {
+    console.error('Error saving PHQ-9 assessment:', error);
+    throw error;
   }
-
-  return data;
 };
 
 export const getPHQ9Assessments = async (clientId: string): Promise<PHQ9Assessment[]> => {
-  const { data, error } = await supabase
-    .from('phq9_assessments' as any)
-    .select('*')
-    .eq('client_id', clientId)
-    .order('assessment_date', { ascending: false });
+  try {
+    const { data, error } = await supabase
+      .from('phq9_assessments' as any)
+      .select('*')
+      .eq('client_id', clientId)
+      .order('assessment_date', { ascending: false });
 
-  if (error) {
-    throw new Error(`Failed to fetch PHQ-9 assessments: ${error.message}`);
+    if (error) {
+      throw new Error(`Failed to fetch PHQ-9 assessments: ${error.message}`);
+    }
+
+    return (data || []) as PHQ9Assessment[];
+  } catch (error) {
+    console.error('Error fetching PHQ-9 assessments:', error);
+    return [];
   }
-
-  return data || [];
 };
 
 export const getLatestPHQ9Assessment = async (clientId: string): Promise<PHQ9Assessment | null> => {
-  const { data, error } = await supabase
-    .from('phq9_assessments' as any)
-    .select('*')
-    .eq('client_id', clientId)
-    .order('assessment_date', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  try {
+    const { data, error } = await supabase
+      .from('phq9_assessments' as any)
+      .select('*')
+      .eq('client_id', clientId)
+      .order('assessment_date', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-  if (error) {
-    throw new Error(`Failed to fetch latest PHQ-9 assessment: ${error.message}`);
+    if (error) {
+      throw new Error(`Failed to fetch latest PHQ-9 assessment: ${error.message}`);
+    }
+
+    return data as PHQ9Assessment | null;
+  } catch (error) {
+    console.error('Error fetching latest PHQ-9 assessment:', error);
+    return null;
   }
-
-  return data;
 };
 
 export const calculatePHQ9Score = (responses: Record<string, number>): number => {
