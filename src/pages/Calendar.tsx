@@ -1,159 +1,130 @@
 
-import React, { useState } from "react";
-import Layout from "../components/layout/Layout";
-import { useAuth } from "@/context/AuthProvider";
-import ErrorBoundary from "@/components/common/ErrorBoundary";
-import VirtualCalendar from "../components/calendar/VirtualCalendar";
-import { getUserTimeZone } from "@/utils/timeZoneUtils";
-import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
-import { addWeeks, subWeeks, startOfWeek, endOfWeek } from "date-fns";
-import ClinicianAvailabilityPanel from "../components/calendar/ClinicianAvailabilityPanel";
-import SchedulerManagementPanel from "../components/calendar/SchedulerManagementPanel";
-import CalendarConnectionsPanel from "../components/calendar/CalendarConnectionsPanel";
-import { useMutation } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/components/ui/use-toast";
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useToast } from '@/components/ui/use-toast';
+import { Calendar as CalendarIcon, Settings, Database } from 'lucide-react';
+import NylasHybridCalendar from '@/components/calendar/NylasHybridCalendar';
+import ClinicianAvailabilityPanel from '@/components/calendar/ClinicianAvailabilityPanel';
+import CalendarConnectionsPanel from '@/components/calendar/CalendarConnectionsPanel';
+import InfrastructureStatusPanel from '@/components/calendar/InfrastructureStatusPanel';
+import DatabaseDiagnosticTool from '@/components/calendar/DatabaseDiagnosticTool';
+import { supabase } from '@/integrations/supabase/client';
 
-/**
- * Calendar component - Main calendar view for clinicians
- * Simplified to use AuthWrapper for auth checks and remove circular dependencies
- */
 const Calendar = () => {
-  const { userId, userRole } = useAuth();
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const userTimeZone = getUserTimeZone();
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const { toast } = useToast();
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [userTimeZone, setUserTimeZone] = useState<string>('America/New_York');
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  const syncCalendarMutation = useMutation({
-    mutationFn: async () => {
-      const startOfView = startOfWeek(currentDate);
-      const endOfView = endOfWeek(currentDate);
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
 
-      const { data, error } = await supabase.functions.invoke('nylas-sync-appointments', {
-        body: {
-          action: 'sync_bidirectional',
-          clinicianId: userId,
-          startDate: startOfView.toISOString(),
-          endDate: endOfView.toISOString(),
-        },
-      });
+        // Get clinician info
+        const { data: clinician, error } = await supabase
+          .from('clinicians')
+          .select('*')
+          .eq('id', user.id)
+          .single();
 
-      if (error) {
-        throw new Error(error.message);
+        if (error) {
+          console.error('Error fetching clinician:', error);
+          return;
+        }
+
+        setCurrentUser(clinician);
+        setUserTimeZone(clinician.clinician_time_zone || 'America/New_York');
+      } catch (error) {
+        console.error('Error in fetchCurrentUser:', error);
       }
-      return data;
-    },
-    onSuccess: (data: any) => {
-      toast({
-        title: 'Sync Kicked Off',
-        description: data.message || 'Calendar sync analysis has started.',
-      });
-      // Refresh calendar view after a short delay to allow sync to process
-      setTimeout(() => handleAvailabilityUpdated(), 2000);
-    },
-    onError: (error: Error) => {
-      toast({
-        title: 'Sync Failed',
-        description: error.message,
-        variant: 'destructive',
-      });
-    },
-  });
+    };
 
-  // Navigation functions
-  const navigatePrevious = () => setCurrentDate(subWeeks(currentDate, 1));
-  const navigateNext = () => setCurrentDate(addWeeks(currentDate, 1));
-  const navigateToday = () => setCurrentDate(new Date());
+    fetchCurrentUser();
+  }, []);
 
   const handleAvailabilityUpdated = () => {
-    console.log('Availability updated, refreshing calendar view...');
     setRefreshTrigger(prev => prev + 1);
+    toast({
+      title: "Availability Updated",
+      description: "Your availability has been updated successfully.",
+    });
   };
 
-  // Handle event click
-  const handleEventClick = (event: any) => {
-    console.log('Event clicked:', event);
-    // TODO: Open event details dialog
-  };
-
-  // Handle new appointment
-  const handleNewAppointment = (date: Date, time?: string) => {
-    console.log('New appointment requested for:', date, time);
-    // TODO: Open appointment creation dialog
-  };
-
-  return (
-    <Layout>
-      <div className="grid grid-cols-1 xl:grid-cols-[1fr_400px] gap-6">
-        <div>
-          <ErrorBoundary componentName="Calendar">
-            <div className="bg-white rounded-lg shadow-sm p-6 animate-fade-in h-full flex flex-col">
-              <div className="flex flex-col space-y-6">
-                <div className="flex justify-between items-center">
-                  <h1 className="text-2xl font-bold text-gray-800">Calendar</h1>
-                  <div className="text-sm text-gray-500">
-                    User: {userRole} | ID: {userId?.slice(0, 8)}...
-                  </div>
-                </div>
-
-                {/* Navigation */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    <Button variant="outline" onClick={navigatePrevious}>
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <Button variant="outline" onClick={navigateToday}>
-                      Today
-                    </Button>
-                    <Button variant="outline" onClick={navigateNext}>
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      onClick={() => syncCalendarMutation.mutate()} 
-                      disabled={syncCalendarMutation.isPending}
-                    >
-                      <RefreshCw className={`h-4 w-4 mr-2 ${syncCalendarMutation.isPending ? 'animate-spin' : ''}`} />
-                      Sync Calendars
-                    </Button>
-                  </div>
-                  <h2 className="text-lg font-semibold">
-                    {currentDate.toLocaleDateString('en-US', {
-                      month: 'long',
-                      year: 'numeric'
-                    })}
-                  </h2>
-                </div>
-
-                {/* Calendar */}
-                <div className="flex-1">
-                  <VirtualCalendar
-                    clinicianId={userId}
-                    currentDate={currentDate}
-                    userTimeZone={userTimeZone}
-                    onNewAppointment={handleNewAppointment}
-                    onAppointmentClick={handleEventClick}
-                    refreshTrigger={refreshTrigger}
-                    onAvailabilityUpdated={handleAvailabilityUpdated}
-                  />
-                </div>
-              </div>
-            </div>
-          </ErrorBoundary>
-        </div>
-        <div className="space-y-6">
-          <CalendarConnectionsPanel />
-          <ClinicianAvailabilityPanel
-            clinicianId={userId}
-            onAvailabilityUpdated={handleAvailabilityUpdated}
-            userTimeZone={userTimeZone}
-          />
-          <SchedulerManagementPanel clinicianId={userId} />
+  if (!currentUser) {
+    return (
+      <div className="container mx-auto py-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto mb-4"></div>
+            <p>Loading calendar...</p>
+          </div>
         </div>
       </div>
-    </Layout>
+    );
+  }
+
+  return (
+    <div className="container mx-auto py-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <CalendarIcon className="h-8 w-8" />
+            Calendar
+          </h1>
+          <p className="text-gray-600 mt-1">
+            Manage your appointments and availability
+          </p>
+        </div>
+      </div>
+
+      <Tabs defaultValue="calendar" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-5">
+          <TabsTrigger value="calendar">Calendar</TabsTrigger>
+          <TabsTrigger value="availability">Availability</TabsTrigger>
+          <TabsTrigger value="connections">Connections</TabsTrigger>
+          <TabsTrigger value="infrastructure">Infrastructure</TabsTrigger>
+          <TabsTrigger value="diagnostics">Diagnostics</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="calendar" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Your Calendar</CardTitle>
+              <CardDescription>
+                View and manage your appointments
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <NylasHybridCalendar 
+                key={refreshTrigger}
+                clinicianId={currentUser.id}
+                userTimeZone={userTimeZone}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="availability" className="space-y-6">
+          <ClinicianAvailabilityPanel />
+        </TabsContent>
+
+        <TabsContent value="connections" className="space-y-6">
+          <CalendarConnectionsPanel />
+        </TabsContent>
+
+        <TabsContent value="infrastructure" className="space-y-6">
+          <InfrastructureStatusPanel />
+        </TabsContent>
+
+        <TabsContent value="diagnostics" className="space-y-6">
+          <DatabaseDiagnosticTool />
+        </TabsContent>
+      </Tabs>
+    </div>
   );
 };
 

@@ -32,9 +32,20 @@ const DatabaseDiagnosticTool = () => {
 
       const tableName = tableMatch[1];
       
+      // List of valid table names from our schema
+      const validTables = [
+        'appointments', 'clients', 'clinicians', 'admins', 
+        'availability_blocks', 'nylas_connections', 'nylas_calendars',
+        'external_calendar_mappings', 'calendar_sync_logs'
+      ];
+      
+      if (!validTables.includes(tableName)) {
+        throw new Error(`Table '${tableName}' is not available for querying`);
+      }
+      
       // Execute a simple select query
       const { data, error } = await supabase
-        .from(tableName)
+        .from(tableName as any)
         .select('*')
         .limit(10);
 
