@@ -5,27 +5,40 @@ import { supabase } from '@/integrations/supabase/client';
 export interface PHQ9Assessment {
   id: string;
   client_id: string;
-  clinician_id: string;
   assessment_date: string;
-  responses: Record<string, number>;
+  question_1: number;
+  question_2: number;
+  question_3: number;
+  question_4: number;
+  question_5: number;
+  question_6: number;
+  question_7: number;
+  question_8: number;
+  question_9: number;
   total_score: number;
-  interpretation: string;
   additional_notes?: string;
   created_at: string;
-  updated_at: string;
 }
 
-export const savePHQ9Assessment = async (assessment: Omit<PHQ9Assessment, 'id' | 'created_at' | 'updated_at'>): Promise<PHQ9Assessment> => {
+export const savePHQ9Assessment = async (responses: Record<string, number>, clientId: string, additionalNotes?: string): Promise<PHQ9Assessment> => {
+  const totalScore = calculatePHQ9Score(responses);
+  
   const { data, error } = await supabase
-    .from('phq9_assessments')
+    .from('phq9_assessments' as any)
     .insert([{
-      client_id: assessment.client_id,
-      clinician_id: assessment.clinician_id,
-      assessment_date: assessment.assessment_date,
-      responses: assessment.responses,
-      total_score: assessment.total_score,
-      interpretation: assessment.interpretation,
-      additional_notes: assessment.additional_notes
+      client_id: clientId,
+      assessment_date: new Date().toISOString().split('T')[0],
+      question_1: responses.question_1 || 0,
+      question_2: responses.question_2 || 0,
+      question_3: responses.question_3 || 0,
+      question_4: responses.question_4 || 0,
+      question_5: responses.question_5 || 0,
+      question_6: responses.question_6 || 0,
+      question_7: responses.question_7 || 0,
+      question_8: responses.question_8 || 0,
+      question_9: responses.question_9 || 0,
+      total_score: totalScore,
+      additional_notes: additionalNotes
     }])
     .select()
     .single();
@@ -34,23 +47,12 @@ export const savePHQ9Assessment = async (assessment: Omit<PHQ9Assessment, 'id' |
     throw new Error(`Failed to save PHQ-9 assessment: ${error.message}`);
   }
 
-  return {
-    id: data.id,
-    client_id: data.client_id,
-    clinician_id: data.clinician_id,
-    assessment_date: data.assessment_date,
-    responses: data.responses as Record<string, number>,
-    total_score: data.total_score,
-    interpretation: data.interpretation,
-    additional_notes: data.additional_notes,
-    created_at: data.created_at,
-    updated_at: data.updated_at
-  };
+  return data;
 };
 
 export const getPHQ9Assessments = async (clientId: string): Promise<PHQ9Assessment[]> => {
   const { data, error } = await supabase
-    .from('phq9_assessments')
+    .from('phq9_assessments' as any)
     .select('*')
     .eq('client_id', clientId)
     .order('assessment_date', { ascending: false });
@@ -59,23 +61,12 @@ export const getPHQ9Assessments = async (clientId: string): Promise<PHQ9Assessme
     throw new Error(`Failed to fetch PHQ-9 assessments: ${error.message}`);
   }
 
-  return (data || []).map(item => ({
-    id: item.id,
-    client_id: item.client_id,
-    clinician_id: item.clinician_id,
-    assessment_date: item.assessment_date,
-    responses: item.responses as Record<string, number>,
-    total_score: item.total_score,
-    interpretation: item.interpretation,
-    additional_notes: item.additional_notes,
-    created_at: item.created_at,
-    updated_at: item.updated_at
-  }));
+  return data || [];
 };
 
 export const getLatestPHQ9Assessment = async (clientId: string): Promise<PHQ9Assessment | null> => {
   const { data, error } = await supabase
-    .from('phq9_assessments')
+    .from('phq9_assessments' as any)
     .select('*')
     .eq('client_id', clientId)
     .order('assessment_date', { ascending: false })
@@ -86,24 +77,11 @@ export const getLatestPHQ9Assessment = async (clientId: string): Promise<PHQ9Ass
     throw new Error(`Failed to fetch latest PHQ-9 assessment: ${error.message}`);
   }
 
-  if (!data) return null;
-
-  return {
-    id: data.id,
-    client_id: data.client_id,
-    clinician_id: data.clinician_id,
-    assessment_date: data.assessment_date,
-    responses: data.responses as Record<string, number>,
-    total_score: data.total_score,
-    interpretation: data.interpretation,
-    additional_notes: data.additional_notes,
-    created_at: data.created_at,
-    updated_at: data.updated_at
-  };
+  return data;
 };
 
 export const calculatePHQ9Score = (responses: Record<string, number>): number => {
-  return Object.values(responses).reduce((total, score) => total + score, 0);
+  return Object.values(responses).reduce((total, score) => total + (score || 0), 0);
 };
 
 export const interpretPHQ9Score = (score: number): string => {

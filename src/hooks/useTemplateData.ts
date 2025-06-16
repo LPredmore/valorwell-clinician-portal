@@ -6,11 +6,17 @@ import { useToast } from '@/components/ui/use-toast';
 export interface PHQ9Assessment {
   id: string;
   client_id: string;
-  clinician_id: string;
   assessment_date: string;
-  responses: Record<string, number>;
+  question_1: number;
+  question_2: number;
+  question_3: number;
+  question_4: number;
+  question_5: number;
+  question_6: number;
+  question_7: number;
+  question_8: number;
+  question_9: number;
   total_score: number;
-  interpretation: string;
   additional_notes?: string;
   created_at: string;
   updated_at: string;
@@ -19,11 +25,15 @@ export interface PHQ9Assessment {
 export interface GAD7Assessment {
   id: string;
   client_id: string;
-  clinician_id: string;
   assessment_date: string;
-  responses: Record<string, number>;
+  question_1: number;
+  question_2: number;
+  question_3: number;
+  question_4: number;
+  question_5: number;
+  question_6: number;
+  question_7: number;
   total_score: number;
-  interpretation: string;
   additional_notes?: string;
   created_at: string;
   updated_at: string;
@@ -32,9 +42,27 @@ export interface GAD7Assessment {
 export interface PCL5Assessment {
   id: string;
   client_id: string;
-  clinician_id: string;
   assessment_date: string;
-  responses: Record<string, number>;
+  question_1: number;
+  question_2: number;
+  question_3: number;
+  question_4: number;
+  question_5: number;
+  question_6: number;
+  question_7: number;
+  question_8: number;
+  question_9: number;
+  question_10: number;
+  question_11: number;
+  question_12: number;
+  question_13: number;
+  question_14: number;
+  question_15: number;
+  question_16: number;
+  question_17: number;
+  question_18: number;
+  question_19: number;
+  question_20: number;
   total_score: number;
   interpretation: string;
   event_description?: string;
@@ -77,7 +105,12 @@ export const useTemplateData = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
-  const savePHQ9Assessment = async (data: Omit<PHQ9Assessment, 'id' | 'created_at' | 'updated_at'>) => {
+  const savePHQ9Assessment = async (data: { 
+    client_id: string; 
+    responses: Record<string, number>; 
+    total_score: number; 
+    additional_notes?: string;
+  }) => {
     setIsLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -85,20 +118,20 @@ export const useTemplateData = () => {
         throw new Error('User not authenticated');
       }
 
-      // Convert responses object to individual question columns
-      const questionData: Record<string, number> = {};
-      Object.entries(data.responses).forEach(([key, value]) => {
-        const questionNum = key.replace('question_', '');
-        questionData[`question_${questionNum}`] = value;
-      });
-
       const insertData = {
         client_id: data.client_id,
-        clinician_id: user.id,
-        assessment_date: data.assessment_date,
+        assessment_date: new Date().toISOString().split('T')[0],
+        question_1: data.responses.question_1 || 0,
+        question_2: data.responses.question_2 || 0,
+        question_3: data.responses.question_3 || 0,
+        question_4: data.responses.question_4 || 0,
+        question_5: data.responses.question_5 || 0,
+        question_6: data.responses.question_6 || 0,
+        question_7: data.responses.question_7 || 0,
+        question_8: data.responses.question_8 || 0,
+        question_9: data.responses.question_9 || 0,
         total_score: data.total_score,
-        additional_notes: data.additional_notes,
-        ...questionData // Spread individual question columns
+        additional_notes: data.additional_notes
       };
 
       const { data: result, error } = await supabase
@@ -128,7 +161,12 @@ export const useTemplateData = () => {
     }
   };
 
-  const saveGAD7Assessment = async (data: Omit<GAD7Assessment, 'id' | 'created_at' | 'updated_at'>) => {
+  const saveGAD7Assessment = async (data: { 
+    client_id: string; 
+    responses: Record<string, number>; 
+    total_score: number; 
+    additional_notes?: string;
+  }) => {
     setIsLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -136,20 +174,18 @@ export const useTemplateData = () => {
         throw new Error('User not authenticated');
       }
 
-      // Convert responses object to individual question columns
-      const questionData: Record<string, number> = {};
-      Object.entries(data.responses).forEach(([key, value]) => {
-        const questionNum = key.replace('question_', '');
-        questionData[`question_${questionNum}`] = value;
-      });
-
       const insertData = {
         client_id: data.client_id,
-        clinician_id: user.id,
-        assessment_date: data.assessment_date,
+        assessment_date: new Date().toISOString().split('T')[0],
+        question_1: data.responses.question_1 || 0,
+        question_2: data.responses.question_2 || 0,
+        question_3: data.responses.question_3 || 0,
+        question_4: data.responses.question_4 || 0,
+        question_5: data.responses.question_5 || 0,
+        question_6: data.responses.question_6 || 0,
+        question_7: data.responses.question_7 || 0,
         total_score: data.total_score,
-        additional_notes: data.additional_notes,
-        ...questionData // Spread individual question columns
+        additional_notes: data.additional_notes
       };
 
       const { data: result, error } = await supabase
@@ -179,7 +215,14 @@ export const useTemplateData = () => {
     }
   };
 
-  const savePCL5Assessment = async (data: Omit<PCL5Assessment, 'id' | 'created_at' | 'updated_at'>) => {
+  const savePCL5Assessment = async (data: { 
+    client_id: string; 
+    responses: Record<string, number>; 
+    total_score: number; 
+    interpretation: string;
+    event_description?: string;
+    additional_notes?: string;
+  }) => {
     setIsLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -189,20 +232,18 @@ export const useTemplateData = () => {
 
       // Convert responses object to individual question columns
       const questionData: Record<string, number> = {};
-      Object.entries(data.responses).forEach(([key, value]) => {
-        const questionNum = key.replace('question_', '');
-        questionData[`question_${questionNum}`] = value;
-      });
+      for (let i = 1; i <= 20; i++) {
+        questionData[`question_${i}`] = data.responses[`question_${i}`] || 0;
+      }
 
       const insertData = {
         client_id: data.client_id,
-        clinician_id: user.id,
-        assessment_date: data.assessment_date,
+        assessment_date: new Date().toISOString().split('T')[0],
         total_score: data.total_score,
         interpretation: data.interpretation,
         event_description: data.event_description,
         additional_notes: data.additional_notes,
-        ...questionData // Spread individual question columns
+        ...questionData
       };
 
       const { data: result, error } = await supabase
@@ -290,21 +331,21 @@ export const useTemplateData = () => {
       const insertData = {
         client_id: data.client_id,
         clinician_id: user.id,
-        plan_date: data.plan_date,
-        // Map to existing treatment_plans table columns
-        intervention1: data.interventions, // Map interventions to intervention1
-        intervention2: '', // Empty string for required field
-        next_update: data.plan_date, // Use plan_date for next_update
-        plan_length: data.timeline, // Map timeline to plan_length
-        frequency: data.frequency,
+        start_date: data.plan_date,
+        primary_objective: data.objectives,
+        intervention1: data.interventions,
+        intervention2: '',
+        next_update: data.plan_date,
+        plan_length: data.timeline,
+        treatment_frequency: data.frequency,
         goals: data.goals,
         is_active: data.is_active,
         additional_notes: data.additional_notes
       };
 
       const { data: result, error } = await supabase
-        .from('treatment_plans')
-        .insert([insertData])
+        .from('treatment_plans' as any)
+        .insert(insertData)
         .select()
         .single();
 
