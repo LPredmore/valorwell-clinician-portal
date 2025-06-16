@@ -80,9 +80,22 @@ export const useTemplateData = () => {
   const savePHQ9Assessment = async (data: Omit<PHQ9Assessment, 'id' | 'created_at' | 'updated_at'>) => {
     setIsLoading(true);
     try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      // Prepare the data for insertion
+      const insertData = {
+        ...data,
+        clinician_id: user.id,
+      };
+
+      // Insert using generic table access since the table might not be in types yet
       const { data: result, error } = await supabase
-        .from('phq9_assessments')
-        .insert([data])
+        .from('phq9_assessments' as any)
+        .insert([insertData])
         .select()
         .single();
 
@@ -110,9 +123,21 @@ export const useTemplateData = () => {
   const saveGAD7Assessment = async (data: Omit<GAD7Assessment, 'id' | 'created_at' | 'updated_at'>) => {
     setIsLoading(true);
     try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      // Prepare the data for insertion
+      const insertData = {
+        ...data,
+        clinician_id: user.id,
+      };
+
       const { data: result, error } = await supabase
-        .from('gad7_assessments')
-        .insert([data])
+        .from('gad7_assessments' as any)
+        .insert([insertData])
         .select()
         .single();
 
@@ -140,9 +165,21 @@ export const useTemplateData = () => {
   const savePCL5Assessment = async (data: Omit<PCL5Assessment, 'id' | 'created_at' | 'updated_at'>) => {
     setIsLoading(true);
     try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      // Prepare the data for insertion
+      const insertData = {
+        ...data,
+        clinician_id: user.id,
+      };
+
       const { data: result, error } = await supabase
-        .from('pcl5_assessments')
-        .insert([data])
+        .from('pcl5_assessments' as any)
+        .insert([insertData])
         .select()
         .single();
 
@@ -170,9 +207,21 @@ export const useTemplateData = () => {
   const saveSessionNote = async (data: Omit<SessionNote, 'id' | 'created_at' | 'updated_at'>) => {
     setIsLoading(true);
     try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      // Prepare the data for insertion
+      const insertData = {
+        ...data,
+        clinician_id: user.id,
+      };
+
       const { data: result, error } = await supabase
         .from('session_notes')
-        .insert([data])
+        .insert([insertData])
         .select()
         .single();
 
@@ -200,9 +249,21 @@ export const useTemplateData = () => {
   const saveTreatmentPlan = async (data: Omit<TreatmentPlan, 'id' | 'created_at' | 'updated_at'>) => {
     setIsLoading(true);
     try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      // Prepare the data for insertion
+      const insertData = {
+        ...data,
+        clinician_id: user.id,
+      };
+
       const { data: result, error } = await supabase
-        .from('treatment_plans')
-        .insert([data])
+        .from('treatment_plans' as any)
+        .insert([insertData])
         .select()
         .single();
 
@@ -232,17 +293,17 @@ export const useTemplateData = () => {
     try {
       const [phq9Result, gad7Result, pcl5Result] = await Promise.all([
         supabase
-          .from('phq9_assessments')
+          .from('phq9_assessments' as any)
           .select('*')
           .eq('client_id', clientId)
           .order('assessment_date', { ascending: false }),
         supabase
-          .from('gad7_assessments')
+          .from('gad7_assessments' as any)
           .select('*')
           .eq('client_id', clientId)
           .order('assessment_date', { ascending: false }),
         supabase
-          .from('pcl5_assessments')
+          .from('pcl5_assessments' as any)
           .select('*')
           .eq('client_id', clientId)
           .order('assessment_date', { ascending: false })

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -56,6 +55,7 @@ const TreatmentPlanTemplate: React.FC<TreatmentPlanTemplateProps> = ({
         client_id: clientId,
         clinician_id: '', // Will be set by the hook from auth.uid()
         plan_date: new Date().toISOString().split('T')[0],
+        is_active: true, // Add the missing required field
         ...planData
       };
 
