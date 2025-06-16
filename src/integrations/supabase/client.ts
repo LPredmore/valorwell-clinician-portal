@@ -38,21 +38,22 @@ export const getOrCreateVideoRoom = async (appointmentId: string, force: boolean
   }
 };
 
-// Dummy implementations to fix build errors for now.
-export const createUser = async (userData: any) => {
-    console.warn("`createUser` is a stub and not fully implemented.", userData);
-    // In a real implementation, you would call Supabase auth functions.
-    return { data: null, error: new Error("Not implemented") };
-};
-
-export const fetchClinicalDocuments = async (clientId: string) => {
-    console.warn("`fetchClinicalDocuments` is a stub and not fully implemented.", clientId);
-    // In a real implementation, you would query the 'clinical_documents' table.
-    return [];
-};
-
-export const getDocumentDownloadURL = async (filePath: string) => {
-    console.warn("`getDocumentDownloadURL` is a stub and not fully implemented.", filePath);
-    // In a real implementation, you would use Supabase storage functions.
-    return { url: null, error: new Error("Not implemented") };
+// Basic user creation function
+export const createUser = async (email: string, userData: any) => {
+    console.log("`createUser` called with:", { email, userData });
+    try {
+        // Call the create-user edge function
+        const { data, error } = await supabase.functions.invoke('create-user', {
+            body: { email, ...userData }
+        });
+        
+        if (error) {
+            throw error;
+        }
+        
+        return { data, error: null };
+    } catch (error: any) {
+        console.error("Error in createUser:", error);
+        return { data: null, error };
+    }
 };
