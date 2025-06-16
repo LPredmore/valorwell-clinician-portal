@@ -1,10 +1,10 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/components/ui/use-toast';
 import { Plus, FileText, ClipboardList, Brain } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import SessionNoteTemplate from '@/components/templates/SessionNoteTemplate';
 import TreatmentPlanTemplate from '@/components/templates/TreatmentPlanTemplate';
 import PHQ9Template from '@/components/templates/PHQ9Template';
@@ -15,6 +15,33 @@ const TemplatesTab = () => {
   const { toast } = useToast();
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [clinicianName, setClinicianName] = useState<string>('');
+
+  // Fetch clinician name on component mount
+  useEffect(() => {
+    const fetchClinicianName = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data: clinician } = await supabase
+          .from('clinicians')
+          .select('clinician_first_name, clinician_last_name')
+          .eq('id', user.id)
+          .single();
+
+        if (clinician) {
+          const fullName = `${clinician.clinician_first_name || ''} ${clinician.clinician_last_name || ''}`.trim();
+          setClinicianName(fullName || 'Clinician');
+        }
+      } catch (error) {
+        console.error('Error fetching clinician name:', error);
+        setClinicianName('Clinician');
+      }
+    };
+
+    fetchClinicianName();
+  }, []);
 
   const templates = [
     {
@@ -69,7 +96,18 @@ const TemplatesTab = () => {
     if (!template) return null;
 
     const Component = template.component;
-    return <Component onClose={handleCloseDialog} />;
+    
+    // Pass appropriate props based on component type
+    const commonProps = {
+      onClose: handleCloseDialog,
+    };
+
+    // Add clinicianName for templates that need it
+    if (selectedTemplate === 'gad7' || selectedTemplate === 'pcl5') {
+      return <Component {...commonProps} clinicianName={clinicianName} />;
+    }
+
+    return <Component {...commonProps} />;
   };
 
   return (

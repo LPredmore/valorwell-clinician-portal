@@ -62,7 +62,7 @@ export const useAvailabilityEdit = (
         isException: availabilityBlock.isException
       });
       
-      // Simplified approach: Check for existing exceptions first
+      // Check for existing exceptions first
       const { data: existingExceptions } = await supabase
         .from('availability_exceptions')
         .select('id')
@@ -85,9 +85,9 @@ export const useAvailabilityEdit = (
           })
           .eq('id', existingExceptions[0].id);
       } else {
-        // Create new exception
+        // Create new exception with required fields
         console.log('Creating new exception');
-        const insertData: any = {
+        const insertData = {
           clinician_id: clinicianId,
           specific_date: formattedDate,
           start_time: startTime,
@@ -154,7 +154,7 @@ export const useAvailabilityEdit = (
         isException: availabilityBlock.isException
       });
       
-      // Simplified approach: Check for existing exceptions
+      // Check for existing exceptions
       const { data: existingExceptions } = await supabase
         .from('availability_exceptions')
         .select('id')
@@ -175,10 +175,12 @@ export const useAvailabilityEdit = (
           })
           .eq('id', existingExceptions[0].id);
       } else {
-        // Create new exception marked as deleted
+        // Create new exception marked as deleted with required time fields
         const insertData = {
           clinician_id: clinicianId,
           specific_date: formattedDate,
+          start_time: startTime, // Use current times for deleted record
+          end_time: endTime,
           is_deleted: true
         };
         
