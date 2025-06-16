@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -97,16 +98,17 @@ const TemplatesTab = () => {
 
     const Component = template.component;
     
-    // Pass appropriate props based on component type
+    // All templates get these common props
     const commonProps = {
       onClose: handleCloseDialog,
     };
 
-    // Add clinicianName for templates that need it
+    // Templates that require clinicianName
     if (selectedTemplate === 'gad7' || selectedTemplate === 'pcl5') {
       return <Component {...commonProps} clinicianName={clinicianName} />;
     }
 
+    // Templates that don't require clinicianName
     return <Component {...commonProps} />;
   };
 

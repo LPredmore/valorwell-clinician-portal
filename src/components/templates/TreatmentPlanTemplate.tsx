@@ -6,13 +6,24 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
+import { BaseTemplateProps, TemplateSaveCallback } from './types';
 
-interface TreatmentPlanTemplateProps {
-  clientId?: string;
-  onSave?: (plan: any) => void;
+interface TreatmentPlanData {
+  client_id: string;
+  goals: string;
+  objectives: string;
+  interventions: string;
+  timeline: string;
+  frequency: string;
+  created_at: string;
 }
 
-const TreatmentPlanTemplate: React.FC<TreatmentPlanTemplateProps> = ({ clientId, onSave }) => {
+interface TreatmentPlanTemplateProps extends BaseTemplateProps {
+  clientId?: string;
+  onSave?: TemplateSaveCallback<TreatmentPlanData>;
+}
+
+const TreatmentPlanTemplate: React.FC<TreatmentPlanTemplateProps> = ({ onClose, clientId, onSave }) => {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [planData, setPlanData] = useState({
@@ -36,7 +47,7 @@ const TreatmentPlanTemplate: React.FC<TreatmentPlanTemplateProps> = ({ clientId,
     setIsSubmitting(true);
     try {
       // Here you would save the treatment plan
-      const plan = {
+      const plan: TreatmentPlanData = {
         client_id: clientId,
         ...planData,
         created_at: new Date().toISOString()
@@ -48,6 +59,7 @@ const TreatmentPlanTemplate: React.FC<TreatmentPlanTemplateProps> = ({ clientId,
       });
       
       onSave?.(plan);
+      onClose();
     } catch (error) {
       toast({
         title: "Error",
@@ -122,9 +134,14 @@ const TreatmentPlanTemplate: React.FC<TreatmentPlanTemplateProps> = ({ clientId,
           </div>
         </div>
         
-        <Button onClick={handleSubmit} disabled={isSubmitting || !clientId} className="w-full">
-          {isSubmitting ? "Saving..." : "Save Treatment Plan"}
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={handleSubmit} disabled={isSubmitting || !clientId} className="flex-1">
+            {isSubmitting ? "Saving..." : "Save Treatment Plan"}
+          </Button>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );

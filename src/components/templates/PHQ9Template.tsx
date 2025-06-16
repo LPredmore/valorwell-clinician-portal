@@ -4,13 +4,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { savePHQ9Assessment, type PHQ9Assessment } from '@/utils/phq9Utils';
+import { BaseTemplateProps, TemplateSaveCallback } from './types';
 
-interface PHQ9TemplateProps {
+interface PHQ9TemplateProps extends BaseTemplateProps {
   clientId?: string;
-  onSave?: (assessment: PHQ9Assessment) => void;
+  onSave?: TemplateSaveCallback<PHQ9Assessment>;
 }
 
-const PHQ9Template: React.FC<PHQ9TemplateProps> = ({ clientId, onSave }) => {
+const PHQ9Template: React.FC<PHQ9TemplateProps> = ({ onClose, clientId, onSave }) => {
   const [responses, setResponses] = useState<Record<string, number>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
@@ -39,6 +40,7 @@ const PHQ9Template: React.FC<PHQ9TemplateProps> = ({ clientId, onSave }) => {
       });
       
       onSave?.(assessment);
+      onClose();
     } catch (error) {
       toast({
         title: "Error",
@@ -62,9 +64,14 @@ const PHQ9Template: React.FC<PHQ9TemplateProps> = ({ clientId, onSave }) => {
         <p className="text-sm text-gray-600 mb-4">
           PHQ-9 assessment form will be implemented in a future update.
         </p>
-        <Button onClick={handleSubmit} disabled={isSubmitting || !clientId}>
-          {isSubmitting ? "Saving..." : "Save Assessment"}
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={handleSubmit} disabled={isSubmitting || !clientId}>
+            {isSubmitting ? "Saving..." : "Save Assessment"}
+          </Button>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );
