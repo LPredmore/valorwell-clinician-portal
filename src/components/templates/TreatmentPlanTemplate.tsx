@@ -6,32 +6,29 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
-import { BaseTemplateProps, TemplateSaveCallback } from './types';
+import { CheckCircle, X } from 'lucide-react';
+import { useTemplateData } from '@/hooks/useTemplateData';
+import { BaseTemplateProps, ClinicianTemplateProps, ClientTemplateProps } from './types';
 
-interface TreatmentPlanData {
-  client_id: string;
-  goals: string;
-  objectives: string;
-  interventions: string;
-  timeline: string;
-  frequency: string;
-  created_at: string;
-}
+interface TreatmentPlanTemplateProps extends BaseTemplateProps, ClinicianTemplateProps, ClientTemplateProps {}
 
-interface TreatmentPlanTemplateProps extends BaseTemplateProps {
-  clientId?: string;
-  onSave?: TemplateSaveCallback<TreatmentPlanData>;
-}
-
-const TreatmentPlanTemplate: React.FC<TreatmentPlanTemplateProps> = ({ onClose, clientId, onSave }) => {
+const TreatmentPlanTemplate: React.FC<TreatmentPlanTemplateProps> = ({ 
+  onClose, 
+  clinicianName, 
+  clientData,
+  clientId
+}) => {
   const { toast } = useToast();
+  const { saveTreatmentPlan } = useTemplateData();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
   const [planData, setPlanData] = useState({
     goals: '',
     objectives: '',
     interventions: '',
     timeline: '',
-    frequency: ''
+    frequency: '',
+    additional_notes: ''
   });
 
   const handleSubmit = async () => {
@@ -44,28 +41,32 @@ const TreatmentPlanTemplate: React.FC<TreatmentPlanTemplateProps> = ({ onClose, 
       return;
     }
 
-    setIsSubmitting(true);
-    try {
-      // Here you would save the treatment plan
-      const plan: TreatmentPlanData = {
-        client_id: clientId,
-        ...planData,
-        created_at: new Date().toISOString()
-      };
-      
-      toast({
-        title: "Success",
-        description: "Treatment plan saved successfully.",
-      });
-      
-      onSave?.(plan);
-      onClose();
-    } catch (error) {
+    if (!planData.goals.trim() || !planData.objectives.trim() || !planData.interventions.trim()) {
       toast({
         title: "Error",
-        description: "Failed to save treatment plan.",
+        description: "Goals, objectives, and interventions are required.",
         variant: "destructive",
       });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const treatmentPlanData = {
+        client_id: clientId,
+        clinician_id: '', // Will be set by the hook from auth.uid()
+        plan_date: new Date().toISOString().split('T')[0],
+        ...planData
+      };
+
+      await saveTreatmentPlan(treatmentPlanData);
+      
+      setIsSaved(true);
+      setTimeout(() => {
+        setIsSaved(false);
+      }, 3000);
+    } catch (error) {
+      console.error('Error saving treatment plan:', error);
     } finally {
       setIsSubmitting(false);
     }
@@ -74,42 +75,63 @@ const TreatmentPlanTemplate: React.FC<TreatmentPlanTemplateProps> = ({ onClose, 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Treatment Plan Template</CardTitle>
+        <CardTitle className="flex justify-between items-center">
+          <span>Treatment Plan Template</span>
+          <Button variant="outline" size="icon" onClick={onClose}>
+            <X className="h-4 w-4" />
+          </Button>
+        </CardTitle>
         <CardDescription>
           Create a comprehensive treatment plan for the client
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <div>
+            <Label className="text-sm font-medium text-gray-700">Patient Name</Label>
+            <p className="p-2 border rounded-md bg-gray-50">
+              {clientData ? `${clientData.client_first_name} ${clientData.client_last_name}` : "Not specified"}
+            </p>
+          </div>
+          <div>
+            <Label className="text-sm font-medium text-gray-700">Clinician</Label>
+            <p className="p-2 border rounded-md bg-gray-50">{clinicianName || "Not specified"}</p>
+          </div>
+        </div>
+
         <div>
-          <Label htmlFor="goals">Treatment Goals</Label>
+          <Label htmlFor="goals">Treatment Goals *</Label>
           <Textarea
             id="goals"
             value={planData.goals}
             onChange={(e) => setPlanData({...planData, goals: e.target.value})}
             placeholder="Enter treatment goals..."
             rows={3}
+            required
           />
         </div>
         
         <div>
-          <Label htmlFor="objectives">Objectives</Label>
+          <Label htmlFor="objectives">Objectives *</Label>
           <Textarea
             id="objectives"
             value={planData.objectives}
             onChange={(e) => setPlanData({...planData, objectives: e.target.value})}
             placeholder="Enter specific objectives..."
             rows={3}
+            required
           />
         </div>
         
         <div>
-          <Label htmlFor="interventions">Interventions</Label>
+          <Label htmlFor="interventions">Interventions *</Label>
           <Textarea
             id="interventions"
             value={planData.interventions}
             onChange={(e) => setPlanData({...planData, interventions: e.target.value})}
             placeholder="Enter planned interventions..."
             rows={3}
+            required
           />
         </div>
         
@@ -133,10 +155,33 @@ const TreatmentPlanTemplate: React.FC<TreatmentPlanTemplateProps> = ({ onClose, 
             />
           </div>
         </div>
+
+        <div>
+          <Label htmlFor="additional_notes">Additional Notes</Label>
+          <Textarea
+            id="additional_notes"
+            value={planData.additional_notes}
+            onChange={(e) => setPlanData({...planData, additional_notes: e.target.value})}
+            placeholder="Any additional notes or considerations..."
+            rows={2}
+          />
+        </div>
         
-        <div className="flex gap-2">
-          <Button onClick={handleSubmit} disabled={isSubmitting || !clientId} className="flex-1">
-            {isSubmitting ? "Saving..." : "Save Treatment Plan"}
+        <div className="flex gap-2 pt-4">
+          <Button
+            onClick={handleSubmit}
+            disabled={isSubmitting || !clientId}
+            className="flex-1 flex items-center gap-2"
+          >
+            {isSubmitting ? (
+              "Saving..."
+            ) : isSaved ? (
+              <>
+                <CheckCircle className="h-4 w-4" /> Saved
+              </>
+            ) : (
+              "Save Treatment Plan"
+            )}
           </Button>
           <Button variant="outline" onClick={onClose}>
             Cancel
