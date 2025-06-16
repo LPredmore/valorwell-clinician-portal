@@ -80,21 +80,23 @@ export const useTemplateData = () => {
   const savePHQ9Assessment = async (data: Omit<PHQ9Assessment, 'id' | 'created_at' | 'updated_at'>) => {
     setIsLoading(true);
     try {
-      // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         throw new Error('User not authenticated');
       }
 
-      // Prepare the data for insertion
       const insertData = {
-        ...data,
+        client_id: data.client_id,
         clinician_id: user.id,
+        assessment_date: data.assessment_date,
+        responses: data.responses,
+        total_score: data.total_score,
+        interpretation: data.interpretation,
+        additional_notes: data.additional_notes
       };
 
-      // Insert using generic table access since the table might not be in types yet
       const { data: result, error } = await supabase
-        .from('phq9_assessments' as any)
+        .from('phq9_assessments')
         .insert([insertData])
         .select()
         .single();
@@ -123,20 +125,23 @@ export const useTemplateData = () => {
   const saveGAD7Assessment = async (data: Omit<GAD7Assessment, 'id' | 'created_at' | 'updated_at'>) => {
     setIsLoading(true);
     try {
-      // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         throw new Error('User not authenticated');
       }
 
-      // Prepare the data for insertion
       const insertData = {
-        ...data,
+        client_id: data.client_id,
         clinician_id: user.id,
+        assessment_date: data.assessment_date,
+        responses: data.responses,
+        total_score: data.total_score,
+        interpretation: data.interpretation,
+        additional_notes: data.additional_notes
       };
 
       const { data: result, error } = await supabase
-        .from('gad7_assessments' as any)
+        .from('gad7_assessments')
         .insert([insertData])
         .select()
         .single();
@@ -165,20 +170,24 @@ export const useTemplateData = () => {
   const savePCL5Assessment = async (data: Omit<PCL5Assessment, 'id' | 'created_at' | 'updated_at'>) => {
     setIsLoading(true);
     try {
-      // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         throw new Error('User not authenticated');
       }
 
-      // Prepare the data for insertion
       const insertData = {
-        ...data,
+        client_id: data.client_id,
         clinician_id: user.id,
+        assessment_date: data.assessment_date,
+        responses: data.responses,
+        total_score: data.total_score,
+        interpretation: data.interpretation,
+        event_description: data.event_description,
+        additional_notes: data.additional_notes
       };
 
       const { data: result, error } = await supabase
-        .from('pcl5_assessments' as any)
+        .from('pcl5_assessments')
         .insert([insertData])
         .select()
         .single();
@@ -207,16 +216,20 @@ export const useTemplateData = () => {
   const saveSessionNote = async (data: Omit<SessionNote, 'id' | 'created_at' | 'updated_at'>) => {
     setIsLoading(true);
     try {
-      // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         throw new Error('User not authenticated');
       }
 
-      // Prepare the data for insertion
       const insertData = {
-        ...data,
+        client_id: data.client_id,
         clinician_id: user.id,
+        appointment_id: data.appointment_id,
+        session_date: data.session_date,
+        session_data: data.session_data,
+        client_name: data.client_name,
+        clinician_signature: data.clinician_signature,
+        session_notes: data.session_notes
       };
 
       const { data: result, error } = await supabase
@@ -249,20 +262,26 @@ export const useTemplateData = () => {
   const saveTreatmentPlan = async (data: Omit<TreatmentPlan, 'id' | 'created_at' | 'updated_at'>) => {
     setIsLoading(true);
     try {
-      // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         throw new Error('User not authenticated');
       }
 
-      // Prepare the data for insertion
       const insertData = {
-        ...data,
+        client_id: data.client_id,
         clinician_id: user.id,
+        plan_date: data.plan_date,
+        goals: data.goals,
+        objectives: data.objectives,
+        interventions: data.interventions,
+        timeline: data.timeline,
+        frequency: data.frequency,
+        additional_notes: data.additional_notes,
+        is_active: data.is_active
       };
 
       const { data: result, error } = await supabase
-        .from('treatment_plans' as any)
+        .from('treatment_plans')
         .insert([insertData])
         .select()
         .single();
@@ -293,17 +312,17 @@ export const useTemplateData = () => {
     try {
       const [phq9Result, gad7Result, pcl5Result] = await Promise.all([
         supabase
-          .from('phq9_assessments' as any)
+          .from('phq9_assessments')
           .select('*')
           .eq('client_id', clientId)
           .order('assessment_date', { ascending: false }),
         supabase
-          .from('gad7_assessments' as any)
+          .from('gad7_assessments')
           .select('*')
           .eq('client_id', clientId)
           .order('assessment_date', { ascending: false }),
         supabase
-          .from('pcl5_assessments' as any)
+          .from('pcl5_assessments')
           .select('*')
           .eq('client_id', clientId)
           .order('assessment_date', { ascending: false })

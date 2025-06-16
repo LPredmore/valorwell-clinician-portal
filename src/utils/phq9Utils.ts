@@ -19,8 +19,13 @@ export const savePHQ9Assessment = async (assessment: Omit<PHQ9Assessment, 'id' |
   const { data, error } = await supabase
     .from('phq9_assessments')
     .insert([{
-      ...assessment,
-      clinician_id: (await supabase.auth.getUser()).data.user?.id || ''
+      client_id: assessment.client_id,
+      clinician_id: assessment.clinician_id,
+      assessment_date: assessment.assessment_date,
+      responses: assessment.responses,
+      total_score: assessment.total_score,
+      interpretation: assessment.interpretation,
+      additional_notes: assessment.additional_notes
     }])
     .select()
     .single();
@@ -29,7 +34,18 @@ export const savePHQ9Assessment = async (assessment: Omit<PHQ9Assessment, 'id' |
     throw new Error(`Failed to save PHQ-9 assessment: ${error.message}`);
   }
 
-  return data;
+  return {
+    id: data.id,
+    client_id: data.client_id,
+    clinician_id: data.clinician_id,
+    assessment_date: data.assessment_date,
+    responses: data.responses as Record<string, number>,
+    total_score: data.total_score,
+    interpretation: data.interpretation,
+    additional_notes: data.additional_notes,
+    created_at: data.created_at,
+    updated_at: data.updated_at
+  };
 };
 
 export const getPHQ9Assessments = async (clientId: string): Promise<PHQ9Assessment[]> => {
@@ -43,7 +59,18 @@ export const getPHQ9Assessments = async (clientId: string): Promise<PHQ9Assessme
     throw new Error(`Failed to fetch PHQ-9 assessments: ${error.message}`);
   }
 
-  return data || [];
+  return (data || []).map(item => ({
+    id: item.id,
+    client_id: item.client_id,
+    clinician_id: item.clinician_id,
+    assessment_date: item.assessment_date,
+    responses: item.responses as Record<string, number>,
+    total_score: item.total_score,
+    interpretation: item.interpretation,
+    additional_notes: item.additional_notes,
+    created_at: item.created_at,
+    updated_at: item.updated_at
+  }));
 };
 
 export const getLatestPHQ9Assessment = async (clientId: string): Promise<PHQ9Assessment | null> => {
@@ -59,7 +86,20 @@ export const getLatestPHQ9Assessment = async (clientId: string): Promise<PHQ9Ass
     throw new Error(`Failed to fetch latest PHQ-9 assessment: ${error.message}`);
   }
 
-  return data;
+  if (!data) return null;
+
+  return {
+    id: data.id,
+    client_id: data.client_id,
+    clinician_id: data.clinician_id,
+    assessment_date: data.assessment_date,
+    responses: data.responses as Record<string, number>,
+    total_score: data.total_score,
+    interpretation: data.interpretation,
+    additional_notes: data.additional_notes,
+    created_at: data.created_at,
+    updated_at: data.updated_at
+  };
 };
 
 export const calculatePHQ9Score = (responses: Record<string, number>): number => {
