@@ -5,17 +5,28 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { Client } from "@/types/client";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Form, FormField, FormItem, FormControl } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { ClinicianTemplateProps, ClientTemplateProps } from './types';
 
-interface PCL5TemplateProps {
-  onClose: () => void;
-  clinicianName: string;
-  clientData?: Client | null;
+interface PCL5Assessment {
+  id: string;
+  templateType: 'pcl5';
+  responses: Record<string, number>;
+  totalScore: number;
+  interpretation: string;
+  createdAt: string;
+  clientId?: string;
+  clinicianId?: string;
+  eventDescription?: string;
+  additionalNotes?: string;
+}
+
+interface PCL5TemplateProps extends ClinicianTemplateProps, ClientTemplateProps {
+  onSave?: (data: PCL5Assessment) => void | Promise<void>;
 }
 
 // PCL-5 questions based on the official assessment
@@ -51,7 +62,13 @@ const answerOptions = [
   { value: 4, label: "Extremely" }
 ];
 
-const PCL5Template: React.FC<PCL5TemplateProps> = ({ onClose, clinicianName, clientData }) => {
+const PCL5Template: React.FC<PCL5TemplateProps> = ({ 
+  onClose, 
+  clinicianName, 
+  clientData,
+  clientId,
+  onSave
+}) => {
   const { toast } = useToast();
   const [scores, setScores] = useState<number[]>(new Array(20).fill(0));
   const [additionalNotes, setAdditionalNotes] = useState("");
@@ -83,13 +100,41 @@ const PCL5Template: React.FC<PCL5TemplateProps> = ({ onClose, clinicianName, cli
     setScores(newScores);
   };
 
-  const handleSubmit = () => {
-    toast({
-      title: "Assessment Saved",
-      description: "PCL-5 assessment has been saved successfully.",
-    });
-    
-    onClose();
+  const handleSubmit = async () => {
+    try {
+      const assessment: PCL5Assessment = {
+        id: crypto.randomUUID(),
+        templateType: 'pcl5',
+        responses: scores.reduce((acc, score, index) => ({
+          ...acc,
+          [`question_${index + 1}`]: score
+        }), {}),
+        totalScore,
+        interpretation: getInterpretation(totalScore),
+        createdAt: new Date().toISOString(),
+        clientId,
+        eventDescription: form.getValues('eventDescription'),
+        additionalNotes
+      };
+
+      if (onSave) {
+        await onSave(assessment);
+      } else {
+        // Default save behavior
+        toast({
+          title: "Assessment Saved",
+          description: "PCL-5 assessment has been saved successfully.",
+        });
+      }
+      
+      onClose();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save PCL-5 assessment.",
+        variant: "destructive",
+      });
+    }
   };
 
   const calculateClusterScores = () => {
