@@ -14,6 +14,7 @@ import PCL5Template from '@/components/templates/PCL5Template';
 const TemplatesTab = () => {
   const { toast } = useToast();
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const templates = [
     {
@@ -55,6 +56,12 @@ const TemplatesTab = () => {
 
   const handleTemplateSelect = (templateId: string) => {
     setSelectedTemplate(templateId);
+    setIsDialogOpen(true);
+  };
+
+  const handleCloseDialog = () => {
+    setIsDialogOpen(false);
+    setSelectedTemplate(null);
   };
 
   const renderTemplateComponent = () => {
@@ -62,7 +69,7 @@ const TemplatesTab = () => {
     if (!template) return null;
 
     const Component = template.component;
-    return <Component />;
+    return <Component onClose={handleCloseDialog} />;
   };
 
   return (
@@ -90,33 +97,34 @@ const TemplatesTab = () => {
                   </div>
                 </CardHeader>
                 <CardContent className="pt-0">
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <Button 
-                        variant="outline" 
-                        className="w-full"
-                        onClick={() => handleTemplateSelect(template.id)}
-                      >
-                        <Plus className="mr-2 h-4 w-4" />
-                        Use Template
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                      <DialogHeader>
-                        <DialogTitle>{template.name}</DialogTitle>
-                        <DialogDescription>
-                          {template.description}
-                        </DialogDescription>
-                      </DialogHeader>
-                      {renderTemplateComponent()}
-                    </DialogContent>
-                  </Dialog>
+                  <Button 
+                    variant="outline" 
+                    className="w-full"
+                    onClick={() => handleTemplateSelect(template.id)}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Use Template
+                  </Button>
                 </CardContent>
               </Card>
             ))}
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedTemplate && templates.find(t => t.id === selectedTemplate)?.name}
+            </DialogTitle>
+            <DialogDescription>
+              {selectedTemplate && templates.find(t => t.id === selectedTemplate)?.description}
+            </DialogDescription>
+          </DialogHeader>
+          {renderTemplateComponent()}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

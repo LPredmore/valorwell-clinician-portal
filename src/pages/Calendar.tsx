@@ -17,6 +17,7 @@ const Calendar = () => {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [userTimeZone, setUserTimeZone] = useState<string>('America/New_York');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [currentDate, setCurrentDate] = useState(new Date());
 
   useEffect(() => {
     const fetchCurrentUser = async () => {
@@ -103,6 +104,7 @@ const Calendar = () => {
                 key={refreshTrigger}
                 clinicianId={currentUser.id}
                 userTimeZone={userTimeZone}
+                currentDate={currentDate}
               />
             </CardContent>
           </Card>
