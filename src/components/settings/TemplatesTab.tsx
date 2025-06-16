@@ -6,11 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { useToast } from '@/components/ui/use-toast';
 import { Plus, FileText, ClipboardList, Brain } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import SessionNoteTemplate from '@/components/templates/SessionNoteTemplate';
-import TreatmentPlanTemplate from '@/components/templates/TreatmentPlanTemplate';
-import PHQ9Template from '@/components/templates/PHQ9Template';
-import GAD7Template from '@/components/templates/GAD7Template';
-import PCL5Template from '@/components/templates/PCL5Template';
+import TemplateRenderer from '@/components/templates/TemplateRenderer';
 
 const TemplatesTab = () => {
   const { toast } = useToast();
@@ -50,35 +46,30 @@ const TemplatesTab = () => {
       name: 'Session Note',
       description: 'Document therapy sessions and progress',
       icon: FileText,
-      component: SessionNoteTemplate,
     },
     {
       id: 'treatment-plan',
       name: 'Treatment Plan',
       description: 'Create comprehensive treatment plans',
       icon: ClipboardList,
-      component: TreatmentPlanTemplate,
     },
     {
       id: 'phq9',
       name: 'PHQ-9 Assessment',
       description: 'Depression screening questionnaire',
       icon: Brain,
-      component: PHQ9Template,
     },
     {
       id: 'gad7',
       name: 'GAD-7 Assessment',
       description: 'Anxiety screening questionnaire',
       icon: Brain,
-      component: GAD7Template,
     },
     {
       id: 'pcl5',
       name: 'PCL-5 Assessment',
       description: 'PTSD screening questionnaire',
       icon: Brain,
-      component: PCL5Template,
     },
   ];
 
@@ -90,27 +81,6 @@ const TemplatesTab = () => {
   const handleCloseDialog = () => {
     setIsDialogOpen(false);
     setSelectedTemplate(null);
-  };
-
-  const renderTemplateComponent = () => {
-    const template = templates.find(t => t.id === selectedTemplate);
-    if (!template) return null;
-
-    const Component = template.component;
-    
-    // All templates get these common props
-    const commonProps = {
-      onClose: handleCloseDialog,
-      clinicianName,
-    };
-
-    // Templates that don't require special handling (SessionNote and TreatmentPlan only need onClose)
-    if (selectedTemplate === 'session-note' || selectedTemplate === 'treatment-plan') {
-      return <Component onClose={handleCloseDialog} />;
-    }
-
-    // Assessment templates that require clinicianName
-    return <Component {...commonProps} />;
   };
 
   return (
@@ -163,7 +133,13 @@ const TemplatesTab = () => {
               {selectedTemplate && templates.find(t => t.id === selectedTemplate)?.description}
             </DialogDescription>
           </DialogHeader>
-          {renderTemplateComponent()}
+          {selectedTemplate && (
+            <TemplateRenderer
+              templateId={selectedTemplate}
+              onClose={handleCloseDialog}
+              clinicianName={clinicianName}
+            />
+          )}
         </DialogContent>
       </Dialog>
     </div>
