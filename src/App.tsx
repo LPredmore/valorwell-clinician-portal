@@ -9,6 +9,8 @@ import { isConfigValid, getConfigErrors } from "@/utils/configValidation";
 const LazyIndex = lazy(() => import("./pages/Index"));
 const LazyCalendar = lazy(() => import("./pages/Calendar"));
 const LazyLogin = lazy(() => import("./pages/Login"));
+const LazyResetPassword = lazy(() => import("./pages/ResetPassword"));
+const LazyUpdatePassword = lazy(() => import("./pages/UpdatePassword"));
 const LazyNotFound = lazy(() => import("./pages/NotFound"));
 const LazyNylasCallback = lazy(() => import("./pages/NylasCallback"));
 const LazyNylasOAuthCallback = lazy(() => import("./pages/NylasOAuthCallback"));
@@ -191,6 +193,22 @@ const App = () => {
                     fallback={<ChunkErrorComponent onRetry={handleRetry} />}
                   >
                     <LazyLogin />
+                  </ErrorBoundary>
+                } />
+                <Route path="/reset-password" element={
+                  <ErrorBoundary
+                    componentName="ResetPassword"
+                    fallback={<ChunkErrorComponent onRetry={handleRetry} />}
+                  >
+                    <LazyResetPassword />
+                  </ErrorBoundary>
+                } />
+                <Route path="/update-password" element={
+                  <ErrorBoundary
+                    componentName="UpdatePassword"
+                    fallback={<ChunkErrorComponent onRetry={handleRetry} />}
+                  >
+                    <LazyUpdatePassword />
                   </ErrorBoundary>
                 } />
                 <Route path="/nylas-callback" element={

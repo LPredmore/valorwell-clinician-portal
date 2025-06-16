@@ -1,5 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
 import {
   Dialog,
   DialogContent,
@@ -378,6 +378,8 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
     }
   };
 
+  const form = useForm();
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
@@ -405,37 +407,31 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
             )}
           </div>
           <div className="flex items-center space-x-2">
-            <FormField
-              control={{}}
-              name="start_date"
-              render={() => (
-                <FormItem className="flex flex-col">
-                  <Label>Date</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant={"outline"}
-                        className={cn(
-                          "w-[240px] justify-start text-left font-normal",
-                          !appointmentDate && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {appointmentDate ? format(appointmentDate, "PPP") : <span>Pick a date</span>}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={appointmentDate}
-                        onSelect={setAppointmentDate}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </FormItem>
-              )}
-            />
+            <FormItem className="flex flex-col">
+              <Label>Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant={"outline"}
+                    className={cn(
+                      "w-[240px] justify-start text-left font-normal",
+                      !appointmentDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {appointmentDate ? format(appointmentDate, "PPP") : <span>Pick a date</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={appointmentDate}
+                    onSelect={setAppointmentDate}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </FormItem>
           </div>
           <div>
             <Label>Start Time</Label>
