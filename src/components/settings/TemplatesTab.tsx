@@ -103,7 +103,7 @@ const TemplatesTab = () => {
       onClose: handleCloseDialog,
     };
 
-    // Templates that require clinicianName
+    // Templates that require clinicianName (GAD7 and PCL5)
     if (selectedTemplate === 'gad7' || selectedTemplate === 'pcl5') {
       return <Component {...commonProps} clinicianName={clinicianName} />;
     }

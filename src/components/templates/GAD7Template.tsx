@@ -1,14 +1,30 @@
+
 import React, { useState } from 'react';
 import { X, CheckCircle } from 'lucide-react';
-import { Client } from '@/types/client';
+import { ClinicianTemplateProps, ClientTemplateProps } from './types';
 
-interface GAD7TemplateProps {
-  onClose: () => void;
-  clinicianName: string;
-  clientData?: Client;
+interface GAD7Assessment {
+  id: string;
+  templateType: 'gad7';
+  responses: Record<string, number>;
+  totalScore: number;
+  interpretation: string;
+  createdAt: string;
+  clientId?: string;
+  clinicianId?: string;
 }
 
-const GAD7Template = ({ onClose, clinicianName, clientData }: GAD7TemplateProps) => {
+interface GAD7TemplateProps extends ClinicianTemplateProps, ClientTemplateProps {
+  onSave?: (data: GAD7Assessment) => void | Promise<void>;
+}
+
+const GAD7Template: React.FC<GAD7TemplateProps> = ({ 
+  onClose, 
+  clinicianName, 
+  clientData,
+  clientId,
+  onSave
+}) => {
   const [responses, setResponses] = useState<number[]>(Array(7).fill(0));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
@@ -55,9 +71,27 @@ const GAD7Template = ({ onClose, clinicianName, clientData }: GAD7TemplateProps)
   const handleSave = async () => {
     setIsSubmitting(true);
     try {
-      // Here you would typically save to a database
-      // For now, we'll just simulate a successful save
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const totalScore = calculateScore();
+      const assessment: GAD7Assessment = {
+        id: crypto.randomUUID(),
+        templateType: 'gad7',
+        responses: responses.reduce((acc, response, index) => ({
+          ...acc,
+          [`question_${index + 1}`]: response
+        }), {}),
+        totalScore,
+        interpretation: getScoreInterpretation(totalScore),
+        createdAt: new Date().toISOString(),
+        clientId,
+      };
+
+      if (onSave) {
+        await onSave(assessment);
+      } else {
+        // Default save behavior - simulate save
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+      
       setIsSaved(true);
       setTimeout(() => {
         setIsSaved(false);
