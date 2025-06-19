@@ -7,6 +7,7 @@ export interface PHQ9Assessment {
   id: string;
   client_id: string;
   clinician_id?: string;
+  appointment_id?: string;
   assessment_date: string;
   question_1: number;
   question_2: number;
@@ -18,12 +19,12 @@ export interface PHQ9Assessment {
   question_8: number;
   question_9: number;
   total_score: number;
-  interpretation?: string;
+  phq9_narrative?: string;
   additional_notes?: string;
   created_at: string;
-  updated_at: string;
 }
 
+// Temporary interfaces for GAD-7 and PCL-5 (will work with generic table for now)
 export interface GAD7Assessment {
   id: string;
   client_id: string;
@@ -126,6 +127,7 @@ export const useTemplateData = () => {
       const insertData = {
         client_id: data.client_id,
         clinician_id: user.id,
+        appointment_id: null,
         assessment_date: new Date().toISOString().split('T')[0],
         question_1: data.responses.question_1 || 0,
         question_2: data.responses.question_2 || 0,
@@ -137,7 +139,7 @@ export const useTemplateData = () => {
         question_8: data.responses.question_8 || 0,
         question_9: data.responses.question_9 || 0,
         total_score: data.total_score,
-        interpretation: getScoreInterpretation('phq9', data.total_score),
+        phq9_narrative: getScoreInterpretation('phq9', data.total_score),
         additional_notes: data.additional_notes
       };
 
@@ -168,6 +170,7 @@ export const useTemplateData = () => {
     }
   };
 
+  // Placeholder for GAD-7 - will store in clinical_documents for now
   const saveGAD7Assessment = async (data: { 
     client_id: string; 
     responses: Record<string, number>; 
@@ -181,25 +184,26 @@ export const useTemplateData = () => {
         throw new Error('User not authenticated');
       }
 
-      const insertData = {
-        client_id: data.client_id,
-        clinician_id: user.id,
-        assessment_date: new Date().toISOString().split('T')[0],
-        question_1: data.responses.question_1 || 0,
-        question_2: data.responses.question_2 || 0,
-        question_3: data.responses.question_3 || 0,
-        question_4: data.responses.question_4 || 0,
-        question_5: data.responses.question_5 || 0,
-        question_6: data.responses.question_6 || 0,
-        question_7: data.responses.question_7 || 0,
+      // Store GAD-7 data in clinical_documents as JSON for now
+      const assessmentData = {
+        assessment_type: 'GAD-7',
+        responses: data.responses,
         total_score: data.total_score,
         interpretation: getScoreInterpretation('gad7', data.total_score),
-        additional_notes: data.additional_notes
+        additional_notes: data.additional_notes,
+        assessment_date: new Date().toISOString().split('T')[0]
       };
 
       const { data: result, error } = await supabase
-        .from('gad7_assessments')
-        .insert([insertData])
+        .from('clinical_documents')
+        .insert([{
+          client_id: data.client_id,
+          document_type: 'assessment',
+          document_title: `GAD-7 Assessment - ${new Date().toLocaleDateString()}`,
+          document_date: new Date().toISOString().split('T')[0],
+          file_path: JSON.stringify(assessmentData),
+          created_by: user.id
+        }])
         .select()
         .single();
 
@@ -224,6 +228,7 @@ export const useTemplateData = () => {
     }
   };
 
+  // Placeholder for PCL-5 - will store in clinical_documents for now
   const savePCL5Assessment = async (data: { 
     client_id: string; 
     responses: Record<string, number>; 
@@ -239,26 +244,27 @@ export const useTemplateData = () => {
         throw new Error('User not authenticated');
       }
 
-      // Convert responses object to individual question columns
-      const questionData: Record<string, number> = {};
-      for (let i = 1; i <= 20; i++) {
-        questionData[`question_${i}`] = data.responses[`question_${i}`] || 0;
-      }
-
-      const insertData = {
-        client_id: data.client_id,
-        clinician_id: user.id,
-        assessment_date: new Date().toISOString().split('T')[0],
+      // Store PCL-5 data in clinical_documents as JSON for now
+      const assessmentData = {
+        assessment_type: 'PCL-5',
+        responses: data.responses,
         total_score: data.total_score,
         interpretation: data.interpretation,
         event_description: data.event_description,
         additional_notes: data.additional_notes,
-        ...questionData
+        assessment_date: new Date().toISOString().split('T')[0]
       };
 
       const { data: result, error } = await supabase
-        .from('pcl5_assessments')
-        .insert([insertData])
+        .from('clinical_documents')
+        .insert([{
+          client_id: data.client_id,
+          document_type: 'assessment',
+          document_title: `PCL-5 Assessment - ${new Date().toLocaleDateString()}`,
+          document_date: new Date().toISOString().split('T')[0],
+          file_path: JSON.stringify(assessmentData),
+          created_by: user.id
+        }])
         .select()
         .single();
 
@@ -383,16 +389,66 @@ export const useTemplateData = () => {
   const getClientAssessments = async (clientId: string) => {
     setIsLoading(true);
     try {
-      const [phq9Response, gad7Response, pcl5Response] = await Promise.all([
-        supabase.from('phq9_assessments').select('*').eq('client_id', clientId).order('assessment_date', { ascending: false }),
-        supabase.from('gad7_assessments').select('*').eq('client_id', clientId).order('assessment_date', { ascending: false }),
-        supabase.from('pcl5_assessments').select('*').eq('client_id', clientId).order('assessment_date', { ascending: false })
-      ]);
+      // Get PHQ-9 assessments from dedicated table
+      const phq9Response = await supabase
+        .from('phq9_assessments')
+        .select('*')
+        .eq('client_id', clientId)
+        .order('assessment_date', { ascending: false });
+
+      // Get GAD-7 and PCL-5 from clinical_documents
+      const documentsResponse = await supabase
+        .from('clinical_documents')
+        .select('*')
+        .eq('client_id', clientId)
+        .eq('document_type', 'assessment')
+        .order('document_date', { ascending: false });
+
+      const gad7Assessments = documentsResponse.data?.filter(doc => 
+        doc.document_title.includes('GAD-7')
+      ).map(doc => {
+        try {
+          const data = JSON.parse(doc.file_path);
+          return {
+            id: doc.id,
+            client_id: clientId,
+            assessment_date: data.assessment_date,
+            total_score: data.total_score,
+            interpretation: data.interpretation,
+            additional_notes: data.additional_notes,
+            created_at: doc.created_at,
+            ...data.responses
+          };
+        } catch {
+          return null;
+        }
+      }).filter(Boolean) || [];
+
+      const pcl5Assessments = documentsResponse.data?.filter(doc => 
+        doc.document_title.includes('PCL-5')
+      ).map(doc => {
+        try {
+          const data = JSON.parse(doc.file_path);
+          return {
+            id: doc.id,
+            client_id: clientId,
+            assessment_date: data.assessment_date,
+            total_score: data.total_score,
+            interpretation: data.interpretation,
+            event_description: data.event_description,
+            additional_notes: data.additional_notes,
+            created_at: doc.created_at,
+            ...data.responses
+          };
+        } catch {
+          return null;
+        }
+      }).filter(Boolean) || [];
 
       return {
         phq9: phq9Response.data || [],
-        gad7: gad7Response.data || [],
-        pcl5: pcl5Response.data || []
+        gad7: gad7Assessments,
+        pcl5: pcl5Assessments
       };
     } catch (error) {
       console.error('Error fetching client assessments:', error);

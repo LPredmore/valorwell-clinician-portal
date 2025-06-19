@@ -6,6 +6,7 @@ export interface PHQ9Assessment {
   id: string;
   client_id: string;
   clinician_id?: string;
+  appointment_id?: string;
   assessment_date: string;
   question_1: number;
   question_2: number;
@@ -17,10 +18,9 @@ export interface PHQ9Assessment {
   question_8: number;
   question_9: number;
   total_score: number;
-  interpretation?: string;
+  phq9_narrative?: string;
   additional_notes?: string;
   created_at: string;
-  updated_at: string;
 }
 
 export const savePHQ9Assessment = async (responses: Record<string, number>, clientId: string, additionalNotes?: string): Promise<PHQ9Assessment> => {
@@ -31,6 +31,7 @@ export const savePHQ9Assessment = async (responses: Record<string, number>, clie
       .from('phq9_assessments')
       .insert([{
         client_id: clientId,
+        appointment_id: null,
         assessment_date: new Date().toISOString().split('T')[0],
         question_1: responses.question_1 || 0,
         question_2: responses.question_2 || 0,
@@ -42,7 +43,7 @@ export const savePHQ9Assessment = async (responses: Record<string, number>, clie
         question_8: responses.question_8 || 0,
         question_9: responses.question_9 || 0,
         total_score: totalScore,
-        interpretation: interpretPHQ9Score(totalScore),
+        phq9_narrative: interpretPHQ9Score(totalScore),
         additional_notes: additionalNotes
       }])
       .select()
