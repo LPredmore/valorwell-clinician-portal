@@ -6,6 +6,7 @@ import { useToast } from '@/components/ui/use-toast';
 export interface PHQ9Assessment {
   id: string;
   client_id: string;
+  clinician_id?: string;
   assessment_date: string;
   question_1: number;
   question_2: number;
@@ -17,6 +18,7 @@ export interface PHQ9Assessment {
   question_8: number;
   question_9: number;
   total_score: number;
+  interpretation?: string;
   additional_notes?: string;
   created_at: string;
   updated_at: string;
@@ -25,6 +27,7 @@ export interface PHQ9Assessment {
 export interface GAD7Assessment {
   id: string;
   client_id: string;
+  clinician_id?: string;
   assessment_date: string;
   question_1: number;
   question_2: number;
@@ -34,6 +37,7 @@ export interface GAD7Assessment {
   question_6: number;
   question_7: number;
   total_score: number;
+  interpretation?: string;
   additional_notes?: string;
   created_at: string;
   updated_at: string;
@@ -42,6 +46,7 @@ export interface GAD7Assessment {
 export interface PCL5Assessment {
   id: string;
   client_id: string;
+  clinician_id?: string;
   assessment_date: string;
   question_1: number;
   question_2: number;
@@ -120,6 +125,7 @@ export const useTemplateData = () => {
 
       const insertData = {
         client_id: data.client_id,
+        clinician_id: user.id,
         assessment_date: new Date().toISOString().split('T')[0],
         question_1: data.responses.question_1 || 0,
         question_2: data.responses.question_2 || 0,
@@ -131,11 +137,12 @@ export const useTemplateData = () => {
         question_8: data.responses.question_8 || 0,
         question_9: data.responses.question_9 || 0,
         total_score: data.total_score,
+        interpretation: getScoreInterpretation('phq9', data.total_score),
         additional_notes: data.additional_notes
       };
 
       const { data: result, error } = await supabase
-        .from('phq9_assessments' as any)
+        .from('phq9_assessments')
         .insert([insertData])
         .select()
         .single();
@@ -176,6 +183,7 @@ export const useTemplateData = () => {
 
       const insertData = {
         client_id: data.client_id,
+        clinician_id: user.id,
         assessment_date: new Date().toISOString().split('T')[0],
         question_1: data.responses.question_1 || 0,
         question_2: data.responses.question_2 || 0,
@@ -185,11 +193,12 @@ export const useTemplateData = () => {
         question_6: data.responses.question_6 || 0,
         question_7: data.responses.question_7 || 0,
         total_score: data.total_score,
+        interpretation: getScoreInterpretation('gad7', data.total_score),
         additional_notes: data.additional_notes
       };
 
       const { data: result, error } = await supabase
-        .from('gad7_assessments' as any)
+        .from('gad7_assessments')
         .insert([insertData])
         .select()
         .single();
@@ -238,6 +247,7 @@ export const useTemplateData = () => {
 
       const insertData = {
         client_id: data.client_id,
+        clinician_id: user.id,
         assessment_date: new Date().toISOString().split('T')[0],
         total_score: data.total_score,
         interpretation: data.interpretation,
@@ -247,7 +257,7 @@ export const useTemplateData = () => {
       };
 
       const { data: result, error } = await supabase
-        .from('pcl5_assessments' as any)
+        .from('pcl5_assessments')
         .insert([insertData])
         .select()
         .single();
@@ -344,7 +354,7 @@ export const useTemplateData = () => {
       };
 
       const { data: result, error } = await supabase
-        .from('treatment_plans' as any)
+        .from('treatment_plans')
         .insert(insertData)
         .select()
         .single();
@@ -373,12 +383,16 @@ export const useTemplateData = () => {
   const getClientAssessments = async (clientId: string) => {
     setIsLoading(true);
     try {
-      // For now, return empty arrays since the assessment tables don't exist yet
-      // This allows the code to compile and run without errors
+      const [phq9Response, gad7Response, pcl5Response] = await Promise.all([
+        supabase.from('phq9_assessments').select('*').eq('client_id', clientId).order('assessment_date', { ascending: false }),
+        supabase.from('gad7_assessments').select('*').eq('client_id', clientId).order('assessment_date', { ascending: false }),
+        supabase.from('pcl5_assessments').select('*').eq('client_id', clientId).order('assessment_date', { ascending: false })
+      ]);
+
       return {
-        phq9: [],
-        gad7: [],
-        pcl5: []
+        phq9: phq9Response.data || [],
+        gad7: gad7Response.data || [],
+        pcl5: pcl5Response.data || []
       };
     } catch (error) {
       console.error('Error fetching client assessments:', error);
@@ -390,6 +404,24 @@ export const useTemplateData = () => {
       throw error;
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const getScoreInterpretation = (assessmentType: string, score: number): string => {
+    switch (assessmentType) {
+      case 'phq9':
+        if (score >= 0 && score <= 4) return "Minimal depression";
+        if (score >= 5 && score <= 9) return "Mild depression";
+        if (score >= 10 && score <= 14) return "Moderate depression";
+        if (score >= 15 && score <= 19) return "Moderately severe depression";
+        return "Severe depression";
+      case 'gad7':
+        if (score >= 0 && score <= 4) return "Minimal anxiety";
+        if (score >= 5 && score <= 9) return "Mild anxiety";
+        if (score >= 10 && score <= 14) return "Moderate anxiety";
+        return "Severe anxiety";
+      default:
+        return "";
     }
   };
 

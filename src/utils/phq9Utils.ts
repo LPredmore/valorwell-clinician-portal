@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 export interface PHQ9Assessment {
   id: string;
   client_id: string;
+  clinician_id?: string;
   assessment_date: string;
   question_1: number;
   question_2: number;
@@ -16,8 +17,10 @@ export interface PHQ9Assessment {
   question_8: number;
   question_9: number;
   total_score: number;
+  interpretation?: string;
   additional_notes?: string;
   created_at: string;
+  updated_at: string;
 }
 
 export const savePHQ9Assessment = async (responses: Record<string, number>, clientId: string, additionalNotes?: string): Promise<PHQ9Assessment> => {
@@ -25,7 +28,7 @@ export const savePHQ9Assessment = async (responses: Record<string, number>, clie
   
   try {
     const { data, error } = await supabase
-      .from('phq9_assessments' as any)
+      .from('phq9_assessments')
       .insert([{
         client_id: clientId,
         assessment_date: new Date().toISOString().split('T')[0],
@@ -39,6 +42,7 @@ export const savePHQ9Assessment = async (responses: Record<string, number>, clie
         question_8: responses.question_8 || 0,
         question_9: responses.question_9 || 0,
         total_score: totalScore,
+        interpretation: interpretPHQ9Score(totalScore),
         additional_notes: additionalNotes
       }])
       .select()
@@ -46,6 +50,10 @@ export const savePHQ9Assessment = async (responses: Record<string, number>, clie
 
     if (error) {
       throw new Error(`Failed to save PHQ-9 assessment: ${error.message}`);
+    }
+
+    if (!data) {
+      throw new Error('No data returned from PHQ-9 assessment save');
     }
 
     return data as PHQ9Assessment;
@@ -58,7 +66,7 @@ export const savePHQ9Assessment = async (responses: Record<string, number>, clie
 export const getPHQ9Assessments = async (clientId: string): Promise<PHQ9Assessment[]> => {
   try {
     const { data, error } = await supabase
-      .from('phq9_assessments' as any)
+      .from('phq9_assessments')
       .select('*')
       .eq('client_id', clientId)
       .order('assessment_date', { ascending: false });
@@ -77,7 +85,7 @@ export const getPHQ9Assessments = async (clientId: string): Promise<PHQ9Assessme
 export const getLatestPHQ9Assessment = async (clientId: string): Promise<PHQ9Assessment | null> => {
   try {
     const { data, error } = await supabase
-      .from('phq9_assessments' as any)
+      .from('phq9_assessments')
       .select('*')
       .eq('client_id', clientId)
       .order('assessment_date', { ascending: false })
