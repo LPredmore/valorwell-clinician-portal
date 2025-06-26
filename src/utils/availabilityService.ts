@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { DateTime } from 'luxon';
 
@@ -35,6 +34,13 @@ export class AvailabilityService {
     userTimezone: string = 'America/New_York'
   ): Promise<AvailabilitySlot[]> {
     try {
+      console.log('[AvailabilityService] Getting availability instances:', {
+        clinicianId,
+        startDate: startDate.toISOString().split('T')[0],
+        endDate: endDate.toISOString().split('T')[0],
+        userTimezone
+      });
+
       const { data, error } = await supabase.rpc('get_clinician_availability_instances', {
         p_clinician_id: clinicianId,
         p_start_date: startDate.toISOString().split('T')[0],
@@ -42,9 +48,19 @@ export class AvailabilityService {
         p_user_timezone: userTimezone
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('[AvailabilityService] Database error:', error);
+        throw error;
+      }
 
-      return data.map((slot: any) => ({
+      console.log('[AvailabilityService] Database response:', data);
+
+      if (!data || data.length === 0) {
+        console.log('[AvailabilityService] No availability data found');
+        return [];
+      }
+
+      const mappedSlots = data.map((slot: any) => ({
         id: `${clinicianId}-${slot.specific_date}-${slot.slot_number}`,
         day_of_week: slot.day_of_week,
         start_time: slot.start_time,
@@ -55,8 +71,11 @@ export class AvailabilityService {
         utc_start_time: slot.utc_start_time,
         utc_end_time: slot.utc_end_time
       }));
+
+      console.log('[AvailabilityService] Mapped slots:', mappedSlots);
+      return mappedSlots;
     } catch (error) {
-      console.error('Error fetching availability instances:', error);
+      console.error('[AvailabilityService] Error fetching availability instances:', error);
       throw error;
     }
   }
