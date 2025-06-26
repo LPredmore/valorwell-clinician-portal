@@ -42,14 +42,6 @@ const VirtualCalendar: React.FC<VirtualCalendarProps> = ({
   const startDate = useMemo(() => startOfWeek(currentDate), [currentDate]);
   const endDate = useMemo(() => endOfWeek(currentDate), [currentDate]);
   
-  console.log('[VirtualCalendar] Rendering with:', {
-    clinicianId,
-    currentDate: currentDate.toISOString(),
-    startDate: startDate.toISOString(),
-    endDate: endDate.toISOString(),
-    refreshTrigger
-  });
-  
   const { 
     appointments, 
     isLoading: isLoadingAppointments, 
@@ -62,13 +54,6 @@ const VirtualCalendar: React.FC<VirtualCalendarProps> = ({
     isLoading: isLoadingAvailability,
     error: availabilityError,
   } = useAvailability(clinicianId, startDate, endDate, refreshTrigger);
-
-  console.log('[VirtualCalendar] Availability data:', {
-    availability,
-    isLoadingAvailability,
-    availabilityError,
-    availabilityCount: availability?.length || 0
-  });
 
   // --- Start: Fetch external calendar mappings for visual indicators ---
   const appointmentIds = useMemo(() => appointments.map(a => a.id), [appointments]);
@@ -132,12 +117,7 @@ const VirtualCalendar: React.FC<VirtualCalendarProps> = ({
 
   const availabilityByDate = useMemo(() => {
     const grouped: { [key: string]: ProcessedAvailability[] } = {};
-    if (!availability) {
-      console.log('[VirtualCalendar] No availability data to group');
-      return grouped;
-    }
-
-    console.log('[VirtualCalendar] Grouping availability by date:', availability);
+    if (!availability) return grouped;
 
     availability.forEach(block => {
       const dateKey = format(block.date, 'yyyy-MM-dd');
@@ -146,8 +126,6 @@ const VirtualCalendar: React.FC<VirtualCalendarProps> = ({
       }
       grouped[dateKey].push(block);
     });
-    
-    console.log('[VirtualCalendar] Grouped availability:', grouped);
     return grouped;
   }, [availability]);
 
@@ -247,12 +225,6 @@ const VirtualCalendar: React.FC<VirtualCalendarProps> = ({
 
                 let availabilityBlockForSlot: ProcessedAvailability | null = null;
                 for (const block of dayAvailability) {
-                    console.log(`[VirtualCalendar] Checking availability block for ${dateKey} ${hour}:00:`, {
-                      block,
-                      start_time: block.start_time,
-                      end_time: block.end_time
-                    });
-                    
                     const start = new Date(day);
                     const [startH, startM] = block.start_time.split(':');
                     start.setHours(parseInt(startH), parseInt(startM), 0, 0);
@@ -261,16 +233,8 @@ const VirtualCalendar: React.FC<VirtualCalendarProps> = ({
                     const [endH, endM] = block.end_time.split(':');
                     end.setHours(parseInt(endH), parseInt(endM), 0, 0);
                     
-                    console.log(`[VirtualCalendar] Time comparison:`, {
-                      currentSlotTime: currentSlotTime.toISOString(),
-                      blockStart: start.toISOString(),
-                      blockEnd: end.toISOString(),
-                      withinRange: currentSlotTime >= start && currentSlotTime < end
-                    });
-                    
                     if (currentSlotTime >= start && currentSlotTime < end) {
                         availabilityBlockForSlot = block;
-                        console.log(`[VirtualCalendar] Found matching availability block for ${dateKey} ${hour}:00`);
                         break;
                     }
                 }
@@ -312,13 +276,6 @@ const VirtualCalendar: React.FC<VirtualCalendarProps> = ({
                         )}
                       </div>
                     ))}
-                    
-                    {/* Debug info for availability */}
-                    {availabilityBlockForSlot && !hourAppointments.length && (
-                      <div className="text-xs text-green-600 absolute bottom-1 right-1">
-                        Available
-                      </div>
-                    )}
                   </div>
                 );
               })}
@@ -331,17 +288,6 @@ const VirtualCalendar: React.FC<VirtualCalendarProps> = ({
       <div className="text-sm text-gray-600">
         Showing {appointments.length} appointments and {availability?.length || 0} availability blocks for this week.
       </div>
-
-      {/* Debug info */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="text-xs text-gray-500 bg-gray-100 p-2 rounded">
-          <div>Clinician ID: {clinicianId}</div>
-          <div>Date Range: {format(startDate, 'yyyy-MM-dd')} to {format(endDate, 'yyyy-MM-dd')}</div>
-          <div>Availability blocks: {availability?.length || 0}</div>
-          <div>Loading: {isLoadingAvailability ? 'Yes' : 'No'}</div>
-          {availabilityError && <div className="text-red-500">Error: {availabilityError.message}</div>}
-        </div>
-      )}
 
       {selectedAvailability && (
         <AvailabilityEditDialog

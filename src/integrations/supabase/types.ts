@@ -437,53 +437,6 @@ export type Database = {
         }
         Relationships: []
       }
-      availability_sync_status: {
-        Row: {
-          clinician_id: string
-          created_at: string | null
-          day_of_week: string
-          error_message: string | null
-          id: string
-          last_synced_at: string | null
-          nylas_event_id: string | null
-          slot_number: number
-          sync_status: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          clinician_id: string
-          created_at?: string | null
-          day_of_week: string
-          error_message?: string | null
-          id?: string
-          last_synced_at?: string | null
-          nylas_event_id?: string | null
-          slot_number: number
-          sync_status?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          clinician_id?: string
-          created_at?: string | null
-          day_of_week?: string
-          error_message?: string | null
-          id?: string
-          last_synced_at?: string | null
-          nylas_event_id?: string | null
-          slot_number?: number
-          sync_status?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "availability_sync_status_clinician_id_fkey"
-            columns: ["clinician_id"]
-            isOneToOne: false
-            referencedRelation: "clinicians"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       calendar_sync_logs: {
         Row: {
           appointment_id: string | null
@@ -3196,24 +3149,6 @@ export type Database = {
           record_id: string
         }
         Returns: boolean
-      }
-      get_clinician_availability_instances: {
-        Args: {
-          p_clinician_id: string
-          p_start_date: string
-          p_end_date: string
-          p_user_timezone?: string
-        }
-        Returns: {
-          day_of_week: string
-          start_time: string
-          end_time: string
-          timezone: string
-          slot_number: number
-          specific_date: string
-          utc_start_time: string
-          utc_end_time: string
-        }[]
       }
       get_unread_notification_count: {
         Args: { p_user_id: string }

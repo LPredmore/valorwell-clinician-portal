@@ -3,21 +3,31 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
-import { Loader2 } from 'lucide-react';
-import RecurringAvailabilityPanel from './RecurringAvailabilityPanel';
+import { Loader2, Plus, Trash2, Edit } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
+
+interface AvailabilityBlock {
+  id: string;
+  start_at: string;
+  end_at: string;
+  is_active: boolean;
+  recurring_pattern?: any;
+}
 
 interface ClinicianInfo {
   id: string;
   clinician_first_name: string;
   clinician_last_name: string;
   clinician_email: string;
-  clinician_time_granularity: string;
 }
 
 const ClinicianAvailabilityPanel = () => {
   const [currentUser, setCurrentUser] = useState<ClinicianInfo | null>(null);
+  const [availabilityBlocks, setAvailabilityBlocks] = useState<AvailabilityBlock[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [timeGranularity, setTimeGranularity] = useState<'hour' | 'half-hour'>('hour');
   const { toast } = useToast();
@@ -27,9 +37,10 @@ const ClinicianAvailabilityPanel = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      // Get clinician info from clinicians table instead of profiles
       const { data: clinician, error } = await supabase
         .from('clinicians')
-        .select('id, clinician_first_name, clinician_last_name, clinician_email, clinician_time_granularity')
+        .select('id, clinician_first_name, clinician_last_name, clinician_email')
         .eq('id', user.id)
         .single();
 
@@ -39,14 +50,30 @@ const ClinicianAvailabilityPanel = () => {
       }
 
       setCurrentUser(clinician);
-      const granularity = clinician.clinician_time_granularity;
-      if (granularity === 'hour' || granularity === 'half-hour') {
-        setTimeGranularity(granularity);
-      } else {
-        setTimeGranularity('hour');
-      }
     } catch (error) {
       console.error('Error in fetchCurrentUser:', error);
+    }
+  };
+
+  const fetchAvailabilityBlocks = async () => {
+    if (!currentUser) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('availability_blocks')
+        .select('*')
+        .eq('clinician_id', currentUser.id)
+        .eq('is_active', true)
+        .order('start_at');
+
+      if (error) {
+        console.error('Error fetching availability blocks:', error);
+        return;
+      }
+
+      setAvailabilityBlocks(data || []);
+    } catch (error) {
+      console.error('Error in fetchAvailabilityBlocks:', error);
     } finally {
       setIsLoading(false);
     }
@@ -54,14 +81,25 @@ const ClinicianAvailabilityPanel = () => {
 
   const handleTimeGranularityChange = (value: string) => {
     if (value === 'hour' || value === 'half-hour') {
-      setTimeGranularity(value as 'hour' | 'half-hour');
+      setTimeGranularity(value);
     }
   };
+
+  useEffect(() => {
+    fetchCurrentUser();
+  }, []);
+
+  useEffect(() => {
+    if (currentUser) {
+      fetchAvailabilityBlocks();
+    }
+  }, [currentUser]);
 
   const saveUserProfile = async () => {
     if (!currentUser) return;
 
     try {
+      // Update clinician time granularity in clinicians table
       const { error } = await supabase
         .from('clinicians')
         .update({ 
@@ -93,10 +131,6 @@ const ClinicianAvailabilityPanel = () => {
     }
   };
 
-  useEffect(() => {
-    fetchCurrentUser();
-  }, []);
-
   if (isLoading) {
     return (
       <Card>
@@ -123,14 +157,12 @@ const ClinicianAvailabilityPanel = () => {
         <CardHeader>
           <CardTitle>Availability Preferences</CardTitle>
           <CardDescription>
-            Configure your time slot preferences
+            Configure your time slot preferences and availability blocks
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <label htmlFor="timeGranularity" className="block text-sm font-medium mb-2">
-              Time Slot Duration
-            </label>
+            <Label htmlFor="timeGranularity">Time Slot Duration</Label>
             <Select value={timeGranularity} onValueChange={handleTimeGranularityChange}>
               <SelectTrigger>
                 <SelectValue />
@@ -148,7 +180,39 @@ const ClinicianAvailabilityPanel = () => {
         </CardContent>
       </Card>
 
-      <RecurringAvailabilityPanel clinicianId={currentUser.id} />
+      <Card>
+        <CardHeader>
+          <CardTitle>Availability Blocks</CardTitle>
+          <CardDescription>
+            Manage your recurring availability schedule
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {availabilityBlocks.length === 0 ? (
+            <p className="text-gray-500">No availability blocks configured.</p>
+          ) : (
+            <div className="space-y-2">
+              {availabilityBlocks.map((block) => (
+                <div key={block.id} className="flex items-center justify-between p-3 border rounded">
+                  <div>
+                    <p className="font-medium">
+                      {format(parseISO(block.start_at), 'PPP p')} - {format(parseISO(block.end_at), 'p')}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline">
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button size="sm" variant="outline">
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };
