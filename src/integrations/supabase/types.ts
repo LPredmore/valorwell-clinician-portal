@@ -86,110 +86,17 @@ export type Database = {
           },
         ]
       }
-      appointment_sync_mapping: {
-        Row: {
-          appointment_id: string
-          created_at: string | null
-          id: string
-          last_synced_at: string | null
-          nylas_calendar_id: string
-          nylas_event_id: string
-          sync_status: string | null
-        }
-        Insert: {
-          appointment_id: string
-          created_at?: string | null
-          id?: string
-          last_synced_at?: string | null
-          nylas_calendar_id: string
-          nylas_event_id: string
-          sync_status?: string | null
-        }
-        Update: {
-          appointment_id?: string
-          created_at?: string | null
-          id?: string
-          last_synced_at?: string | null
-          nylas_calendar_id?: string
-          nylas_event_id?: string
-          sync_status?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "appointment_sync_mapping_appointment_id_fkey"
-            columns: ["appointment_id"]
-            isOneToOne: false
-            referencedRelation: "appointments"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "appointment_sync_mapping_nylas_calendar_id_fkey"
-            columns: ["nylas_calendar_id"]
-            isOneToOne: false
-            referencedRelation: "nylas_calendars"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      appointment_templates: {
-        Row: {
-          color: string | null
-          created_at: string
-          default_notes: string | null
-          default_status: string
-          default_type: string
-          description: string | null
-          duration: number
-          id: string
-          is_default: boolean | null
-          name: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          color?: string | null
-          created_at?: string
-          default_notes?: string | null
-          default_status?: string
-          default_type?: string
-          description?: string | null
-          duration: number
-          id?: string
-          is_default?: boolean | null
-          name: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          color?: string | null
-          created_at?: string
-          default_notes?: string | null
-          default_status?: string
-          default_type?: string
-          description?: string | null
-          duration?: number
-          id?: string
-          is_default?: boolean | null
-          name?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       appointments: {
         Row: {
           appointment_recurring: string | null
-          appointment_timezone: string | null
           billed_amount: number | null
           billing_notes: string | null
-          buffer_after: number | null
-          buffer_before: number | null
           claim_claimmd_batch_id: string | null
+          claim_claimmd_id: string | null
           claim_last_submission_date: string | null
           claim_response_json: Json | null
           claim_status: string | null
           claim_status_last_checked: string | null
-          claimid: string | null
           client_id: string
           clinician_id: string
           cpt_code: string | null
@@ -200,16 +107,11 @@ export type Database = {
           era_check_eft_number: string | null
           era_claimmd_id: string | null
           era_payment_date: string | null
-          flexibility_window: Json | null
-          google_calendar_event_id: string | null
           id: string
           insurance_adjustment_amount: number | null
           insurance_adjustment_details_json: Json | null
           insurance_paid_amount: number | null
-          is_flexible: boolean | null
-          last_real_time_update: string | null
           last_statement_to_patient_date: string | null
-          last_synced_at: string | null
           modifiers: string[] | null
           notes: string | null
           patient_paid_amount: number | null
@@ -217,31 +119,25 @@ export type Database = {
           patient_payment_status: string | null
           patient_responsibility_amount: number | null
           place_of_service_code: string | null
-          priority: number | null
-          real_time_update_source: string | null
           recurring_group_id: string | null
           requires_billing_review: boolean | null
           start_at: string
           status: string
           stripe_charge_ids: string[] | null
-          template_id: string | null
           type: string
           updated_at: string
           video_room_url: string | null
         }
         Insert: {
           appointment_recurring?: string | null
-          appointment_timezone?: string | null
           billed_amount?: number | null
           billing_notes?: string | null
-          buffer_after?: number | null
-          buffer_before?: number | null
           claim_claimmd_batch_id?: string | null
+          claim_claimmd_id?: string | null
           claim_last_submission_date?: string | null
           claim_response_json?: Json | null
           claim_status?: string | null
           claim_status_last_checked?: string | null
-          claimid?: string | null
           client_id: string
           clinician_id: string
           cpt_code?: string | null
@@ -252,16 +148,11 @@ export type Database = {
           era_check_eft_number?: string | null
           era_claimmd_id?: string | null
           era_payment_date?: string | null
-          flexibility_window?: Json | null
-          google_calendar_event_id?: string | null
           id?: string
           insurance_adjustment_amount?: number | null
           insurance_adjustment_details_json?: Json | null
           insurance_paid_amount?: number | null
-          is_flexible?: boolean | null
-          last_real_time_update?: string | null
           last_statement_to_patient_date?: string | null
-          last_synced_at?: string | null
           modifiers?: string[] | null
           notes?: string | null
           patient_paid_amount?: number | null
@@ -269,31 +160,25 @@ export type Database = {
           patient_payment_status?: string | null
           patient_responsibility_amount?: number | null
           place_of_service_code?: string | null
-          priority?: number | null
-          real_time_update_source?: string | null
           recurring_group_id?: string | null
           requires_billing_review?: boolean | null
           start_at: string
           status?: string
           stripe_charge_ids?: string[] | null
-          template_id?: string | null
           type: string
           updated_at?: string
           video_room_url?: string | null
         }
         Update: {
           appointment_recurring?: string | null
-          appointment_timezone?: string | null
           billed_amount?: number | null
           billing_notes?: string | null
-          buffer_after?: number | null
-          buffer_before?: number | null
           claim_claimmd_batch_id?: string | null
+          claim_claimmd_id?: string | null
           claim_last_submission_date?: string | null
           claim_response_json?: Json | null
           claim_status?: string | null
           claim_status_last_checked?: string | null
-          claimid?: string | null
           client_id?: string
           clinician_id?: string
           cpt_code?: string | null
@@ -304,16 +189,11 @@ export type Database = {
           era_check_eft_number?: string | null
           era_claimmd_id?: string | null
           era_payment_date?: string | null
-          flexibility_window?: Json | null
-          google_calendar_event_id?: string | null
           id?: string
           insurance_adjustment_amount?: number | null
           insurance_adjustment_details_json?: Json | null
           insurance_paid_amount?: number | null
-          is_flexible?: boolean | null
-          last_real_time_update?: string | null
           last_statement_to_patient_date?: string | null
-          last_synced_at?: string | null
           modifiers?: string[] | null
           notes?: string | null
           patient_paid_amount?: number | null
@@ -321,14 +201,11 @@ export type Database = {
           patient_payment_status?: string | null
           patient_responsibility_amount?: number | null
           place_of_service_code?: string | null
-          priority?: number | null
-          real_time_update_source?: string | null
           recurring_group_id?: string | null
           requires_billing_review?: boolean | null
           start_at?: string
           status?: string
           stripe_charge_ids?: string[] | null
-          template_id?: string | null
           type?: string
           updated_at?: string
           video_room_url?: string | null
@@ -346,13 +223,6 @@ export type Database = {
             columns: ["clinician_id"]
             isOneToOne: false
             referencedRelation: "clinicians"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "appointments_template_id_fkey"
-            columns: ["template_id"]
-            isOneToOne: false
-            referencedRelation: "appointment_templates"
             referencedColumns: ["id"]
           },
         ]
@@ -436,60 +306,6 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
-      }
-      calendar_sync_logs: {
-        Row: {
-          appointment_id: string | null
-          connection_id: string
-          created_at: string | null
-          error_message: string | null
-          external_event_id: string | null
-          id: string
-          operation: string
-          status: string
-          sync_data: Json | null
-          sync_type: string
-        }
-        Insert: {
-          appointment_id?: string | null
-          connection_id: string
-          created_at?: string | null
-          error_message?: string | null
-          external_event_id?: string | null
-          id?: string
-          operation: string
-          status?: string
-          sync_data?: Json | null
-          sync_type: string
-        }
-        Update: {
-          appointment_id?: string | null
-          connection_id?: string
-          created_at?: string | null
-          error_message?: string | null
-          external_event_id?: string | null
-          id?: string
-          operation?: string
-          status?: string
-          sync_data?: Json | null
-          sync_type?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "calendar_sync_logs_appointment_id_fkey"
-            columns: ["appointment_id"]
-            isOneToOne: false
-            referencedRelation: "appointments"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "calendar_sync_logs_connection_id_fkey"
-            columns: ["connection_id"]
-            isOneToOne: false
-            referencedRelation: "nylas_connections"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       client_history: {
         Row: {
@@ -846,7 +662,6 @@ export type Database = {
       }
       clients: {
         Row: {
-          client_address: string | null
           client_affect: string | null
           client_age: number | null
           client_appearance: string | null
@@ -943,7 +758,6 @@ export type Database = {
           client_tricare_sponsor_id: string | null
           client_tricare_sponsor_name: string | null
           client_vacoverage: string | null
-          client_zip_code: string | null
           client_zipcode: string | null
           created_at: string
           eligibility_claimmd_id_primary: string | null
@@ -959,7 +773,6 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          client_address?: string | null
           client_affect?: string | null
           client_age?: number | null
           client_appearance?: string | null
@@ -1056,7 +869,6 @@ export type Database = {
           client_tricare_sponsor_id?: string | null
           client_tricare_sponsor_name?: string | null
           client_vacoverage?: string | null
-          client_zip_code?: string | null
           client_zipcode?: string | null
           created_at?: string
           eligibility_claimmd_id_primary?: string | null
@@ -1072,7 +884,6 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          client_address?: string | null
           client_affect?: string | null
           client_age?: number | null
           client_appearance?: string | null
@@ -1169,7 +980,6 @@ export type Database = {
           client_tricare_sponsor_id?: string | null
           client_tricare_sponsor_name?: string | null
           client_vacoverage?: string | null
-          client_zip_code?: string | null
           client_zipcode?: string | null
           created_at?: string
           eligibility_claimmd_id_primary?: string | null
@@ -1364,13 +1174,11 @@ export type Database = {
           clinician_temppassword: string | null
           clinician_time_granularity: string | null
           clinician_time_zone: string | null
-          clinician_timezone: Database["public"]["Enums"]["time_zones"][] | null
+          clinician_timezone: string[] | null
           clinician_treatment_approaches: string[] | null
           clinician_type: string | null
           created_at: string
           id: string
-          last_google_sync: string | null
-          profile_id: string | null
           updated_at: string
         }
         Insert: {
@@ -1459,15 +1267,11 @@ export type Database = {
           clinician_temppassword?: string | null
           clinician_time_granularity?: string | null
           clinician_time_zone?: string | null
-          clinician_timezone?:
-            | Database["public"]["Enums"]["time_zones"][]
-            | null
+          clinician_timezone?: string[] | null
           clinician_treatment_approaches?: string[] | null
           clinician_type?: string | null
           created_at?: string
           id: string
-          last_google_sync?: string | null
-          profile_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -1556,245 +1360,14 @@ export type Database = {
           clinician_temppassword?: string | null
           clinician_time_granularity?: string | null
           clinician_time_zone?: string | null
-          clinician_timezone?:
-            | Database["public"]["Enums"]["time_zones"][]
-            | null
+          clinician_timezone?: string[] | null
           clinician_treatment_approaches?: string[] | null
           clinician_type?: string | null
           created_at?: string
           id?: string
-          last_google_sync?: string | null
-          profile_id?: string | null
           updated_at?: string
         }
         Relationships: []
-      }
-      CMS1500_claims: {
-        Row: {
-          accept_assign: string
-          appointment_id: string | null
-          bill_addr_1: string
-          bill_addr_2: string | null
-          bill_city: string
-          bill_name: string
-          bill_npi: string
-          bill_state: string
-          bill_taxid: string
-          bill_taxid_type: string
-          bill_taxonomy: string
-          bill_zip: string
-          charge: number
-          claim_md_batch_id: string | null
-          claim_md_id: string | null
-          created_at: string | null
-          diag_1: string | null
-          diag_10: string | null
-          diag_11: string | null
-          diag_12: string | null
-          diag_2: string | null
-          diag_3: string | null
-          diag_4: string | null
-          diag_5: string | null
-          diag_6: string | null
-          diag_7: string | null
-          diag_8: string | null
-          diag_9: string | null
-          diag_ref: string
-          from_date: string
-          id: string
-          ins_addr_1: string
-          ins_city: string
-          ins_dob: string
-          ins_group: string | null
-          ins_name_f: string
-          ins_name_l: string
-          ins_number: string
-          ins_state: string
-          ins_zip: string
-          last_status_check: string | null
-          last_submission: string | null
-          mod_1: string | null
-          mod_2: string | null
-          mod_3: string | null
-          mod_4: string | null
-          pat_addr_1: string
-          pat_city: string
-          pat_dob: string
-          pat_name_f: string
-          pat_name_l: string
-          pat_rel: string
-          pat_sex: string
-          pat_state: string
-          pat_zip: string
-          payerid: string
-          pcn: string
-          place_of_service: string
-          proc_code: string
-          prov_name_f: string
-          prov_name_l: string
-          prov_npi: string
-          prov_taxonomy: string | null
-          remote_claimid: string
-          response_json: Json | null
-          status: string | null
-          thru_date: string
-          total_charge: number
-          units: number
-          updated_at: string | null
-        }
-        Insert: {
-          accept_assign?: string
-          appointment_id?: string | null
-          bill_addr_1: string
-          bill_addr_2?: string | null
-          bill_city: string
-          bill_name: string
-          bill_npi: string
-          bill_state: string
-          bill_taxid: string
-          bill_taxid_type: string
-          bill_taxonomy: string
-          bill_zip: string
-          charge: number
-          claim_md_batch_id?: string | null
-          claim_md_id?: string | null
-          created_at?: string | null
-          diag_1?: string | null
-          diag_10?: string | null
-          diag_11?: string | null
-          diag_12?: string | null
-          diag_2?: string | null
-          diag_3?: string | null
-          diag_4?: string | null
-          diag_5?: string | null
-          diag_6?: string | null
-          diag_7?: string | null
-          diag_8?: string | null
-          diag_9?: string | null
-          diag_ref: string
-          from_date: string
-          id?: string
-          ins_addr_1: string
-          ins_city: string
-          ins_dob: string
-          ins_group?: string | null
-          ins_name_f: string
-          ins_name_l: string
-          ins_number: string
-          ins_state: string
-          ins_zip: string
-          last_status_check?: string | null
-          last_submission?: string | null
-          mod_1?: string | null
-          mod_2?: string | null
-          mod_3?: string | null
-          mod_4?: string | null
-          pat_addr_1: string
-          pat_city: string
-          pat_dob: string
-          pat_name_f: string
-          pat_name_l: string
-          pat_rel: string
-          pat_sex: string
-          pat_state: string
-          pat_zip: string
-          payerid: string
-          pcn: string
-          place_of_service: string
-          proc_code: string
-          prov_name_f: string
-          prov_name_l: string
-          prov_npi: string
-          prov_taxonomy?: string | null
-          remote_claimid: string
-          response_json?: Json | null
-          status?: string | null
-          thru_date: string
-          total_charge: number
-          units?: number
-          updated_at?: string | null
-        }
-        Update: {
-          accept_assign?: string
-          appointment_id?: string | null
-          bill_addr_1?: string
-          bill_addr_2?: string | null
-          bill_city?: string
-          bill_name?: string
-          bill_npi?: string
-          bill_state?: string
-          bill_taxid?: string
-          bill_taxid_type?: string
-          bill_taxonomy?: string
-          bill_zip?: string
-          charge?: number
-          claim_md_batch_id?: string | null
-          claim_md_id?: string | null
-          created_at?: string | null
-          diag_1?: string | null
-          diag_10?: string | null
-          diag_11?: string | null
-          diag_12?: string | null
-          diag_2?: string | null
-          diag_3?: string | null
-          diag_4?: string | null
-          diag_5?: string | null
-          diag_6?: string | null
-          diag_7?: string | null
-          diag_8?: string | null
-          diag_9?: string | null
-          diag_ref?: string
-          from_date?: string
-          id?: string
-          ins_addr_1?: string
-          ins_city?: string
-          ins_dob?: string
-          ins_group?: string | null
-          ins_name_f?: string
-          ins_name_l?: string
-          ins_number?: string
-          ins_state?: string
-          ins_zip?: string
-          last_status_check?: string | null
-          last_submission?: string | null
-          mod_1?: string | null
-          mod_2?: string | null
-          mod_3?: string | null
-          mod_4?: string | null
-          pat_addr_1?: string
-          pat_city?: string
-          pat_dob?: string
-          pat_name_f?: string
-          pat_name_l?: string
-          pat_rel?: string
-          pat_sex?: string
-          pat_state?: string
-          pat_zip?: string
-          payerid?: string
-          pcn?: string
-          place_of_service?: string
-          proc_code?: string
-          prov_name_f?: string
-          prov_name_l?: string
-          prov_npi?: string
-          prov_taxonomy?: string | null
-          remote_claimid?: string
-          response_json?: Json | null
-          status?: string | null
-          thru_date?: string
-          total_charge?: number
-          units?: number
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "claims_appointment_id_fkey"
-            columns: ["appointment_id"]
-            isOneToOne: false
-            referencedRelation: "appointments"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       completed_appointments: {
         Row: {
@@ -1907,51 +1480,6 @@ export type Database = {
         }
         Relationships: []
       }
-      external_calendar_mappings: {
-        Row: {
-          appointment_id: string
-          connection_id: string
-          created_at: string | null
-          external_calendar_id: string
-          external_event_id: string
-          id: string
-          last_synced_at: string | null
-        }
-        Insert: {
-          appointment_id: string
-          connection_id: string
-          created_at?: string | null
-          external_calendar_id: string
-          external_event_id: string
-          id?: string
-          last_synced_at?: string | null
-        }
-        Update: {
-          appointment_id?: string
-          connection_id?: string
-          created_at?: string | null
-          external_calendar_id?: string
-          external_event_id?: string
-          id?: string
-          last_synced_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "external_calendar_mappings_appointment_id_fkey"
-            columns: ["appointment_id"]
-            isOneToOne: false
-            referencedRelation: "appointments"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "external_calendar_mappings_connection_id_fkey"
-            columns: ["connection_id"]
-            isOneToOne: false
-            referencedRelation: "nylas_connections"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       icd10: {
         Row: {
           diagnosis_name: string
@@ -2055,7 +1583,6 @@ export type Database = {
           details: Json | null
           id: number
           migration_name: string
-          status: string
         }
         Insert: {
           created_at?: string | null
@@ -2063,7 +1590,6 @@ export type Database = {
           details?: Json | null
           id?: number
           migration_name: string
-          status?: string
         }
         Update: {
           created_at?: string | null
@@ -2071,276 +1597,8 @@ export type Database = {
           details?: Json | null
           id?: number
           migration_name?: string
-          status?: string
         }
         Relationships: []
-      }
-      nylas_accounts: {
-        Row: {
-          access_token: string
-          clinician_id: string
-          created_at: string | null
-          email: string
-          expires_at: string | null
-          id: string
-          is_active: boolean | null
-          nylas_grant_id: string
-          provider: string
-          refresh_token: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          access_token: string
-          clinician_id: string
-          created_at?: string | null
-          email: string
-          expires_at?: string | null
-          id?: string
-          is_active?: boolean | null
-          nylas_grant_id: string
-          provider: string
-          refresh_token?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          access_token?: string
-          clinician_id?: string
-          created_at?: string | null
-          email?: string
-          expires_at?: string | null
-          id?: string
-          is_active?: boolean | null
-          nylas_grant_id?: string
-          provider?: string
-          refresh_token?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "nylas_accounts_clinician_id_fkey"
-            columns: ["clinician_id"]
-            isOneToOne: false
-            referencedRelation: "clinicians"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      nylas_calendars: {
-        Row: {
-          calendar_description: string | null
-          calendar_name: string
-          created_at: string | null
-          id: string
-          is_primary: boolean | null
-          is_synced: boolean | null
-          nylas_account_id: string
-          nylas_calendar_id: string
-          sync_direction: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          calendar_description?: string | null
-          calendar_name: string
-          created_at?: string | null
-          id?: string
-          is_primary?: boolean | null
-          is_synced?: boolean | null
-          nylas_account_id: string
-          nylas_calendar_id: string
-          sync_direction?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          calendar_description?: string | null
-          calendar_name?: string
-          created_at?: string | null
-          id?: string
-          is_primary?: boolean | null
-          is_synced?: boolean | null
-          nylas_account_id?: string
-          nylas_calendar_id?: string
-          sync_direction?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "nylas_calendars_nylas_account_id_fkey"
-            columns: ["nylas_account_id"]
-            isOneToOne: false
-            referencedRelation: "nylas_accounts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      nylas_connections: {
-        Row: {
-          access_token: string
-          calendar_ids: string[] | null
-          connector_id: string | null
-          created_at: string | null
-          email: string
-          grant_status: string | null
-          id: string
-          is_active: boolean | null
-          last_sync_at: string | null
-          provider: string
-          refresh_token: string | null
-          scopes: string[] | null
-          sync_preferences: Json | null
-          token_expires_at: string | null
-          updated_at: string | null
-          user_id: string
-        }
-        Insert: {
-          access_token: string
-          calendar_ids?: string[] | null
-          connector_id?: string | null
-          created_at?: string | null
-          email: string
-          grant_status?: string | null
-          id: string
-          is_active?: boolean | null
-          last_sync_at?: string | null
-          provider?: string
-          refresh_token?: string | null
-          scopes?: string[] | null
-          sync_preferences?: Json | null
-          token_expires_at?: string | null
-          updated_at?: string | null
-          user_id: string
-        }
-        Update: {
-          access_token?: string
-          calendar_ids?: string[] | null
-          connector_id?: string | null
-          created_at?: string | null
-          email?: string
-          grant_status?: string | null
-          id?: string
-          is_active?: boolean | null
-          last_sync_at?: string | null
-          provider?: string
-          refresh_token?: string | null
-          scopes?: string[] | null
-          sync_preferences?: Json | null
-          token_expires_at?: string | null
-          updated_at?: string | null
-          user_id?: string
-        }
-        Relationships: []
-      }
-      nylas_scheduler_configs: {
-        Row: {
-          clinician_id: string
-          config_data: Json
-          created_at: string | null
-          id: string
-          is_active: boolean | null
-          public_url: string | null
-          scheduler_id: string
-          updated_at: string | null
-        }
-        Insert: {
-          clinician_id: string
-          config_data?: Json
-          created_at?: string | null
-          id?: string
-          is_active?: boolean | null
-          public_url?: string | null
-          scheduler_id: string
-          updated_at?: string | null
-        }
-        Update: {
-          clinician_id?: string
-          config_data?: Json
-          created_at?: string | null
-          id?: string
-          is_active?: boolean | null
-          public_url?: string | null
-          scheduler_id?: string
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
-      nylas_sync_logs: {
-        Row: {
-          completed_at: string | null
-          connection_id: string
-          created_at: string | null
-          direction: string
-          errors: Json | null
-          events_processed: number | null
-          id: string
-          started_at: string | null
-          status: string
-          sync_type: string
-        }
-        Insert: {
-          completed_at?: string | null
-          connection_id: string
-          created_at?: string | null
-          direction: string
-          errors?: Json | null
-          events_processed?: number | null
-          id?: string
-          started_at?: string | null
-          status: string
-          sync_type: string
-        }
-        Update: {
-          completed_at?: string | null
-          connection_id?: string
-          created_at?: string | null
-          direction?: string
-          errors?: Json | null
-          events_processed?: number | null
-          id?: string
-          started_at?: string | null
-          status?: string
-          sync_type?: string
-        }
-        Relationships: []
-      }
-      nylas_sync_status: {
-        Row: {
-          created_at: string | null
-          error_message: string | null
-          events_synced: number | null
-          id: string
-          last_sync_at: string | null
-          nylas_account_id: string
-          sync_direction: string
-          sync_status: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          error_message?: string | null
-          events_synced?: number | null
-          id?: string
-          last_sync_at?: string | null
-          nylas_account_id: string
-          sync_direction: string
-          sync_status?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          error_message?: string | null
-          events_synced?: number | null
-          id?: string
-          last_sync_at?: string | null
-          nylas_account_id?: string
-          sync_direction?: string
-          sync_status?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "nylas_sync_status_nylas_account_id_fkey"
-            columns: ["nylas_account_id"]
-            isOneToOne: false
-            referencedRelation: "nylas_accounts"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       phq9_assessments: {
         Row: {
@@ -2452,90 +1710,6 @@ export type Database = {
           practice_taxonomy?: string | null
           practice_zip?: string | null
           updated_at?: string
-        }
-        Relationships: []
-      }
-      real_time_notifications: {
-        Row: {
-          created_at: string
-          entity_id: string | null
-          entity_type: string | null
-          id: string
-          is_read: boolean | null
-          message: string
-          type: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          entity_id?: string | null
-          entity_type?: string | null
-          id?: string
-          is_read?: boolean | null
-          message: string
-          type: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          entity_id?: string | null
-          entity_type?: string | null
-          id?: string
-          is_read?: boolean | null
-          message?: string
-          type?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      scheduling_preferences: {
-        Row: {
-          allow_concurrent_appointments: boolean | null
-          auto_confirm_threshold: number | null
-          buffer_between_appointments: number | null
-          created_at: string
-          default_appointment_duration: number | null
-          enable_real_time_updates: boolean | null
-          id: string
-          max_daily_appointments: number | null
-          real_time_notification_preferences: Json | null
-          timezone: string
-          updated_at: string
-          user_id: string
-          working_hours: Json | null
-        }
-        Insert: {
-          allow_concurrent_appointments?: boolean | null
-          auto_confirm_threshold?: number | null
-          buffer_between_appointments?: number | null
-          created_at?: string
-          default_appointment_duration?: number | null
-          enable_real_time_updates?: boolean | null
-          id?: string
-          max_daily_appointments?: number | null
-          real_time_notification_preferences?: Json | null
-          timezone?: string
-          updated_at?: string
-          user_id: string
-          working_hours?: Json | null
-        }
-        Update: {
-          allow_concurrent_appointments?: boolean | null
-          auto_confirm_threshold?: number | null
-          buffer_between_appointments?: number | null
-          created_at?: string
-          default_appointment_duration?: number | null
-          enable_real_time_updates?: boolean | null
-          id?: string
-          max_daily_appointments?: number | null
-          real_time_notification_preferences?: Json | null
-          timezone?: string
-          updated_at?: string
-          user_id?: string
-          working_hours?: Json | null
         }
         Relationships: []
       }
@@ -2858,56 +2032,6 @@ export type Database = {
         }
         Relationships: []
       }
-      synced_events: {
-        Row: {
-          clinician_id: string
-          created_at: string | null
-          display_title: string | null
-          end_at: string
-          google_calendar_event_id: string | null
-          id: string
-          is_busy: boolean | null
-          original_description: string | null
-          original_title: string | null
-          start_at: string
-          updated_at: string | null
-        }
-        Insert: {
-          clinician_id: string
-          created_at?: string | null
-          display_title?: string | null
-          end_at: string
-          google_calendar_event_id?: string | null
-          id?: string
-          is_busy?: boolean | null
-          original_description?: string | null
-          original_title?: string | null
-          start_at: string
-          updated_at?: string | null
-        }
-        Update: {
-          clinician_id?: string
-          created_at?: string | null
-          display_title?: string | null
-          end_at?: string
-          google_calendar_event_id?: string | null
-          id?: string
-          is_busy?: boolean | null
-          original_description?: string | null
-          original_title?: string | null
-          start_at?: string
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "synced_events_clinician_id_fkey"
-            columns: ["clinician_id"]
-            isOneToOne: false
-            referencedRelation: "clinicians"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       system_settings: {
         Row: {
           created_at: string | null
@@ -3057,46 +2181,11 @@ export type Database = {
           },
         ]
       }
-      user_profiles: {
-        Row: {
-          auth_provider: string
-          created_at: string | null
-          email: string | null
-          id: string
-          updated_at: string | null
-          user_id: string
-        }
-        Insert: {
-          auth_provider?: string
-          created_at?: string | null
-          email?: string | null
-          id?: string
-          updated_at?: string | null
-          user_id: string
-        }
-        Update: {
-          auth_provider?: string
-          created_at?: string | null
-          email?: string | null
-          id?: string
-          updated_at?: string | null
-          user_id?: string
-        }
-        Relationships: []
-      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      cancel_appointment_and_delete_mapping: {
-        Args: {
-          p_appointment_id: string
-          p_mapping_id: string
-          p_notes: string
-        }
-        Returns: undefined
-      }
       check_table_exists: {
         Args: { check_table_name: string }
         Returns: boolean
@@ -3105,32 +2194,9 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
-      create_appointment_and_mapping: {
-        Args: {
-          p_clinician_id: string
-          p_type: string
-          p_status: Database["public"]["Enums"]["appointment_status"]
-          p_start_at: string
-          p_end_at: string
-          p_notes: string
-          p_external_event_id: string
-          p_connection_id: string
-          p_sync_direction: string
-          p_last_sync_hash: string
-        }
-        Returns: undefined
-      }
       create_or_replace_check_table_exists_function: {
         Args: Record<PropertyKey, never>
         Returns: undefined
-      }
-      debug_auth_context: {
-        Args: Record<PropertyKey, never>
-        Returns: {
-          current_user_id: string
-          current_user_role: string
-          is_authenticated: boolean
-        }[]
       }
       debug_client_therapist_matching: {
         Args: { p_therapist_id: string }
@@ -3150,10 +2216,6 @@ export type Database = {
         }
         Returns: boolean
       }
-      get_unread_notification_count: {
-        Args: { p_user_id: string }
-        Returns: number
-      }
       is_admin: {
         Args: Record<PropertyKey, never>
         Returns: boolean
@@ -3166,24 +2228,9 @@ export type Database = {
         Args: { user_id: string }
         Returns: boolean
       }
-      mark_notifications_as_read: {
-        Args: { p_user_id: string; p_notification_ids?: string[] }
-        Returns: number
-      }
       standardize_uuid: {
         Args: { input_id: string }
         Returns: string
-      }
-      update_appointment_and_mapping: {
-        Args: {
-          p_appointment_id: string
-          p_start_at: string
-          p_end_at: string
-          p_notes: string
-          p_mapping_id: string
-          p_last_sync_hash: string
-        }
-        Returns: undefined
       }
       user_has_admin_role: {
         Args: { user_id: string }
@@ -3192,7 +2239,6 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "client" | "clinician"
-      appointment_status: "scheduled" | "documented" | "no show"
       client_gender_identity_type: "Male" | "Female" | "Other"
       client_gender_type: "Male" | "Female"
       client_relationship_type: "Self" | "Parent/Guardian" | "Spouse" | "Child"
@@ -3210,7 +2256,6 @@ export type Database = {
         | "Discharged"
         | "Blacklist"
         | "Do Not Contact"
-        | "Scheduled"
       client_va_coverage_type:
         | "CHAMPVA"
         | "VA Community Care"
@@ -3230,15 +2275,6 @@ export type Database = {
         | "therapy_note"
         | "questionnaire"
       event_type: "appointment" | "time_off" | "availability"
-      insurance_type:
-        | "PPO"
-        | "HMO"
-        | "EPO"
-        | "POS"
-        | "Medicare"
-        | "Medicaid"
-        | "CHIP"
-        | "Other"
       states:
         | "Alabama"
         | "Alaska"
@@ -3296,14 +2332,6 @@ export type Database = {
         | "West Virginia"
         | "Wisconsin"
         | "Wyoming"
-      time_zones:
-        | "America/New_York"
-        | "America/Chicago"
-        | "America/Denver"
-        | "America/Los_Angeles"
-        | "America/Anchorage"
-        | "Pacific/Honolulu"
-        | "America/Phoenix"
       user_role: "user" | "admin"
     }
     CompositeTypes: {
@@ -3421,7 +2449,6 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "client", "clinician"],
-      appointment_status: ["scheduled", "documented", "no show"],
       client_gender_identity_type: ["Male", "Female", "Other"],
       client_gender_type: ["Male", "Female"],
       client_relationship_type: ["Self", "Parent/Guardian", "Spouse", "Child"],
@@ -3439,7 +2466,6 @@ export const Constants = {
         "Discharged",
         "Blacklist",
         "Do Not Contact",
-        "Scheduled",
       ],
       client_va_coverage_type: [
         "CHAMPVA",
@@ -3463,16 +2489,6 @@ export const Constants = {
         "questionnaire",
       ],
       event_type: ["appointment", "time_off", "availability"],
-      insurance_type: [
-        "PPO",
-        "HMO",
-        "EPO",
-        "POS",
-        "Medicare",
-        "Medicaid",
-        "CHIP",
-        "Other",
-      ],
       states: [
         "Alabama",
         "Alaska",
@@ -3530,15 +2546,6 @@ export const Constants = {
         "West Virginia",
         "Wisconsin",
         "Wyoming",
-      ],
-      time_zones: [
-        "America/New_York",
-        "America/Chicago",
-        "America/Denver",
-        "America/Los_Angeles",
-        "America/Anchorage",
-        "Pacific/Honolulu",
-        "America/Phoenix",
       ],
       user_role: ["user", "admin"],
     },

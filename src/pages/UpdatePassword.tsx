@@ -1,76 +1,126 @@
 
 import { useState, useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { debugAuthOperation } from "@/debug/authDebugUtils";
 
 const UpdatePassword = () => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [hashPresent, setHashPresent] = useState(false);
+  const [sessionVerified, setSessionVerified] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isValidSession, setIsValidSession] = useState(false);
-  const [isCheckingSession, setIsCheckingSession] = useState(true);
+  const [debugInfo, setDebugInfo] = useState<any>({});
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   useEffect(() => {
     const checkSession = async () => {
       try {
-        // Check if we have recovery tokens in URL params
-        const accessToken = searchParams.get('access_token');
-        const refreshToken = searchParams.get('refresh_token');
-        const type = searchParams.get('type');
+        // Check if we have a hash parameter in the URL which indicates we're coming from a password reset email
+        const hash = window.location.hash;
+        console.log("[UpdatePassword] Checking URL hash:", hash);
         
-        console.log("[UpdatePassword] URL params:", { accessToken: !!accessToken, refreshToken: !!refreshToken, type });
+        // Check specifically for the recovery token pattern
+        const hasResetToken = hash.includes('type=recovery') && hash.includes('access_token=');
+        setHashPresent(hasResetToken);
         
-        // If we have tokens in URL, set the session
-        if (accessToken && refreshToken && type === 'recovery') {
-          console.log("[UpdatePassword] Setting session from URL tokens");
-          const { data, error } = await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken
-          });
-          
-          if (error) {
-            console.error("[UpdatePassword] Error setting session:", error);
-            setError(`Failed to verify reset link: ${error.message}`);
-            setIsValidSession(false);
-          } else {
-            console.log("[UpdatePassword] Session set successfully");
-            setIsValidSession(true);
+        // Log detailed hash information for debugging
+        setDebugInfo(prev => ({
+          ...prev,
+          hashCheck: {
+            status: hasResetToken ? 'success' : 'warning',
+            message: hasResetToken ? 'Valid reset token found' : 'No valid reset token found',
+            hash: hash,
+            hasType: hash.includes('type=recovery'),
+            hasToken: hash.includes('access_token='),
+            timestamp: new Date().toISOString()
           }
+        }));
+
+        // If there's no valid hash, this might not be a valid password reset flow
+        if (!hasResetToken) {
+          console.log("[UpdatePassword] No valid reset token found in URL, might not be a valid reset flow");
+          return;
+        }
+
+        // Check if there's an existing user session that might conflict with the reset
+        const existingSession = await supabase.auth.getSession();
+        if (existingSession.data.session) {
+          setCurrentUser(existingSession.data.session.user);
+          console.log("[UpdatePassword] Found existing session for user:", existingSession.data.session.user.email);
+          
+          setDebugInfo(prev => ({
+            ...prev,
+            existingSession: {
+              email: existingSession.data.session.user.email,
+              id: existingSession.data.session.user.id,
+              timestamp: new Date().toISOString()
+            }
+          }));
+
+          // Auto sign-out if we detect a recovery token but user is already logged in
+          if (hasResetToken) {
+            console.log("[UpdatePassword] Reset token found but user is already logged in - signing out automatically");
+            await signOutBeforeReset();
+          }
+        }
+
+        // Verify the session is active for password reset
+        console.log("[UpdatePassword] Verifying session from hash...");
+        const { data, error } = await debugAuthOperation("getSession", () => 
+          supabase.auth.getSession()
+        );
+
+        if (error) {
+          console.error("[UpdatePassword] Session verification error:", error);
+          setError(`Session verification failed: ${error.message}`);
+          setSessionVerified(false);
+          return;
+        }
+
+        const session = data?.session;
+        console.log("[UpdatePassword] Session data:", session ? "Session exists" : "No session");
+        
+        if (session) {
+          console.log("[UpdatePassword] Found active session, user can reset password");
+          setSessionVerified(true);
         } else {
-          // Check for existing session
-          const { data: { session }, error } = await supabase.auth.getSession();
-          
-          if (error) {
-            console.error("[UpdatePassword] Error getting session:", error);
-            setError(`Session error: ${error.message}`);
-            setIsValidSession(false);
-          } else if (session) {
-            console.log("[UpdatePassword] Found existing session");
-            setIsValidSession(true);
-          } else {
-            console.log("[UpdatePassword] No valid session found");
-            setError("No valid reset session found. Please request a new password reset link.");
-            setIsValidSession(false);
-          }
+          console.log("[UpdatePassword] No active session found, password reset may fail");
+          setError("No active session found. The reset link may have expired.");
+          setSessionVerified(false);
         }
       } catch (error: any) {
         console.error("[UpdatePassword] Error in checkSession:", error);
         setError(`Error checking session: ${error.message}`);
-        setIsValidSession(false);
-      } finally {
-        setIsCheckingSession(false);
       }
     };
 
     checkSession();
-  }, [searchParams]);
+  }, []);
+
+  const signOutBeforeReset = async () => {
+    try {
+      console.log("[UpdatePassword] Signing out current user before password reset");
+      
+      // Use global sign out to ensure complete token removal
+      await supabase.auth.signOut({ scope: 'global' });
+      
+      // Wait a moment for the auth system to sync
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      window.location.reload(); // Reload to process the recovery token
+      return true;
+    } catch (error) {
+      console.error("[UpdatePassword] Error signing out:", error);
+      return false;
+    }
+  };
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,14 +147,41 @@ const UpdatePassword = () => {
       return;
     }
 
+    if (!hashPresent) {
+      setError("Missing or invalid password reset token");
+      toast({
+        title: "Invalid reset link",
+        description: "Please use the complete password reset link from your email or request a new one.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     console.log("[UpdatePassword] Starting password update process");
     setIsLoading(true);
 
+    // Set a timeout to clear the loading state in case the operation hangs
+    const timeoutId = setTimeout(() => {
+      console.warn("[UpdatePassword] Update password operation timed out after 45 seconds");
+      setIsLoading(false);
+      setError("The request timed out. Please try again or request a new reset link.");
+      toast({
+        title: "Request timed out",
+        description: "The password update took too long. Please try again.",
+        variant: "destructive",
+      });
+    }, 45000); // Increased to 45 seconds for more reliable operation
+
     try {
       // Update the user's password
-      const { data, error } = await supabase.auth.updateUser({
-        password: password
-      });
+      const { data, error } = await debugAuthOperation("updatePassword", () =>
+        supabase.auth.updateUser({
+          password: password
+        })
+      );
+
+      // Clear the timeout since the operation completed
+      clearTimeout(timeoutId);
 
       if (error) {
         console.error("[UpdatePassword] Error updating password:", error.message);
@@ -119,13 +196,23 @@ const UpdatePassword = () => {
         description: "Your password has been updated successfully.",
       });
 
-      // Sign out to clear the recovery session
-      await supabase.auth.signOut();
-      
-      // Redirect to login page
-      navigate("/login");
+      // After password is updated successfully, clear the session to prevent session conflicts
+      try {
+        await supabase.auth.signOut({ scope: 'global' });
+        console.log("[UpdatePassword] Signed out after successful password update");
+      } catch (signOutError) {
+        console.error("[UpdatePassword] Error signing out after password update:", signOutError);
+      }
+
+      // Redirect to login page after successful password update
+      // Added delay to ensure signout completes and toast is visible
+      setTimeout(() => {
+        navigate("/login");
+      }, 2000);
     } catch (error: any) {
       console.error("[UpdatePassword] Error details:", error);
+      // Clear the timeout if there's an error
+      clearTimeout(timeoutId);
       
       toast({
         title: "Failed to update password",
@@ -137,28 +224,13 @@ const UpdatePassword = () => {
     }
   };
 
-  if (isCheckingSession) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <Card className="w-full max-w-md">
-          <CardContent className="flex items-center justify-center py-8">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mx-auto mb-4"></div>
-              <p>Verifying reset link...</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold text-center">Update Password</CardTitle>
           <CardDescription className="text-center">
-            {isValidSession ? 
+            {hashPresent ? 
               "Enter your new password below" : 
               "This page is for resetting your password after clicking the link in the reset email"}
           </CardDescription>
@@ -170,14 +242,36 @@ const UpdatePassword = () => {
             </div>
           )}
           
-          {!isValidSession && (
+          {currentUser && (
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 text-blue-800 rounded-md">
+              <p className="text-sm font-medium">
+                You're currently logged in as {currentUser.email}
+              </p>
+              <p className="text-xs mt-1">
+                To reset a different account's password, you need to sign out first.
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-2 w-full"
+                onClick={signOutBeforeReset}
+              >
+                Sign out and continue with password reset
+              </Button>
+            </div>
+          )}
+          
+          {!hashPresent && (
             <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-md">
               <p className="text-sm font-medium">
-                No valid reset session found. Please request a new password reset.
+                No valid reset token found. You need to access this page using the complete link from your password reset email.
+              </p>
+              <p className="text-xs mt-1">
+                The link may have expired or been used already. Make sure you're using the most recent email and clicking the complete link.
               </p>
               <Button
                 variant="link"
-                className="text-sm p-0 h-auto text-yellow-800 underline mt-2"
+                className="text-sm p-0 h-auto text-yellow-800 underline"
                 onClick={() => navigate("/reset-password")}
               >
                 Request a new password reset email
@@ -195,8 +289,8 @@ const UpdatePassword = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter your new password"
                 required
-                disabled={isLoading || !isValidSession}
-                className={!isValidSession ? "bg-gray-100" : ""}
+                disabled={isLoading || !hashPresent || currentUser !== null}
+                className={!hashPresent || currentUser !== null ? "bg-gray-100" : ""}
               />
             </div>
             <div className="space-y-2">
@@ -208,18 +302,28 @@ const UpdatePassword = () => {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Confirm your new password"
                 required
-                disabled={isLoading || !isValidSession}
-                className={!isValidSession ? "bg-gray-100" : ""}
+                disabled={isLoading || !hashPresent || currentUser !== null}
+                className={!hashPresent || currentUser !== null ? "bg-gray-100" : ""}
               />
             </div>
             <Button 
               type="submit" 
               className="w-full" 
-              disabled={isLoading || !isValidSession}
+              disabled={isLoading || !hashPresent || currentUser !== null}
             >
               {isLoading ? "Updating..." : "Update Password"}
             </Button>
           </form>
+          
+          {/* Debug info for development */}
+          {process.env.NODE_ENV === 'development' && Object.keys(debugInfo).length > 0 && (
+            <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-md">
+              <p className="text-xs font-medium text-gray-500 mb-1">Debug Info:</p>
+              <pre className="text-xs text-gray-600 overflow-auto max-h-32">
+                {JSON.stringify(debugInfo, null, 2)}
+              </pre>
+            </div>
+          )}
         </CardContent>
         <CardFooter className="flex justify-center">
           <Button variant="link" onClick={() => navigate("/login")}>

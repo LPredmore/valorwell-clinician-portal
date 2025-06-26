@@ -1,4 +1,4 @@
-export interface Client {
+export interface ClientDetails {
   id: string;
   client_first_name: string | null;
   client_last_name: string | null;
@@ -133,7 +133,7 @@ export interface Clinician {
 export interface TabProps {
   isEditing: boolean;
   form: any;
-  clientData: Client | null;
+  clientData: ClientDetails | null;
   clinicians?: Clinician[];
   handleAddDiagnosis?: () => void;
   handleRemoveDiagnosis?: (index: number) => void;
@@ -143,7 +143,7 @@ export interface SessionNoteTemplateProps {
   onClose: () => void;
   appointment?: any;
   clinicianName?: string;
-  clientData?: Client | null;
+  clientData?: ClientDetails | null;
 }
 
 export const relationshipOptions = ["Self", "Spouse", "Child", "Other"];

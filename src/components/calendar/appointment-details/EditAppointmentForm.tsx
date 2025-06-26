@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -194,7 +195,7 @@ const EditAppointmentForm: React.FC<EditAppointmentFormProps> = ({
             ...updateData,
             recurring_group_id: null,
             appointment_recurring: null
-          } as any) // Bypassing strict type check after DB migration
+          })
           .eq('id', appointment.id);
 
         if (error) throw error;
@@ -240,7 +241,7 @@ const EditAppointmentForm: React.FC<EditAppointmentFormProps> = ({
               status: values.status,
               notes: values.notes,
               appointment_timezone: appointmentTimeZone
-            } as any) // Bypassing strict type check after DB migration
+            })
             .eq('id', appt.id);
         });
 
@@ -292,7 +293,7 @@ const EditAppointmentForm: React.FC<EditAppointmentFormProps> = ({
               status: values.status,
               notes: values.notes,
               appointment_timezone: appointmentTimeZone
-            } as any) // Bypassing strict type check after DB migration
+            })
             .eq('id', appt.id);
         });
 
@@ -312,7 +313,7 @@ const EditAppointmentForm: React.FC<EditAppointmentFormProps> = ({
         // Regular single appointment update
         const { error } = await supabase
           .from('appointments')
-          .update(updateData as any) // Bypassing strict type check after DB migration
+          .update(updateData)
           .eq('id', appointment.id);
 
         if (error) throw error;

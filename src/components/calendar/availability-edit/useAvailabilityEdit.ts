@@ -62,19 +62,46 @@ export const useAvailabilityEdit = (
         isException: availabilityBlock.isException
       });
       
-      // Check for existing exceptions first
-      const { data: existingExceptions } = await supabase
-        .from('availability_exceptions')
-        .select('id')
-        .eq('clinician_id', clinicianId)
-        .eq('specific_date', formattedDate)
-        .limit(1);
+      let existingException = null;
+      let checkError = null;
+      
+      // If it's not already an exception, check if an exception exists
+      if (!availabilityBlock.isException) {
+        const result = await supabase
+          .from('availability_exceptions')
+          .select('id')
+          .eq('clinician_id', clinicianId)
+          .eq('specific_date', formattedDate)
+          .eq('original_availability_id', availabilityBlock.id)
+          .maybeSingle();
+          
+        existingException = result.data;
+        checkError = result.error;
+        
+        console.log('Existing exception check result:', { existingException, error: checkError });
+      } else {
+        // For existing exceptions, just look for it by ID
+        const result = await supabase
+          .from('availability_exceptions')
+          .select('id')
+          .eq('id', availabilityBlock.id)
+          .maybeSingle();
+          
+        existingException = result.data;
+        checkError = result.error;
+        
+        console.log('Existing exception (by ID) check result:', { existingException, error: checkError });
+      }
+      
+      if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is 'not found' error
+        throw checkError;
+      }
       
       let updateResult;
       
-      if (existingExceptions && existingExceptions.length > 0) {
+      if (existingException) {
         // Update existing exception
-        console.log('Updating existing exception:', existingExceptions[0].id);
+        console.log('Updating existing exception:', existingException.id);
         updateResult = await supabase
           .from('availability_exceptions')
           .update({
@@ -83,11 +110,16 @@ export const useAvailabilityEdit = (
             is_deleted: false,
             updated_at: new Date().toISOString()
           })
-          .eq('id', existingExceptions[0].id);
+          .eq('id', existingException.id);
+          
+        if (updateResult.error) {
+          console.error('Error updating exception:', updateResult.error);
+          throw updateResult.error;
+        }
       } else {
-        // Create new exception with required fields
+        // Create new exception
         console.log('Creating new exception');
-        const insertData = {
+        const insertData: any = {
           clinician_id: clinicianId,
           specific_date: formattedDate,
           start_time: startTime,
@@ -95,25 +127,32 @@ export const useAvailabilityEdit = (
           is_deleted: false
         };
         
+        // Only add original_availability_id if this is modifying a regular availability
+        if (!availabilityBlock.isException) {
+          insertData.original_availability_id = availabilityBlock.id;
+        }
+        
         updateResult = await supabase
           .from('availability_exceptions')
           .insert(insertData);
-      }
           
-      if (updateResult.error) {
-        console.error('Error updating exception:', updateResult.error);
-        throw updateResult.error;
+        if (updateResult.error) {
+          console.error('Error inserting exception:', updateResult.error);
+          throw updateResult.error;
+        }
       }
       
       // Wait a brief moment to ensure the database transaction completes
       await new Promise(resolve => setTimeout(resolve, 300));
       
+      // Only show success toast if no errors
       toast({
         title: "Success",
         description: `Availability for ${format(specificDate, 'PPP')} has been updated.`,
       });
       
       console.log('[useAvailabilityEdit] Calling onAvailabilityUpdated to refresh calendar');
+      // Explicitly call onAvailabilityUpdated to refresh the calendar view
       onAvailabilityUpdated();
       onClose();
     } catch (error) {
@@ -154,45 +193,79 @@ export const useAvailabilityEdit = (
         isException: availabilityBlock.isException
       });
       
-      // Check for existing exceptions
-      const { data: existingExceptions } = await supabase
-        .from('availability_exceptions')
-        .select('id')
-        .eq('clinician_id', clinicianId)
-        .eq('specific_date', formattedDate)
-        .limit(1);
+      let existingException = null;
+      let checkError = null;
+      
+      // If it's not already an exception, check if an exception exists for the original availability
+      if (!availabilityBlock.isException) {
+        const result = await supabase
+          .from('availability_exceptions')
+          .select('id, original_availability_id')
+          .eq('clinician_id', clinicianId)
+          .eq('specific_date', formattedDate)
+          .eq('original_availability_id', availabilityBlock.id)
+          .maybeSingle();
+          
+        existingException = result.data;
+        checkError = result.error;
+      } else {
+        // For existing exceptions, look it up by ID
+        const result = await supabase
+          .from('availability_exceptions')
+          .select('id, original_availability_id')
+          .eq('id', availabilityBlock.id)
+          .maybeSingle();
+          
+        existingException = result.data;
+        checkError = result.error;
+      }
+      
+      console.log('Existing exception check for delete:', { existingException, error: checkError });
+      
+      if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is 'not found' error
+        throw checkError;
+      }
       
       let updateResult;
       
-      if (existingExceptions && existingExceptions.length > 0) {
+      if (existingException) {
         // Update existing exception to mark as deleted
-        console.log('Updating existing exception to deleted:', existingExceptions[0].id);
+        console.log('Updating existing exception to deleted:', existingException.id);
         updateResult = await supabase
           .from('availability_exceptions')
           .update({
             is_deleted: true,
             updated_at: new Date().toISOString()
           })
-          .eq('id', existingExceptions[0].id);
+          .eq('id', existingException.id);
+          
+        if (updateResult.error) {
+          console.error('Error updating exception to deleted:', updateResult.error);
+          throw updateResult.error;
+        }
       } else {
-        // Create new exception marked as deleted with required time fields
-        const insertData = {
+        // Create new exception marked as deleted
+        const insertData: any = {
           clinician_id: clinicianId,
           specific_date: formattedDate,
-          start_time: startTime, // Use current times for deleted record
-          end_time: endTime,
           is_deleted: true
         };
+
+        // Only add original_availability_id if it references a valid entry in the availability table
+        // If it's an exception, don't include the original_availability_id field
+        if (!availabilityBlock.isException) {
+          insertData.original_availability_id = availabilityBlock.id;
+        }
         
         console.log('Creating new deleted exception with data:', insertData);
         updateResult = await supabase
           .from('availability_exceptions')
           .insert(insertData);
-      }
           
-      if (updateResult.error) {
-        console.error('Error updating exception to deleted:', updateResult.error);
-        throw updateResult.error;
+        if (updateResult.error) {
+          console.error('Error inserting deleted exception:', updateResult.error);
+          throw updateResult.error;
+        }
       }
       
       // Wait a brief moment to ensure the database transaction completes
@@ -204,6 +277,7 @@ export const useAvailabilityEdit = (
       });
       
       console.log('[useAvailabilityEdit] Calling onAvailabilityUpdated after delete to refresh calendar');
+      // Explicitly refresh the parent component
       setIsDeleteDialogOpen(false);
       onAvailabilityUpdated();
       onClose();

@@ -2,25 +2,18 @@
 import React, { useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { X, FileText } from 'lucide-react';
-import { SessionNoteTemplateProps } from '@/types/client';
+import { ClientDetails, SessionNoteTemplateProps } from '@/types/client';
 import { useSessionNoteForm } from './sessionNote/useSessionNoteForm';
 import { ClientInfoSection } from './sessionNote/ClientInfoSection';
 import { MentalStatusSection } from './sessionNote/MentalStatusSection';
 import { TreatmentObjectivesSection } from './sessionNote/TreatmentObjectivesSection';
 import { SessionAssessmentSection } from './sessionNote/SessionAssessmentSection';
 import { Textarea } from "@/components/ui/textarea";
-import { BaseTemplateProps } from './types';
 
 // Add PDF-specific styles
 import './sessionNote/pdf-styles.css';
 
-interface SessionNoteTemplateExtendedProps extends BaseTemplateProps {
-  appointment?: any;
-  clinicianName?: string;
-  clientData?: any;
-}
-
-const SessionNoteTemplate: React.FC<SessionNoteTemplateExtendedProps> = ({
+const SessionNoteTemplate: React.FC<SessionNoteTemplateProps> = ({
   onClose,
   appointment,
   clinicianName = '',

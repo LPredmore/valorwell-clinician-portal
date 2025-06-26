@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
 import {
   Dialog,
   DialogContent,
@@ -20,14 +19,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form"
 import { cn } from "@/lib/utils"
 import { format } from 'date-fns';
 import { TimeZoneService } from '@/utils/timeZoneService';
@@ -315,132 +306,243 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
       console.log('[AppointmentDialog] Using clinician timezone for appointment creation:', clinicianTimezone);
       
       // Convert the selected wall time to UTC using the clinician's timezone
-      const startDateTimeUTC = convertLocalToUTC(appointmentDate, startTime, clinicianTimezone);
-      const endDateTimeUTC = new Date(startDateTimeUTC.getTime() + 60 * 60 * 1000); // 1 hour duration
+      const startDateTime = convertLocalToUTC(appointmentDate, startTime, clinicianTimezone);
+      const endDateTime = new Date(startDateTime.getTime() + 60 * 60 * 1000); // Add 1 hour
 
-      const recurringGroupId = isRecurring ? uuidv4() : null;
-      let appointmentsToCreate = [];
+      if (isNaN(startDateTime.getTime()) || isNaN(endDateTime.getTime())) {
+        toast({
+          title: "Invalid Date/Time",
+          description: "Please enter a valid date and time.",
+          variant: "destructive",
+        });
+        return;
+      }
 
-      const baseAppointment = {
-        clientId,
-        clinicianId: currentClinicianId,
-        type: 'Therapy Session',
-        status: 'scheduled',
-        notes,
-        isRecurring,
-        appointment_timezone: clinicianTimezone,
-        recurring_group_id: recurringGroupId,
-        appointment_recurring: isRecurring ? recurringType : null,
-      };
-
+      let recurringData = null;
       if (isRecurring) {
-        const recurringDates = generateRecurringDates(startDateTimeUTC, recurringType, recurringEndDate, recurringCount);
-        appointmentsToCreate = recurringDates.map(date => {
-          const appointmentEnd = new Date(date.getTime() + 60 * 60 * 1000);
-          return {
-            ...baseAppointment,
-            startAt: date.toISOString(),
-            endAt: appointmentEnd.toISOString(),
+        if (!recurringType) {
+          toast({
+            title: "Missing Recurrence Type",
+            description: "Please select a recurrence type.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        if (!recurringEndDate && !recurringCount) {
+          toast({
+            title: "Missing Recurrence End",
+            description: "Please select either an end date or a number of occurrences for the recurring appointment.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        if (recurringEndDate && isBefore(recurringEndDate, appointmentDate)) {
+          toast({
+            title: "Invalid End Date",
+            description: "The recurring end date must be after the start date.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        recurringData = {
+          recurringType: recurringType,
+          recurringEndDate: recurringEndDate ? recurringEndDate.toISOString() : null,
+          recurringCount: recurringCount,
+        };
+      }
+
+      if (isRecurring && recurringData) {
+        // Generate recurring appointments
+        const recurringGroupId = uuidv4();
+        const recurringDates = generateRecurringDates(
+          appointmentDate,
+          recurringData.recurringType,
+          recurringEndDate,
+          recurringCount
+        );
+
+        console.log('[AppointmentDialog] Creating recurring appointments:', recurringDates.length);
+
+        // Save each recurring appointment
+        for (const date of recurringDates) {
+          const recurringStartDateTime = convertLocalToUTC(date, startTime, clinicianTimezone);
+          const recurringEndDateTime = new Date(recurringStartDateTime.getTime() + 60 * 60 * 1000);
+
+          const appointmentData = {
+            clientId: clientId,
+            clinicianId: currentClinicianId,
+            startAt: recurringStartDateTime.toISOString(),
+            endAt: recurringEndDateTime.toISOString(),
+            type: 'Therapy Session',
+            notes: notes,
+            isRecurring: true,
+            recurringData: recurringData,
+            appointment_timezone: clinicianTimezone,
+            recurringGroupId: recurringGroupId,
           };
+
+          const result = await saveAppointment(appointmentData);
+          if (!result.success) {
+            throw new Error(`Failed to save recurring appointment for ${date.toISOString()}`);
+          }
+        }
+
+        toast({
+          title: "Success",
+          description: `${recurringDates.length} recurring appointments created successfully with video rooms.`,
+          variant: "success",
         });
       } else {
-        appointmentsToCreate.push({
-          ...baseAppointment,
-          startAt: startDateTimeUTC.toISOString(),
-          endAt: endDateTimeUTC.toISOString(),
+        // Save single appointment
+        const appointmentData = {
+          clientId: clientId,
+          clinicianId: currentClinicianId,
+          startAt: startDateTime.toISOString(),
+          endAt: endDateTime.toISOString(),
+          type: 'Therapy Session',
+          notes: notes,
+          isRecurring: false,
+          recurringData: null,
+          appointment_timezone: clinicianTimezone,
+        };
+
+        const result = await saveAppointment(appointmentData);
+        if (!result.success) {
+          throw new Error('Failed to save appointment');
+        }
+
+        toast({
+          title: "Success",
+          description: "Appointment created successfully with video room.",
+          variant: "success",
         });
       }
 
-      for (const appt of appointmentsToCreate) {
-        const result = await saveAppointment(appt);
-        if (!result.success) {
-          throw result.error || new Error("Failed to save an appointment in the series.");
-        }
+      // Call the legacy onSave prop if provided (for backward compatibility)
+      if (onSave) {
+        const legacyData = {
+          clientId: clientId,
+          clinicianId: currentClinicianId,
+          startAt: startDateTime.toISOString(),
+          endAt: endDateTime.toISOString(),
+          type: 'Therapy Session',
+          notes: notes,
+          isRecurring: isRecurring,
+          recurringData: recurringData,
+          appointment_timezone: clinicianTimezone,
+        };
+        onSave(legacyData);
       }
       
-      toast({
-        title: "Success!",
-        description: `Successfully created ${appointmentsToCreate.length} appointment(s).`,
-      });
-
-      onClose();
       if (onAppointmentCreated) {
         onAppointmentCreated();
       }
-
-    } catch (error: any) {
-      console.error("[AppointmentDialog] Error creating appointment:", error);
+      
+      onClose();
+    } catch (error) {
+      console.error('[AppointmentDialog] Error creating appointment:', error);
       toast({
-        title: "Error Creating Appointment",
-        description: error.message || "An unexpected error occurred.",
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to create appointment. Please try again.",
         variant: "destructive",
       });
     }
   };
 
-  const form = useForm();
+  const handleRecurringChange = (checked: boolean | "indeterminate") => {
+    const isChecked = checked === true;
+    setIsRecurring(isChecked);
+    if (!isChecked) {
+      setRecurringType('');
+      setRecurringEndDate(undefined);
+      setRecurringCount('');
+    }
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>New Appointment</DialogTitle>
+          <DialogTitle>Schedule New Appointment</DialogTitle>
         </DialogHeader>
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <Label htmlFor="client">Client</Label>
-            {loadingClients ? (
-              <p>Loading clients...</p>
-            ) : (
-              <Select onValueChange={setClientId} value={clientId}>
-                <SelectTrigger id="client" className="mt-2">
-                  <SelectValue placeholder="Select a client" />
-                </SelectTrigger>
-                <SelectContent>
-                  {clients.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.client_first_name} {c.client_last_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          </div>
-          <div className="flex items-center space-x-2">
-            <FormItem className="flex flex-col">
-              <Label>Date</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant={"outline"}
-                    className={cn(
-                      "w-[240px] justify-start text-left font-normal",
-                      !appointmentDate && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {appointmentDate ? format(appointmentDate, "PPP") : <span>Pick a date</span>}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={appointmentDate}
-                    onSelect={setAppointmentDate}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </FormItem>
-          </div>
-          <div>
-            <Label>Start Time</Label>
-            <Select onValueChange={setStartTime} value={startTime}>
+            <Select onValueChange={setClientId} value={clientId}>
               <SelectTrigger>
-                <SelectValue placeholder="Select a time" />
+                <SelectValue placeholder={loadingClients ? "Loading clients..." : "Select a client"} />
               </SelectTrigger>
               <SelectContent>
-                {timeOptions.map(option => (
+                {clients && clients.length > 0 ? (
+                  clients.map((client) => (
+                    <SelectItem key={client.id} value={client.id}>
+                      {client.displayName}
+                    </SelectItem>
+                  ))
+                ) : (
+                  <SelectItem value="" disabled>
+                    {loadingClients ? "Loading..." : "No clients available"}
+                  </SelectItem>
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Appointment Type - Read-only display */}
+          <div>
+            <Label htmlFor="appointmentType">Appointment Type</Label>
+            <Input 
+              type="text" 
+              value="Therapy Session" 
+              readOnly 
+              className="bg-gray-100 text-gray-600"
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="date">Date</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant={"outline"}
+                  className={cn(
+                    "w-[240px] justify-start text-left font-normal",
+                    !appointmentDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {appointmentDate ? (
+                    format(appointmentDate, "PPP")
+                  ) : (
+                    <span>Pick a date</span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={appointmentDate}
+                  onSelect={setAppointmentDate}
+                  disabled={{ before: new Date() }}
+                  initialFocus
+                  className="p-3 pointer-events-auto"
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          <div>
+            <Label htmlFor="startTime">Start Time (1 hour appointment)</Label>
+            <Select onValueChange={setStartTime} value={startTime}>
+              <SelectTrigger className="mt-2">
+                <SelectValue placeholder="Select start time" />
+              </SelectTrigger>
+              <SelectContent className="max-h-[200px]">
+                {timeOptions.map((option) => (
                   <SelectItem key={option.value} value={option.value}>
                     {option.label}
                   </SelectItem>
@@ -448,58 +550,92 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
               </SelectContent>
             </Select>
           </div>
+
           <div>
             <Label htmlFor="notes">Notes</Label>
-            <Input id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
+            <Input
+              type="text"
+              id="notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
           </div>
+
           <div className="flex items-center space-x-2">
-            <Checkbox id="recurring" checked={isRecurring} onCheckedChange={(checked) => setIsRecurring(Boolean(checked))} />
-            <Label htmlFor="recurring">This is a recurring appointment</Label>
+            <Checkbox
+              id="isRecurring"
+              checked={isRecurring}
+              onCheckedChange={handleRecurringChange}
+            />
+            <Label htmlFor="isRecurring">Recurring Appointment</Label>
           </div>
+
           {isRecurring && (
-            <div className="space-y-4 pl-6 border-l-2">
-              <Select onValueChange={setRecurringType} value={recurringType}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Repeats..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="daily">Daily</SelectItem>
-                  <SelectItem value="weekly">Weekly</SelectItem>
-                  <SelectItem value="monthly">Monthly</SelectItem>
-                </SelectContent>
-              </Select>
-              <Input type="number" placeholder="Number of occurrences" value={recurringCount} onChange={e => setRecurringCount(e.target.value)} />
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant={"outline"}
-                    className={cn(
-                      "w-[240px] justify-start text-left font-normal",
-                      !recurringEndDate && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {recurringEndDate ? format(recurringEndDate, "PPP") : <span>End date (optional)</span>}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={recurringEndDate}
-                    onSelect={setRecurringEndDate}
+            <div className="space-y-2">
+              <div>
+                <Label htmlFor="recurringType">Recurring Type</Label>
+                <Select onValueChange={setRecurringType}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select recurring type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="daily">Daily</SelectItem>
+                    <SelectItem value="weekly">Weekly</SelectItem>
+                    <SelectItem value="monthly">Monthly</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="recurringEndDate">Recurring End Date</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant={"outline"}
+                        className={cn(
+                          "w-[240px] justify-start text-left font-normal",
+                          !recurringEndDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {recurringEndDate ? (
+                          format(recurringEndDate, "PPP")
+                        ) : (
+                          <span>Pick an end date</span>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={recurringEndDate}
+                        onSelect={setRecurringEndDate}
+                        disabled={{ before: addDays(appointmentDate || new Date(), 1) }}
+                        initialFocus
+                        className="p-3 pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                <div>
+                  <Label htmlFor="recurringCount">Recurring Count</Label>
+                  <Input
+                    type="number"
+                    id="recurringCount"
+                    value={recurringCount}
+                    onChange={(e) => setRecurringCount(e.target.value)}
+                    placeholder="Number of occurrences"
                   />
-                </PopoverContent>
-              </Popover>
+                </div>
+              </div>
             </div>
           )}
-          <div className="flex justify-end gap-2">
-            <DialogClose asChild>
-              <Button type="button" variant="outline">
-                Cancel
-              </Button>
-            </DialogClose>
-            <Button type="submit">Save Appointment</Button>
-          </div>
+
+          <DialogClose asChild>
+            <Button type="submit">Schedule Appointment</Button>
+          </DialogClose>
         </form>
       </DialogContent>
     </Dialog>

@@ -1,7 +1,8 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/context/AuthProvider';
+import { useUser } from '@/context/UserContext';
 
 interface SchedulerConfig {
   id: string;
@@ -17,7 +18,7 @@ export const useNylasScheduler = (clinicianId: string | null) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const { toast } = useToast();
-  const { authInitialized } = useAuth();
+  const { authInitialized } = useUser();
 
   // Fetch existing scheduler configuration
   const fetchSchedulerConfig = async () => {
@@ -35,10 +36,9 @@ export const useNylasScheduler = (clinicianId: string | null) => {
         .select('*')
         .eq('clinician_id', clinicianId)
         .eq('is_active', true)
-        .limit(1)
-        .maybeSingle();
+        .single();
 
-      if (error) {
+      if (error && error.code !== 'PGRST116') {
         console.error('[useNylasScheduler] Database error:', error);
         if (error.code === 'PGRST301' || error.message?.includes('permission denied')) {
           toast({

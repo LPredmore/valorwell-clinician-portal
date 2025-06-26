@@ -2,7 +2,7 @@
 import { useState, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, testResendEmailService } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -45,12 +45,19 @@ const ResetPassword = () => {
       console.warn("[ResetPassword] Reset password operation timed out after 45 seconds");
       setIsLoading(false);
       setErrorMessage("The request timed out. Please try again.");
+      setDebugInfo(prev => ({
+        ...prev,
+        timeout: {
+          timestamp: new Date().toISOString(),
+          message: "Operation timed out after 45 seconds"
+        }
+      }));
       toast({
         title: "Request timed out",
         description: "The password reset request took too long. Please try again.",
         variant: "destructive",
       });
-    }, 45000) as unknown as number;
+    }, 45000) as unknown as number;  // Increased to 45 seconds
     
     try {
       setIsLoading(true);
@@ -59,6 +66,15 @@ const ResetPassword = () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
         console.log("[ResetPassword] Found existing session, signing out first");
+        setDebugInfo(prev => ({
+          ...prev,
+          existingSession: {
+            email: session.user.email,
+            id: session.user.id,
+            timestamp: new Date().toISOString()
+          }
+        }));
+        
         await supabase.auth.signOut();
         console.log("[ResetPassword] Successfully signed out existing user");
       }
@@ -69,16 +85,50 @@ const ResetPassword = () => {
       
       console.log("[ResetPassword] Using redirect URL:", redirectTo);
       
+      // Verify the URL is properly formatted
+      if (!siteUrl || !siteUrl.startsWith('http')) {
+        throw new Error(`Invalid site URL: ${siteUrl}. Password reset may not work correctly.`);
+      }
+      
+      // Save URL details for debugging
+      setDebugInfo(prev => ({
+        ...prev,
+        urlDetails: {
+          siteUrl,
+          redirectTo,
+          timestamp: new Date().toISOString()
+        }
+      }));
+      
+      // IMPORTANT: Removed the test email functionality completely
+      // Proceed directly with password reset
+
       // Call Supabase Auth API directly with explicit redirect URL
-      console.log("[ResetPassword] Calling supabase.auth.resetPasswordForEmail");
+      console.log("[ResetPassword] Calling supabase.auth.resetPasswordForEmail with:", {
+        email: email,
+        redirectTo: redirectTo
+      });
       
       const { data, error } = await debugAuthOperation("resetPasswordForEmail", () =>
         supabase.auth.resetPasswordForEmail(email, {
           redirectTo: redirectTo,
+          captchaToken: undefined // Explicitly set to undefined to avoid issues
         })
       );
       
       console.log("[ResetPassword] Reset password response:", { data, error });
+      
+      setDebugInfo(prev => ({
+        ...prev,
+        supabaseResponse: {
+          data,
+          error: error ? {
+            message: error.message,
+            status: error.status
+          } : null,
+          timestamp: new Date().toISOString()
+        }
+      }));
       
       // Clear the timeout since the operation completed
       if (timeoutRef.current) {
@@ -95,9 +145,18 @@ const ResetPassword = () => {
       setSuccessMessage("Password reset email sent successfully!");
       console.log("[ResetPassword] Password reset email sent successfully");
       
+      // Add more detailed success information
+      setDebugInfo(prev => ({
+        ...prev,
+        resetSuccess: {
+          timestamp: new Date().toISOString(),
+          redirectUrl: redirectTo
+        }
+      }));
+      
       toast({
         title: "Password reset email sent",
-        description: "Please check your email for the password reset link.",
+        description: "Please check your email for the password reset link. Be sure to click the complete link in the email.",
       });
     } catch (error: any) {
       console.error("[ResetPassword] Error details:", error);
@@ -111,6 +170,94 @@ const ResetPassword = () => {
         title: "Failed to send reset email",
         description: error.message || "There was a problem sending the reset email. Please try again.",
         variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleTestEmail = async () => {
+    if (!email || !email.includes('@')) {
+      setErrorMessage("Please enter a valid email address");
+      return;
+    }
+    
+    setIsLoading(true);
+    setDebugInfo(prev => ({ ...prev, testingEmail: true }));
+    
+    try {
+      const result = await testResendEmailService(email);
+      setDebugInfo(prev => ({
+        ...prev,
+        directTestResult: result,
+        timestamp: new Date().toISOString()
+      }));
+      
+      if (result.success) {
+        toast({
+          title: "Test email sent",
+          description: "A test email was sent successfully. Please check your inbox.",
+        });
+      } else {
+        toast({
+          title: "Test email failed",
+          description: result.error || "Failed to send test email",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      console.error("[ResetPassword] Test email error:", error);
+      toast({
+        title: "Test email failed",
+        description: error.message || "There was a problem sending the test email",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+      setDebugInfo(prev => ({ ...prev, testingEmail: false }));
+    }
+  };
+  
+  const testEdgeFunction = async () => {
+    try {
+      setIsLoading(true);
+      setDebugInfo(prev => ({ ...prev, edgeFunctionTest: { status: 'testing' } }));
+      
+      const response = await fetch(`https://gqlkritspnhjxfejvgfg.supabase.co/functions/v1/test-resend`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      const result = await response.json();
+      setDebugInfo(prev => ({
+        ...prev,
+        edgeFunctionTest: {
+          status: 'completed',
+          result: result,
+          timestamp: new Date().toISOString()
+        }
+      }));
+      
+      toast({
+        title: "Edge Function Test",
+        description: result.status === 'ok' ? "Edge function is operational" : "Edge function test failed",
+        variant: result.status === 'ok' ? "default" : "destructive"
+      });
+    } catch (error) {
+      setDebugInfo(prev => ({
+        ...prev,
+        edgeFunctionTest: {
+          status: 'error',
+          error: error,
+          timestamp: new Date().toISOString()
+        }
+      }));
+      toast({
+        title: "Edge Function Test Failed",
+        description: "Could not connect to the edge function",
+        variant: "destructive"
       });
     } finally {
       setIsLoading(false);
@@ -156,7 +303,50 @@ const ResetPassword = () => {
             <Button type="submit" className="w-full" disabled={isLoading || !!successMessage}>
               {isLoading ? "Sending..." : "Send Reset Link"}
             </Button>
+            
+            {/* Test email functionality (in development) */}
+            {process.env.NODE_ENV === 'development' && (
+              <div className="mt-2">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm"
+                  className="w-full text-xs"
+                  onClick={handleTestEmail}
+                  disabled={isLoading || !email}
+                >
+                  Test Email Delivery
+                </Button>
+              </div>
+            )}
+            
+            {process.env.NODE_ENV === 'development' && (
+              <div className="mt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="w-full text-xs"
+                  onClick={testEdgeFunction}
+                  disabled={isLoading}
+                >
+                  Test Edge Function
+                </Button>
+              </div>
+            )}
           </form>
+          
+          {/* Debug info for development */}
+          {process.env.NODE_ENV === 'development' && Object.keys(debugInfo).length > 0 && (
+            <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-md">
+              <details>
+                <summary className="text-xs font-medium text-gray-500 cursor-pointer">Debug Info:</summary>
+                <pre className="text-xs text-gray-600 overflow-auto max-h-60 mt-2">
+                  {JSON.stringify(debugInfo, null, 2)}
+                </pre>
+              </details>
+            </div>
+          )}
         </CardContent>
         <CardFooter className="flex justify-center">
           <Button variant="link" onClick={() => navigate("/login")}>

@@ -167,7 +167,7 @@ const CalendarConnectionsPanel: React.FC = () => {
 
           {/* Actions */}
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => refreshConnections(true)} size="sm" className="flex-1">
+            <Button variant="outline" onClick={refreshConnections} size="sm" className="flex-1">
               <ExternalLink className="h-3 w-3 mr-1" />
               Refresh
             </Button>

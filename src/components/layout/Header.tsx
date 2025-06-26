@@ -1,3 +1,4 @@
+
 import { Bell, Search, LogOut, User } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from "@/integrations/supabase/client";
@@ -5,7 +6,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { toast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useEffect, useState } from "react";
-import { useAuth } from '@/context/AuthProvider';
+import { useUser } from '@/context/UserContext';
 
 interface HeaderProps {
   userName?: string;
@@ -23,7 +24,7 @@ const Header: React.FC<HeaderProps> = ({
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [initials, setInitials] = useState('');
-  const { userRole, userId } = useAuth();
+  const { userRole, userId } = useUser();
 
   // Get user profile data
   useEffect(() => {

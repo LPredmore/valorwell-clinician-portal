@@ -5,17 +5,17 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import { ClientDetails } from "@/types/client";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Form, FormField, FormItem, FormControl } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { CheckCircle, X } from 'lucide-react';
-import { useTemplateData } from '@/hooks/useTemplateData';
-import { ClinicianTemplateProps, ClientTemplateProps } from './types';
 
-interface PCL5TemplateProps extends ClinicianTemplateProps, ClientTemplateProps {
+interface PCL5TemplateProps {
   onClose: () => void;
+  clinicianName: string;
+  clientData?: ClientDetails | null;
 }
 
 // PCL-5 questions based on the official assessment
@@ -51,18 +51,10 @@ const answerOptions = [
   { value: 4, label: "Extremely" }
 ];
 
-const PCL5Template: React.FC<PCL5TemplateProps> = ({ 
-  onClose, 
-  clinicianName, 
-  clientData,
-  clientId
-}) => {
+const PCL5Template: React.FC<PCL5TemplateProps> = ({ onClose, clinicianName, clientData }) => {
   const { toast } = useToast();
-  const { savePCL5Assessment } = useTemplateData();
   const [scores, setScores] = useState<number[]>(new Array(20).fill(0));
   const [additionalNotes, setAdditionalNotes] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSaved, setIsSaved] = useState(false);
   
   const form = useForm({
     defaultValues: {
@@ -91,43 +83,13 @@ const PCL5Template: React.FC<PCL5TemplateProps> = ({
     setScores(newScores);
   };
 
-  const handleSubmit = async () => {
-    if (!clientId) {
-      toast({
-        title: "Error",
-        description: "Client ID is required.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      const assessmentData = {
-        client_id: clientId,
-        clinician_id: '', // Will be set by the hook from auth.uid()
-        assessment_date: new Date().toISOString().split('T')[0],
-        responses: scores.reduce((acc, score, index) => ({
-          ...acc,
-          [`question_${index + 1}`]: score
-        }), {}),
-        total_score: totalScore,
-        interpretation: getInterpretation(totalScore),
-        event_description: form.getValues('eventDescription'),
-        additional_notes: additionalNotes
-      };
-
-      await savePCL5Assessment(assessmentData);
-      
-      setIsSaved(true);
-      setTimeout(() => {
-        setIsSaved(false);
-      }, 3000);
-    } catch (error) {
-      console.error('Error saving PCL-5 assessment:', error);
-    } finally {
-      setIsSubmitting(false);
-    }
+  const handleSubmit = () => {
+    toast({
+      title: "Assessment Saved",
+      description: "PCL-5 assessment has been saved successfully.",
+    });
+    
+    onClose();
   };
 
   const calculateClusterScores = () => {
@@ -152,7 +114,7 @@ const PCL5Template: React.FC<PCL5TemplateProps> = ({
             onClick={onClose}
             className="text-white border-white hover:bg-valorwell-700"
           >
-            <X className="h-4 w-4" />
+            Close
           </Button>
         </CardTitle>
       </CardHeader>
@@ -296,20 +258,8 @@ const PCL5Template: React.FC<PCL5TemplateProps> = ({
             <Button variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button
-              onClick={handleSubmit}
-              disabled={isSubmitting || !clientId}
-              className="flex items-center gap-2"
-            >
-              {isSubmitting ? (
-                "Saving..."
-              ) : isSaved ? (
-                <>
-                  <CheckCircle className="h-4 w-4" /> Saved
-                </>
-              ) : (
-                "Save Assessment"
-              )}
+            <Button onClick={handleSubmit}>
+              Save Assessment
             </Button>
           </div>
         </Form>

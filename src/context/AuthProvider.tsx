@@ -1,9 +1,25 @@
+
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { Client } from '@/types/client'; // Import the unified Client type
 
-// Types for client profile (matching main clients table) - REMOVED, using Client from types/client.ts
+// Types for client profile (matching main clients table)
+export interface ClientProfile {
+  client_id: string;
+  client_first_name: string | null;
+  client_last_name: string | null;
+  client_preferred_name: string | null;
+  client_email: string | null;
+  client_phone: string | null;
+  client_status: 'Active' | 'Inactive' | 'Pending' | null;
+  client_date_of_birth: string | null;
+  client_age: number | null;
+  client_gender: string | null;
+  client_address: string | null;
+  client_city: string | null;
+  client_state: string | null;
+  client_zipcode: string | null;
+}
 
 type AuthState = 'initializing' | 'authenticated' | 'unauthenticated' | 'error';
 
@@ -11,8 +27,8 @@ interface AuthContextType {
   user: SupabaseUser | null;
   userId: string | null;
   userRole: string | null;
-  clientProfile: Client | null; // Use Client type
-  clientStatus: Client['client_status'] | null; // Use Client type
+  clientProfile: ClientProfile | null;
+  clientStatus: ClientProfile['client_status'] | null;
   isLoading: boolean;
   authInitialized: boolean;
   authState: AuthState;
@@ -26,7 +42,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
-  const [clientProfile, setClientProfile] = useState<Client | null>(null);
+  const [clientProfile, setClientProfile] = useState<ClientProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [authInitialized, setAuthInitialized] = useState(false);
   const [authState, setAuthState] = useState<AuthState>('initializing');
@@ -41,21 +57,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setAuthInitialized(true);
   };
 
-  const fetchClientProfile = async (userId: string): Promise<Client | null> => {
+  const fetchClientProfile = async (userId: string) => {
     try {
+      // Match the actual clients table schema
       const { data, error } = await supabase
         .from('clients')
-        .select('*') // Fetch all fields for the comprehensive Client type
+        .select(
+          `id as client_id, first_name as client_first_name, last_name as client_last_name, preferred_name as client_preferred_name, email as client_email, phone as client_phone, status as client_status, date_of_birth as client_date_of_birth, age as client_age, gender as client_gender, address as client_address, city as client_city, state as client_state, zipcode as client_zipcode`
+        )
         .eq('id', userId)
         .single();
-
-      if (error) {
-        console.error('Error fetching client profile:', error);
-        return null;
-      }
-      return data as Client;
-    } catch (e) {
-      console.error('Exception while fetching client profile:', e);
+      if (error) return null;
+      return data;
+    } catch {
       return null;
     }
   };
@@ -116,7 +130,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setIsLoading(false);
         if (session.user.user_metadata?.role === 'client') {
           const profile = await fetchClientProfile(session.user.id);
-          setClientProfile(profile); // profile can be null, which is handled
+          setClientProfile(profile || null);
         } else {
           setClientProfile(null);
         }

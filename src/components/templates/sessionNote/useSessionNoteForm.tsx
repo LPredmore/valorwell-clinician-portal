@@ -1,13 +1,12 @@
-
 import { useState, useEffect, RefObject } from 'react';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Client } from '@/types/client';
+import { ClientDetails } from '@/types/client';
 import { generateAndSavePDF } from '@/utils/pdfUtils';
 import { createCMS1500ClaimsForCompletedAppointment } from '@/utils/cms1500ClaimsUtils';
 
 interface UseSessionNoteFormProps {
-  clientData: Client | null;
+  clientData: ClientDetails | null;
   clinicianName: string;
   appointment?: any;
   onClose: () => void;

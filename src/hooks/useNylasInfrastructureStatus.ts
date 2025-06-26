@@ -1,6 +1,7 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/context/AuthProvider';
+import { useUser } from '@/context/UserContext';
 
 interface ComponentStatus {
   status: 'checking' | 'ready' | 'error';
@@ -25,7 +26,7 @@ export const useNylasInfrastructureStatus = () => {
     nylasApi: { status: 'checking', message: 'Checking Nylas API...' },
     overall: 'checking'
   });
-  const { userId, authInitialized } = useAuth();
+  const { userId, authInitialized } = useUser();
 
   useEffect(() => {
     if (!authInitialized || !userId) return;
