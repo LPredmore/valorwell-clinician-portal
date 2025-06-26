@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/components/ui/use-toast';
 import { Loader2, Plus, Trash2, Edit } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import AddAvailabilityBlockDialog from './availability-blocks/AddAvailabilityBlockDialog';
 
 interface AvailabilityBlock {
   id: string;
@@ -30,6 +31,8 @@ const ClinicianAvailabilityPanel = () => {
   const [availabilityBlocks, setAvailabilityBlocks] = useState<AvailabilityBlock[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [timeGranularity, setTimeGranularity] = useState<'hour' | 'half-hour'>('hour');
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const { toast } = useToast();
 
   const fetchCurrentUser = async () => {
@@ -85,6 +88,36 @@ const ClinicianAvailabilityPanel = () => {
     }
   };
 
+  const handleAvailabilityAdded = () => {
+    setRefreshTrigger(prev => prev + 1);
+    fetchAvailabilityBlocks();
+  };
+
+  const handleDeleteBlock = async (blockId: string) => {
+    try {
+      const { error } = await supabase
+        .from('availability_blocks')
+        .update({ is_active: false })
+        .eq('id', blockId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Availability block deleted successfully.",
+      });
+
+      fetchAvailabilityBlocks();
+    } catch (error) {
+      console.error('Error deleting availability block:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete availability block.",
+        variant: "destructive",
+      });
+    }
+  };
+
   useEffect(() => {
     fetchCurrentUser();
   }, []);
@@ -93,7 +126,7 @@ const ClinicianAvailabilityPanel = () => {
     if (currentUser) {
       fetchAvailabilityBlocks();
     }
-  }, [currentUser]);
+  }, [currentUser, refreshTrigger]);
 
   const saveUserProfile = async () => {
     if (!currentUser) return;
@@ -182,14 +215,26 @@ const ClinicianAvailabilityPanel = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle>Availability Blocks</CardTitle>
+          <CardTitle className="flex items-center justify-between">
+            Availability Blocks
+            <Button onClick={() => setIsAddDialogOpen(true)} size="sm">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Block
+            </Button>
+          </CardTitle>
           <CardDescription>
             Manage your recurring availability schedule
           </CardDescription>
         </CardHeader>
         <CardContent>
           {availabilityBlocks.length === 0 ? (
-            <p className="text-gray-500">No availability blocks configured.</p>
+            <div className="text-center py-8">
+              <p className="text-gray-500 mb-4">No availability blocks configured.</p>
+              <Button onClick={() => setIsAddDialogOpen(true)} variant="outline">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Your First Availability Block
+              </Button>
+            </div>
           ) : (
             <div className="space-y-2">
               {availabilityBlocks.map((block) => (
@@ -200,10 +245,14 @@ const ClinicianAvailabilityPanel = () => {
                     </p>
                   </div>
                   <div className="flex gap-2">
-                    <Button size="sm" variant="outline">
+                    <Button size="sm" variant="outline" disabled>
                       <Edit className="h-4 w-4" />
                     </Button>
-                    <Button size="sm" variant="outline">
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => handleDeleteBlock(block.id)}
+                    >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
@@ -213,6 +262,13 @@ const ClinicianAvailabilityPanel = () => {
           )}
         </CardContent>
       </Card>
+
+      <AddAvailabilityBlockDialog
+        isOpen={isAddDialogOpen}
+        onClose={() => setIsAddDialogOpen(false)}
+        clinicianId={currentUser.id}
+        onAvailabilityAdded={handleAvailabilityAdded}
+      />
     </div>
   );
 };
