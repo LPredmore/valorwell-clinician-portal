@@ -3,7 +3,7 @@ import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Plus, Trash2, Loader2 } from 'lucide-react';
+import { Calendar, Plus, Trash2, Loader2, AlertTriangle } from 'lucide-react';
 import { useNylasIntegration } from '@/hooks/useNylasIntegration';
 
 const CalendarConnectionsPanel: React.FC = () => {
@@ -11,6 +11,7 @@ const CalendarConnectionsPanel: React.FC = () => {
     connections,
     isLoading,
     isConnecting,
+    infrastructureError,
     connectCalendar,
     disconnectCalendar
   } = useNylasIntegration();
@@ -55,6 +56,18 @@ const CalendarConnectionsPanel: React.FC = () => {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {infrastructureError && (
+          <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-red-800 font-medium text-sm">Setup Required</p>
+                <p className="text-red-700 text-xs mt-1">{infrastructureError}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {isLoading ? (
           <div className="flex items-center justify-center py-4">
             <Loader2 className="h-6 w-6 animate-spin" />
@@ -87,6 +100,7 @@ const CalendarConnectionsPanel: React.FC = () => {
                         variant="ghost"
                         size="sm"
                         onClick={() => disconnectCalendar(connection.id)}
+                        disabled={!!infrastructureError}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -104,7 +118,7 @@ const CalendarConnectionsPanel: React.FC = () => {
 
             <Button
               onClick={connectCalendar}
-              disabled={isConnecting}
+              disabled={isConnecting || !!infrastructureError}
               className="w-full"
             >
               {isConnecting ? (
@@ -119,6 +133,12 @@ const CalendarConnectionsPanel: React.FC = () => {
                 </>
               )}
             </Button>
+
+            {infrastructureError && (
+              <p className="text-xs text-gray-500 text-center">
+                Connection disabled until infrastructure is configured
+              </p>
+            )}
           </>
         )}
       </CardContent>
