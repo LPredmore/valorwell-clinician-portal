@@ -1,8 +1,9 @@
+
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
 import { Search, Filter, RotateCcw, MoreHorizontal } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, getCurrentUser } from '@/integrations/supabase/client';
 import { useToast } from "@/hooks/use-toast";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 
@@ -21,6 +22,7 @@ const Clients = () => {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [clinicianId, setClinicianId] = useState<string | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
   
@@ -33,16 +35,73 @@ const Clients = () => {
   const currentClients = clients.slice(indexOfFirstItem, indexOfLastItem);
 
   useEffect(() => {
-    fetchClients();
-  }, []);
+    const getClinicianInfo = async () => {
+      try {
+        const user = await getCurrentUser();
+        if (!user) {
+          console.error('No authenticated user found');
+          toast({
+            title: "Authentication Required",
+            description: "Please log in to view clients.",
+            variant: "destructive",
+          });
+          navigate('/login');
+          return;
+        }
+        
+        const { data, error } = await supabase
+          .from('clinicians')
+          .select('id')
+          .eq('clinician_email', user.email)
+          .maybeSingle();
+          
+        if (error) {
+          console.error('Error fetching clinician:', error);
+          toast({
+            title: "Error",
+            description: "Failed to fetch clinician information.",
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        if (data) {
+          console.log('Found clinician ID:', data.id);
+          setClinicianId(data.id);
+          fetchClients(data.id);
+        } else {
+          console.error('No clinician found for current user');
+          toast({
+            title: "Access Denied",
+            description: "You don't have permission to view clients.",
+            variant: "destructive",
+          });
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error('Error getting clinician info:', error);
+        toast({
+          title: "Error",
+          description: "Failed to authenticate user.",
+          variant: "destructive",
+        });
+        setLoading(false);
+      }
+    };
+    
+    getClinicianInfo();
+  }, [navigate, toast]);
 
-  const fetchClients = async () => {
+  const fetchClients = async (clinicianId: string) => {
     try {
       setLoading(true);
+      
+      console.log('Fetching clients for clinician ID:', clinicianId);
       
       const { data, error } = await supabase
         .from('clients')
         .select('id, client_first_name, client_last_name, client_email, client_phone, client_date_of_birth, client_status, client_assigned_therapist')
+        .eq('client_assigned_therapist', clinicianId)
         .order('created_at', { ascending: false });
       
       if (error) {
@@ -64,8 +123,10 @@ const Clients = () => {
   };
 
   const handleSearch = () => {
-    if (!searchQuery.trim()) {
-      fetchClients();
+    if (!searchQuery.trim() || !clinicianId) {
+      if (clinicianId) {
+        fetchClients(clinicianId);
+      }
       return;
     }
 
@@ -81,7 +142,9 @@ const Clients = () => {
 
   const handleClearSearch = () => {
     setSearchQuery('');
-    fetchClients();
+    if (clinicianId) {
+      fetchClients(clinicianId);
+    }
   };
 
   const formatDateOfBirth = (dateString: string | null) => {
@@ -103,7 +166,7 @@ const Clients = () => {
     <Layout>
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <h2 className="text-2xl font-semibold">Clients</h2>
+          <h2 className="text-2xl font-semibold">My Clients</h2>
           <span className="bg-valorwell-700 text-white text-xs px-2 py-0.5 rounded-full">{clients.length}</span>
         </div>
       </div>
@@ -153,7 +216,7 @@ const Clients = () => {
               </button>
               <button 
                 className="p-2 border rounded text-gray-700 hover:bg-gray-50 transition-colors"
-                onClick={fetchClients}
+                onClick={() => clinicianId && fetchClients(clinicianId)}
               >
                 <RotateCcw size={16} />
               </button>
@@ -172,18 +235,17 @@ const Clients = () => {
                   <th className="px-4 py-3">Phone</th>
                   <th className="px-4 py-3">Date Of Birth</th>
                   <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Therapist</th>
                   <th className="px-4 py-3">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={8} className="text-center py-4">Loading clients...</td>
+                    <td colSpan={7} className="text-center py-4">Loading clients...</td>
                   </tr>
                 ) : currentClients.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="text-center py-4">No clients found</td>
+                    <td colSpan={7} className="text-center py-4">No clients found</td>
                   </tr>
                 ) : (
                   currentClients.map((client) => (
@@ -213,7 +275,6 @@ const Clients = () => {
                           {client.client_status || 'Unknown'}
                         </span>
                       </td>
-                      <td className="px-4 py-3">{client.client_assigned_therapist || '-'}</td>
                       <td className="px-4 py-3">
                         <button className="text-gray-500 hover:text-gray-700">
                           <MoreHorizontal size={16} />
