@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -49,7 +48,7 @@ const ClinicianAvailabilityPanel = () => {
 
   const handleTimeGranularityChange = (value: string) => {
     if (value === 'hour' || value === 'half-hour') {
-      setTimeGranularity(value);
+      setTimeGranularity(value as 'hour' | 'half-hour');
     }
   };
 

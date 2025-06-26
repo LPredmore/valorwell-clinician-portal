@@ -1,10 +1,9 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Plus, Edit, Trash2, Clock, Sync } from 'lucide-react';
+import { Loader2, Plus, Edit, Trash2, Clock, RefreshCw } from 'lucide-react';
 import { useRecurringAvailability } from '@/hooks/useRecurringAvailability';
 import { RecurringAvailabilityDialog } from './RecurringAvailabilityDialog';
 import { RecurringAvailability } from '@/utils/availabilityService';
@@ -65,7 +64,7 @@ const RecurringAvailabilityPanel: React.FC<RecurringAvailabilityPanelProps> = ({
 
     return (
       <Badge variant={variants[status.sync_status as keyof typeof variants] || 'secondary'} className="ml-2">
-        <Sync className="h-3 w-3 mr-1" />
+        <RefreshCw className="h-3 w-3 mr-1" />
         {status.sync_status}
       </Badge>
     );
