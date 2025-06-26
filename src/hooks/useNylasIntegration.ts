@@ -11,6 +11,10 @@ interface NylasConnection {
   is_active: boolean;
   created_at: string;
   calendar_ids?: string[];
+  connector_id?: string;
+  grant_status?: string;
+  scopes?: string[];
+  last_sync_at?: string;
 }
 
 export const useNylasIntegration = () => {
@@ -25,14 +29,13 @@ export const useNylasIntegration = () => {
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === 'NYLAS_AUTH_SUCCESS') {
-        console.log('[useNylasIntegration] Received auth success message');
+        console.log('[useNylasIntegration] Received Google Calendar auth success message');
         setIsConnecting(false);
         toast({
-          title: 'Calendar Connected',
-          description: `Successfully connected ${event.data.connection?.provider} calendar`,
-          variant: 'success'
+          title: 'Google Calendar Connected',
+          description: 'Successfully connected your Google Calendar via Nylas',
+          variant: 'default'
         });
-        // Refresh connections
         fetchConnections();
       }
     };
@@ -55,15 +58,16 @@ export const useNylasIntegration = () => {
       
       const { data, error } = await supabase
         .from('nylas_connections')
-        .select('id, email, provider, is_active, created_at, calendar_ids')
+        .select('id, email, provider, is_active, created_at, calendar_ids, connector_id, grant_status, scopes, last_sync_at')
         .eq('is_active', true)
         .order('created_at', { ascending: false });
 
       if (error) {
         console.error('[useNylasIntegration] Database error:', error);
         
+        // Handle specific error cases
         if (error.code === 'PGRST301' || error.message?.includes('permission denied')) {
-          setInfrastructureError('Database permissions not configured. Please apply the RLS migration.');
+          setInfrastructureError('Database permissions not configured. Please apply the latest migration.');
           toast({
             title: 'Setup Required',
             description: 'Calendar integration requires database migration. Please contact support.',
@@ -78,7 +82,7 @@ export const useNylasIntegration = () => {
           });
         } else {
           setInfrastructureError(`Database error: ${error.message}`);
-          throw error;
+          console.error('[useNylasIntegration] Detailed error:', error);
         }
         return;
       }
@@ -98,12 +102,12 @@ export const useNylasIntegration = () => {
     }
   };
 
-  // Initialize calendar connection
-  const connectCalendar = async () => {
+  // Initialize Google Calendar connection via Nylas
+  const connectGoogleCalendar = async () => {
     if (!authInitialized || !userId) {
       toast({
         title: 'Authentication Required',
-        description: 'Please log in to connect a calendar',
+        description: 'Please log in to connect Google Calendar',
         variant: 'destructive'
       });
       return;
@@ -112,7 +116,7 @@ export const useNylasIntegration = () => {
     try {
       setIsConnecting(true);
       setInfrastructureError(null);
-      console.log('[useNylasIntegration] Initializing calendar connection');
+      console.log('[useNylasIntegration] Initializing Google Calendar connection via Nylas');
 
       const { data, error } = await supabase.functions.invoke('nylas-auth', {
         body: { action: 'initialize' }
@@ -128,26 +132,46 @@ export const useNylasIntegration = () => {
             description: 'Nylas edge functions need to be deployed. Please contact support.',
             variant: 'destructive'
           });
+        } else if (error.message?.includes('Nylas configuration missing')) {
+          setInfrastructureError('Nylas API credentials not configured. Please set NYLAS_CLIENT_ID, NYLAS_CLIENT_SECRET, and NYLAS_API_KEY.');
+          toast({
+            title: 'Configuration Required',
+            description: 'Nylas API credentials need to be configured in Supabase secrets.',
+            variant: 'destructive'
+          });
         } else {
           setInfrastructureError(`Connection error: ${error.message}`);
-          throw error;
+          toast({
+            title: 'Connection Failed',
+            description: error.message || 'Failed to initialize connection',
+            variant: 'destructive'
+          });
         }
         return;
       }
 
       if (data?.authUrl) {
-        console.log('[useNylasIntegration] Opening OAuth window');
+        console.log('[useNylasIntegration] Opening Google OAuth window via Nylas');
         const popup = window.open(
           data.authUrl,
-          'nylas-auth',
+          'google-calendar-auth',
           'width=500,height=600,scrollbars=yes,resizable=yes'
         );
 
-        // Monitor popup closure (in case user closes without completing auth)
+        if (!popup) {
+          setInfrastructureError('Popup blocked. Please allow popups for this site.');
+          toast({
+            title: 'Popup Blocked',
+            description: 'Please allow popups and try again.',
+            variant: 'destructive'
+          });
+          return;
+        }
+
+        // Monitor popup closure
         const checkClosed = setInterval(() => {
           if (popup?.closed) {
             clearInterval(checkClosed);
-            // Only set connecting to false if we haven't received a success message
             setTimeout(() => {
               setIsConnecting(false);
             }, 1000);
@@ -158,11 +182,11 @@ export const useNylasIntegration = () => {
         throw new Error('No authorization URL received');
       }
     } catch (error: any) {
-      console.error('[useNylasIntegration] Error connecting calendar:', error);
+      console.error('[useNylasIntegration] Error connecting Google Calendar:', error);
       setInfrastructureError(`Connection failed: ${error.message}`);
       toast({
         title: 'Connection Failed',
-        description: error.message || 'Failed to initialize calendar connection',
+        description: error.message || 'Failed to initialize Google Calendar connection',
         variant: 'destructive'
       });
       setIsConnecting(false);
@@ -195,7 +219,7 @@ export const useNylasIntegration = () => {
 
       toast({
         title: 'Calendar Disconnected',
-        description: 'Calendar has been successfully disconnected'
+        description: 'Google Calendar has been successfully disconnected'
       });
 
       fetchConnections();
@@ -220,7 +244,8 @@ export const useNylasIntegration = () => {
     isLoading,
     isConnecting,
     infrastructureError,
-    connectCalendar,
+    connectCalendar: connectGoogleCalendar,
+    connectGoogleCalendar,
     disconnectCalendar,
     refreshConnections: fetchConnections
   };

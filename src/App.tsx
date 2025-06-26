@@ -15,7 +15,7 @@ import Clients from "./pages/Clients";
 import ClientDetails from "./pages/ClientDetails";
 import Settings from "./pages/Settings";
 import ResetPassword from "./pages/ResetPassword";
-import NylasCallback from "./pages/NylasCallback";
+import NylasOAuthCallback from "./pages/NylasOAuthCallback";
 
 const queryClient = new QueryClient();
 
@@ -32,7 +32,7 @@ const App = () => {
               <Route path="/login" element={<Login />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/portal" element={<PatientDashboard />} />
-              <Route path="/auth/callback" element={<NylasCallback />} />
+              <Route path="/nylas-oauth-callback" element={<NylasOAuthCallback />} />
 
               {/* Protected Routes */}
               <Route 

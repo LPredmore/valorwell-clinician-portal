@@ -7,12 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-interface EventsRequest {
-  action: 'fetch_events'
-  startDate?: string
-  endDate?: string
-}
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -29,120 +23,153 @@ serve(async (req) => {
       }
     )
 
-    const { data: { user } } = await supabaseClient.auth.getUser()
-    if (!user) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+    // Verify JWT and get user
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader) {
+      throw new Error('No authorization header')
     }
 
-    const { action, startDate, endDate }: EventsRequest = await req.json()
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser()
+    if (authError || !user) {
+      throw new Error('Authentication failed')
+    }
 
-    if (action === 'fetch_events') {
-      // Get user's active Nylas connections
-      const { data: connections, error: connError } = await supabaseClient
-        .from('nylas_connections')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('is_active', true)
+    const { action, startDate, endDate, calendarIds } = await req.json()
 
-      if (connError || !connections?.length) {
-        return new Response(
-          JSON.stringify({ events: [], connections: [] }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      }
+    if (action !== 'fetch_events') {
+      throw new Error('Invalid action')
+    }
 
-      const allEvents = []
+    // Get user's active connections
+    const { data: connections, error: connectionsError } = await supabaseClient
+      .from('nylas_connections')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
 
-      for (const connection of connections) {
-        try {
-          // Fetch calendars for this connection first
-          const calendarsResponse = await fetch(`https://api.nylas.com/v3/grants/${connection.grant_id}/calendars`, {
-            headers: {
-              'Authorization': `Bearer ${connection.access_token}`,
-            }
-          })
+    if (connectionsError) {
+      throw new Error('Failed to fetch connections')
+    }
 
-          if (!calendarsResponse.ok) {
-            console.error(`Failed to fetch calendars for connection ${connection.id}`)
-            continue
-          }
-
-          const calendarsData = await calendarsResponse.json()
-          const calendars = calendarsData.data || []
-
-          // Update connection with calendar IDs if not already stored
-          if (!connection.calendar_ids || connection.calendar_ids.length === 0) {
-            const calendarIds = calendars.map((cal: any) => cal.id)
-            await supabaseClient
-              .from('nylas_connections')
-              .update({ calendar_ids: calendarIds })
-              .eq('id', connection.id)
-          }
-
-          // Fetch events from each calendar
-          for (const calendar of calendars) {
-            const eventsUrl = new URL(`https://api.nylas.com/v3/grants/${connection.grant_id}/events`)
-            eventsUrl.searchParams.set('calendar_id', calendar.id)
-            
-            if (startDate) {
-              eventsUrl.searchParams.set('start', startDate)
-            }
-            if (endDate) {
-              eventsUrl.searchParams.set('end', endDate)
-            }
-
-            const eventsResponse = await fetch(eventsUrl.toString(), {
-              headers: {
-                'Authorization': `Bearer ${connection.access_token}`,
-              }
-            })
-
-            if (eventsResponse.ok) {
-              const eventsData = await eventsResponse.json()
-              const events = eventsData.data || []
-              
-              // Add connection and calendar info to each event
-              const enrichedEvents = events.map((event: any) => ({
-                ...event,
-                connection_id: connection.id,
-                connection_email: connection.email,
-                connection_provider: connection.provider,
-                calendar_id: calendar.id,
-                calendar_name: calendar.name
-              }))
-
-              allEvents.push(...enrichedEvents)
-            }
-          }
-        } catch (error) {
-          console.error(`Error fetching events for connection ${connection.id}:`, error)
-          continue
-        }
-      }
-
+    if (!connections || connections.length === 0) {
       return new Response(
-        JSON.stringify({ 
-          events: allEvents,
-          connections: connections.map(conn => ({
-            id: conn.id,
-            email: conn.email,
-            provider: conn.provider
-          }))
-        }),
+        JSON.stringify({ events: [], connections: [] }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    throw new Error('Invalid action')
+    const allEvents = []
+    const connectionInfo = []
+
+    // Fetch events from each connection
+    for (const connection of connections) {
+      try {
+        // Check if token needs refresh
+        const tokenExpiresAt = new Date(connection.token_expires_at)
+        const now = new Date()
+        
+        let accessToken = connection.access_token
+
+        if (tokenExpiresAt <= now && connection.refresh_token) {
+          // Refresh token
+          const refreshResponse = await fetch('https://api.nylas.com/v3/connect/token', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              client_id: Deno.env.get('NYLAS_CLIENT_ID'),
+              client_secret: Deno.env.get('NYLAS_CLIENT_SECRET'),
+              refresh_token: connection.refresh_token,
+              grant_type: 'refresh_token',
+            }),
+          })
+
+          if (refreshResponse.ok) {
+            const refreshData = await refreshResponse.json()
+            accessToken = refreshData.access_token
+
+            // Update stored token
+            await supabaseClient
+              .from('nylas_connections')
+              .update({
+                access_token: refreshData.access_token,
+                token_expires_at: new Date(Date.now() + (refreshData.expires_in * 1000)).toISOString(),
+              })
+              .eq('id', connection.id)
+          }
+        }
+
+        // Build events query
+        const eventsUrl = new URL(`https://api.nylas.com/v3/grants/${connection.id}/events`)
+        if (startDate) eventsUrl.searchParams.set('start', new Date(startDate).getTime().toString())
+        if (endDate) eventsUrl.searchParams.set('end', new Date(endDate).getTime().toString())
+        if (calendarIds && calendarIds.length > 0) {
+          eventsUrl.searchParams.set('calendar_id', calendarIds.join(','))
+        }
+
+        const eventsResponse = await fetch(eventsUrl.toString(), {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json',
+          },
+        })
+
+        if (eventsResponse.ok) {
+          const eventsData = await eventsResponse.json()
+          
+          // Transform events to consistent format
+          const transformedEvents = eventsData.data?.map((event: any) => ({
+            id: event.id,
+            title: event.title || 'Untitled Event',
+            description: event.description,
+            when: {
+              start_time: event.when?.start_time,
+              end_time: event.when?.end_time,
+              start_timezone: event.when?.start_timezone,
+              end_timezone: event.when?.end_timezone,
+            },
+            connection_id: connection.id,
+            connection_email: connection.email,
+            connection_provider: connection.provider,
+            calendar_id: event.calendar_id,
+            calendar_name: event.calendar_name,
+            status: event.status,
+            location: event.location,
+          })) || []
+
+          allEvents.push(...transformedEvents)
+        }
+
+        connectionInfo.push({
+          id: connection.id,
+          email: connection.email,
+          provider: connection.provider,
+          is_active: true,
+        })
+
+      } catch (error) {
+        console.error(`Error fetching events for connection ${connection.id}:`, error)
+        // Continue with other connections
+      }
+    }
+
+    return new Response(
+      JSON.stringify({ 
+        events: allEvents,
+        connections: connectionInfo 
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
 
   } catch (error) {
     console.error('Nylas events error:', error)
     return new Response(
       JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { 
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
     )
   }
 })
