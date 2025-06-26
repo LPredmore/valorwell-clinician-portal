@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -38,7 +39,12 @@ const ClinicianAvailabilityPanel = () => {
       }
 
       setCurrentUser(clinician);
-      setTimeGranularity(clinician.clinician_time_granularity || 'hour');
+      const granularity = clinician.clinician_time_granularity;
+      if (granularity === 'hour' || granularity === 'half-hour') {
+        setTimeGranularity(granularity);
+      } else {
+        setTimeGranularity('hour');
+      }
     } catch (error) {
       console.error('Error in fetchCurrentUser:', error);
     } finally {
