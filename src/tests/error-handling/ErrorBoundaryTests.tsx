@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import ErrorBoundary from '@/components/common/ErrorBoundary';
@@ -47,8 +46,9 @@ describe('ErrorBoundary Tests', () => {
     expect(ErrorBoundary.prototype.componentDidCatch).toHaveBeenCalled();
     
     // Check that fallback UI is rendered
-    expect(screen.getByText('Error in TestComponent')).toBeInTheDocument();
-    expect(screen.getByText(/Error Details/i)).toBeInTheDocument();
+    expect(screen.getByText('TestComponent Error')).toBeInTheDocument();
+    expect(screen.getByText(/Something went wrong/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /reload page/i })).toBeInTheDocument();
   });
 
@@ -77,19 +77,34 @@ describe('ErrorBoundary Tests', () => {
     render(<TestComponent />);
 
     // Error boundary should show error UI
-    expect(screen.getByText('Error in TestComponent')).toBeInTheDocument();
+    expect(screen.getByText('TestComponent Error')).toBeInTheDocument();
+    
+    // Mock the behavior of clicking "Try Again"
+    // In a real scenario, this would reset the error boundary state
+    // and potentially fix the issue that caused the error
+    const tryAgainButton = screen.getByRole('button', { name: /try again/i });
     
     // Simulate fixing the error condition
     fireEvent.click(screen.getByTestId('toggle-error'));
     
-    // Now click reload page to reset error boundary
-    const reloadButton = screen.getByRole('button', { name: /reload page/i });
+    // Now click try again to reset error boundary
+    fireEvent.click(tryAgainButton);
     
     // Component should recover and render without error
     expect(screen.getByTestId('recovered')).toBeInTheDocument();
   });
 
-  // Remove the test with invalid fallback prop since ErrorBoundary doesn't support it
+  test('should use custom fallback if provided', () => {
+    const customFallback = <div data-testid="custom-fallback">Custom Error UI</div>;
+    
+    render(
+      <ErrorBoundary fallback={customFallback}>
+        <ErrorThrowingComponent />
+      </ErrorBoundary>
+    );
+    
+    expect(screen.getByTestId('custom-fallback')).toBeInTheDocument();
+  });
 });
 
 describe('CalendarErrorBoundary Tests', () => {
@@ -159,5 +174,15 @@ describe('CalendarErrorBoundary Tests', () => {
     expect(screen.getByTestId('calendar-recovered')).toBeInTheDocument();
   });
 
-  // Remove the test with invalid fallback prop since CalendarErrorBoundary doesn't support it
+  test('should use custom fallback if provided in calendar error boundary', () => {
+    const customFallback = <div data-testid="custom-calendar-fallback">Custom Calendar Error UI</div>;
+    
+    render(
+      <CalendarErrorBoundary fallback={customFallback}>
+        <ErrorThrowingComponent />
+      </CalendarErrorBoundary>
+    );
+    
+    expect(screen.getByTestId('custom-calendar-fallback')).toBeInTheDocument();
+  });
 });

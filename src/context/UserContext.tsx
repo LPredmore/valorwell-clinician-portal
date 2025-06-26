@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext } from 'react';
 import { AuthChangeEvent, Session, User as SupabaseUser } from '@supabase/supabase-js';
 import { useAuth, ClientProfile, AuthState } from './AuthProvider';
@@ -45,4 +44,4 @@ export const useUser = (): UserContextType => {
   return context;
 };
 
-export type { ClientProfile, AuthState };
+export { ClientProfile, AuthState };

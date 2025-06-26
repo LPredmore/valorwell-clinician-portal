@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -140,17 +139,11 @@ describe('Calendar Integration Tests', () => {
   });
 
   test('should load and display appointments', async () => {
-    // Create a proper mock chain for Supabase query
-    const mockOrder = jest.fn().mockResolvedValueOnce({
+    // Mock appointments query response
+    (supabase.from().select().eq().in().order as jest.Mock).mockResolvedValueOnce({
       data: mockAppointments,
       error: null
     });
-    const mockIn = jest.fn().mockReturnValue({ order: mockOrder });
-    const mockEq = jest.fn().mockReturnValue({ in: mockIn });
-    const mockSelect = jest.fn().mockReturnValue({ eq: mockEq });
-    const mockFrom = jest.fn().mockReturnValue({ select: mockSelect });
-
-    (supabase.from as jest.Mock) = mockFrom;
 
     // Mock Nylas events response
     (supabase.functions.invoke as jest.Mock).mockResolvedValueOnce({
@@ -186,17 +179,11 @@ describe('Calendar Integration Tests', () => {
   });
 
   test('should load and display external calendar events', async () => {
-    // Create a proper mock chain for Supabase query
-    const mockOrder = jest.fn().mockResolvedValueOnce({
+    // Mock appointments query response
+    (supabase.from().select().eq().in().order as jest.Mock).mockResolvedValueOnce({
       data: [],
       error: null
     });
-    const mockIn = jest.fn().mockReturnValue({ order: mockOrder });
-    const mockEq = jest.fn().mockReturnValue({ in: mockIn });
-    const mockSelect = jest.fn().mockReturnValue({ eq: mockEq });
-    const mockFrom = jest.fn().mockReturnValue({ select: mockSelect });
-
-    (supabase.from as jest.Mock) = mockFrom;
 
     // Mock Nylas events response
     (supabase.functions.invoke as jest.Mock).mockResolvedValueOnce({
@@ -228,17 +215,11 @@ describe('Calendar Integration Tests', () => {
   });
 
   test('should display both appointments and external events together', async () => {
-    // Create a proper mock chain for Supabase query
-    const mockOrder = jest.fn().mockResolvedValueOnce({
+    // Mock appointments query response
+    (supabase.from().select().eq().in().order as jest.Mock).mockResolvedValueOnce({
       data: mockAppointments,
       error: null
     });
-    const mockIn = jest.fn().mockReturnValue({ order: mockOrder });
-    const mockEq = jest.fn().mockReturnValue({ in: mockIn });
-    const mockSelect = jest.fn().mockReturnValue({ eq: mockEq });
-    const mockFrom = jest.fn().mockReturnValue({ select: mockSelect });
-
-    (supabase.from as jest.Mock) = mockFrom;
 
     // Mock Nylas events response
     (supabase.functions.invoke as jest.Mock).mockResolvedValueOnce({
@@ -271,17 +252,11 @@ describe('Calendar Integration Tests', () => {
   });
 
   test('should handle errors in appointments loading', async () => {
-    // Create a proper mock chain for Supabase query with error
-    const mockOrder = jest.fn().mockResolvedValueOnce({
+    // Mock appointments query error
+    (supabase.from().select().eq().in().order as jest.Mock).mockResolvedValueOnce({
       data: null,
       error: { message: 'Failed to fetch appointments' }
     });
-    const mockIn = jest.fn().mockReturnValue({ order: mockOrder });
-    const mockEq = jest.fn().mockReturnValue({ in: mockIn });
-    const mockSelect = jest.fn().mockReturnValue({ eq: mockEq });
-    const mockFrom = jest.fn().mockReturnValue({ select: mockSelect });
-
-    (supabase.from as jest.Mock) = mockFrom;
 
     // Mock Nylas events response
     (supabase.functions.invoke as jest.Mock).mockResolvedValueOnce({
@@ -309,17 +284,11 @@ describe('Calendar Integration Tests', () => {
   });
 
   test('should handle errors in external events loading', async () => {
-    // Create a proper mock chain for Supabase query
-    const mockOrder = jest.fn().mockResolvedValueOnce({
+    // Mock appointments query response
+    (supabase.from().select().eq().in().order as jest.Mock).mockResolvedValueOnce({
       data: mockAppointments,
       error: null
     });
-    const mockIn = jest.fn().mockReturnValue({ order: mockOrder });
-    const mockEq = jest.fn().mockReturnValue({ in: mockIn });
-    const mockSelect = jest.fn().mockReturnValue({ eq: mockEq });
-    const mockFrom = jest.fn().mockReturnValue({ select: mockSelect });
-
-    (supabase.from as jest.Mock) = mockFrom;
 
     // Mock Nylas events error
     (supabase.functions.invoke as jest.Mock).mockResolvedValueOnce({
