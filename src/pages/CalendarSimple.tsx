@@ -1,15 +1,22 @@
-
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "../components/layout/Layout";
 import { useUser } from "@/context/UserContext";
 import { useToast } from "@/hooks/use-toast";
 import CalendarErrorBoundary from "../components/calendar/CalendarErrorBoundary";
-import NylasCalendarView from "../components/calendar/NylasCalendarView";
+import WeeklyCalendarGrid from "../components/calendar/WeeklyCalendarGrid";
+import AvailabilityManagementSidebar from "../components/calendar/AvailabilityManagementSidebar";
+import { Button } from "@/components/ui/button";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { addWeeks, subWeeks } from "date-fns";
+import { TimeZoneService } from "@/utils/timeZoneService";
+import { getClinicianTimeZone } from "@/hooks/useClinicianData";
 
 const CalendarSimple = React.memo(() => {
   const { userId, authInitialized, userRole } = useUser();
   const [isReady, setIsReady] = useState(false);
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [userTimeZone, setUserTimeZone] = useState<string>(TimeZoneService.DEFAULT_TIMEZONE);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -45,6 +52,37 @@ const CalendarSimple = React.memo(() => {
       }
     }
   }, [authInitialized, userId, userRole, navigate, toast]);
+
+  // Load user's timezone
+  useEffect(() => {
+    const loadUserTimeZone = async () => {
+      if (userId) {
+        try {
+          const timeZone = await getClinicianTimeZone(userId);
+          setUserTimeZone(TimeZoneService.ensureIANATimeZone(timeZone));
+        } catch (error) {
+          console.error('Error loading user timezone:', error);
+          // Keep default timezone
+        }
+      }
+    };
+
+    if (isReady && userId) {
+      loadUserTimeZone();
+    }
+  }, [isReady, userId]);
+
+  const navigatePrevious = () => {
+    setCurrentDate(subWeeks(currentDate, 1));
+  };
+
+  const navigateNext = () => {
+    setCurrentDate(addWeeks(currentDate, 1));
+  };
+
+  const navigateToday = () => {
+    setCurrentDate(new Date());
+  };
 
   if (!authInitialized) {
     return (
@@ -102,16 +140,53 @@ const CalendarSimple = React.memo(() => {
   return (
     <Layout>
       <CalendarErrorBoundary>
-        <div className="bg-white rounded-lg shadow-sm p-6 animate-fade-in">
-          <div className="flex flex-col space-y-6">
-            <div className="flex justify-between items-center">
-              <h1 className="text-2xl font-bold text-gray-800">Calendar</h1>
-              <div className="text-sm text-gray-500">
-                User: {userRole} | ID: {userId?.slice(0, 8)}...
-              </div>
+        <div className="space-y-6">
+          {/* Header with navigation */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <Button variant="outline" onClick={navigatePrevious}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" onClick={navigateToday}>
+                Today
+              </Button>
+              <Button variant="outline" onClick={navigateNext}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+            <h1 className="text-2xl font-bold text-gray-800">
+              {currentDate.toLocaleDateString('en-US', { 
+                month: 'long', 
+                year: 'numeric' 
+              })}
+            </h1>
+            <div className="text-sm text-gray-500">
+              User: {userRole} | Timezone: {userTimeZone}
+            </div>
+          </div>
+
+          {/* Main content */}
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            {/* Calendar display */}
+            <div className="lg:col-span-3">
+              <WeeklyCalendarGrid
+                currentDate={currentDate}
+                clinicianId={userId}
+                userTimeZone={userTimeZone}
+                onAvailabilityClick={(date, startTime, endTime) => {
+                  console.log('Availability clicked:', { date, startTime, endTime });
+                  // TODO: Implement availability editing modal
+                }}
+              />
             </div>
 
-            <NylasCalendarView clinicianId={userId} />
+            {/* Availability management sidebar */}
+            <div className="lg:col-span-1">
+              <AvailabilityManagementSidebar
+                clinicianId={userId}
+                userTimeZone={userTimeZone}
+              />
+            </div>
           </div>
         </div>
       </CalendarErrorBoundary>
