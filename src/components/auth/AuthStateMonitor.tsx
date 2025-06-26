@@ -1,5 +1,6 @@
+
 import { useEffect } from 'react';
-import { useAuth } from '@/context/AuthProvider';
+import { useUser } from '@/context/UserContext';
 
 interface AuthStateMonitorProps {
   visible?: boolean;
@@ -10,7 +11,7 @@ interface AuthStateMonitorProps {
  * This is useful for debugging authentication issues
  */
 const AuthStateMonitor = ({ visible = false }: AuthStateMonitorProps) => {
-  const { user, userId, userRole, isLoading, authInitialized, clientStatus } = useAuth();
+  const { user, userId, userRole, isLoading, authInitialized, clientStatus } = useUser();
   
   // Log auth state changes
   useEffect(() => {

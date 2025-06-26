@@ -1,212 +1,129 @@
 
-import React, { lazy, Suspense, useState, useEffect } from "react";
+import React from "react";
+import { Toaster } from "sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { AuthProvider } from "@/context/AuthProvider";
-import ErrorBoundary, { ErrorCategory } from "./components/common/ErrorBoundary";
-import { isConfigValid, getConfigErrors } from "@/utils/configValidation";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { UserProvider } from "./context/UserContext";
+import ProtectedRoute from "./components/auth/ProtectedRoute";
 
-// Lazy-loaded components with error boundaries
-const LazyIndex = lazy(() => import("./pages/Index"));
-const LazyCalendar = lazy(() => import("./pages/Calendar"));
-const LazyLogin = lazy(() => import("./pages/Login"));
-const LazyNotFound = lazy(() => import("./pages/NotFound"));
+// Pages
+import Index from "./pages/Index";
+import Calendar from "./pages/Calendar";
+import Clients from "./pages/Clients";
+import ClientDetails from "./pages/ClientDetails";
+import Analytics from "./pages/Analytics";
+import Activity from "./pages/Activity";
+import Settings from "./pages/Settings";
+import Reminders from "./pages/Reminders";
+import Messages from "./pages/Messages";
+import NotFound from "./pages/NotFound";
+import Login from "./pages/Login";
+import Signup from "./pages/Signup";
+import ClinicianDetails from "./pages/ClinicianDetails";
+import MyClients from "./pages/MyClients";
+import ClinicianDashboard from "./pages/ClinicianDashboard";
+import ResetPassword from "./pages/ResetPassword";
+import UpdatePassword from "./pages/UpdatePassword";
 
-// Component to display when environment variables are missing
-const ConfigurationErrorComponent = ({ errors }: { errors: Record<string, string> }) => (
-  <div style={{ padding: '20px', color: 'red', fontSize: '18px' }}>
-    <h1>Configuration Error</h1>
-    <p>Missing or invalid environment variables:</p>
-    <ul>
-      {Object.entries(errors).map(([key, message]) => (
-        <li key={key}>
-          <strong>{key}:</strong> {message}
-        </li>
-      ))}
-    </ul>
-    <div style={{ marginTop: '20px', padding: '10px', backgroundColor: '#fff8e8', borderRadius: '4px' }}>
-      <p><strong>Troubleshooting:</strong></p>
-      <ol>
-        <li>Check your .env file to ensure all required variables are set</li>
-        <li>Restart the development server after updating environment variables</li>
-        <li>Contact the development team if the issue persists</li>
-      </ol>
-    </div>
-  </div>
-);
+// Create a client
+const queryClient = new QueryClient();
 
-// Loading component for suspense fallback
-const LoadingComponent = () => (
-  <div style={{
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    height: '100vh',
-    flexDirection: 'column',
-    gap: '1rem'
-  }}>
-    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-    <p className="text-lg">Loading application...</p>
-  </div>
-);
-
-// Error component for chunk loading failures
-const ChunkErrorComponent = ({ onRetry }: { onRetry: () => void }) => (
-  <div style={{ padding: '20px', color: 'red', fontSize: '18px', textAlign: 'center' }}>
-    <h2>Failed to load application module</h2>
-    <p>This could be due to network issues or a new deployment.</p>
-    <button
-      onClick={onRetry}
-      style={{
-        marginTop: '20px',
-        padding: '10px 20px',
-        backgroundColor: '#4a90e2',
-        color: 'white',
-        border: 'none',
-        borderRadius: '4px',
-        cursor: 'pointer'
-      }}
-    >
-      Retry
-    </button>
-  </div>
-);
-
-/**
- * Main App component with progressive initialization
- * Implements proper error handling and optimized dynamic imports
- */
-const App = () => {
-  const [initializationError, setInitializationError] = useState<string | null>(null);
-  const [configErrors, setConfigErrors] = useState<Record<string, string>>({});
-  const [isInitialized, setIsInitialized] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
-
-  // Initialize application
-  useEffect(() => {
-    const initializeApp = async () => {
-      try {
-        // Validate environment configuration
-        if (!isConfigValid()) {
-          setConfigErrors(getConfigErrors());
-          throw new Error("Invalid configuration");
-        }
-
-        // Additional initialization steps can be added here
-        // For example: feature flag initialization, analytics setup, etc.
-
-        // Mark initialization as complete
-        setIsInitialized(true);
-      } catch (error) {
-        console.error("Application initialization failed:", error);
-        setInitializationError(error instanceof Error ? error.message : "Unknown initialization error");
-      }
-    };
-
-    initializeApp();
-  }, [retryCount]);
-
-  // Handle retry of initialization
-  const handleRetry = () => {
-    setInitializationError(null);
-    setConfigErrors({});
-    setRetryCount(prev => prev + 1);
-  };
-
-  // Show configuration error if environment variables are missing
-  if (Object.keys(configErrors).length > 0) {
-    return <ConfigurationErrorComponent errors={configErrors} />;
-  }
-
-  // Show initialization error if any
-  if (initializationError) {
-    return (
-      <div style={{ padding: '20px', color: 'red', fontSize: '18px' }}>
-        <h1>Initialization Error</h1>
-        <p>{initializationError}</p>
-        <button
-          onClick={handleRetry}
-          style={{
-            marginTop: '20px',
-            padding: '10px 20px',
-            backgroundColor: '#4a90e2',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer'
-          }}
-        >
-          Retry Initialization
-        </button>
-      </div>
-    );
-  }
-
-  // Wait for initialization to complete
-  if (!isInitialized) {
-    return <LoadingComponent />;
-  }
-
-  // Create query client with optimized settings
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: 2,
-        staleTime: 60000,
-        refetchOnWindowFocus: false,
-      },
-      mutations: {
-        retry: 1,
-      },
-    },
-  });
-
+function App() {
   return (
-    <ErrorBoundary componentName="Application">
-      <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <BrowserRouter>
-            <Suspense fallback={<LoadingComponent />}>
+    <React.StrictMode>
+      <BrowserRouter>
+        <QueryClientProvider client={queryClient}>
+          <TooltipProvider>
+            <UserProvider>
+              {/* Sonner Toaster - the only toast component we need */}
+              <Toaster richColors position="top-right" />
               <Routes>
-                <Route path="/" element={
-                  <ErrorBoundary
-                    componentName="Dashboard"
-                    fallback={<ChunkErrorComponent onRetry={handleRetry} />}
-                  >
-                    <LazyIndex />
-                  </ErrorBoundary>
+                {/* Public routes */}
+                <Route path="/" element={<Index />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/signup" element={<Signup />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/update-password" element={<UpdatePassword />} />
+                
+                {/* Allow clinicians and admins to view client details */}
+                <Route path="/clients/:clientId" element={
+                  <ProtectedRoute allowedRoles={['admin', 'moderator', 'clinician']}>
+                    <ClientDetails />
+                  </ProtectedRoute>
                 } />
+                
+                {/* Protected routes - clinician, admin, moderator */}
+                <Route path="/clinician-dashboard" element={
+                  <ProtectedRoute allowedRoles={['admin', 'clinician']}>
+                    <ClinicianDashboard />
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/my-clients" element={
+                  <ProtectedRoute allowedRoles={['admin', 'clinician']}>
+                    <MyClients />
+                  </ProtectedRoute>
+                } />
+                
                 <Route path="/calendar" element={
-                  <ErrorBoundary
-                    componentName="Calendar"
-                    fallback={<ChunkErrorComponent onRetry={handleRetry} />}
-                  >
-                    <LazyCalendar />
-                  </ErrorBoundary>
+                  <ProtectedRoute allowedRoles={['admin', 'clinician']}>
+                    <Calendar />
+                  </ProtectedRoute>
                 } />
-                <Route path="/login" element={
-                  <ErrorBoundary
-                    componentName="Login"
-                    fallback={<ChunkErrorComponent onRetry={handleRetry} />}
-                  >
-                    <LazyLogin />
-                  </ErrorBoundary>
+                
+                {/* Clinicians can view their own profile */}
+                <Route path="/clinicians/:clinicianId" element={
+                  <ProtectedRoute allowedRoles={['admin', 'clinician']}>
+                    <ClinicianDetails />
+                  </ProtectedRoute>
                 } />
-                <Route path="*" element={
-                  <ErrorBoundary
-                    componentName="NotFound"
-                    fallback={<ChunkErrorComponent onRetry={handleRetry} />}
-                  >
-                    <LazyNotFound />
-                  </ErrorBoundary>
+                
+                {/* Protected routes - admin only */}
+                <Route path="/clients" element={
+                  <ProtectedRoute allowedRoles={['admin']}>
+                    <Clients />
+                  </ProtectedRoute>
                 } />
+                
+                <Route path="/analytics" element={
+                  <ProtectedRoute allowedRoles={['admin']}>
+                    <Analytics />
+                  </ProtectedRoute>
+                } />
+
+                <Route path="/activity" element={
+                  <ProtectedRoute allowedRoles={['admin']}>
+                    <Activity />
+                  </ProtectedRoute>
+                } />
+
+                <Route path="/settings" element={
+                  <ProtectedRoute allowedRoles={['admin']}>
+                    <Settings />
+                  </ProtectedRoute>
+                } />
+
+                <Route path="/reminders" element={
+                  <ProtectedRoute allowedRoles={['admin']}>
+                    <Reminders />
+                  </ProtectedRoute>
+                } />
+
+                <Route path="/messages" element={
+                  <ProtectedRoute allowedRoles={['admin']}>
+                    <Messages />
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="*" element={<NotFound />} />
               </Routes>
-            </Suspense>
-          </BrowserRouter>
-        </AuthProvider>
-      </QueryClientProvider>
-    </ErrorBoundary>
+            </UserProvider>
+          </TooltipProvider>
+        </QueryClientProvider>
+      </BrowserRouter>
+    </React.StrictMode>
   );
-};
+}
 
 export default App;

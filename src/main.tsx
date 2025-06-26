@@ -1,29 +1,19 @@
 
-// External dependencies
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-
-// Components
-import App from './App';
-import ErrorBoundary from './components/common/ErrorBoundary';
-
-// Styles
+import App from './App.tsx';
 import './index.css';
 
-// Get the root element
-const rootElement = document.getElementById('root');
+const rootElement = document.getElementById("root");
 
+// Make sure the root element exists before rendering
 if (!rootElement) {
-  throw new Error('Root element not found');
-}
-
-// Create the React root and render the app
-const root = createRoot(rootElement);
-
-root.render(
-  <React.StrictMode>
-    <ErrorBoundary componentName="Application Root">
+  console.error("Root element not found!");
+} else {
+  const root = createRoot(rootElement);
+  root.render(
+    <React.StrictMode>
       <App />
-    </ErrorBoundary>
-  </React.StrictMode>
-);
+    </React.StrictMode>
+  );
+}

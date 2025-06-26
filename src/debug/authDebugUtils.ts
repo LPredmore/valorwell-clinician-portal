@@ -1,95 +1,96 @@
+import { DebugUtils } from './debugUtils';
 
 /**
- * Simplified Authentication Debugging Utilities
- * 
- * This file contains utilities for debugging authentication issues in the Valorwell Clinician Portal.
- * Simplified to remove the separate state machine and use AuthProvider as the single source of truth.
+ * Debug utility for authentication operations
+ * @param operation The name of the auth operation being debugged
+ * @param callback The auth operation function to execute and debug
+ * @returns The result of the callback function
  */
-
-// Enable/disable debug logging based on environment
-const isDev = process.env.NODE_ENV === 'development';
-const logInfo = isDev ? console.log : () => {};
-const logWarn = isDev ? console.warn : () => {};
-const logError = console.error;
-
-/**
- * Debug wrapper for authentication operations
- */
-export async function debugAuthOperation<T>(
-  operationName: string,
-  operation: () => Promise<T>
-): Promise<T> {
+export async function debugAuthOperation<T>(operation: string, callback: () => Promise<T>): Promise<T> {
   try {
-    logInfo(`[AuthDebug] Starting operation: ${operationName}`);
-    const result = await operation();
-    logInfo(`[AuthDebug] Operation completed: ${operationName}`);
+    DebugUtils.log('AuthDebug', `Auth operation '${operation}' started`);
+    const result = await callback();
+    DebugUtils.log('AuthDebug', `Auth operation '${operation}' completed`, result);
     return result;
   } catch (error) {
-    logError(`[AuthDebug] Operation failed: ${operationName}`, error);
+    DebugUtils.error('AuthDebug', `Auth operation '${operation}' failed`, error);
     throw error;
   }
 }
 
 /**
- * Logs the complete authentication state for debugging
+ * Debug utility for simple authentication operations
+ * @param operation The name of the auth operation being debugged
+ * @param data Any relevant data for the operation
+ * @param error Any error that occurred during the operation
  */
-export function logAuthDebugInfo(userContext: any): void {
-  if (!isDev) return;
-  
-  logInfo('=== AUTH DEBUG INFO ===');
-  logInfo('UserContext State:', {
-    isLoading: userContext.isLoading,
-    authInitialized: userContext.authInitialized,
-    authState: userContext.authState,
-    userId: userContext.userId,
-    userRole: userContext.userRole,
-    hasAuthError: !!userContext.authError
-  });
-  logInfo('========================');
-}
-
-/**
- * Performs a direct session check for diagnostic purposes
- */
-export async function performEmergencySessionCheck(): Promise<{
-  user: any | null;
-  error: Error | null;
-}> {
-  try {
-    logWarn('[AuthDebug] Performing emergency session check');
-    
-    // Import supabase dynamically to avoid circular dependencies
-    const { supabase } = await import('@/integrations/supabase/client');
-    const { data, error } = await supabase.auth.getSession();
-    
-    if (error) {
-      logError('[AuthDebug] Emergency session check failed:', error);
-      return { user: null, error: error as Error };
-    }
-    
-    const user = data.session?.user || null;
-    logInfo('[AuthDebug] Emergency session check result:', user ? 'User found' : 'No active session');
-    
-    return { user, error: null };
-  } catch (error) {
-    logError('[AuthDebug] Exception in emergency session check:', error);
-    return { user: null, error: error as Error };
+export function debugAuthSimpleOperation(operation: string, data?: any, error?: any): void {
+  if (error) {
+    DebugUtils.error('AuthDebug', `Auth operation '${operation}' failed`, error);
+    return;
   }
+  
+  DebugUtils.log('AuthDebug', `Auth operation '${operation}' executed`, data);
 }
 
 /**
- * Checks if authentication is taking too long and logs warnings
+ * Log Supabase configuration details for debugging
+ * @param config The configuration object to log
  */
-export function checkAuthTimeout(timeoutMs: number = 5000): boolean {
-  // This is a simplified version that just logs a warning
-  // The actual timeout handling is now in AuthProvider
-  logWarn(`[AuthDebug] Authentication timeout check requested (${timeoutMs}ms)`);
-  return false;
+export function logSupabaseConfig(config: any): void {
+  // Sanitize the config to remove sensitive information
+  const safeConfig = { ...config };
+  
+  // Remove any keys or secrets
+  if (safeConfig.key) safeConfig.key = '[REDACTED]';
+  if (safeConfig.secret) safeConfig.secret = '[REDACTED]';
+  if (safeConfig.serviceKey) safeConfig.serviceKey = '[REDACTED]';
+  if (safeConfig.apiKey) safeConfig.apiKey = '[REDACTED]';
+  
+  DebugUtils.log('AuthDebug', 'Supabase configuration', safeConfig);
 }
 
-export default {
-  debugAuthOperation,
-  logAuthDebugInfo,
-  performEmergencySessionCheck,
-  checkAuthTimeout
-};
+/**
+ * Log authentication context for debugging
+ * @param context The auth context to log
+ */
+export function logAuthContext(context: any): void {
+  // Sanitize the context to remove sensitive information
+  const safeContext = { ...context };
+  
+  // Remove any tokens or sensitive data
+  if (safeContext.session?.access_token) safeContext.session.access_token = '[REDACTED]';
+  if (safeContext.session?.refresh_token) safeContext.session.refresh_token = '[REDACTED]';
+  
+  DebugUtils.log('AuthDebug', 'Auth context', safeContext);
+}
+
+/**
+ * Inspect the current authentication state
+ * @param authState The current auth state to inspect
+ */
+export function inspectAuthState(authState: any): void {
+  // Create a safe copy of the auth state
+  const safeState = { ...authState };
+  
+  // Remove sensitive information
+  if (safeState.session?.access_token) safeState.session.access_token = '[REDACTED]';
+  if (safeState.session?.refresh_token) safeState.session.refresh_token = '[REDACTED]';
+  
+  // Extract useful information
+  const userInfo = safeState.user ? {
+    id: safeState.user.id,
+    email: safeState.user.email,
+    role: safeState.user.user_metadata?.role || 'unknown',
+    confirmed: safeState.user.confirmed_at ? true : false,
+    lastSignIn: safeState.user.last_sign_in_at,
+    createdAt: safeState.user.created_at
+  } : null;
+  
+  DebugUtils.log('AuthDebug', 'Auth state inspection', {
+    isAuthenticated: !!safeState.user,
+    userInfo,
+    sessionExpires: safeState.session?.expires_at ? new Date(safeState.session.expires_at * 1000).toISOString() : null,
+    provider: safeState.user?.app_metadata?.provider || 'unknown'
+  });
+}

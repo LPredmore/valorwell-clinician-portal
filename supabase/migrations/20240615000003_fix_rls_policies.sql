@@ -9,8 +9,6 @@
 DROP POLICY IF EXISTS "Users can view their own client data" ON clients;
 DROP POLICY IF EXISTS "Clinicians can view their assigned clients" ON clients;
 DROP POLICY IF EXISTS "Users can manage their own client data" ON clients;
-DROP POLICY IF EXISTS "Users can access their own client record" ON clients;
-DROP POLICY IF EXISTS "Clinicians can access assigned clients" ON clients;
 
 -- Create comprehensive RLS policies for clients table
 -- Allow users to access their own client record
@@ -86,14 +84,15 @@ ALTER TABLE clinicians ENABLE ROW LEVEL SECURITY;
 CREATE OR REPLACE FUNCTION debug_auth_context()
 RETURNS TABLE (
   current_user_id uuid,
-  current_user_role text,
+  current_role text,
   is_authenticated boolean
 ) LANGUAGE SQL SECURITY DEFINER AS $$
   SELECT 
     auth.uid() as current_user_id,
-    auth.role() as current_user_role,
+    auth.role() as current_role,
     auth.uid() IS NOT NULL as is_authenticated;
 $$;
 
 -- Grant execute permission on debug function
 GRANT EXECUTE ON FUNCTION debug_auth_context() TO authenticated;
+
