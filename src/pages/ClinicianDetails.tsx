@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
 import { supabase } from '@/integrations/supabase/client';
@@ -53,7 +53,7 @@ const ClinicianDetails = () => {
   const { clinicianId } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { userId, userRole } = useUser();
+  const { userId, userRole, authInitialized } = useUser();
 
   const [clinician, setClinician] = useState<Clinician | null>(null);
   const [editedClinician, setEditedClinician] = useState<Clinician | null>(null);
@@ -63,6 +63,7 @@ const ClinicianDetails = () => {
   const [profileImage, setProfileImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [hasAccessError, setHasAccessError] = useState(false);
 
   const licenseTypes = [
     "LPC", 
@@ -131,26 +132,93 @@ const ClinicianDetails = () => {
     { code: "Wyoming", name: "Wyoming" }
   ];
 
-  useEffect(() => {
-    if (clinicianId) {
-      // Check if user has permission to view this profile
-      if (userRole === 'admin') {
-        // Admins can view any clinician profile
-        fetchClinicianData();
-      } else if (userRole === 'clinician' && userId === clinicianId) {
-        // Clinicians can only view their own profile
-        fetchClinicianData();
-      } else {
-        // Unauthorized access
-        toast({
-          title: "Access Denied",
-          description: "You don't have permission to view this profile.",
-          variant: "destructive",
-        });
-        navigate('/calendar');
+  // Memoize functions to prevent useEffect re-runs
+  const showAccessDeniedError = useCallback(() => {
+    toast({
+      title: "Access Denied",
+      description: "You don't have permission to view this profile.",
+      variant: "destructive",
+    });
+    setHasAccessError(true);
+  }, [toast]);
+
+  const fetchClinicianData = useCallback(async () => {
+    if (!clinicianId) return;
+    
+    setIsLoading(true);
+    try {
+      console.log("Fetching clinician data for ID:", clinicianId);
+      const { data, error } = await supabase
+        .from('clinicians')
+        .select('*')
+        .eq('id', clinicianId)
+        .single();
+      
+      if (error) {
+        console.error("Error fetching clinician:", error);
+        if (error.code === 'PGRST116') {
+          showAccessDeniedError();
+        } else {
+          throw error;
+        }
+        return;
       }
+      
+      console.log("Fetched clinician data:", data);
+      setClinician(data);
+      setEditedClinician(data);
+      
+      if (data.clinician_licensed_states) {
+        const fullStateNames = data.clinician_licensed_states.map(state => {
+          if (states.some(s => s.name === state)) {
+            return state;
+          }
+          const stateObj = states.find(s => s.code === state);
+          return stateObj ? stateObj.name : state;
+        });
+        setSelectedStates(fullStateNames);
+      }
+      
+      if (data.clinician_image_url) {
+        setImagePreview(data.clinician_image_url);
+      }
+    } catch (error) {
+      console.error('Error fetching clinician:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch clinician details.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
     }
-  }, [clinicianId, userId, userRole, navigate, toast]);
+  }, [clinicianId, showAccessDeniedError, toast]);
+
+  // Check access permissions and fetch data
+  useEffect(() => {
+    console.log("ClinicianDetails useEffect triggered", {
+      clinicianId,
+      userId,
+      userRole,
+      authInitialized
+    });
+
+    if (!authInitialized || !clinicianId || !userId) {
+      console.log("Auth not ready or missing IDs");
+      return;
+    }
+
+    // Check permissions
+    const hasPermission = userRole === 'admin' || (userRole === 'clinician' && userId === clinicianId);
+    
+    if (!hasPermission) {
+      console.log("Access denied - insufficient permissions");
+      showAccessDeniedError();
+      return;
+    }
+
+    fetchClinicianData();
+  }, [clinicianId, userId, userRole, authInitialized, fetchClinicianData, showAccessDeniedError]);
 
   useEffect(() => {
     if (clinician?.clinician_licensed_states) {
@@ -180,48 +248,6 @@ const ClinicianDetails = () => {
       reader.readAsDataURL(profileImage);
     }
   }, [profileImage]);
-
-  const fetchClinicianData = async () => {
-    setIsLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('clinicians')
-        .select('*')
-        .eq('id', clinicianId)
-        .single();
-      
-      if (error) {
-        throw error;
-      }
-      
-      console.log("Fetched clinician data:", data);
-      setClinician(data);
-      setEditedClinician(data);
-      if (data.clinician_licensed_states) {
-        const fullStateNames = data.clinician_licensed_states.map(state => {
-          if (states.some(s => s.name === state)) {
-            return state;
-          }
-          const stateObj = states.find(s => s.code === state);
-          return stateObj ? stateObj.name : state;
-        });
-        setSelectedStates(fullStateNames);
-      }
-      
-      if (data.clinician_image_url) {
-        setImagePreview(data.clinician_image_url);
-      }
-    } catch (error) {
-      console.error('Error fetching clinician:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch clinician details.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleInputChange = (field: keyof Clinician, value: string) => {
     if (editedClinician) {
@@ -386,6 +412,26 @@ const ClinicianDetails = () => {
     );
   };
 
+  // Show access error
+  if (hasAccessError) {
+    return (
+      <Layout>
+        <div className="flex justify-center items-center h-full">
+          <div className="text-center">
+            <h2 className="text-xl font-semibold text-red-600 mb-2">Access Denied</h2>
+            <p className="text-gray-600">You don't have permission to view this profile.</p>
+            <Button 
+              onClick={() => navigate('/calendar')} 
+              className="mt-4"
+            >
+              Go to Calendar
+            </Button>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
   if (isLoading) {
     return (
       <Layout>
@@ -400,7 +446,15 @@ const ClinicianDetails = () => {
     return (
       <Layout>
         <div className="flex justify-center items-center h-full">
-          <p>Clinician not found.</p>
+          <div className="text-center">
+            <p className="text-gray-600 mb-4">Clinician not found.</p>
+            <Button 
+              onClick={() => navigate('/calendar')} 
+              className="mt-4"
+            >
+              Go to Calendar
+            </Button>
+          </div>
         </div>
       </Layout>
     );
