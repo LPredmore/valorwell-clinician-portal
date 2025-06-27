@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { format, addDays, isSameDay, parseISO } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
@@ -21,6 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
+import { filterRealClients } from '@/utils/clientFilterUtils';
 
 // Types for appointment slots
 interface AppointmentSlot {
@@ -294,14 +294,19 @@ export const AppointmentBookingDialog: React.FC<AppointmentBookingDialogProps> =
       
       console.log('Appointments data from Supabase:', data);
       
-      const formattedAppointments = data?.map(appointment => ({
+      // Filter out blocked time appointments using centralized utility
+      const realAppointments = (data || []).filter(appointment => 
+        appointment.client_id !== BLOCKED_TIME_CLIENT_ID
+      );
+      
+      const formattedAppointments = realAppointments.map(appointment => ({
         ...appointment,
         localStart: formatDateTime(appointment.start_at, clientTimeZone),
         localEnd: formatDateTime(appointment.end_at, clientTimeZone)
       }));
       
-      console.log('Formatted appointments:', formattedAppointments);
-      setExistingAppointments(formattedAppointments || []);
+      console.log('Filtered real appointments:', formattedAppointments.length, 'of', data?.length || 0);
+      setExistingAppointments(formattedAppointments);
       
     } catch (error) {
       console.error('Error fetching appointments:', error);

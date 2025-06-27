@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -34,6 +34,8 @@ import { getUserTimeZone } from '@/utils/timeZoneUtils';
 import { getClinicianTimeZone } from '@/hooks/useClinicianData';
 import { supabase, getOrCreateVideoRoom } from '@/integrations/supabase/client';
 import { v4 as uuidv4 } from 'uuid';
+
+import { filterRealClients } from '@/utils/clientFilterUtils';
 
 interface AppointmentDialogProps {
   isOpen: boolean;
@@ -162,15 +164,23 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
   const [appointmentDate, setAppointmentDate] = useState<Date | undefined>(selectedDate);
   const { toast } = useToast();
 
+  // Filter out blocked time client from the clients list
+  const filteredClients = React.useMemo(() => {
+    console.log('[AppointmentDialog] Filtering clients, raw count:', clients?.length || 0);
+    const filtered = filterRealClients(clients || []);
+    console.log('[AppointmentDialog] Filtered clients count:', filtered.length);
+    return filtered;
+  }, [clients]);
+
   // Debug logging for client data
   useEffect(() => {
     console.log('[AppointmentDialog] Client data received:', {
-      clients,
-      clientsLength: clients?.length,
+      rawClients: clients?.length || 0,
+      filteredClients: filteredClients?.length || 0,
       loadingClients,
-      sampleClient: clients?.[0]
+      sampleClient: filteredClients?.[0]
     });
-  }, [clients, loadingClients]);
+  }, [clients, filteredClients, loadingClients]);
 
   const timeOptions = generateTimeOptions();
 
@@ -477,8 +487,8 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
                 <SelectValue placeholder={loadingClients ? "Loading clients..." : "Select a client"} />
               </SelectTrigger>
               <SelectContent>
-                {clients && clients.length > 0 ? (
-                  clients.map((client) => (
+                {filteredClients && filteredClients.length > 0 ? (
+                  filteredClients.map((client) => (
                     <SelectItem key={client.id} value={client.id}>
                       {client.displayName}
                     </SelectItem>
