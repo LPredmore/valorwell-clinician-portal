@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -12,8 +13,6 @@ serve(async (req) => {
   }
 
   try {
-    console.log('[nylas-scheduler-config] Request received:', req.method, req.url)
-    
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -27,120 +26,25 @@ serve(async (req) => {
     // Verify JWT and get user
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
-      console.error('[nylas-scheduler-config] No authorization header')
-      return new Response(
-        JSON.stringify({ 
-          error: 'Authentication failed',
-          code: 'AUTH_HEADER_MISSING',
-          details: 'No authorization header provided'
-        }),
-        { 
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      )
+      throw new Error('No authorization header')
     }
 
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser()
     if (authError || !user) {
-      console.error('[nylas-scheduler-config] Authentication failed:', authError)
-      return new Response(
-        JSON.stringify({ 
-          error: 'Authentication failed',
-          code: 'INVALID_JWT',
-          details: authError?.message || 'Invalid or expired JWT token'
-        }),
-        { 
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      )
+      throw new Error('Authentication failed')
     }
-
-    console.log('[nylas-scheduler-config] Authenticated user:', user.id)
 
     const { action, clinicianId, schedulerData } = await req.json()
 
-    // Check for ping action
-    if (action === 'ping') {
-      return new Response(
-        JSON.stringify({ 
-          status: 'ok', 
-          timestamp: new Date().toISOString(),
-          user_id: user.id
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    // Check for check-config action
-    if (action === 'check-config') {
-      const nylasClientId = Deno.env.get('NYLAS_CLIENT_ID')
-      const nylasClientSecret = Deno.env.get('NYLAS_CLIENT_SECRET')
-      const nylasApiKey = Deno.env.get('NYLAS_API_KEY')
-      
-      const missingConfig = []
-      if (!nylasClientId) missingConfig.push('NYLAS_CLIENT_ID')
-      if (!nylasClientSecret) missingConfig.push('NYLAS_CLIENT_SECRET')
-      if (!nylasApiKey) missingConfig.push('NYLAS_API_KEY')
-
-      if (missingConfig.length > 0) {
-        return new Response(
-          JSON.stringify({ 
-            error: 'Nylas configuration missing',
-            missing: missingConfig,
-            details: `Missing environment variables: ${missingConfig.join(', ')}`
-          }),
-          { 
-            status: 400,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-          }
-        )
-      }
-
-      return new Response(
-        JSON.stringify({ 
-          status: 'ok',
-          message: 'Nylas configuration is valid',
-          config: {
-            hasClientId: true,
-            hasClientSecret: true,
-            hasApiKey: true
-          }
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
     const nylasClientSecret = Deno.env.get('NYLAS_CLIENT_SECRET')
     if (!nylasClientSecret) {
-      return new Response(
-        JSON.stringify({ 
-          error: 'Nylas configuration missing',
-          code: 'CONFIG_MISSING',
-          details: 'NYLAS_CLIENT_SECRET is required'
-        }),
-        { 
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      )
+      throw new Error('Nylas configuration missing')
     }
 
     switch (action) {
       case 'create_scheduler': {
         if (!clinicianId) {
-          return new Response(
-            JSON.stringify({ 
-              error: 'Clinician ID required',
-              code: 'MISSING_CLINICIAN_ID',
-              details: 'A clinician ID must be provided'
-            }),
-            { 
-              status: 400,
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-            }
-          )
+          throw new Error('Clinician ID required')
         }
 
         // Get clinician's first active connection
@@ -151,33 +55,8 @@ serve(async (req) => {
           .eq('is_active', true)
           .limit(1)
 
-        if (connectionsError) {
-          console.error('[nylas-scheduler-config] Database error:', connectionsError)
-          return new Response(
-            JSON.stringify({ 
-              error: 'Failed to fetch connections',
-              code: 'DB_ERROR',
-              details: connectionsError.message
-            }),
-            { 
-              status: 400,
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-            }
-          )
-        }
-
-        if (!connections || connections.length === 0) {
-          return new Response(
-            JSON.stringify({ 
-              error: 'No active calendar connection found',
-              code: 'NO_ACTIVE_CONNECTION',
-              details: 'Please connect a calendar first'
-            }),
-            { 
-              status: 400,
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-            }
-          )
+        if (connectionsError || !connections || connections.length === 0) {
+          throw new Error('No active calendar connection found. Please connect a calendar first.')
         }
 
         const connection = connections[0]
@@ -190,18 +69,7 @@ serve(async (req) => {
           .single()
 
         if (clinicianError) {
-          console.error('[nylas-scheduler-config] Database error:', clinicianError)
-          return new Response(
-            JSON.stringify({ 
-              error: 'Failed to fetch clinician details',
-              code: 'DB_ERROR',
-              details: clinicianError.message
-            }),
-            { 
-              status: 400,
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-            }
-          )
+          throw new Error('Failed to fetch clinician details')
         }
 
         // Create scheduler configuration via Nylas API
@@ -244,9 +112,7 @@ serve(async (req) => {
           ],
         }
 
-        console.log('[nylas-scheduler-config] Creating scheduler configuration')
-        
-        const schedulerResponse = await fetch('https://api.us.nylas.com/v3/scheduling/configurations', {
+        const schedulerResponse = await fetch('https://api.nylas.com/v3/scheduling/configurations', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${nylasClientSecret}`,
@@ -257,49 +123,27 @@ serve(async (req) => {
 
         if (!schedulerResponse.ok) {
           const error = await schedulerResponse.text()
-          console.error('[nylas-scheduler-config] Failed to create scheduler:', schedulerResponse.status, error)
-          return new Response(
-            JSON.stringify({ 
-              error: 'Failed to create scheduler',
-              code: 'API_ERROR',
-              details: error
-            }),
-            { 
-              status: 400,
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-            }
-          )
+          throw new Error(`Failed to create scheduler: ${error}`)
         }
 
-        const schedulerResponseData = await schedulerResponse.json()
-        console.log('[nylas-scheduler-config] Scheduler created successfully:', schedulerResponseData.id)
+        const schedulerData = await schedulerResponse.json()
 
         // Store scheduler configuration in database
         const { data: dbScheduler, error: dbError } = await supabaseClient
           .from('nylas_scheduler_configs')
           .insert({
             clinician_id: clinicianId,
-            scheduler_id: schedulerResponseData.id,
-            public_url: `https://book.nylas.com/${schedulerResponseData.slug}`,
-            config_data: schedulerResponseData,
+            scheduler_id: schedulerData.id,
+            public_url: `https://book.nylas.com/${schedulerData.slug}`,
+            config_data: schedulerData,
             is_active: true,
           })
           .select()
           .single()
 
         if (dbError) {
-          console.error('[nylas-scheduler-config] Database error:', dbError)
-          return new Response(
-            JSON.stringify({ 
-              error: 'Failed to store scheduler configuration',
-              code: 'DB_ERROR',
-              details: dbError.message
-            }),
-            { 
-              status: 400,
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-            }
-          )
+          console.error('Database error:', dbError)
+          throw new Error('Failed to store scheduler configuration')
         }
 
         return new Response(
@@ -318,58 +162,24 @@ serve(async (req) => {
 
       case 'update_scheduler': {
         // Implementation for updating scheduler settings
-        return new Response(
-          JSON.stringify({ 
-            error: 'Not implemented',
-            code: 'NOT_IMPLEMENTED',
-            details: 'Update scheduler functionality is not yet implemented'
-          }),
-          { 
-            status: 501,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-          }
-        )
+        throw new Error('Update scheduler not yet implemented')
       }
 
       case 'delete_scheduler': {
         // Implementation for deleting scheduler
-        return new Response(
-          JSON.stringify({ 
-            error: 'Not implemented',
-            code: 'NOT_IMPLEMENTED',
-            details: 'Delete scheduler functionality is not yet implemented'
-          }),
-          { 
-            status: 501,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-          }
-        )
+        throw new Error('Delete scheduler not yet implemented')
       }
 
       default:
-        return new Response(
-          JSON.stringify({ 
-            error: 'Invalid action',
-            code: 'INVALID_ACTION',
-            details: `Action '${action}' is not supported`
-          }),
-          { 
-            status: 400,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-          }
-        )
+        throw new Error('Invalid action')
     }
 
   } catch (error) {
-    console.error('[nylas-scheduler-config] Error:', error)
+    console.error('Nylas scheduler error:', error)
     return new Response(
-      JSON.stringify({ 
-        error: 'Server error',
-        code: 'SERVER_ERROR',
-        details: error.message
-      }),
+      JSON.stringify({ error: error.message }),
       { 
-        status: 500,
+        status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     )
