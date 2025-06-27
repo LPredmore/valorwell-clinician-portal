@@ -1,9 +1,13 @@
 
 import React from 'react';
+import { useNylasIntegration } from '@/hooks/useNylasIntegration';
+import { useNylasEvents } from '@/hooks/useNylasEvents';
+import { useNylasScheduler } from '@/hooks/useNylasScheduler';
 import { addWeeks, subWeeks } from 'date-fns';
 import CalendarErrorBoundary from './CalendarErrorBoundary';
-import WeeklyCalendarGrid from './WeeklyCalendarGrid';
-import AvailabilityManagementSidebar from './AvailabilityManagementSidebar';
+import NylasHybridCalendar from './NylasHybridCalendar';
+import CalendarConnectionsPanel from './CalendarConnectionsPanel';
+import SchedulerManagementPanel from './SchedulerManagementPanel';
 
 interface CalendarProps {
   view: 'week' | 'month';
@@ -26,7 +30,7 @@ const CalendarView = ({
   isLoading = false,
   error = null
 }: CalendarProps) => {
-  console.log('[CalendarView] Rendering traditional weekly calendar with:', {
+  console.log('[CalendarView] Rendering Nylas-only calendar with:', {
     clinicianId,
     currentDate,
     userTimeZone,
@@ -34,6 +38,15 @@ const CalendarView = ({
     isLoading,
     hasError: !!error
   });
+
+  // Calculate date range for external events
+  const startDate = subWeeks(currentDate, 2);
+  const endDate = addWeeks(currentDate, 4);
+
+  const handleEventClick = (event: any) => {
+    console.log('[CalendarView] External event clicked:', event);
+    // Handle external calendar event clicks here
+  };
 
   if (isLoading) {
     return (
@@ -59,24 +72,25 @@ const CalendarView = ({
   return (
     <CalendarErrorBoundary>
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Main Weekly Calendar Display */}
+        {/* Main Nylas Calendar Display */}
         <div className="lg:col-span-3">
-          <WeeklyCalendarGrid
-            currentDate={currentDate}
-            clinicianId={clinicianId}
-            userTimeZone={userTimeZone}
-            onAvailabilityClick={(date, startTime, endTime) => {
-              console.log('Availability clicked:', { date, startTime, endTime });
-              // TODO: Implement availability editing
-            }}
-          />
+          <div className="bg-white rounded-lg shadow-sm border p-6">
+            <h2 className="text-lg font-semibold mb-4">Calendar</h2>
+            <NylasHybridCalendar
+              clinicianId={clinicianId}
+              userTimeZone={userTimeZone}
+              currentDate={currentDate}
+              onEventClick={handleEventClick}
+            />
+          </div>
         </div>
         
-        {/* Availability Management Sidebar */}
-        <div className="lg:col-span-1">
-          <AvailabilityManagementSidebar
-            clinicianId={clinicianId}
-            userTimeZone={userTimeZone}
+        {/* Sidebar with management panels */}
+        <div className="lg:col-span-1 space-y-4">
+          <CalendarConnectionsPanel />
+          
+          <SchedulerManagementPanel 
+            clinicianId={clinicianId} 
           />
         </div>
       </div>

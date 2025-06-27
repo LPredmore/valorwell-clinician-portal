@@ -1,9 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from "@/hooks/use-toast";
-import { useUser } from '@/context/UserContext';
 import { Pencil, Save, X, Upload, Camera, User } from 'lucide-react';
 import { 
   Card, 
@@ -53,7 +52,6 @@ const ClinicianDetails = () => {
   const { clinicianId } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { userId, userRole, authInitialized } = useUser();
 
   const [clinician, setClinician] = useState<Clinician | null>(null);
   const [editedClinician, setEditedClinician] = useState<Clinician | null>(null);
@@ -63,7 +61,6 @@ const ClinicianDetails = () => {
   const [profileImage, setProfileImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [hasAccessError, setHasAccessError] = useState(false);
 
   const licenseTypes = [
     "LPC", 
@@ -132,93 +129,11 @@ const ClinicianDetails = () => {
     { code: "Wyoming", name: "Wyoming" }
   ];
 
-  // Memoize functions to prevent useEffect re-runs
-  const showAccessDeniedError = useCallback(() => {
-    toast({
-      title: "Access Denied",
-      description: "You don't have permission to view this profile.",
-      variant: "destructive",
-    });
-    setHasAccessError(true);
-  }, [toast]);
-
-  const fetchClinicianData = useCallback(async () => {
-    if (!clinicianId) return;
-    
-    setIsLoading(true);
-    try {
-      console.log("Fetching clinician data for ID:", clinicianId);
-      const { data, error } = await supabase
-        .from('clinicians')
-        .select('*')
-        .eq('id', clinicianId)
-        .single();
-      
-      if (error) {
-        console.error("Error fetching clinician:", error);
-        if (error.code === 'PGRST116') {
-          showAccessDeniedError();
-        } else {
-          throw error;
-        }
-        return;
-      }
-      
-      console.log("Fetched clinician data:", data);
-      setClinician(data);
-      setEditedClinician(data);
-      
-      if (data.clinician_licensed_states) {
-        const fullStateNames = data.clinician_licensed_states.map(state => {
-          if (states.some(s => s.name === state)) {
-            return state;
-          }
-          const stateObj = states.find(s => s.code === state);
-          return stateObj ? stateObj.name : state;
-        });
-        setSelectedStates(fullStateNames);
-      }
-      
-      if (data.clinician_image_url) {
-        setImagePreview(data.clinician_image_url);
-      }
-    } catch (error) {
-      console.error('Error fetching clinician:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch clinician details.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [clinicianId, showAccessDeniedError, toast]);
-
-  // Check access permissions and fetch data
   useEffect(() => {
-    console.log("ClinicianDetails useEffect triggered", {
-      clinicianId,
-      userId,
-      userRole,
-      authInitialized
-    });
-
-    if (!authInitialized || !clinicianId || !userId) {
-      console.log("Auth not ready or missing IDs");
-      return;
+    if (clinicianId) {
+      fetchClinicianData();
     }
-
-    // Check permissions
-    const hasPermission = userRole === 'admin' || (userRole === 'clinician' && userId === clinicianId);
-    
-    if (!hasPermission) {
-      console.log("Access denied - insufficient permissions");
-      showAccessDeniedError();
-      return;
-    }
-
-    fetchClinicianData();
-  }, [clinicianId, userId, userRole, authInitialized, fetchClinicianData, showAccessDeniedError]);
+  }, [clinicianId]);
 
   useEffect(() => {
     if (clinician?.clinician_licensed_states) {
@@ -248,6 +163,48 @@ const ClinicianDetails = () => {
       reader.readAsDataURL(profileImage);
     }
   }, [profileImage]);
+
+  const fetchClinicianData = async () => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('clinicians')
+        .select('*')
+        .eq('id', clinicianId)
+        .single();
+      
+      if (error) {
+        throw error;
+      }
+      
+      console.log("Fetched clinician data:", data);
+      setClinician(data);
+      setEditedClinician(data);
+      if (data.clinician_licensed_states) {
+        const fullStateNames = data.clinician_licensed_states.map(state => {
+          if (states.some(s => s.name === state)) {
+            return state;
+          }
+          const stateObj = states.find(s => s.code === state);
+          return stateObj ? stateObj.name : state;
+        });
+        setSelectedStates(fullStateNames);
+      }
+      
+      if (data.clinician_image_url) {
+        setImagePreview(data.clinician_image_url);
+      }
+    } catch (error) {
+      console.error('Error fetching clinician:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch clinician details.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleInputChange = (field: keyof Clinician, value: string) => {
     if (editedClinician) {
@@ -412,26 +369,6 @@ const ClinicianDetails = () => {
     );
   };
 
-  // Show access error
-  if (hasAccessError) {
-    return (
-      <Layout>
-        <div className="flex justify-center items-center h-full">
-          <div className="text-center">
-            <h2 className="text-xl font-semibold text-red-600 mb-2">Access Denied</h2>
-            <p className="text-gray-600">You don't have permission to view this profile.</p>
-            <Button 
-              onClick={() => navigate('/calendar')} 
-              className="mt-4"
-            >
-              Go to Calendar
-            </Button>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
-
   if (isLoading) {
     return (
       <Layout>
@@ -446,22 +383,11 @@ const ClinicianDetails = () => {
     return (
       <Layout>
         <div className="flex justify-center items-center h-full">
-          <div className="text-center">
-            <p className="text-gray-600 mb-4">Clinician not found.</p>
-            <Button 
-              onClick={() => navigate('/calendar')} 
-              className="mt-4"
-            >
-              Go to Calendar
-            </Button>
-          </div>
+          <p>Clinician not found.</p>
         </div>
       </Layout>
     );
   }
-
-  // Determine if current user can edit this profile
-  const canEdit = userRole === 'admin' || (userRole === 'clinician' && userId === clinicianId);
 
   return (
     <Layout>
@@ -469,32 +395,27 @@ const ClinicianDetails = () => {
         <div>
           <h1 className="text-2xl font-bold">
             {clinician.clinician_first_name} {clinician.clinician_last_name}
-            {userId === clinicianId && <span className="text-sm text-gray-500 ml-2">(Your Profile)</span>}
           </h1>
           <p className="text-gray-500">{clinician.clinician_email}</p>
         </div>
         <div className="flex gap-2">
-          {canEdit && (
+          {isEditing ? (
             <>
-              {isEditing ? (
-                <>
-                  <Button variant="outline" onClick={handleCancel} className="flex items-center gap-1">
-                    <X size={16} /> Cancel
-                  </Button>
-                  <Button 
-                    onClick={handleSave} 
-                    className="flex items-center gap-1 bg-valorwell-700 hover:bg-valorwell-800"
-                    disabled={isUploading}
-                  >
-                    <Save size={16} /> Save Changes
-                  </Button>
-                </>
-              ) : (
-                <Button onClick={() => setIsEditing(true)} className="flex items-center gap-1">
-                  <Pencil size={16} /> Edit
-                </Button>
-              )}
+              <Button variant="outline" onClick={handleCancel} className="flex items-center gap-1">
+                <X size={16} /> Cancel
+              </Button>
+              <Button 
+                onClick={handleSave} 
+                className="flex items-center gap-1 bg-valorwell-700 hover:bg-valorwell-800"
+                disabled={isUploading}
+              >
+                <Save size={16} /> Save Changes
+              </Button>
             </>
+          ) : (
+            <Button onClick={() => setIsEditing(true)} className="flex items-center gap-1">
+              <Pencil size={16} /> Edit
+            </Button>
           )}
         </div>
       </div>
@@ -843,7 +764,7 @@ const ClinicianDetails = () => {
           </CardContent>
         </Card>
 
-        {canEdit && isEditing && (
+        {isEditing && (
           <div className="flex justify-end gap-2 mt-4">
             <Button variant="outline" onClick={handleCancel}>
               Cancel
