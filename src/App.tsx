@@ -85,8 +85,18 @@ const App = () => {
                 } 
               />
 
-              {/* Default redirect */}
-              <Route path="/" element={<Navigate to="/calendar" replace />} />
+              {/* Root route redirect based on authentication */}
+              <Route 
+                path="/" 
+                element={
+                  <ProtectedRoute allowedRoles={['clinician', 'admin']}>
+                    <Navigate to="/calendar" replace />
+                  </ProtectedRoute>
+                } 
+              />
+              
+              {/* Catch-all redirect */}
+              <Route path="*" element={<Navigate to="/login" replace />} />
             </Routes>
           </BrowserRouter>
         </TooltipProvider>
