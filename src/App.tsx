@@ -12,6 +12,7 @@ import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import Login from "./pages/Login";
 import Calendar from "./pages/Calendar";
 import PatientDashboard from "./pages/PatientDashboard";
+import ClinicianDashboard from "./pages/ClinicianDashboard";
 import Clients from "./pages/Clients";
 import ClientDetails from "./pages/ClientDetails";
 import ClinicianDetails from "./pages/ClinicianDetails";
@@ -75,7 +76,7 @@ const App = () => {
                 path="/dashboard" 
                 element={
                   <ProtectedRoute allowedRoles={['clinician', 'admin']}>
-                    <PatientDashboard />
+                    <ClinicianDashboard />
                   </ProtectedRoute>
                 } 
               />
@@ -117,7 +118,7 @@ const App = () => {
                 path="/" 
                 element={
                   <ProtectedRoute allowedRoles={['clinician', 'admin']}>
-                    <Navigate to="/calendar" replace />
+                    <Navigate to="/dashboard" replace />
                   </ProtectedRoute>
                 } 
               />

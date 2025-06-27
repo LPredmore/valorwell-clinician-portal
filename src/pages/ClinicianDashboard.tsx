@@ -1,137 +1,170 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Calendar, Clock, AlertCircle } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
-import { supabase } from '@/integrations/supabase/client';
 import Layout from '@/components/layout/Layout';
 import VideoChat from '@/components/video/VideoChat';
 import { TimeZoneService } from '@/utils/timeZoneService';
 import { AppointmentsList } from '@/components/dashboard/AppointmentsList';
 import SessionNoteTemplate from '@/components/templates/SessionNoteTemplate';
-import { useAppointments } from '@/hooks/useAppointments';
 import { getClinicianTimeZone } from '@/hooks/useClinicianData';
 import { SessionDidNotOccurDialog } from '@/components/dashboard/SessionDidNotOccurDialog';
 import { Appointment } from '@/types/appointment';
 import { ClientDetails } from '@/types/client';
+import { fetchClinicianAppointments, fetchClinicianProfile } from '@/utils/clinicianDataUtils';
 
 const ClinicianDashboard = () => {
   const { userRole, userId } = useUser();
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [clinicianProfile, setClinicianProfile] = useState<any>(null);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [clinicianTimeZone, setClinicianTimeZone] = useState<string>(TimeZoneService.DEFAULT_TIMEZONE);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+  const [isLoadingAppointments, setIsLoadingAppointments] = useState(true);
   const [isLoadingTimeZone, setIsLoadingTimeZone] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
   
-  // STEP 3: Add refreshTrigger state for proper data management
-  const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
+  // Video and session states
+  const [isVideoOpen, setIsVideoOpen] = useState(false);
+  const [currentVideoUrl, setCurrentVideoUrl] = useState<string>('');
+  const [showSessionTemplate, setShowSessionTemplate] = useState(false);
+  const [currentAppointment, setCurrentAppointment] = useState<Appointment | null>(null);
+  const [clientData, setClientData] = useState<any>(null);
+  const [isLoadingClientData, setIsLoadingClientData] = useState(false);
   
+  // Session did not occur dialog states
+  const [showSessionDidNotOccurDialog, setShowSessionDidNotOccurDialog] = useState(false);
+  const [selectedAppointmentForNoShow, setSelectedAppointmentForNoShow] = useState<Appointment | null>(null);
+  
+  // Circuit breaker to prevent infinite loops
+  const dataFetchCountRef = useRef(0);
+  const refreshTrigger = 0;
+
   // Ensure timezone is always a string
   const safeClinicianTimeZone = Array.isArray(clinicianTimeZone) ? clinicianTimeZone[0] : clinicianTimeZone;
   const timeZoneDisplay = TimeZoneService.getTimeZoneDisplayName(safeClinicianTimeZone);
-  
-  const [showSessionDidNotOccurDialog, setShowSessionDidNotOccurDialog] = useState(false);
-  const [selectedAppointmentForNoShow, setSelectedAppointmentForNoShow] = useState<Appointment | null>(null);
 
+  // Fetch clinician profile
   useEffect(() => {
-    const fetchUserId = async () => {
-      const { data } = await supabase.auth.getUser();
-      if (data?.user) {
-        setCurrentUserId(data.user.id);
+    if (!userId || dataFetchCountRef.current >= 3) return;
+    
+    const fetchProfile = async () => {
+      setIsLoadingProfile(true);
+      try {
+        const profile = await fetchClinicianProfile(userId);
+        setClinicianProfile(profile);
+      } catch (error) {
+        console.error("Error fetching clinician profile:", error);
+        setError(error as Error);
+      } finally {
+        setIsLoadingProfile(false);
       }
     };
     
-    fetchUserId();
-  }, []);
+    fetchProfile();
+  }, [userId]);
 
   // Fetch clinician's timezone
   useEffect(() => {
-    const fetchClinicianTimeZone = async () => {
-      if (currentUserId) {
-        setIsLoadingTimeZone(true);
-        try {
-          const timeZone = await getClinicianTimeZone(currentUserId);
-          console.log("[ClinicianDashboard] STEP 3 - Fetched clinician timezone:", { timeZone, type: typeof timeZone, isArray: Array.isArray(timeZone) });
-          
-          // Ensure timezone is a string
-          const safeTimeZone = Array.isArray(timeZone) ? timeZone[0] : timeZone;
-          console.log("[ClinicianDashboard] STEP 3 - Safe timezone after conversion:", { safeTimeZone, type: typeof safeTimeZone });
-          
-          setClinicianTimeZone(safeTimeZone);
-        } catch (error) {
-          console.error("Error fetching clinician timezone:", error);
-          // Fallback to system timezone
-          setClinicianTimeZone(TimeZoneService.DEFAULT_TIMEZONE);
-        } finally {
-          setIsLoadingTimeZone(false);
-        }
+    if (!userId || dataFetchCountRef.current >= 3) return;
+    
+    const fetchTimeZone = async () => {
+      setIsLoadingTimeZone(true);
+      try {
+        const timeZone = await getClinicianTimeZone(userId);
+        console.log("[ClinicianDashboard] Fetched clinician timezone:", { timeZone, type: typeof timeZone, isArray: Array.isArray(timeZone) });
+        
+        // Ensure timezone is a string
+        const safeTimeZone = Array.isArray(timeZone) ? timeZone[0] : timeZone;
+        console.log("[ClinicianDashboard] Safe timezone after conversion:", { safeTimeZone, type: typeof safeTimeZone });
+        
+        setClinicianTimeZone(safeTimeZone);
+      } catch (error) {
+        console.error("Error fetching clinician timezone:", error);
+        // Fallback to system timezone
+        setClinicianTimeZone(TimeZoneService.DEFAULT_TIMEZONE);
+      } finally {
+        setIsLoadingTimeZone(false);
       }
     };
     
-    fetchClinicianTimeZone();
-  }, [currentUserId]);
+    fetchTimeZone();
+  }, [userId]);
 
-  // STEP 3: FIX - Correct useAppointments call with proper parameter order
-  console.log("[ClinicianDashboard] STEP 3 FIX - Calling useAppointments with corrected parameters:", {
-    currentUserId,
-    safeClinicianTimeZone,
-    refreshTrigger,
-    parameterOrder: "useAppointments(clinicianId, undefined, undefined, clinicianTimeZone, refreshTrigger)",
-    parameterTypes: {
-      currentUserId: typeof currentUserId,
-      safeClinicianTimeZone: typeof safeClinicianTimeZone,
-      refreshTrigger: typeof refreshTrigger
-    }
+  // Fetch clinician's appointments
+  useEffect(() => {
+    if (!userId || dataFetchCountRef.current >= 3) return;
+    
+    dataFetchCountRef.current++;
+    
+    const fetchAppointments = async () => {
+      setIsLoadingAppointments(true);
+      try {
+        const appointmentsData = await fetchClinicianAppointments(userId);
+        setAppointments(appointmentsData);
+        setError(null);
+      } catch (error) {
+        console.error("Error fetching clinician appointments:", error);
+        setError(error as Error);
+      } finally {
+        setIsLoadingAppointments(false);
+      }
+    };
+    
+    fetchAppointments();
+  }, [userId, refreshTrigger]);
+
+  // Process appointments into categories
+  const today = new Date();
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+
+  const todayAppointments = appointments.filter(apt => {
+    const aptDate = new Date(apt.start_at);
+    return aptDate >= todayStart && aptDate < todayEnd && apt.status !== 'cancelled';
   });
 
-  const {
-    appointments,
-    todayAppointments,
-    upcomingAppointments,
-    pastAppointments,
-    isLoading,
-    error,
-    refetch,
-    currentAppointment,
-    isVideoOpen,
-    currentVideoUrl,
-    showSessionTemplate,
-    clientData,
-    isLoadingClientData,
-    startVideoSession,
-    openSessionTemplate,
-    closeSessionTemplate,
-    closeVideoSession
-  } = useAppointments(
-    currentUserId, 
-    undefined, 
-    undefined, 
-    safeClinicianTimeZone, 
-    refreshTrigger
-  ); // STEP 3 FIX: Correct parameter order - refreshTrigger is now in position 5
-
-  // STEP 3: Enhanced logging for duplicate card debugging
-  console.log("[ClinicianDashboard] STEP 3 - Data validation for duplicate prevention:", {
-    currentUserId,
-    refreshTrigger,
-    totalAppointments: appointments?.length || 0,
-    todayAppointments: todayAppointments?.length || 0,
-    upcomingAppointments: upcomingAppointments?.length || 0,
-    pastAppointments: pastAppointments?.length || 0,
-    isLoading,
-    hasError: !!error
+  const upcomingAppointments = appointments.filter(apt => {
+    const aptDate = new Date(apt.start_at);
+    return aptDate >= todayEnd && apt.status !== 'cancelled';
   });
 
-  // STEP 3: Log appointment IDs to detect duplicates
-  if (appointments?.length > 0) {
-    const appointmentIds = appointments.map(apt => apt.id);
-    const uniqueIds = [...new Set(appointmentIds)];
-    if (appointmentIds.length !== uniqueIds.length) {
-      console.error("[ClinicianDashboard] STEP 3 - DUPLICATE APPOINTMENTS DETECTED:", {
-        totalAppointments: appointmentIds.length,
-        uniqueAppointments: uniqueIds.length,
-        duplicateIds: appointmentIds.filter((id, index) => appointmentIds.indexOf(id) !== index)
+  const pastAppointments = appointments.filter(apt => {
+    const aptDate = new Date(apt.start_at);
+    return aptDate < todayStart && apt.status === 'completed' && !apt.notes;
+  });
+
+  // Video session handlers
+  const startVideoSession = (appointment: Appointment) => {
+    setCurrentAppointment(appointment);
+    setCurrentVideoUrl(appointment.video_room_url || '');
+    setIsVideoOpen(true);
+  };
+
+  const closeVideoSession = () => {
+    setIsVideoOpen(false);
+    setCurrentVideoUrl('');
+    setCurrentAppointment(null);
+  };
+
+  // Session template handlers
+  const openSessionTemplate = (appointment: Appointment) => {
+    setCurrentAppointment(appointment);
+    setShowSessionTemplate(true);
+    
+    // Set client data from appointment
+    if (appointment.client) {
+      setClientData({
+        client_first_name: appointment.client.client_first_name,
+        client_last_name: appointment.client.client_last_name,
+        client_preferred_name: appointment.client.client_preferred_name
       });
-    } else {
-      console.log("[ClinicianDashboard] STEP 3 - No duplicate appointments detected");
     }
-  }
+  };
+
+  const closeSessionTemplate = () => {
+    setShowSessionTemplate(false);
+    setCurrentAppointment(null);
+    setClientData(null);
+  };
 
   const handleSessionDidNotOccur = (appointment: Appointment) => {
     setSelectedAppointmentForNoShow(appointment);
@@ -141,17 +174,16 @@ const ClinicianDashboard = () => {
   const closeSessionDidNotOccurDialog = () => {
     setShowSessionDidNotOccurDialog(false);
     setSelectedAppointmentForNoShow(null);
-    // STEP 3: Trigger refresh to update appointment lists
-    setRefreshTrigger(prev => prev + 1);
+    // Refetch appointments after status update
+    if (userId) {
+      fetchClinicianAppointments(userId).then(setAppointments);
+    }
   };
 
-  // Create a type adapter function to ensure clientData is handled properly by SessionNoteTemplate
+  // Create a type adapter function for SessionNoteTemplate
   const prepareClientDataForTemplate = (): ClientDetails | null => {
     if (!clientData) return null;
     
-    // Create a ClientDetails object with the available data
-    // Only include fields that we can safely access from clientData
-    // Add null defaults for all properties required by ClientDetails
     return {
       id: currentAppointment?.client_id || '',
       client_first_name: clientData.client_first_name || null,
@@ -264,7 +296,7 @@ const ClinicianDashboard = () => {
     };
   };
 
-  console.log("[ClinicianDashboard] STEP 3 - Rendering with corrected data management:", {
+  console.log("[ClinicianDashboard] Rendering with corrected data management:", {
     clinicianTimeZone,
     safeClinicianTimeZone,
     timeZoneDisplay,
@@ -277,11 +309,7 @@ const ClinicianDashboard = () => {
     return (
       <Layout>
         <SessionNoteTemplate 
-          onClose={() => {
-            closeSessionTemplate();
-            // STEP 3: Trigger refresh after closing session template
-            setRefreshTrigger(prev => prev + 1);
-          }}
+          onClose={closeSessionTemplate}
           appointment={currentAppointment}
           clinicianName={userId}
           clientData={prepareClientDataForTemplate()}
@@ -302,7 +330,7 @@ const ClinicianDashboard = () => {
               title="Today's Appointments"
               icon={<Calendar className="h-5 w-5 mr-2" />}
               appointments={todayAppointments}
-              isLoading={isLoading || isLoadingTimeZone}
+              isLoading={isLoadingAppointments || isLoadingTimeZone}
               error={error}
               emptyMessage="No appointments scheduled for today."
               timeZoneDisplay={timeZoneDisplay}
@@ -318,16 +346,13 @@ const ClinicianDashboard = () => {
               title="Outstanding Documentation"
               icon={<AlertCircle className="h-5 w-5 mr-2" />}
               appointments={pastAppointments}
-              isLoading={isLoading || isLoadingTimeZone || isLoadingClientData}
+              isLoading={isLoadingAppointments || isLoadingTimeZone || isLoadingClientData}
               error={error}
               emptyMessage="No outstanding documentation."
               timeZoneDisplay={timeZoneDisplay}
               userTimeZone={safeClinicianTimeZone}
               onDocumentSession={openSessionTemplate}
-              onSessionDidNotOccur={(appointment: Appointment) => {
-                setSelectedAppointmentForNoShow(appointment);
-                setShowSessionDidNotOccurDialog(true);
-              }}
+              onSessionDidNotOccur={handleSessionDidNotOccur}
             />
           </div>
           
@@ -337,7 +362,7 @@ const ClinicianDashboard = () => {
               title="Upcoming Appointments"
               icon={<Calendar className="h-5 w-5 mr-2" />}
               appointments={upcomingAppointments}
-              isLoading={isLoading || isLoadingTimeZone}
+              isLoading={isLoadingAppointments || isLoadingTimeZone}
               error={error}
               emptyMessage="No upcoming appointments scheduled."
               timeZoneDisplay={timeZoneDisplay}
@@ -361,16 +386,13 @@ const ClinicianDashboard = () => {
       {showSessionDidNotOccurDialog && selectedAppointmentForNoShow && (
         <SessionDidNotOccurDialog
           isOpen={showSessionDidNotOccurDialog}
-          onClose={() => {
-            setShowSessionDidNotOccurDialog(false);
-            setSelectedAppointmentForNoShow(null);
-            // STEP 3: Trigger refresh to update appointment lists
-            setRefreshTrigger(prev => prev + 1);
-          }}
+          onClose={closeSessionDidNotOccurDialog}
           appointmentId={selectedAppointmentForNoShow.id}
           onStatusUpdate={() => {
-            refetch();
-            setRefreshTrigger(prev => prev + 1);
+            // Refetch appointments after status update
+            if (userId) {
+              fetchClinicianAppointments(userId).then(setAppointments);
+            }
           }}
         />
       )}

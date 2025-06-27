@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "../components/layout/Layout";
 import { useUser } from "@/context/UserContext";
@@ -21,6 +21,11 @@ const CalendarSimple = React.memo(() => {
   const [isMounted, setIsMounted] = useState(true);
   const navigate = useNavigate();
   const { toast } = useToast();
+  
+  // Circuit breaker to prevent infinite loops
+  const authCheckCountRef = useRef(0);
+  const timezoneLoadCountRef = useRef(0);
+  const accessDeniedRef = useRef(false);
 
   // Memoize navigation functions to prevent re-renders
   const navigatePrevious = useCallback(() => {
@@ -35,10 +40,11 @@ const CalendarSimple = React.memo(() => {
     setCurrentDate(new Date());
   }, []);
 
-  // Stabilized access control handler
+  // Stabilized access control handler with circuit breaker
   const handleAccessDenied = useCallback((message: string) => {
-    if (!isMounted) return;
+    if (!isMounted || accessDeniedRef.current) return;
     
+    accessDeniedRef.current = true;
     toast({
       title: "Access Denied",
       description: message,
@@ -46,9 +52,11 @@ const CalendarSimple = React.memo(() => {
     });
   }, [toast, isMounted]);
 
-  // Stabilized timezone loading function
+  // Stabilized timezone loading function with circuit breaker
   const loadUserTimeZone = useCallback(async (clinicianId: string) => {
-    if (!isMounted) return;
+    if (!isMounted || timezoneLoadCountRef.current >= 3) return;
+    
+    timezoneLoadCountRef.current++;
     
     try {
       console.log('[CalendarSimple] Loading timezone for:', clinicianId);
@@ -75,23 +83,24 @@ const CalendarSimple = React.memo(() => {
     };
   }, []);
 
-  // Primary auth and access control effect - STABILIZED
+  // Primary auth effect - SEPARATED with circuit breaker
   useEffect(() => {
-    console.log('[CalendarSimple] Auth state:', { authInitialized, userId, userRole });
+    if (!authInitialized || authCheckCountRef.current >= 3) return;
     
-    if (!authInitialized) return;
+    authCheckCountRef.current++;
+    console.log('[CalendarSimple] Auth check #', authCheckCountRef.current, { authInitialized, userId, userRole });
     
     if (!userId) {
       console.log('[CalendarSimple] No user found, redirecting to login');
       handleAccessDenied("Please log in to access the calendar");
-      navigate('/login');
+      setTimeout(() => navigate('/login'), 100);
       return;
     }
     
     if (userRole === 'client') {
       console.log('[CalendarSimple] Client user detected, redirecting to portal');
       handleAccessDenied("This calendar is for clinicians only. Redirecting to client portal.");
-      navigate('/portal');
+      setTimeout(() => navigate('/portal'), 100);
       return;
     }
     
@@ -99,15 +108,15 @@ const CalendarSimple = React.memo(() => {
       console.log('[CalendarSimple] Authorized user, setting ready');
       setIsReady(true);
     }
-  }, [authInitialized, userId, userRole, navigate, handleAccessDenied]);
+  }, [authInitialized, userId, userRole]); // Removed navigate and handleAccessDenied
 
-  // Timezone loading effect - SEPARATED and STABILIZED
+  // Timezone loading effect - SEPARATED with circuit breaker
   useEffect(() => {
-    if (!isReady || !userId || !isMounted) return;
+    if (!isReady || !userId || !isMounted || timezoneLoadCountRef.current >= 3) return;
     
     console.log('[CalendarSimple] Loading timezone for ready user:', userId);
     loadUserTimeZone(userId);
-  }, [isReady, userId, loadUserTimeZone, isMounted]);
+  }, [isReady, userId, isMounted]); // Removed loadUserTimeZone
 
   // Memoized display values
   const currentMonthDisplay = useMemo(() => {

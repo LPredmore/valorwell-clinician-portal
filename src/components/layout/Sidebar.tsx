@@ -82,8 +82,8 @@ const Sidebar = () => {
       <nav className="flex-1 py-4 space-y-1 px-2">
         {/* Clinician and Admin links */}
         <Link 
-          to="/clinician-dashboard" 
-          className={`sidebar-link ${isActive('/clinician-dashboard') ? 'active' : ''}`}
+          to="/dashboard" 
+          className={`sidebar-link ${isActive('/dashboard') ? 'active' : ''}`}
         >
           <LayoutDashboard size={18} />
           <span>Dashboard</span>
