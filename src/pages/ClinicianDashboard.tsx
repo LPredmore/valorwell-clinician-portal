@@ -11,6 +11,7 @@ import { SessionDidNotOccurDialog } from '@/components/dashboard/SessionDidNotOc
 import { Appointment } from '@/types/appointment';
 import { ClientDetails } from '@/types/client';
 import { fetchClinicianAppointments, fetchClinicianProfile } from '@/utils/clinicianDataUtils';
+import { isBlockedTimeAppointment } from '@/utils/blockedTimeUtils';
 
 const ClinicianDashboard = () => {
   const { userRole, userId } = useUser();
@@ -112,22 +113,25 @@ const ClinicianDashboard = () => {
     fetchAppointments();
   }, [userId, refreshTrigger]);
 
-  // Process appointments into categories
+  // Process appointments into categories with blocked time filtering
   const today = new Date();
   const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
 
-  const todayAppointments = appointments.filter(apt => {
+  // Filter out blocked time appointments from all categories
+  const realAppointments = appointments.filter(apt => !isBlockedTimeAppointment(apt));
+
+  const todayAppointments = realAppointments.filter(apt => {
     const aptDate = new Date(apt.start_at);
     return aptDate >= todayStart && aptDate < todayEnd && apt.status !== 'cancelled';
   });
 
-  const upcomingAppointments = appointments.filter(apt => {
+  const upcomingAppointments = realAppointments.filter(apt => {
     const aptDate = new Date(apt.start_at);
     return aptDate >= todayEnd && apt.status !== 'cancelled';
   });
 
-  const pastAppointments = appointments.filter(apt => {
+  const pastAppointments = realAppointments.filter(apt => {
     const aptDate = new Date(apt.start_at);
     return aptDate < todayStart && apt.status === 'completed' && !apt.notes;
   });
@@ -302,7 +306,10 @@ const ClinicianDashboard = () => {
     timeZoneDisplay,
     refreshTrigger,
     type: typeof safeClinicianTimeZone,
-    isArray: Array.isArray(clinicianTimeZone)
+    isArray: Array.isArray(clinicianTimeZone),
+    totalAppointments: appointments.length,
+    realAppointments: realAppointments.length,
+    filteredBlockedTime: appointments.length - realAppointments.length
   });
 
   if (showSessionTemplate && currentAppointment) {
