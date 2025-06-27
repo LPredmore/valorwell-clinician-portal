@@ -1,6 +1,6 @@
 
 import React, { useMemo } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useUser } from '@/context/UserContext';
 import { useToast } from '@/hooks/use-toast';
 
@@ -15,6 +15,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = React.memo(({
 }) => {
   const { userRole, isLoading, authInitialized } = useUser();
   const { toast } = useToast();
+  const location = useLocation();
   
   // Memoize the access decision to prevent unnecessary recalculations
   const accessDecision = useMemo(() => {
@@ -23,18 +24,21 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = React.memo(({
       return { type: 'loading' };
     }
     
-    // Check role-based access
+    // FIXED: Admin can access all routes - check this FIRST
+    if (userRole === 'admin') {
+      console.log('[ProtectedRoute] Admin access granted for route:', location.pathname);
+      return { type: 'allow' };
+    }
+    
+    // Check role-based access for non-admins
     if (!userRole || !allowedRoles.includes(userRole)) {
+      console.log('[ProtectedRoute] Access denied:', { userRole, allowedRoles, route: location.pathname });
+      
       // Check if this is a client trying to access clinician functionality
       if (userRole === 'client') {
         return { type: 'client_redirect' };
       }
-      
-      // Admin can access all routes
-      if (userRole === 'admin') {
-        return { type: 'allow' };
-      }
-      // Redirect clinicians to Calendar page
+      // Redirect clinicians to Calendar page if they don't have access
       else if (userRole === 'clinician') {
         return { type: 'clinician_redirect' };
       }
@@ -44,8 +48,9 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = React.memo(({
       }
     }
     
+    console.log('[ProtectedRoute] Role-based access granted:', { userRole, allowedRoles, route: location.pathname });
     return { type: 'allow' };
-  }, [authInitialized, isLoading, userRole, allowedRoles]);
+  }, [authInitialized, isLoading, userRole, allowedRoles, location.pathname]);
   
   // Handle different access decisions
   switch (accessDecision.type) {

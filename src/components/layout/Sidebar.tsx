@@ -101,8 +101,8 @@ const Sidebar = () => {
         )}
         
         <Link 
-          to="/my-clients" 
-          className={`sidebar-link ${isActive('/my-clients') ? 'active' : ''}`}
+          to="/clients" 
+          className={`sidebar-link ${isActive('/clients') ? 'active' : ''}`}
         >
           <UserCheck size={18} />
           <span>My Clients</span>

@@ -1,129 +1,135 @@
 
-import React from "react";
-import { Toaster } from "sonner";
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { UserProvider } from "./context/UserContext";
-import ProtectedRoute from "./components/auth/ProtectedRoute";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { UserProvider } from "@/context/UserContext";
+import { useEffect } from "react";
+import ProtectedRoute from "@/components/auth/ProtectedRoute";
 
 // Pages
-import Index from "./pages/Index";
+import Login from "./pages/Login";
 import Calendar from "./pages/Calendar";
+import PatientDashboard from "./pages/PatientDashboard";
 import Clients from "./pages/Clients";
 import ClientDetails from "./pages/ClientDetails";
-import Analytics from "./pages/Analytics";
-import Activity from "./pages/Activity";
-import Settings from "./pages/Settings";
-import Reminders from "./pages/Reminders";
-import Messages from "./pages/Messages";
-import NotFound from "./pages/NotFound";
-import Login from "./pages/Login";
-import Signup from "./pages/Signup";
 import ClinicianDetails from "./pages/ClinicianDetails";
-import MyClients from "./pages/MyClients";
-import ClinicianDashboard from "./pages/ClinicianDashboard";
+import Settings from "./pages/Settings";
 import ResetPassword from "./pages/ResetPassword";
-import UpdatePassword from "./pages/UpdatePassword";
+import NylasOAuthCallback from "./pages/NylasOAuthCallback";
 
-// Create a client
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
-function App() {
+// Route monitoring component for debugging
+const RouteMonitor = () => {
+  const location = useLocation();
+  
+  useEffect(() => {
+    console.log('[RouteMonitor] Route change:', {
+      pathname: location.pathname,
+      search: location.search,
+      hash: location.hash,
+      state: location.state
+    });
+  }, [location]);
+  
+  return null;
+};
+
+const App = () => {
   return (
-    <React.StrictMode>
-      <BrowserRouter>
-        <QueryClientProvider client={queryClient}>
-          <TooltipProvider>
-            <UserProvider>
-              {/* Sonner Toaster - the only toast component we need */}
-              <Toaster richColors position="top-right" />
-              <Routes>
-                {/* Public routes */}
-                <Route path="/" element={<Index />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/signup" element={<Signup />} />
-                <Route path="/reset-password" element={<ResetPassword />} />
-                <Route path="/update-password" element={<UpdatePassword />} />
-                
-                {/* Allow clinicians and admins to view client details */}
-                <Route path="/clients/:clientId" element={
-                  <ProtectedRoute allowedRoles={['admin', 'moderator', 'clinician']}>
-                    <ClientDetails />
-                  </ProtectedRoute>
-                } />
-                
-                {/* Protected routes - clinician, admin, moderator */}
-                <Route path="/clinician-dashboard" element={
-                  <ProtectedRoute allowedRoles={['admin', 'clinician']}>
-                    <ClinicianDashboard />
-                  </ProtectedRoute>
-                } />
-                
-                <Route path="/my-clients" element={
-                  <ProtectedRoute allowedRoles={['admin', 'clinician']}>
-                    <MyClients />
-                  </ProtectedRoute>
-                } />
-                
-                <Route path="/calendar" element={
-                  <ProtectedRoute allowedRoles={['admin', 'clinician']}>
+    <QueryClientProvider client={queryClient}>
+      <UserProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            {/* Add route monitoring in development */}
+            {process.env.NODE_ENV === 'development' && <RouteMonitor />}
+            
+            <Routes>
+              {/* Public Routes */}
+              <Route path="/login" element={<Login />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/portal" element={<PatientDashboard />} />
+              <Route path="/nylas-oauth-callback" element={<NylasOAuthCallback />} />
+
+              {/* Protected Routes */}
+              <Route 
+                path="/calendar" 
+                element={
+                  <ProtectedRoute allowedRoles={['clinician', 'admin']}>
                     <Calendar />
                   </ProtectedRoute>
-                } />
-                
-                {/* Clinicians can view their own profile */}
-                <Route path="/clinicians/:clinicianId" element={
-                  <ProtectedRoute allowedRoles={['admin', 'clinician']}>
-                    <ClinicianDetails />
+                } 
+              />
+              <Route 
+                path="/dashboard" 
+                element={
+                  <ProtectedRoute allowedRoles={['clinician', 'admin']}>
+                    <PatientDashboard />
                   </ProtectedRoute>
-                } />
-                
-                {/* Protected routes - admin only */}
-                <Route path="/clients" element={
-                  <ProtectedRoute allowedRoles={['admin']}>
+                } 
+              />
+              <Route 
+                path="/clients" 
+                element={
+                  <ProtectedRoute allowedRoles={['clinician', 'admin']}>
                     <Clients />
                   </ProtectedRoute>
-                } />
-                
-                <Route path="/analytics" element={
-                  <ProtectedRoute allowedRoles={['admin']}>
-                    <Analytics />
+                } 
+              />
+              <Route 
+                path="/clients/:id" 
+                element={
+                  <ProtectedRoute allowedRoles={['clinician', 'admin']}>
+                    <ClientDetails />
                   </ProtectedRoute>
-                } />
-
-                <Route path="/activity" element={
-                  <ProtectedRoute allowedRoles={['admin']}>
-                    <Activity />
+                } 
+              />
+              <Route 
+                path="/clinicians/:clinicianId" 
+                element={
+                  <ProtectedRoute allowedRoles={['clinician', 'admin']}>
+                    <ClinicianDetails />
                   </ProtectedRoute>
-                } />
-
-                <Route path="/settings" element={
+                } 
+              />
+              <Route 
+                path="/settings" 
+                element={
                   <ProtectedRoute allowedRoles={['admin']}>
                     <Settings />
                   </ProtectedRoute>
-                } />
+                } 
+              />
 
-                <Route path="/reminders" element={
-                  <ProtectedRoute allowedRoles={['admin']}>
-                    <Reminders />
+              {/* Root route redirect based on authentication */}
+              <Route 
+                path="/" 
+                element={
+                  <ProtectedRoute allowedRoles={['clinician', 'admin']}>
+                    <Navigate to="/calendar" replace />
                   </ProtectedRoute>
-                } />
-
-                <Route path="/messages" element={
-                  <ProtectedRoute allowedRoles={['admin']}>
-                    <Messages />
-                  </ProtectedRoute>
-                } />
-                
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </UserProvider>
-          </TooltipProvider>
-        </QueryClientProvider>
-      </BrowserRouter>
-    </React.StrictMode>
+                } 
+              />
+              
+              {/* Catch-all redirect */}
+              <Route path="*" element={<Navigate to="/login" replace />} />
+            </Routes>
+          </BrowserRouter>
+        </TooltipProvider>
+      </UserProvider>
+    </QueryClientProvider>
   );
-}
+};
 
 export default App;

@@ -6,7 +6,6 @@ import './index.css';
 
 const rootElement = document.getElementById("root");
 
-// Make sure the root element exists before rendering
 if (!rootElement) {
   console.error("Root element not found!");
 } else {

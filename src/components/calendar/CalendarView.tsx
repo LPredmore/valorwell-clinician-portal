@@ -1,14 +1,9 @@
-import React, { useEffect, useState } from 'react';
-import WeekView from './WeekView';
-import MonthView from './MonthView';
-import ClinicianAvailabilityPanel from './ClinicianAvailabilityPanel';
-import { TimeZoneService } from '@/utils/timeZoneService';
-import { Appointment } from '@/types/appointment';
-import { DateTime } from 'luxon';
-import { AvailabilityBlock } from '@/types/availability';
-import AppointmentDetailsDialog from './AppointmentDetailsDialog';
-import { convertAppointmentBlockToAppointment } from '@/utils/appointmentUtils';
+
+import React from 'react';
+import { addWeeks, subWeeks } from 'date-fns';
 import CalendarErrorBoundary from './CalendarErrorBoundary';
+import WeeklyCalendarGrid from './WeeklyCalendarGrid';
+import AvailabilityManagementSidebar from './AvailabilityManagementSidebar';
 
 interface CalendarProps {
   view: 'week' | 'month';
@@ -18,176 +13,27 @@ interface CalendarProps {
   userTimeZone: string;
   clinicianTimeZone: string;
   refreshTrigger: number;
-  appointments: Appointment[];
+  appointments: any[];
   isLoading: boolean;
   error: any;
 }
 
 const CalendarView = ({ 
-  view, 
-  showAvailability, 
   clinicianId, 
   currentDate, 
   userTimeZone,
-  clinicianTimeZone,
   refreshTrigger = 0,
-  appointments = [],
   isLoading = false,
   error = null
 }: CalendarProps) => {
-  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
-  const [isAppointmentDialogOpen, setIsAppointmentDialogOpen] = useState(false);
-  
-  console.log('[CalendarView] STEP 1 FIX - Rendering with proper timezone parameters:', {
-    view,
+  console.log('[CalendarView] Rendering traditional weekly calendar with:', {
     clinicianId,
-    appointmentsCount: appointments?.length || 0,
+    currentDate,
     userTimeZone,
-    clinicianTimeZone,
+    refreshTrigger,
     isLoading,
     hasError: !!error
   });
-  
-  // Ensure we have valid IANA timezones
-  const validUserTimeZone = TimeZoneService.ensureIANATimeZone(userTimeZone);
-  const validClinicianTimeZone = TimeZoneService.ensureIANATimeZone(clinicianTimeZone);
-  
-  // STEP 4: Add comprehensive logging for raw data
-  console.log('[CalendarView] STEP 4 - Raw data logging:', {
-    rawAppointments: appointments,
-    appointmentsCount: appointments?.length || 0,
-    appointmentsEmpty: !appointments || appointments.length === 0,
-    sampleRawAppointment: appointments?.[0] ? {
-      id: appointments[0].id,
-      start_at: appointments[0].start_at,
-      end_at: appointments[0].end_at,
-      appointment_timezone: appointments[0].appointment_timezone,
-      clientName: appointments[0].clientName
-    } : null
-  });
-  
-  // Use a local refresh trigger that combines the external one plus local changes
-  const [localRefreshTrigger, setLocalRefreshTrigger] = useState(0);
-  
-  // Combine both refresh triggers
-  const combinedRefreshTrigger = refreshTrigger + localRefreshTrigger;
-  
-  // Calculate the week days for the WeekView component
-  const startOfWeek = new Date(currentDate);
-  startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
-
-  const days = Array.from({ length: 7 }, (_, i) => {
-    const day = new Date(startOfWeek);
-    day.setDate(startOfWeek.getDate() + i);
-    return day;
-  });
-  
-  // STEP 4: Log timezone parameters for validation
-  console.log('[CalendarView] STEP 4 - Timezone parameters validation:', {
-    userTimeZone,
-    clinicianTimeZone,
-    validUserTimeZone,
-    validClinicianTimeZone,
-    userTzValid: TimeZoneService.isValidTimeZone(userTimeZone),
-    clinicianTzValid: TimeZoneService.isValidTimeZone(clinicianTimeZone)
-  });
-  
-  if (!clinicianId) {
-    console.error('No clinician ID provided to Calendar component');
-  }
-
-  // Handle click on an appointment clicked in calendar
-  const handleAppointmentClick = (appointment: Appointment) => {
-    console.log(`[CalendarView] Appointment clicked:`, {
-      id: appointment.id,
-      clientName: appointment.clientName,
-      clientId: appointment.client_id,
-      hasClient: !!appointment.client,
-      startAt: appointment.start_at,
-      endAt: appointment.end_at
-    });
-    
-    if (!appointment.client && appointment.client_id) {
-      const completeAppointment = appointments.find(a => a.id === appointment.id);
-      
-      if (completeAppointment && completeAppointment.client) {
-        setSelectedAppointment(completeAppointment);
-      } else {
-        const fullAppointment = convertAppointmentBlockToAppointment(appointment, appointments);
-        setSelectedAppointment(fullAppointment);
-      }
-    } else {
-      setSelectedAppointment(appointment);
-    }
-    
-    setIsAppointmentDialogOpen(true);
-  };
-
-  // Handle availability block clicked in calendar
-  const handleAvailabilityClick = (date: DateTime | Date, availabilityBlock: AvailabilityBlock) => {
-    const dateTime = date instanceof Date ? 
-      TimeZoneService.fromJSDate(date, validUserTimeZone) : date;
-      
-    console.log(`[CalendarView] Availability clicked for ${dateTime.toFormat('yyyy-MM-dd')} - Block:`, availabilityBlock);
-  };
-
-  // Handler for when availability is updated
-  const handleAvailabilityUpdated = () => {
-    console.log('[CalendarView] Availability updated, triggering calendar refresh...');
-    setLocalRefreshTrigger(prev => prev + 1);
-  };
-  
-  // Handler for when appointment is updated in the dialog
-  const handleAppointmentUpdated = () => {
-    console.log('[CalendarView] Appointment updated, triggering calendar refresh...');
-    setLocalRefreshTrigger(prev => prev + 1);
-    setIsAppointmentDialogOpen(false);
-    setSelectedAppointment(null);
-  };
-  
-  // Handler for when an appointment is updated via drag-and-drop
-  const handleAppointmentDragUpdate = (appointmentId: string, newStartAt: string, newEndAt: string) => {
-    console.log('[CalendarView] Appointment updated via drag-and-drop, triggering calendar refresh...');
-    
-    if (appointmentId === "refresh-trigger" && !newStartAt && !newEndAt) {
-      setLocalRefreshTrigger(prev => prev + 1);
-      return;
-    }
-    
-    if (appointmentId && newStartAt && newEndAt) {
-      console.log('[CalendarView] Updating appointment:', {
-        appointmentId,
-        newStartAt,
-        newEndAt
-      });
-      
-      (async () => {
-        try {
-          const { supabase } = await import('@/integrations/supabase/client');
-          
-          // STEP 5: Implement timezone conversion flow for appointment updates
-          // When updating appointment, ensure appointment_timezone is preserved
-          const { error } = await supabase
-            .from('appointments')
-            .update({
-              start_at: newStartAt,
-              end_at: newEndAt
-              // appointment_timezone should remain unchanged during drag-and-drop
-            })
-            .eq('id', appointmentId);
-            
-          if (error) {
-            throw error;
-          }
-          
-          console.log('[CalendarView] Successfully updated appointment in database');
-          setLocalRefreshTrigger(prev => prev + 1);
-        } catch (error) {
-          console.error('[CalendarView] Error updating appointment:', error);
-        }
-      })();
-    }
-  };
 
   if (isLoading) {
     return (
@@ -212,61 +58,27 @@ const CalendarView = ({
 
   return (
     <CalendarErrorBoundary>
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="md:col-span-3">
-          {view === 'week' ? (
-            <WeekView 
-              days={days}
-              currentDate={currentDate}
-              selectedClinicianId={clinicianId}
-              refreshTrigger={combinedRefreshTrigger}
-              appointments={appointments}
-              onAppointmentClick={handleAppointmentClick}
-              onAvailabilityClick={handleAvailabilityClick}
-              onAppointmentUpdate={handleAppointmentDragUpdate}
-              userTimeZone={validUserTimeZone}
-              clinicianTimeZone={validClinicianTimeZone}
-              isLoading={isLoading}
-              error={error}
-            />
-          ) : (
-            <MonthView 
-              currentDate={currentDate}
-              clinicianId={clinicianId}
-              refreshTrigger={combinedRefreshTrigger}
-              appointments={appointments}
-              getClientName={(clientId: string): string => {
-                const appointment = appointments.find(app => app.client_id === clientId);
-                return appointment?.clientName || 'Unknown Client';
-              }}
-              onAppointmentClick={handleAppointmentClick}
-              onAvailabilityClick={handleAvailabilityClick}
-              userTimeZone={validUserTimeZone}
-            />
-          )}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* Main Weekly Calendar Display */}
+        <div className="lg:col-span-3">
+          <WeeklyCalendarGrid
+            currentDate={currentDate}
+            clinicianId={clinicianId}
+            userTimeZone={userTimeZone}
+            onAvailabilityClick={(date, startTime, endTime) => {
+              console.log('Availability clicked:', { date, startTime, endTime });
+              // TODO: Implement availability editing
+            }}
+          />
         </div>
         
-        {showAvailability && (
-          <div className="md:col-span-1">
-            <ClinicianAvailabilityPanel 
-              clinicianId={clinicianId} 
-              onAvailabilityUpdated={handleAvailabilityUpdated}
-              userTimeZone={validUserTimeZone}
-            />
-          </div>
-        )}
-        
-        <AppointmentDetailsDialog
-          isOpen={isAppointmentDialogOpen}
-          onClose={() => {
-            console.log('[CalendarView] Closing appointment dialog');
-            setIsAppointmentDialogOpen(false);
-            setSelectedAppointment(null);
-          }}
-          appointment={selectedAppointment}
-          onAppointmentUpdated={handleAppointmentUpdated}
-          userTimeZone={validUserTimeZone}
-        />
+        {/* Availability Management Sidebar */}
+        <div className="lg:col-span-1">
+          <AvailabilityManagementSidebar
+            clinicianId={clinicianId}
+            userTimeZone={userTimeZone}
+          />
+        </div>
       </div>
     </CalendarErrorBoundary>
   );
