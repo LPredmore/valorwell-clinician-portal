@@ -19,7 +19,14 @@ import Settings from "./pages/Settings";
 import ResetPassword from "./pages/ResetPassword";
 import NylasOAuthCallback from "./pages/NylasOAuthCallback";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 // Route monitoring component for debugging
 const RouteMonitor = () => {
