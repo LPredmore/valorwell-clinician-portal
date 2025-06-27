@@ -163,16 +163,6 @@ const ClinicianDetails = () => {
     }
   }, [location.pathname, clinicianId, navigate]);
 
-  // Memoize functions to prevent useEffect re-runs
-  const showAccessDeniedError = useCallback(() => {
-    toast({
-      title: "Access Denied",
-      description: "You don't have permission to view this profile.",
-      variant: "destructive",
-    });
-    setHasAccessError(true);
-  }, [toast]);
-
   // Stabilized access denied handler
   const handleAccessDenied = useCallback(() => {
     toast({
@@ -181,7 +171,7 @@ const ClinicianDetails = () => {
       variant: "destructive",
     });
     setHasAccessError(true);
-  }, []); // Removed toast from dependencies to prevent recreation
+  }, [toast]);
 
   // Stabilized fetch function
   const performFetch = useCallback(async (id: string) => {
@@ -253,7 +243,7 @@ const ClinicianDetails = () => {
     }
   }, [userId, userRole, handleAccessDenied, toast]);
 
-  // FIXED: Stabilized useEffect with only primitive dependencies
+  // Main useEffect with stabilized dependencies
   useEffect(() => {
     console.log("[ClinicianDetails] useEffect triggered", {
       clinicianId,
@@ -291,7 +281,7 @@ const ClinicianDetails = () => {
     }
 
     performFetch(clinicianId);
-  }, [clinicianId, userId, userRole, authInitialized]); // FIXED: Only primitive dependencies
+  }, [clinicianId, userId, userRole, authInitialized, performFetch, handleAccessDenied]);
 
   useEffect(() => {
     if (clinician?.clinician_licensed_states) {
@@ -453,7 +443,10 @@ const ClinicianDetails = () => {
         description: "Clinician details updated successfully.",
       });
       
-      fetchClinicianData();
+      // Refresh the data after saving
+      if (clinicianId) {
+        performFetch(clinicianId);
+      }
       
     } catch (error) {
       console.error('Error updating clinician:', error);
