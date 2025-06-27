@@ -13,6 +13,7 @@ import Calendar from "./pages/Calendar";
 import PatientDashboard from "./pages/PatientDashboard";
 import Clients from "./pages/Clients";
 import ClientDetails from "./pages/ClientDetails";
+import ClinicianDetails from "./pages/ClinicianDetails";
 import Settings from "./pages/Settings";
 import ResetPassword from "./pages/ResetPassword";
 import NylasOAuthCallback from "./pages/NylasOAuthCallback";
@@ -64,6 +65,14 @@ const App = () => {
                 element={
                   <ProtectedRoute allowedRoles={['clinician', 'admin']}>
                     <ClientDetails />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/clinicians/:clinicianId" 
+                element={
+                  <ProtectedRoute allowedRoles={['clinician', 'admin']}>
+                    <ClinicianDetails />
                   </ProtectedRoute>
                 } 
               />

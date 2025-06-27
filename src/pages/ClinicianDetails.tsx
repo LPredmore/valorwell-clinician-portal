@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from "@/hooks/use-toast";
+import { useUser } from '@/context/UserContext';
 import { Pencil, Save, X, Upload, Camera, User } from 'lucide-react';
 import { 
   Card, 
@@ -52,6 +53,7 @@ const ClinicianDetails = () => {
   const { clinicianId } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { userId, userRole } = useUser();
 
   const [clinician, setClinician] = useState<Clinician | null>(null);
   const [editedClinician, setEditedClinician] = useState<Clinician | null>(null);
@@ -131,9 +133,24 @@ const ClinicianDetails = () => {
 
   useEffect(() => {
     if (clinicianId) {
-      fetchClinicianData();
+      // Check if user has permission to view this profile
+      if (userRole === 'admin') {
+        // Admins can view any clinician profile
+        fetchClinicianData();
+      } else if (userRole === 'clinician' && userId === clinicianId) {
+        // Clinicians can only view their own profile
+        fetchClinicianData();
+      } else {
+        // Unauthorized access
+        toast({
+          title: "Access Denied",
+          description: "You don't have permission to view this profile.",
+          variant: "destructive",
+        });
+        navigate('/calendar');
+      }
     }
-  }, [clinicianId]);
+  }, [clinicianId, userId, userRole, navigate, toast]);
 
   useEffect(() => {
     if (clinician?.clinician_licensed_states) {
@@ -389,33 +406,41 @@ const ClinicianDetails = () => {
     );
   }
 
+  // Determine if current user can edit this profile
+  const canEdit = userRole === 'admin' || (userRole === 'clinician' && userId === clinicianId);
+
   return (
     <Layout>
       <div className="mb-6 flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold">
             {clinician.clinician_first_name} {clinician.clinician_last_name}
+            {userId === clinicianId && <span className="text-sm text-gray-500 ml-2">(Your Profile)</span>}
           </h1>
           <p className="text-gray-500">{clinician.clinician_email}</p>
         </div>
         <div className="flex gap-2">
-          {isEditing ? (
+          {canEdit && (
             <>
-              <Button variant="outline" onClick={handleCancel} className="flex items-center gap-1">
-                <X size={16} /> Cancel
-              </Button>
-              <Button 
-                onClick={handleSave} 
-                className="flex items-center gap-1 bg-valorwell-700 hover:bg-valorwell-800"
-                disabled={isUploading}
-              >
-                <Save size={16} /> Save Changes
-              </Button>
+              {isEditing ? (
+                <>
+                  <Button variant="outline" onClick={handleCancel} className="flex items-center gap-1">
+                    <X size={16} /> Cancel
+                  </Button>
+                  <Button 
+                    onClick={handleSave} 
+                    className="flex items-center gap-1 bg-valorwell-700 hover:bg-valorwell-800"
+                    disabled={isUploading}
+                  >
+                    <Save size={16} /> Save Changes
+                  </Button>
+                </>
+              ) : (
+                <Button onClick={() => setIsEditing(true)} className="flex items-center gap-1">
+                  <Pencil size={16} /> Edit
+                </Button>
+              )}
             </>
-          ) : (
-            <Button onClick={() => setIsEditing(true)} className="flex items-center gap-1">
-              <Pencil size={16} /> Edit
-            </Button>
           )}
         </div>
       </div>
@@ -764,7 +789,7 @@ const ClinicianDetails = () => {
           </CardContent>
         </Card>
 
-        {isEditing && (
+        {canEdit && isEditing && (
           <div className="flex justify-end gap-2 mt-4">
             <Button variant="outline" onClick={handleCancel}>
               Cancel
