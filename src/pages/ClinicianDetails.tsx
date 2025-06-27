@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from "@/hooks/use-toast";
@@ -52,7 +52,6 @@ interface Clinician {
 const ClinicianDetails = () => {
   const { clinicianId } = useParams();
   const navigate = useNavigate();
-  const location = useLocation();
   const { toast } = useToast();
   const { userId, userRole, authInitialized } = useUser();
 
@@ -133,38 +132,8 @@ const ClinicianDetails = () => {
     { code: "Wyoming", name: "Wyoming" }
   ];
 
-  // Circuit breaker to prevent infinite loops
-  const [fetchCount, setFetchCount] = useState(0);
-  const fetchCountRef = useRef(0);
-  const MAX_FETCHES = 3;
-  const lastFetchParams = useRef<string>('');
-
-  // Route state validation
-  useEffect(() => {
-    console.log('[ClinicianDetails] Route state validation:', {
-      currentPath: location.pathname,
-      clinicianId,
-      expectedPath: `/clinicians/${clinicianId}`,
-      routeMatch: location.pathname === `/clinicians/${clinicianId}`
-    });
-
-    // Validate route consistency
-    if (clinicianId && !location.pathname.includes(`/clinicians/${clinicianId}`)) {
-      console.error('[ClinicianDetails] Route desync detected - navigating to correct route');
-      navigate(`/clinicians/${clinicianId}`, { replace: true });
-      return;
-    }
-
-    // If on root route but component is mounted, this is incorrect
-    if (location.pathname === '/' && clinicianId) {
-      console.error('[ClinicianDetails] Component mounted on wrong route - redirecting');
-      navigate('/calendar', { replace: true });
-      return;
-    }
-  }, [location.pathname, clinicianId, navigate]);
-
-  // Stabilized access denied handler
-  const handleAccessDenied = useCallback(() => {
+  // Memoize functions to prevent useEffect re-runs
+  const showAccessDeniedError = useCallback(() => {
     toast({
       title: "Access Denied",
       description: "You don't have permission to view this profile.",
@@ -173,47 +142,29 @@ const ClinicianDetails = () => {
     setHasAccessError(true);
   }, [toast]);
 
-  // Stabilized fetch function
-  const performFetch = useCallback(async (id: string) => {
-    // Circuit breaker check
-    if (fetchCountRef.current >= MAX_FETCHES) {
-      console.log('[ClinicianDetails] Circuit breaker: Too many fetches, stopping');
-      setIsLoading(false);
-      return;
-    }
-
-    // Prevent duplicate fetches with same params
-    const currentParams = `${id}-${userId}-${userRole}`;
-    if (lastFetchParams.current === currentParams) {
-      console.log('[ClinicianDetails] Duplicate fetch prevented');
-      return;
-    }
-
-    lastFetchParams.current = currentParams;
-    fetchCountRef.current += 1;
-    setFetchCount(fetchCountRef.current);
-
-    console.log(`[ClinicianDetails] Fetch attempt ${fetchCountRef.current}/${MAX_FETCHES} for ID:`, id);
+  const fetchClinicianData = useCallback(async () => {
+    if (!clinicianId) return;
     
     setIsLoading(true);
     try {
+      console.log("Fetching clinician data for ID:", clinicianId);
       const { data, error } = await supabase
         .from('clinicians')
         .select('*')
-        .eq('id', id)
+        .eq('id', clinicianId)
         .single();
       
       if (error) {
         console.error("Error fetching clinician:", error);
         if (error.code === 'PGRST116') {
-          handleAccessDenied();
+          showAccessDeniedError();
         } else {
           throw error;
         }
         return;
       }
       
-      console.log("Fetched clinician data successfully");
+      console.log("Fetched clinician data:", data);
       setClinician(data);
       setEditedClinician(data);
       
@@ -241,33 +192,19 @@ const ClinicianDetails = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [userId, userRole, handleAccessDenied, toast]);
+  }, [clinicianId, showAccessDeniedError, toast]);
 
-  // Main useEffect with stabilized dependencies
+  // Check access permissions and fetch data
   useEffect(() => {
-    console.log("[ClinicianDetails] useEffect triggered", {
+    console.log("ClinicianDetails useEffect triggered", {
       clinicianId,
       userId,
       userRole,
-      authInitialized,
-      fetchCount: fetchCountRef.current
+      authInitialized
     });
-
-    // Reset circuit breaker on parameter change
-    if (clinicianId !== lastFetchParams.current.split('-')[0]) {
-      fetchCountRef.current = 0;
-      setFetchCount(0);
-      lastFetchParams.current = '';
-    }
 
     if (!authInitialized || !clinicianId || !userId) {
       console.log("Auth not ready or missing IDs");
-      return;
-    }
-
-    // Circuit breaker check
-    if (fetchCountRef.current >= MAX_FETCHES) {
-      console.log('Circuit breaker: Maximum fetches reached');
       return;
     }
 
@@ -276,12 +213,12 @@ const ClinicianDetails = () => {
     
     if (!hasPermission) {
       console.log("Access denied - insufficient permissions");
-      handleAccessDenied();
+      showAccessDeniedError();
       return;
     }
 
-    performFetch(clinicianId);
-  }, [clinicianId, userId, userRole, authInitialized, performFetch, handleAccessDenied]);
+    fetchClinicianData();
+  }, [clinicianId, userId, userRole, authInitialized, fetchClinicianData, showAccessDeniedError]);
 
   useEffect(() => {
     if (clinician?.clinician_licensed_states) {
@@ -443,10 +380,7 @@ const ClinicianDetails = () => {
         description: "Clinician details updated successfully.",
       });
       
-      // Refresh the data after saving
-      if (clinicianId) {
-        performFetch(clinicianId);
-      }
+      fetchClinicianData();
       
     } catch (error) {
       console.error('Error updating clinician:', error);
@@ -477,31 +411,6 @@ const ClinicianDetails = () => {
         : [...current, stateName]
     );
   };
-
-  // Show circuit breaker status in development
-  if (process.env.NODE_ENV === 'development' && fetchCount >= MAX_FETCHES) {
-    return (
-      <Layout>
-        <div className="flex justify-center items-center h-full">
-          <div className="text-center">
-            <h2 className="text-xl font-semibold text-orange-600 mb-2">Circuit Breaker Active</h2>
-            <p className="text-gray-600">Too many fetch attempts. Please refresh the page.</p>
-            <Button 
-              onClick={() => {
-                fetchCountRef.current = 0;
-                setFetchCount(0);
-                lastFetchParams.current = '';
-                window.location.reload();
-              }} 
-              className="mt-4"
-            >
-              Reset & Refresh
-            </Button>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
 
   // Show access error
   if (hasAccessError) {

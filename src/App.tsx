@@ -3,9 +3,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { UserProvider } from "@/context/UserContext";
-import { useEffect } from "react";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 
 // Pages
@@ -19,30 +18,7 @@ import Settings from "./pages/Settings";
 import ResetPassword from "./pages/ResetPassword";
 import NylasOAuthCallback from "./pages/NylasOAuthCallback";
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1,
-      refetchOnWindowFocus: false,
-    },
-  },
-});
-
-// Route monitoring component for debugging
-const RouteMonitor = () => {
-  const location = useLocation();
-  
-  useEffect(() => {
-    console.log('[RouteMonitor] Route change:', {
-      pathname: location.pathname,
-      search: location.search,
-      hash: location.hash,
-      state: location.state
-    });
-  }, [location]);
-  
-  return null;
-};
+const queryClient = new QueryClient();
 
 const App = () => {
   return (
@@ -52,9 +28,6 @@ const App = () => {
           <Toaster />
           <Sonner />
           <BrowserRouter>
-            {/* Add route monitoring in development */}
-            {process.env.NODE_ENV === 'development' && <RouteMonitor />}
-            
             <Routes>
               {/* Public Routes */}
               <Route path="/login" element={<Login />} />

@@ -1,5 +1,4 @@
-
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "../components/layout/Layout";
 import { useUser } from "@/context/UserContext";
@@ -18,111 +17,73 @@ const CalendarSimple = React.memo(() => {
   const [isReady, setIsReady] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [userTimeZone, setUserTimeZone] = useState<string>(TimeZoneService.DEFAULT_TIMEZONE);
-  const [isMounted, setIsMounted] = useState(true);
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Memoize navigation functions to prevent re-renders
-  const navigatePrevious = useCallback(() => {
-    setCurrentDate(prev => subWeeks(prev, 1));
-  }, []);
-
-  const navigateNext = useCallback(() => {
-    setCurrentDate(prev => addWeeks(prev, 1));
-  }, []);
-
-  const navigateToday = useCallback(() => {
-    setCurrentDate(new Date());
-  }, []);
-
-  // Stabilized access control handler
-  const handleAccessDenied = useCallback((message: string) => {
-    if (!isMounted) return;
-    
-    toast({
-      title: "Access Denied",
-      description: message,
-      variant: "destructive"
-    });
-  }, [toast, isMounted]);
-
-  // Stabilized timezone loading function
-  const loadUserTimeZone = useCallback(async (clinicianId: string) => {
-    if (!isMounted) return;
-    
-    try {
-      console.log('[CalendarSimple] Loading timezone for:', clinicianId);
-      const timeZone = await getClinicianTimeZone(clinicianId);
-      
-      if (!isMounted) return; // Check again after async operation
-      
-      setUserTimeZone(TimeZoneService.ensureIANATimeZone(timeZone));
-    } catch (error) {
-      console.error('[CalendarSimple] Error loading user timezone:', error);
-      if (isMounted) {
-        // Fallback to browser timezone
-        const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        setUserTimeZone(TimeZoneService.ensureIANATimeZone(browserTimezone));
-      }
-    }
-  }, [isMounted]);
-
-  // Component mounting effect
-  useEffect(() => {
-    setIsMounted(true);
-    return () => {
-      setIsMounted(false);
-    };
-  }, []);
-
-  // Primary auth and access control effect - STABILIZED
   useEffect(() => {
     console.log('[CalendarSimple] Auth state:', { authInitialized, userId, userRole });
     
-    if (!authInitialized) return;
-    
-    if (!userId) {
-      console.log('[CalendarSimple] No user found, redirecting to login');
-      handleAccessDenied("Please log in to access the calendar");
-      navigate('/login');
-      return;
+    if (authInitialized) {
+      if (!userId) {
+        console.log('[CalendarSimple] No user found, redirecting to login');
+        toast({
+          title: "Authentication Required",
+          description: "Please log in to access the calendar",
+          variant: "destructive"
+        });
+        navigate('/login');
+        return;
+      }
+      
+      if (userRole === 'client') {
+        console.log('[CalendarSimple] Client user detected, redirecting to portal');
+        toast({
+          title: "Access Denied",
+          description: "This calendar is for clinicians only. Redirecting to client portal.",
+          variant: "destructive"
+        });
+        navigate('/portal');
+        return;
+      }
+      
+      if (userRole === 'clinician' || userRole === 'admin') {
+        console.log('[CalendarSimple] Authorized user, setting ready');
+        setIsReady(true);
+      }
     }
-    
-    if (userRole === 'client') {
-      console.log('[CalendarSimple] Client user detected, redirecting to portal');
-      handleAccessDenied("This calendar is for clinicians only. Redirecting to client portal.");
-      navigate('/portal');
-      return;
-    }
-    
-    if (userRole === 'clinician' || userRole === 'admin') {
-      console.log('[CalendarSimple] Authorized user, setting ready');
-      setIsReady(true);
-    }
-  }, [authInitialized, userId, userRole, navigate, handleAccessDenied]);
+  }, [authInitialized, userId, userRole, navigate, toast]);
 
-  // Timezone loading effect - SEPARATED and STABILIZED
+  // Load user's timezone
   useEffect(() => {
-    if (!isReady || !userId || !isMounted) return;
-    
-    console.log('[CalendarSimple] Loading timezone for ready user:', userId);
-    loadUserTimeZone(userId);
-  }, [isReady, userId, loadUserTimeZone, isMounted]);
+    const loadUserTimeZone = async () => {
+      if (userId) {
+        try {
+          const timeZone = await getClinicianTimeZone(userId);
+          setUserTimeZone(TimeZoneService.ensureIANATimeZone(timeZone));
+        } catch (error) {
+          console.error('Error loading user timezone:', error);
+          // Keep default timezone
+        }
+      }
+    };
 
-  // Memoized display values
-  const currentMonthDisplay = useMemo(() => {
-    return currentDate.toLocaleDateString('en-US', { 
-      month: 'long', 
-      year: 'numeric' 
-    });
-  }, [currentDate]);
+    if (isReady && userId) {
+      loadUserTimeZone();
+    }
+  }, [isReady, userId]);
 
-  const handleAvailabilityClick = useCallback((date: any, startTime: any, endTime: any) => {
-    console.log('Availability clicked:', { date, startTime, endTime });
-    // TODO: Implement availability editing modal
-  }, []);
+  const navigatePrevious = () => {
+    setCurrentDate(subWeeks(currentDate, 1));
+  };
 
-  // Early returns for loading states
+  const navigateNext = () => {
+    setCurrentDate(addWeeks(currentDate, 1));
+  };
+
+  const navigateToday = () => {
+    setCurrentDate(new Date());
+  };
+
   if (!authInitialized) {
     return (
       <Layout>
@@ -194,7 +155,10 @@ const CalendarSimple = React.memo(() => {
               </Button>
             </div>
             <h1 className="text-2xl font-bold text-gray-800">
-              {currentMonthDisplay}
+              {currentDate.toLocaleDateString('en-US', { 
+                month: 'long', 
+                year: 'numeric' 
+              })}
             </h1>
             <div className="text-sm text-gray-500">
               User: {userRole} | Timezone: {userTimeZone}
@@ -209,7 +173,10 @@ const CalendarSimple = React.memo(() => {
                 currentDate={currentDate}
                 clinicianId={userId}
                 userTimeZone={userTimeZone}
-                onAvailabilityClick={handleAvailabilityClick}
+                onAvailabilityClick={(date, startTime, endTime) => {
+                  console.log('Availability clicked:', { date, startTime, endTime });
+                  // TODO: Implement availability editing modal
+                }}
               />
             </div>
 
