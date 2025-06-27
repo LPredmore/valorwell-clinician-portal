@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { format, addDays, isSameDay, parseISO } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
@@ -7,6 +8,7 @@ import { TimeZoneService } from '@/utils/timeZoneService';
 import { DateTime } from 'luxon';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '@/context/UserContext';
+import { BLOCKED_TIME_CLIENT_ID } from '@/utils/blockedTimeUtils';
 
 import { 
   Dialog, 
