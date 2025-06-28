@@ -135,8 +135,6 @@ export interface TabProps {
   form: any;
   clientData: ClientDetails | null;
   clinicians?: Clinician[];
-  handleAddDiagnosis?: () => void;
-  handleRemoveDiagnosis?: (index: number) => void;
 }
 
 export interface SessionNoteTemplateProps {

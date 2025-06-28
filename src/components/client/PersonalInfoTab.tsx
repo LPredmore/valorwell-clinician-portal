@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { format } from "date-fns";
 import {
@@ -16,20 +17,19 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { CalendarIcon, Clock, Plus, Trash } from "lucide-react";
+import { CalendarIcon, Clock } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { TabProps } from '@/types/client';
 import { timezoneOptions } from '@/utils/timezoneOptions';
+import { DiagnosisSelector } from '@/components/DiagnosisSelector';
 
 const PersonalInfoTab: React.FC<TabProps> = ({ 
   isEditing, 
   form, 
-  clientData,
-  handleAddDiagnosis, 
-  handleRemoveDiagnosis 
+  clientData
 }) => {
   return (
     <>
@@ -242,7 +242,7 @@ const PersonalInfoTab: React.FC<TabProps> = ({
               />
               <FormField
                 control={form.control}
-                name="client_zipcode"
+                name="client_zip_code"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Zip Code</FormLabel>
@@ -338,46 +338,21 @@ const PersonalInfoTab: React.FC<TabProps> = ({
           <CardDescription>Add client diagnoses here</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {form.watch("client_diagnosis")?.map((diagnosis: string, index: number) => (
-              <div key={index} className="flex items-center gap-2">
-                <Input 
-                  value={diagnosis}
-                  onChange={(e) => {
-                    const updatedDiagnoses = [...(form.getValues("client_diagnosis") || [])];
-                    updatedDiagnoses[index] = e.target.value;
-                    form.setValue("client_diagnosis", updatedDiagnoses);
-                  }}
-                  readOnly={!isEditing}
-                  placeholder="Enter diagnosis"
-                  className="flex-grow"
-                />
-                {isEditing && (
-                  <Button 
-                    type="button" 
-                    variant="ghost" 
-                    size="icon"
-                    onClick={() => handleRemoveDiagnosis && handleRemoveDiagnosis(index)}
-                  >
-                    <Trash size={16} className="text-red-500" />
-                  </Button>
-                )}
-              </div>
-            ))}
-            {isEditing && (
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={handleAddDiagnosis}
-                className="flex items-center gap-1"
-              >
-                <Plus size={16} /> Add Diagnosis
-              </Button>
+          <FormField
+            control={form.control}
+            name="client_diagnosis"
+            render={({ field }) => (
+              <FormItem>
+                <FormControl>
+                  <DiagnosisSelector
+                    value={field.value || []}
+                    onChange={field.onChange}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
             )}
-            {(!form.watch("client_diagnosis") || form.watch("client_diagnosis")?.length === 0) && !isEditing && (
-              <p className="text-sm text-gray-500">No diagnoses have been added yet.</p>
-            )}
-          </div>
+          />
         </CardContent>
       </Card>
     </>

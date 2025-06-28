@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase, parseDateString, formatDateForDB } from "@/integrations/supabase/client";
@@ -146,9 +147,8 @@ const ClientDetails = () => {
     client_tricare_has_referral: z.string().optional().nullable(),
     client_tricare_referral_number: z.string().optional().nullable(),
     client_city: z.string().optional().nullable(),
-    client_zipcode: z.string().optional().nullable(),
-    client_address: z.string().optional().nullable(),
     client_zip_code: z.string().optional().nullable(),
+    client_address: z.string().optional().nullable(),
     client_treatmentplan_startdate: z.date().optional().nullable(),
     client_is_profile_complete: z.string().optional().nullable(),
   });
@@ -206,9 +206,8 @@ const ClientDetails = () => {
       client_tricare_has_referral: clientData?.client_tricare_has_referral || "",
       client_tricare_referral_number: clientData?.client_tricare_referral_number || "",
       client_city: clientData?.client_city || "",
-      client_zipcode: clientData?.client_zipcode || "",
-      client_address: clientData?.client_address || "",
       client_zip_code: clientData?.client_zip_code || "",
+      client_address: clientData?.client_address || "",
       client_treatmentplan_startdate: clientData?.client_treatmentplan_startdate ? parseDateString(clientData.client_treatmentplan_startdate) : null,
       client_is_profile_complete: clientData?.client_is_profile_complete || "",
     },
@@ -267,9 +266,8 @@ const ClientDetails = () => {
         client_tricare_has_referral: clientData.client_tricare_has_referral || "",
         client_tricare_referral_number: clientData.client_tricare_referral_number || "",
         client_city: clientData.client_city || "",
-        client_zipcode: clientData.client_zipcode || "",
-        client_address: clientData.client_address || "",
         client_zip_code: clientData.client_zip_code || "",
+        client_address: clientData.client_address || "",
         client_treatmentplan_startdate: clientData.client_treatmentplan_startdate ? parseDateString(clientData.client_treatmentplan_startdate) : null,
         client_is_profile_complete: clientData.client_is_profile_complete || "",
       });
@@ -328,19 +326,6 @@ const ClientDetails = () => {
   const handleCancel = () => {
     form.reset();
     setIsEditing(false);
-  };
-
-  const handleAddDiagnosis = () => {
-    const currentDiagnoses = form.getValues("client_diagnosis") || [];
-    form.setValue("client_diagnosis", [...currentDiagnoses, ""]);
-  };
-
-  const handleRemoveDiagnosis = (index: number) => {
-    const currentDiagnoses = form.getValues("client_diagnosis") || [];
-    form.setValue(
-      "client_diagnosis",
-      currentDiagnoses.filter((_, i) => i !== index)
-    );
   };
 
   if (isLoading) {
@@ -409,8 +394,6 @@ const ClientDetails = () => {
                 isEditing={isEditing} 
                 form={form} 
                 clientData={clientData}
-                handleAddDiagnosis={handleAddDiagnosis}
-                handleRemoveDiagnosis={handleRemoveDiagnosis}
               />
             </TabsContent>
 

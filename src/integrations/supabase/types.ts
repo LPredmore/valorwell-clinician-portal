@@ -991,7 +991,6 @@ export type Database = {
           client_tricare_sponsor_name: string | null
           client_vacoverage: string | null
           client_zip_code: string | null
-          client_zipcode: string | null
           created_at: string
           eligibility_claimmd_id_primary: string | null
           eligibility_coinsurance_primary_percent: number | null
@@ -1104,7 +1103,6 @@ export type Database = {
           client_tricare_sponsor_name?: string | null
           client_vacoverage?: string | null
           client_zip_code?: string | null
-          client_zipcode?: string | null
           created_at?: string
           eligibility_claimmd_id_primary?: string | null
           eligibility_coinsurance_primary_percent?: number | null
@@ -1217,7 +1215,6 @@ export type Database = {
           client_tricare_sponsor_name?: string | null
           client_vacoverage?: string | null
           client_zip_code?: string | null
-          client_zipcode?: string | null
           created_at?: string
           eligibility_claimmd_id_primary?: string | null
           eligibility_coinsurance_primary_percent?: number | null
