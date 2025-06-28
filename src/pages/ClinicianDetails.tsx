@@ -7,10 +7,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/context/UserContext';
 import Layout from '@/components/layout/Layout';
+import { EditableField } from '@/components/ui/EditableField';
 
 const ClinicianDetails = () => {
   const { clinicianId } = useParams<{ clinicianId: string }>();
@@ -59,9 +60,8 @@ const ClinicianDetails = () => {
       }
 
       if (!data) {
-        // Get fresh toast instance inside the function
-        const { toast: toastInstance } = useToast();
-        toastInstance({
+        const toastInstance = useToast();
+        toastInstance.toast({
           title: "Error",
           description: "Clinician not found.",
           variant: "destructive",
@@ -75,9 +75,8 @@ const ClinicianDetails = () => {
       fetchAttemptCount.current = 0; // Reset on success
     } catch (error) {
       console.error('Error fetching clinician data:', error);
-      // Get fresh toast instance inside the function
-      const { toast: toastInstance } = useToast();
-      toastInstance({
+      const toastInstance = useToast();
+      toastInstance.toast({
         title: "Error loading profile",
         description: error instanceof Error ? error.message : "Failed to load clinician profile.",
         variant: "destructive",
@@ -125,11 +124,43 @@ const ClinicianDetails = () => {
     });
 
     if (!routeMatch && clinicianId) {
-      // Get fresh navigate instance inside effect
       const navInstance = useNavigate();
       navInstance(expectedPath, { replace: true });
     }
   }, [clinicianId]);
+
+  // Update clinician field function
+  const updateClinicianField = async (field: string, value: string | string[]) => {
+    try {
+      const { error } = await supabase
+        .from('clinicians')
+        .update({ [field]: value })
+        .eq('id', clinicianId);
+
+      if (error) throw error;
+
+      // Update local state
+      setClinicianData((prev: any) => ({
+        ...prev,
+        [field]: value
+      }));
+
+      const toastInstance = useToast();
+      toastInstance.toast({
+        title: "Success",
+        description: "Profile updated successfully.",
+      });
+    } catch (error) {
+      console.error('Error updating clinician field:', error);
+      const toastInstance = useToast();
+      toastInstance.toast({
+        title: "Error",
+        description: "Failed to update profile.",
+        variant: "destructive",
+      });
+      throw error;
+    }
+  };
 
   if (showAccessDeniedError) {
     return (
@@ -203,12 +234,31 @@ const ClinicianDetails = () => {
     return slots.length > 0 ? slots.join(', ') : 'Not available';
   };
 
+  const statusOptions = ['New', 'Active', 'Inactive', 'Pending'];
+  const licenseTypeOptions = ['LCSW', 'LPC', 'LMFT', 'LMHC', 'PhD', 'PsyD', 'MD'];
+  const treatmentApproaches = [
+    'Cognitive Behavioral Therapy (CBT)',
+    'Dialectical Behavior Therapy (DBT)',
+    'Eye Movement Desensitization and Reprocessing (EMDR)',
+    'Acceptance and Commitment Therapy (ACT)',
+    'Psychodynamic Therapy',
+    'Humanistic Therapy',
+    'Family Systems Therapy',
+    'Trauma-Informed Care'
+  ];
+
   return (
     <Layout>
       <div className="container mx-auto py-6 space-y-6">
         {/* Header Section */}
         <div className="flex items-start gap-6">
           <Avatar className="h-24 w-24">
+            {clinicianData.clinician_image_url ? (
+              <AvatarImage 
+                src={clinicianData.clinician_image_url} 
+                alt={`${clinicianData.clinician_first_name} ${clinicianData.clinician_last_name}`}
+              />
+            ) : null}
             <AvatarFallback className="text-2xl">
               {getInitials(clinicianData.clinician_first_name, clinicianData.clinician_last_name)}
             </AvatarFallback>
@@ -252,30 +302,40 @@ const ClinicianDetails = () => {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">First Name</label>
-                    <p className="text-sm">{clinicianData.clinician_first_name || 'Not specified'}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Last Name</label>
-                    <p className="text-sm">{clinicianData.clinician_last_name || 'Not specified'}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Professional Name</label>
-                    <p className="text-sm">{clinicianData.clinician_professional_name || 'Not specified'}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Status</label>
-                    <p className="text-sm">{clinicianData.clinician_status || 'New'}</p>
-                  </div>
+                  <EditableField
+                    label="First Name"
+                    value={clinicianData.clinician_first_name}
+                    onSave={(value) => updateClinicianField('clinician_first_name', value as string)}
+                    placeholder="Enter first name"
+                  />
+                  <EditableField
+                    label="Last Name"
+                    value={clinicianData.clinician_last_name}
+                    onSave={(value) => updateClinicianField('clinician_last_name', value as string)}
+                    placeholder="Enter last name"
+                  />
+                  <EditableField
+                    label="Professional Name"
+                    value={clinicianData.clinician_professional_name}
+                    onSave={(value) => updateClinicianField('clinician_professional_name', value as string)}
+                    placeholder="Enter professional name"
+                  />
+                  <EditableField
+                    label="Status"
+                    value={clinicianData.clinician_status}
+                    onSave={(value) => updateClinicianField('clinician_status', value as string)}
+                    type="select"
+                    options={statusOptions}
+                  />
                 </div>
                 
-                {clinicianData.clinician_bio && (
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Bio</label>
-                    <p className="text-sm mt-1">{clinicianData.clinician_bio}</p>
-                  </div>
-                )}
+                <EditableField
+                  label="Bio"
+                  value={clinicianData.clinician_bio}
+                  onSave={(value) => updateClinicianField('clinician_bio', value as string)}
+                  type="textarea"
+                  placeholder="Enter professional bio"
+                />
               </CardContent>
             </Card>
           </TabsContent>
@@ -287,18 +347,24 @@ const ClinicianDetails = () => {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 gap-4">
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Email</label>
-                    <p className="text-sm">{clinicianData.clinician_email || 'Not specified'}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Phone</label>
-                    <p className="text-sm">{clinicianData.clinician_phone || 'Not specified'}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Time Zone</label>
-                    <p className="text-sm">{clinicianData.clinician_time_zone || 'Not specified'}</p>
-                  </div>
+                  <EditableField
+                    label="Email"
+                    value={clinicianData.clinician_email}
+                    onSave={(value) => updateClinicianField('clinician_email', value as string)}
+                    placeholder="Enter email address"
+                  />
+                  <EditableField
+                    label="Phone"
+                    value={clinicianData.clinician_phone}
+                    onSave={(value) => updateClinicianField('clinician_phone', value as string)}
+                    placeholder="Enter phone number"
+                  />
+                  <EditableField
+                    label="Time Zone"
+                    value={clinicianData.clinician_time_zone}
+                    onSave={(value) => updateClinicianField('clinician_time_zone', value as string)}
+                    placeholder="Enter time zone"
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -311,25 +377,35 @@ const ClinicianDetails = () => {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">NPI Number</label>
-                    <p className="text-sm">{clinicianData.clinician_npi_number || 'Not specified'}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Taxonomy Code</label>
-                    <p className="text-sm">{clinicianData.clinician_taxonomy_code || 'Not specified'}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">License Type</label>
-                    <p className="text-sm">{clinicianData.clinician_license_type || 'Not specified'}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Accepting New Clients</label>
-                    <p className="text-sm">{clinicianData.clinician_accepting_new_clients || 'Not specified'}</p>
-                  </div>
+                  <EditableField
+                    label="NPI Number"
+                    value={clinicianData.clinician_npi_number}
+                    onSave={(value) => updateClinicianField('clinician_npi_number', value as string)}
+                    placeholder="Enter NPI number"
+                  />
+                  <EditableField
+                    label="Taxonomy Code"
+                    value={clinicianData.clinician_taxonomy_code}
+                    onSave={(value) => updateClinicianField('clinician_taxonomy_code', value as string)}
+                    placeholder="Enter taxonomy code"
+                  />
+                  <EditableField
+                    label="License Type"
+                    value={clinicianData.clinician_license_type}
+                    onSave={(value) => updateClinicianField('clinician_license_type', value as string)}
+                    type="select"
+                    options={licenseTypeOptions}
+                  />
+                  <EditableField
+                    label="Accepting New Clients"
+                    value={clinicianData.clinician_accepting_new_clients}
+                    onSave={(value) => updateClinicianField('clinician_accepting_new_clients', value as string)}
+                    type="select"
+                    options={['Yes', 'No', 'Waitlist']}
+                  />
                 </div>
 
-                {clinicianData.clinician_licensed_states && clinicianData.clinician_licensed_states.length > 0 && (
+                {clinicianData.clinician_licensed_states && (
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Licensed States</label>
                     <div className="flex flex-wrap gap-1 mt-1">
@@ -342,7 +418,7 @@ const ClinicianDetails = () => {
                   </div>
                 )}
 
-                {clinicianData.clinician_treatment_approaches && clinicianData.clinician_treatment_approaches.length > 0 && (
+                {clinicianData.clinician_treatment_approaches && (
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Treatment Approaches</label>
                     <div className="flex flex-wrap gap-1 mt-1">
@@ -362,6 +438,7 @@ const ClinicianDetails = () => {
             <Card>
               <CardHeader>
                 <CardTitle>Weekly Availability</CardTitle>
+                <CardDescription>Availability is managed through the calendar system</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
