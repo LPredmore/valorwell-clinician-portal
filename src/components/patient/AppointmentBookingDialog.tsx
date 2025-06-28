@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { format, addDays, isSameDay, parseISO } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
@@ -468,7 +467,7 @@ export const AppointmentBookingDialog: React.FC<AppointmentBookingDialogProps> =
       }
       
       console.log('[AppointmentBookingDialog] Appointment timezone conversion:', {
-        selectedWallTime: `${format(selectedDate, 'yyyy-MM-dd')} ${selectedTimeSlot}`,
+        selectedWallTime: `${selectedDate.toISOString().split('T')[0]} ${selectedTimeSlot}`,
         clinicianTimezone,
         utcStart,
         utcEnd

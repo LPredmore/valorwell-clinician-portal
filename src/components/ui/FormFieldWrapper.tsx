@@ -15,7 +15,7 @@ interface FormFieldWrapperProps {
   maxLength?: number;
   required?: boolean;
   defaultValue?: string;
-  onValueCommit?: (name: string, value: string) => void; // New callback for immediate saving
+  onValueCommit?: (name: string, value: string) => void;
 }
 
 const FormFieldWrapper: React.FC<FormFieldWrapperProps> = ({
@@ -82,6 +82,15 @@ const FormFieldWrapper: React.FC<FormFieldWrapperProps> = ({
             onValueCommit(name, valueToStore);
           }
         };
+        
+        const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+          field.onChange(e);
+          // If onValueCommit is provided, call it to save the value immediately
+          if (onValueCommit) {
+            console.log(`FormFieldWrapper ${name} input calling onValueCommit with:`, e.target.value);
+            onValueCommit(name, e.target.value);
+          }
+        };
 
         // If a labelMapper is provided and we have a value, map the value to a display label
         const displayValue = (labelMapper && field.value) 
@@ -118,14 +127,7 @@ const FormFieldWrapper: React.FC<FormFieldWrapperProps> = ({
                   className={readOnly ? "bg-gray-100" : ""}
                   maxLength={maxLength}
                   required={required}
-                  onChange={(e) => {
-                    field.onChange(e);
-                    // If onValueCommit is provided, call it to save the value immediately
-                    if (onValueCommit) {
-                      console.log(`FormFieldWrapper ${name} input calling onValueCommit with:`, e.target.value);
-                      onValueCommit(name, e.target.value);
-                    }
-                  }}
+                  onChange={handleInputChange}
                 />
               )}
             </FormControl>
