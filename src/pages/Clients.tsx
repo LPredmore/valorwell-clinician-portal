@@ -1,8 +1,7 @@
-
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
-import { Search, Filter, RotateCcw, MoreHorizontal } from 'lucide-react';
+import { Search, Filter, RotateCcw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from '@/context/UserContext';
@@ -238,18 +237,16 @@ const Clients = () => {
                   <th className="px-4 py-3">Email</th>
                   <th className="px-4 py-3">Phone</th>
                   <th className="px-4 py-3">Date Of Birth</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={7} className="text-center py-4">Loading clients...</td>
+                    <td colSpan={5} className="text-center py-4">Loading clients...</td>
                   </tr>
                 ) : currentClients.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="text-center py-4">No clients found</td>
+                    <td colSpan={5} className="text-center py-4">No clients found</td>
                   </tr>
                 ) : (
                   currentClients.map((client) => (
@@ -269,21 +266,6 @@ const Clients = () => {
                       <td className="px-4 py-3">{client.client_email || '-'}</td>
                       <td className="px-4 py-3">{client.client_phone || '-'}</td>
                       <td className="px-4 py-3">{formatDateOfBirth(client.client_date_of_birth)}</td>
-                      <td className="px-4 py-3">
-                        <span className={`px-2 py-1 ${
-                          client.client_status === 'Waiting' ? 'bg-yellow-100 text-yellow-800' :
-                          client.client_status === 'Active' ? 'bg-green-100 text-green-800' :
-                          client.client_status === 'Inactive' ? 'bg-gray-100 text-gray-800' :
-                          'bg-gray-100 text-gray-800'
-                        } rounded-full text-xs font-medium`}>
-                          {client.client_status || 'Unknown'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <button className="text-gray-500 hover:text-gray-700">
-                          <MoreHorizontal size={16} />
-                        </button>
-                      </td>
                     </tr>
                   ))
                 )}
