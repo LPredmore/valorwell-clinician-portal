@@ -1326,7 +1326,9 @@ export type Database = {
       }
       clinicians: {
         Row: {
-          clinician_accepting_new_clients: string | null
+          clinician_accepting_new_clients:
+            | Database["public"]["Enums"]["Yes/No"]
+            | null
           clinician_availability_end_friday_1: string | null
           clinician_availability_end_friday_2: string | null
           clinician_availability_end_friday_3: string | null
@@ -1421,7 +1423,9 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          clinician_accepting_new_clients?: string | null
+          clinician_accepting_new_clients?:
+            | Database["public"]["Enums"]["Yes/No"]
+            | null
           clinician_availability_end_friday_1?: string | null
           clinician_availability_end_friday_2?: string | null
           clinician_availability_end_friday_3?: string | null
@@ -1518,7 +1522,9 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          clinician_accepting_new_clients?: string | null
+          clinician_accepting_new_clients?:
+            | Database["public"]["Enums"]["Yes/No"]
+            | null
           clinician_availability_end_friday_1?: string | null
           clinician_availability_end_friday_2?: string | null
           clinician_availability_end_friday_3?: string | null
@@ -3379,6 +3385,7 @@ export type Database = {
         | "Pacific/Honolulu"
         | "America/Phoenix"
       user_role: "user" | "admin"
+      "Yes/No": "Yes" | "No"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -3615,6 +3622,7 @@ export const Constants = {
         "America/Phoenix",
       ],
       user_role: ["user", "admin"],
+      "Yes/No": ["Yes", "No"],
     },
   },
 } as const

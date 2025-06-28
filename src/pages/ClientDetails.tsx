@@ -24,14 +24,13 @@ import { ClientDetails as ClientDetailsType, Clinician } from "@/types/client";
 import { useUser } from "@/context/UserContext";
 
 const ClientDetails = () => {
-  const { clientId } = useParams();
+  const { id: clientId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [clientData, setClientData] = useState<ClientDetailsType | null>(null);
   const [clinicians, setClinicians] = useState<Clinician[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("personal");
   const { userRole } = useUser();
 
@@ -54,7 +53,10 @@ const ClientDetails = () => {
         console.error('Error fetching client:', err);
         setError(err as Error);
         setIsLoading(false);
-        toast({
+        
+        // Get fresh toast instance inside effect
+        const { toast: toastInstance } = useToast();
+        toastInstance({
           title: "Error",
           description: "Failed to fetch client details.",
           variant: "destructive",
@@ -76,7 +78,10 @@ const ClientDetails = () => {
       } catch (err) {
         console.error('Error fetching clinicians:', err);
         setError(err as Error);
-        toast({
+        
+        // Get fresh toast instance inside effect
+        const { toast: toastInstance } = useToast();
+        toastInstance({
           title: "Error",
           description: "Failed to fetch clinicians.",
           variant: "destructive",
@@ -84,9 +89,11 @@ const ClientDetails = () => {
       }
     };
 
-    fetchClient();
-    fetchClinicians();
-  }, [clientId, toast]);
+    if (clientId) {
+      fetchClient();
+      fetchClinicians();
+    }
+  }, [clientId]);
 
   const formSchema = z.object({
     client_first_name: z.string().min(2).max(50),
@@ -267,7 +274,7 @@ const ClientDetails = () => {
         client_is_profile_complete: clientData.client_is_profile_complete || "",
       });
     }
-  }, [clientData, form]);
+  }, [clientData]);
 
   const handleSaveChanges = async (values: z.infer<typeof formSchema>) => {
     try {
@@ -290,7 +297,8 @@ const ClientDetails = () => {
         throw error;
       }
 
-      toast({
+      const { toast: toastInstance } = useToast();
+      toastInstance({
         title: "Success",
         description: "Client details updated successfully."
       });
@@ -308,7 +316,8 @@ const ClientDetails = () => {
       }
     } catch (err) {
       console.error('Error updating client:', err);
-      toast({
+      const { toast: toastInstance } = useToast();
+      toastInstance({
         title: "Error",
         description: "Failed to update client details.",
         variant: "destructive",
