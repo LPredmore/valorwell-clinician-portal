@@ -1,4 +1,6 @@
 
+import React from 'react';
+
 // Feature flags for emergency safeguards
 export const FEATURE_FLAGS = {
   SEARCH: false,        // Disabled until safe filtering implemented
