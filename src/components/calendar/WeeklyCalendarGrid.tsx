@@ -21,7 +21,7 @@ const WeeklyCalendarGrid: React.FC<WeeklyCalendarGridProps> = ({
   // Add availability state and fetching
   const [availabilityData, setAvailabilityData] = useState<any>({});
 
-  // Fetch availability data
+  // Fetch availability data - fetches ALL availability blocks (1, 2, 3)
   useEffect(() => {
     if (!clinicianId) return;
     
@@ -31,12 +31,26 @@ const WeeklyCalendarGrid: React.FC<WeeklyCalendarGridProps> = ({
           .from('clinicians')
           .select(`
             clinician_availability_start_monday_1, clinician_availability_end_monday_1,
+            clinician_availability_start_monday_2, clinician_availability_end_monday_2,
+            clinician_availability_start_monday_3, clinician_availability_end_monday_3,
             clinician_availability_start_tuesday_1, clinician_availability_end_tuesday_1,
+            clinician_availability_start_tuesday_2, clinician_availability_end_tuesday_2,
+            clinician_availability_start_tuesday_3, clinician_availability_end_tuesday_3,
             clinician_availability_start_wednesday_1, clinician_availability_end_wednesday_1,
+            clinician_availability_start_wednesday_2, clinician_availability_end_wednesday_2,
+            clinician_availability_start_wednesday_3, clinician_availability_end_wednesday_3,
             clinician_availability_start_thursday_1, clinician_availability_end_thursday_1,
+            clinician_availability_start_thursday_2, clinician_availability_end_thursday_2,
+            clinician_availability_start_thursday_3, clinician_availability_end_thursday_3,
             clinician_availability_start_friday_1, clinician_availability_end_friday_1,
+            clinician_availability_start_friday_2, clinician_availability_end_friday_2,
+            clinician_availability_start_friday_3, clinician_availability_end_friday_3,
             clinician_availability_start_saturday_1, clinician_availability_end_saturday_1,
-            clinician_availability_start_sunday_1, clinician_availability_end_sunday_1
+            clinician_availability_start_saturday_2, clinician_availability_end_saturday_2,
+            clinician_availability_start_saturday_3, clinician_availability_end_saturday_3,
+            clinician_availability_start_sunday_1, clinician_availability_end_sunday_1,
+            clinician_availability_start_sunday_2, clinician_availability_end_sunday_2,
+            clinician_availability_start_sunday_3, clinician_availability_end_sunday_3
           `)
           .eq('id', clinicianId)
           .single();
@@ -51,18 +65,31 @@ const WeeklyCalendarGrid: React.FC<WeeklyCalendarGridProps> = ({
     };
     
     loadAvailability();
-  }, [clinicianId]);
+  }, [clinicianId]); // Only clinicianId dependency
 
-  // Helper function for time range checking
-  const isTimeInRange = useCallback((hour: number, minute: number, startTime: string | null, endTime: string | null) => {
-    if (!startTime || !endTime) return false;
+  // Updated helper function to check ALL availability blocks for a time slot
+  const isTimeSlotAvailable = useCallback((dayName: string, hour: number, minute: number) => {
+    if (!availabilityData) return false;
     
     const slotTime = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:00`;
-    const startTimeFormatted = startTime.length === 5 ? `${startTime}:00` : startTime;
-    const endTimeFormatted = endTime.length === 5 ? `${endTime}:00` : endTime;
     
-    return slotTime >= startTimeFormatted && slotTime < endTimeFormatted;
-  }, []);
+    // Check all 3 potential blocks for the day
+    for (let i = 1; i <= 3; i++) {
+      const startTime = availabilityData[`clinician_availability_start_${dayName}_${i}`];
+      const endTime = availabilityData[`clinician_availability_end_${dayName}_${i}`];
+      
+      if (startTime && endTime) {
+        const startTimeFormatted = startTime.length === 5 ? `${startTime}:00` : startTime;
+        const endTimeFormatted = endTime.length === 5 ? `${endTime}:00` : endTime;
+        
+        if (slotTime >= startTimeFormatted && slotTime < endTimeFormatted) {
+          return true;
+        }
+      }
+    }
+    
+    return false;
+  }, [availabilityData]);
 
   // Memoized week boundaries calculation
   const weekBoundaries = useMemo(() => {
@@ -157,10 +184,7 @@ const WeeklyCalendarGrid: React.FC<WeeklyCalendarGridProps> = ({
             {/* Day cells with availability rendering */}
             {weekBoundaries.days.map((day, dayIndex) => {
               const dayName = day.toFormat('cccc').toLowerCase();
-              const startTime = availabilityData[`clinician_availability_start_${dayName}_1`];
-              const endTime = availabilityData[`clinician_availability_end_${dayName}_1`];
-              
-              const isAvailableSlot = isTimeInRange(slot.hour, slot.minute, startTime, endTime);
+              const isAvailableSlot = isTimeSlotAvailable(dayName, slot.hour, slot.minute);
               
               return (
                 <div

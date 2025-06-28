@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
@@ -36,16 +37,20 @@ const Clients = () => {
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentClients = clients.slice(indexOfFirstItem, indexOfLastItem);
 
+  // Authentication and clinician setup effect with stable dependencies only
   useEffect(() => {
     const getClinicianInfo = async () => {
       if (!userId) {
         console.error('No authenticated user found');
-        toast({
+        // Get fresh instances inside the effect
+        const navInstance = useNavigate();
+        const { toast: toastInstance } = useToast();
+        toastInstance({
           title: "Authentication Required",
           description: "Please log in to view clients.",
           variant: "destructive",
         });
-        navigate('/login');
+        navInstance('/login');
         return;
       }
 
@@ -58,7 +63,9 @@ const Clients = () => {
 
         if (error || !data) {
           console.error('No clinician found for current user');
-          toast({
+          // Get fresh toast instance inside the effect
+          const { toast: toastInstance } = useToast();
+          toastInstance({
             title: "Access Denied",
             description: "You don't have permission to view clients.",
             variant: "destructive",
@@ -72,7 +79,9 @@ const Clients = () => {
         fetchClients(data.id);
       } catch (error) {
         console.error('Error getting clinician info:', error);
-        toast({
+        // Get fresh toast instance inside the effect
+        const { toast: toastInstance } = useToast();
+        toastInstance({
           title: "Error",
           description: "Failed to authenticate user.",
           variant: "destructive",
@@ -82,7 +91,7 @@ const Clients = () => {
     };
     
     getClinicianInfo();
-  }, [userId, navigate, toast]); // Stable dependencies only
+  }, [userId]); // Only userId dependency - no navigate or toast
 
   const fetchClients = async (clinicianId: string) => {
     try {
@@ -105,7 +114,9 @@ const Clients = () => {
       setClients(data || []);
     } catch (error) {
       console.error('Error fetching clients:', error);
-      toast({
+      // Get fresh toast instance when needed
+      const { toast: toastInstance } = useToast();
+      toastInstance({
         title: "Error",
         description: "Failed to fetch clients.",
         variant: "destructive",
