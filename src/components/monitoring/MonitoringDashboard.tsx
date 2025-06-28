@@ -3,6 +3,7 @@ import React from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import BlockedTimeMonitor from './BlockedTimeMonitor';
 import LeakTestResults from './LeakTestResults';
+import SystemStatusDashboard from './SystemStatusDashboard';
 
 const MonitoringDashboard: React.FC = () => {
   return (
@@ -14,11 +15,16 @@ const MonitoringDashboard: React.FC = () => {
         </p>
       </div>
 
-      <Tabs defaultValue="monitoring" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
+      <Tabs defaultValue="system-status" className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="system-status">System Status</TabsTrigger>
           <TabsTrigger value="monitoring">Real-time Monitoring</TabsTrigger>
           <TabsTrigger value="leak-tests">Leak Test Results</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="system-status" className="space-y-6">
+          <SystemStatusDashboard />
+        </TabsContent>
 
         <TabsContent value="monitoring" className="space-y-6">
           <BlockedTimeMonitor />
@@ -41,7 +47,7 @@ const MonitoringDashboard: React.FC = () => {
           </div>
           <div className="p-4 bg-purple-50 rounded-lg">
             <h3 className="font-semibold text-purple-800">Security</h3>
-            <p className="text-sm text-purple-600 mt-1">Stealth Rendering Active</p>
+            <p className="text-sm text-purple-600 mt-1">Auto-Healing Active</p>
           </div>
         </div>
       </div>
