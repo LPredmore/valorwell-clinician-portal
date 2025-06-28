@@ -1,8 +1,9 @@
 
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useState, useEffect } from 'react';
 import { DateTime } from 'luxon';
 import { TimeZoneService } from '@/utils/timeZoneService';
 import { Card } from '@/components/ui/card';
+import { supabase } from '@/integrations/supabase/client';
 
 interface WeeklyCalendarGridProps {
   currentDate: Date;
@@ -17,6 +18,52 @@ const WeeklyCalendarGrid: React.FC<WeeklyCalendarGridProps> = ({
   userTimeZone,
   onAvailabilityClick
 }) => {
+  // Add availability state and fetching
+  const [availabilityData, setAvailabilityData] = useState<any>({});
+
+  // Fetch availability data
+  useEffect(() => {
+    if (!clinicianId) return;
+    
+    const loadAvailability = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('clinicians')
+          .select(`
+            clinician_availability_start_monday_1, clinician_availability_end_monday_1,
+            clinician_availability_start_tuesday_1, clinician_availability_end_tuesday_1,
+            clinician_availability_start_wednesday_1, clinician_availability_end_wednesday_1,
+            clinician_availability_start_thursday_1, clinician_availability_end_thursday_1,
+            clinician_availability_start_friday_1, clinician_availability_end_friday_1,
+            clinician_availability_start_saturday_1, clinician_availability_end_saturday_1,
+            clinician_availability_start_sunday_1, clinician_availability_end_sunday_1
+          `)
+          .eq('id', clinicianId)
+          .single();
+        
+        if (!error && data) {
+          console.log('[WeeklyCalendarGrid] Loaded availability data:', data);
+          setAvailabilityData(data);
+        }
+      } catch (error) {
+        console.error('Error loading availability:', error);
+      }
+    };
+    
+    loadAvailability();
+  }, [clinicianId]);
+
+  // Helper function for time range checking
+  const isTimeInRange = useCallback((hour: number, minute: number, startTime: string | null, endTime: string | null) => {
+    if (!startTime || !endTime) return false;
+    
+    const slotTime = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:00`;
+    const startTimeFormatted = startTime.length === 5 ? `${startTime}:00` : startTime;
+    const endTimeFormatted = endTime.length === 5 ? `${endTime}:00` : endTime;
+    
+    return slotTime >= startTimeFormatted && slotTime < endTimeFormatted;
+  }, []);
+
   // Memoized week boundaries calculation
   const weekBoundaries = useMemo(() => {
     const dt = TimeZoneService.fromJSDate(currentDate, userTimeZone);
@@ -107,16 +154,32 @@ const WeeklyCalendarGrid: React.FC<WeeklyCalendarGridProps> = ({
               {slot.minute === 0 ? formatters.formatTimeSlot(slot.hour, slot.minute) : ''}
             </div>
 
-            {/* Day cells */}
-            {weekBoundaries.days.map((day, dayIndex) => (
-              <div
-                key={`${slotIndex}-${dayIndex}`}
-                className="border-r border-b border-gray-100 h-12 hover:bg-gray-50 cursor-pointer transition-colors last:border-r-0"
-                onClick={() => handleCellClick(day, slot)}
-              >
-                {/* This will be populated with availability blocks and appointments */}
-              </div>
-            ))}
+            {/* Day cells with availability rendering */}
+            {weekBoundaries.days.map((day, dayIndex) => {
+              const dayName = day.toFormat('cccc').toLowerCase();
+              const startTime = availabilityData[`clinician_availability_start_${dayName}_1`];
+              const endTime = availabilityData[`clinician_availability_end_${dayName}_1`];
+              
+              const isAvailableSlot = isTimeInRange(slot.hour, slot.minute, startTime, endTime);
+              
+              return (
+                <div
+                  key={`${slotIndex}-${dayIndex}`}
+                  className={`border-r border-b border-gray-100 h-12 cursor-pointer transition-colors last:border-r-0 ${
+                    isAvailableSlot 
+                      ? 'bg-green-50 hover:bg-green-100' 
+                      : 'hover:bg-gray-50'
+                  }`}
+                  onClick={() => handleCellClick(day, slot)}
+                >
+                  {isAvailableSlot && (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </React.Fragment>
         ))}
       </div>

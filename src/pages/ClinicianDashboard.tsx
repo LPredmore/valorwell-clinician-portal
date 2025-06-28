@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Calendar, Clock, AlertCircle } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import Layout from '@/components/layout/Layout';
@@ -37,7 +37,6 @@ const ClinicianDashboard = () => {
   
   // Circuit breaker to prevent infinite loops
   const dataFetchCountRef = useRef(0);
-  const refreshTrigger = 0;
 
   // Ensure timezone is always a string
   const safeClinicianTimeZone = Array.isArray(clinicianTimeZone) ? clinicianTimeZone[0] : clinicianTimeZone;
@@ -45,7 +44,7 @@ const ClinicianDashboard = () => {
 
   // Fetch clinician profile
   useEffect(() => {
-    if (!userId || dataFetchCountRef.current >= 3) return;
+    if (!userId) return;
     
     const fetchProfile = async () => {
       setIsLoadingProfile(true);
@@ -65,7 +64,7 @@ const ClinicianDashboard = () => {
 
   // Fetch clinician's timezone
   useEffect(() => {
-    if (!userId || dataFetchCountRef.current >= 3) return;
+    if (!userId) return;
     
     const fetchTimeZone = async () => {
       setIsLoadingTimeZone(true);
@@ -90,11 +89,17 @@ const ClinicianDashboard = () => {
     fetchTimeZone();
   }, [userId]);
 
-  // Fetch clinician's appointments
+  // Fetch clinician's appointments with circuit breaker
   useEffect(() => {
-    if (!userId || dataFetchCountRef.current >= 3) return;
+    if (!userId) return;
     
-    dataFetchCountRef.current++;
+    // Circuit breaker check INSIDE effect, not on render
+    const currentAttempts = dataFetchCountRef.current++;
+    if (currentAttempts >= 3) {
+      console.error("Max fetch attempts reached");
+      setIsLoadingAppointments(false);
+      return;
+    }
     
     const fetchAppointments = async () => {
       setIsLoadingAppointments(true);
@@ -102,6 +107,7 @@ const ClinicianDashboard = () => {
         const appointmentsData = await fetchClinicianAppointments(userId);
         setAppointments(appointmentsData);
         setError(null);
+        dataFetchCountRef.current = 0; // Reset on success
       } catch (error) {
         console.error("Error fetching clinician appointments:", error);
         setError(error as Error);
@@ -111,30 +117,32 @@ const ClinicianDashboard = () => {
     };
     
     fetchAppointments();
-  }, [userId, refreshTrigger]);
+  }, [userId]); // Remove refreshTrigger from dependencies
 
-  // Process appointments into categories with blocked time filtering
-  const today = new Date();
-  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+  // Memoize expensive appointment calculations
+  const appointmentCategories = useMemo(() => {
+    const today = new Date();
+    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
 
-  // Filter out blocked time appointments from all categories
-  const realAppointments = appointments.filter(apt => !isBlockedTimeAppointment(apt));
+    // Filter out blocked time appointments from all categories
+    const realAppointments = appointments.filter(apt => !isBlockedTimeAppointment(apt));
 
-  const todayAppointments = realAppointments.filter(apt => {
-    const aptDate = new Date(apt.start_at);
-    return aptDate >= todayStart && aptDate < todayEnd && apt.status !== 'cancelled';
-  });
-
-  const upcomingAppointments = realAppointments.filter(apt => {
-    const aptDate = new Date(apt.start_at);
-    return aptDate >= todayEnd && apt.status !== 'cancelled';
-  });
-
-  const pastAppointments = realAppointments.filter(apt => {
-    const aptDate = new Date(apt.start_at);
-    return aptDate < todayStart && apt.status === 'completed' && !apt.notes;
-  });
+    return {
+      today: realAppointments.filter(apt => {
+        const aptDate = new Date(apt.start_at);
+        return aptDate >= todayStart && aptDate < todayEnd && apt.status !== 'cancelled';
+      }),
+      upcoming: realAppointments.filter(apt => {
+        const aptDate = new Date(apt.start_at);
+        return aptDate >= todayEnd && apt.status !== 'cancelled';
+      }),
+      past: realAppointments.filter(apt => {
+        const aptDate = new Date(apt.start_at);
+        return aptDate < todayStart && apt.status === 'completed' && !apt.notes;
+      })
+    };
+  }, [appointments]);
 
   // Video session handlers
   const startVideoSession = (appointment: Appointment) => {
@@ -300,16 +308,16 @@ const ClinicianDashboard = () => {
     };
   };
 
-  console.log("[ClinicianDashboard] Rendering with corrected data management:", {
+  console.log("[ClinicianDashboard] Rendering with stabilized data management:", {
     clinicianTimeZone,
     safeClinicianTimeZone,
     timeZoneDisplay,
-    refreshTrigger,
     type: typeof safeClinicianTimeZone,
     isArray: Array.isArray(clinicianTimeZone),
     totalAppointments: appointments.length,
-    realAppointments: realAppointments.length,
-    filteredBlockedTime: appointments.length - realAppointments.length
+    todayCount: appointmentCategories.today.length,
+    upcomingCount: appointmentCategories.upcoming.length,
+    pastCount: appointmentCategories.past.length
   });
 
   if (showSessionTemplate && currentAppointment) {
@@ -336,7 +344,7 @@ const ClinicianDashboard = () => {
             <AppointmentsList
               title="Today's Appointments"
               icon={<Calendar className="h-5 w-5 mr-2" />}
-              appointments={todayAppointments}
+              appointments={appointmentCategories.today}
               isLoading={isLoadingAppointments || isLoadingTimeZone}
               error={error}
               emptyMessage="No appointments scheduled for today."
@@ -352,7 +360,7 @@ const ClinicianDashboard = () => {
             <AppointmentsList
               title="Outstanding Documentation"
               icon={<AlertCircle className="h-5 w-5 mr-2" />}
-              appointments={pastAppointments}
+              appointments={appointmentCategories.past}
               isLoading={isLoadingAppointments || isLoadingTimeZone || isLoadingClientData}
               error={error}
               emptyMessage="No outstanding documentation."
@@ -368,7 +376,7 @@ const ClinicianDashboard = () => {
             <AppointmentsList
               title="Upcoming Appointments"
               icon={<Calendar className="h-5 w-5 mr-2" />}
-              appointments={upcomingAppointments}
+              appointments={appointmentCategories.upcoming}
               isLoading={isLoadingAppointments || isLoadingTimeZone}
               error={error}
               emptyMessage="No upcoming appointments scheduled."

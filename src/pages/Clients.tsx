@@ -1,10 +1,10 @@
-
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
 import { Search, Filter, RotateCcw, MoreHorizontal } from 'lucide-react';
-import { supabase, getCurrentUser } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/client';
 import { useToast } from "@/hooks/use-toast";
+import { useUser } from '@/context/UserContext';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 import { BLOCKED_TIME_CLIENT_ID } from '@/utils/blockedTimeUtils';
 
@@ -20,6 +20,7 @@ interface Client {
 }
 
 const Clients = () => {
+  const { userId, userRole } = useUser();
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -37,40 +38,25 @@ const Clients = () => {
 
   useEffect(() => {
     const getClinicianInfo = async () => {
+      if (!userId) {
+        console.error('No authenticated user found');
+        toast({
+          title: "Authentication Required",
+          description: "Please log in to view clients.",
+          variant: "destructive",
+        });
+        navigate('/login');
+        return;
+      }
+
       try {
-        const user = await getCurrentUser();
-        if (!user) {
-          console.error('No authenticated user found');
-          toast({
-            title: "Authentication Required",
-            description: "Please log in to view clients.",
-            variant: "destructive",
-          });
-          navigate('/login');
-          return;
-        }
-        
         const { data, error } = await supabase
           .from('clinicians')
           .select('id')
-          .eq('clinician_email', user.email)
-          .maybeSingle();
-          
-        if (error) {
-          console.error('Error fetching clinician:', error);
-          toast({
-            title: "Error",
-            description: "Failed to fetch clinician information.",
-            variant: "destructive",
-          });
-          return;
-        }
-        
-        if (data) {
-          console.log('Found clinician ID:', data.id);
-          setClinicianId(data.id);
-          fetchClients(data.id);
-        } else {
+          .eq('id', userId) // Use userId directly instead of email lookup
+          .single();
+
+        if (error || !data) {
           console.error('No clinician found for current user');
           toast({
             title: "Access Denied",
@@ -78,7 +64,12 @@ const Clients = () => {
             variant: "destructive",
           });
           setLoading(false);
+          return;
         }
+
+        console.log('Found clinician ID:', data.id);
+        setClinicianId(data.id);
+        fetchClients(data.id);
       } catch (error) {
         console.error('Error getting clinician info:', error);
         toast({
@@ -91,7 +82,7 @@ const Clients = () => {
     };
     
     getClinicianInfo();
-  }, [navigate, toast]);
+  }, [userId, navigate, toast]); // Stable dependencies only
 
   const fetchClients = async (clinicianId: string) => {
     try {
