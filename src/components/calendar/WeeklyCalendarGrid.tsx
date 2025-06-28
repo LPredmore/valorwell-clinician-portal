@@ -3,7 +3,6 @@ import React, { useMemo } from 'react';
 import { DateTime } from 'luxon';
 import { TimeZoneService } from '@/utils/timeZoneService';
 import { useAppointments } from '@/hooks/useAppointments';
-import { useAvailability } from '@/hooks/useAvailability';
 import { startOfWeek, endOfWeek } from 'date-fns';
 
 interface WeeklyCalendarGridProps {
@@ -46,6 +45,7 @@ const WeeklyCalendarGrid: React.FC<WeeklyCalendarGridProps> = ({
     userTimeZone,
     weekStart: weekStart.toISOString(),
     weekEnd: weekEnd.toISOString(),
+    clinicianId,
     appointments: appointments?.map(apt => ({
       id: apt.id,
       start_at: apt.start_at,
