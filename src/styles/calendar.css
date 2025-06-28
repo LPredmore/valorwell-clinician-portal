@@ -1,0 +1,26 @@
+
+/* Stealth rendering for blocked time - makes them invisible in calendar views */
+.appointment-type-INTERNAL_BLOCKED_TIME {
+  height: 0 !important;
+  opacity: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  overflow: hidden !important;
+  pointer-events: none !important;
+  position: absolute !important;
+  z-index: -1 !important;
+}
+
+/* Ensure blocked time doesn't affect layout */
+.calendar-event-container .appointment-type-INTERNAL_BLOCKED_TIME {
+  display: none !important;
+}
+
+/* Emergency visibility for debugging (remove in production) */
+.debug-blocked-time .appointment-type-INTERNAL_BLOCKED_TIME {
+  height: 20px !important;
+  opacity: 0.3 !important;
+  background: red !important;
+  border: 1px dashed red !important;
+}

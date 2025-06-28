@@ -1,6 +1,9 @@
 
 import { BLOCKED_TIME_CLIENT_ID } from '@/utils/blockedTimeUtils';
 
+// Secret type used by BlockedTimeService
+const INTERNAL_BLOCKED_TIME_TYPE = 'INTERNAL_BLOCKED_TIME';
+
 // Client filtering utilities
 export const filterRealClients = <T extends { id: string }>(clients: T[]): T[] => {
   if (!clients || !Array.isArray(clients)) {
@@ -20,8 +23,8 @@ export const filterRealClients = <T extends { id: string }>(clients: T[]): T[] =
   return filtered;
 };
 
-// Appointment filtering utilities
-export const filterRealAppointments = <T extends { client_id: string }>(appointments: T[]): T[] => {
+// Enhanced appointment filtering utilities that exclude both old and new blocked time
+export const filterRealAppointments = <T extends { client_id: string; type?: string }>(appointments: T[]): T[] => {
   if (!appointments || !Array.isArray(appointments)) {
     console.warn('[clientFilterUtils] Invalid appointments array provided:', appointments);
     return [];
@@ -32,7 +35,18 @@ export const filterRealAppointments = <T extends { client_id: string }>(appointm
       console.warn('[clientFilterUtils] Appointment missing client_id:', appointment);
       return false;
     }
-    return appointment.client_id !== BLOCKED_TIME_CLIENT_ID;
+    
+    // Filter out old blocked time approach (fake client)
+    if (appointment.client_id === BLOCKED_TIME_CLIENT_ID) {
+      return false;
+    }
+    
+    // Filter out new blocked time approach (secret type)
+    if (appointment.type === INTERNAL_BLOCKED_TIME_TYPE) {
+      return false;
+    }
+    
+    return true;
   });
   
   console.log(`[clientFilterUtils] Filtered ${appointments.length - filtered.length} blocked time appointments from ${appointments.length} total appointments`);
@@ -45,7 +59,34 @@ export const isBlockedTimeClient = (clientId: string | null | undefined): boolea
   return clientId === BLOCKED_TIME_CLIENT_ID;
 };
 
+// Check if an appointment is blocked time (both old and new methods)
+export const isBlockedTimeAppointment = (appointment: any): boolean => {
+  if (!appointment) return false;
+  
+  // Check old method (fake client)
+  if (appointment.client_id === BLOCKED_TIME_CLIENT_ID) {
+    return true;
+  }
+  
+  // Check new method (secret type)
+  if (appointment.type === INTERNAL_BLOCKED_TIME_TYPE) {
+    return true;
+  }
+  
+  return false;
+};
+
 // Safe client count that excludes blocked time
 export const getRealClientCount = <T extends { id: string }>(clients: T[]): number => {
   return filterRealClients(clients).length;
+};
+
+// Safe appointment count that excludes blocked time
+export const getRealAppointmentCount = <T extends { client_id: string; type?: string }>(appointments: T[]): number => {
+  return filterRealAppointments(appointments).length;
+};
+
+// Export the secret type for internal use
+export const getInternalBlockedTimeType = (): string => {
+  return INTERNAL_BLOCKED_TIME_TYPE;
 };

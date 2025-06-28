@@ -20,10 +20,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { getClinicianTimeZone } from '@/hooks/useClinicianData';
-import { BLOCKED_TIME_CLIENT_ID } from '@/utils/blockedTimeUtils';
+import { blockedTimeService } from '@/services/BlockedTimeService';
 import { TimeZoneService } from '@/utils/timeZoneService';
 
 interface BlockTimeDialogProps {
@@ -51,7 +50,7 @@ const generateTimeOptions = () => {
   return options;
 };
 
-// Helper function to convert local date/time to UTC (matching AppointmentDialog logic)
+// Helper function to convert local date/time to UTC using BlockedTimeService approach
 const convertLocalToUTC = (dateString: string, timeString: string, timezone: string) => {
   try {
     const localDateTimeStr = `${dateString}T${timeString}`;
@@ -106,53 +105,6 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
     return null;
   };
 
-  // Ensure blocked time client exists with minimal required fields only
-  const ensureBlockedTimeClient = async () => {
-    try {
-      // Check if blocked time client already exists
-      const { data: existingClient, error: checkError } = await supabase
-        .from('clients')
-        .select('id')
-        .eq('id', BLOCKED_TIME_CLIENT_ID)
-        .single();
-
-      if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "not found"
-        throw new Error(`Database error checking client: ${checkError.message}`);
-      }
-
-      if (!existingClient) {
-        // Create blocked time client with only essential fields that exist in the schema
-        const clientData = {
-          id: BLOCKED_TIME_CLIENT_ID,
-          client_first_name: 'Blocked',
-          client_last_name: 'Time',
-          client_preferred_name: 'Blocked',
-          client_email: 'blocked@system.internal',
-          client_phone: '000-000-0000',
-          client_date_of_birth: '1900-01-01',
-          client_address: 'System Internal',
-          client_city: 'System',
-          client_state: 'Internal',
-          client_zipcode: '00000',
-          client_assigned_therapist: selectedClinicianId,
-          client_status: 'active'
-        };
-
-        const { error: insertError } = await supabase
-          .from('clients')
-          .insert(clientData);
-
-        if (insertError) {
-          console.error('Failed to create blocked time client:', insertError);
-          throw new Error(`Failed to create blocked time client: ${insertError.message}`);
-        }
-      }
-    } catch (error) {
-      console.error('Error in ensureBlockedTimeClient:', error);
-      throw error;
-    }
-  };
-
   const handleSubmit = async () => {
     // Validate inputs
     const validationError = validateInputs();
@@ -168,10 +120,7 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
     setIsLoading(true);
 
     try {
-      // Ensure blocked time client exists
-      await ensureBlockedTimeClient();
-
-      // Get clinician's timezone with fallback (matching AppointmentDialog logic)
+      // Get clinician's timezone with fallback
       let clinicianTimeZone;
       try {
         const timeZoneResult = await getClinicianTimeZone(selectedClinicianId!);
@@ -187,14 +136,14 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
 
       console.log('[BlockTimeDialog] Using clinician timezone:', clinicianTimeZone);
 
-      // Format date for conversion (matching AppointmentDialog logic)
+      // Format date for conversion
       const dateString = format(selectedDate!, 'yyyy-MM-dd');
 
-      // Convert start and end times to UTC using the same logic as AppointmentDialog
+      // Convert start and end times to UTC
       const startAtUTC = convertLocalToUTC(dateString, startTime, clinicianTimeZone);
       const endAtUTC = convertLocalToUTC(dateString, endTime, clinicianTimeZone);
 
-      console.log('[BlockTimeDialog] Timezone conversion results:', {
+      console.log('[BlockTimeDialog] Creating blocked time:', {
         dateString,
         startTime,
         endTime,
@@ -203,32 +152,21 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
         endAtUTC: endAtUTC.toISO()
       });
 
-      // Create the blocked time appointment with consistent timezone handling
-      const appointmentData = {
-        client_id: BLOCKED_TIME_CLIENT_ID,
-        clinician_id: selectedClinicianId,
-        start_at: startAtUTC.toISO(),
-        end_at: endAtUTC.toISO(),
-        type: 'Blocked Time',
-        status: 'blocked',
-        notes: notes || `Blocked time: ${blockLabel}`,
-        appointment_timezone: clinicianTimeZone // Save the clinician's timezone
-      };
+      // Use BlockedTimeService to create the block
+      const result = await blockedTimeService.createBlock(
+        selectedClinicianId!,
+        startAtUTC.toJSDate(),
+        endAtUTC.toJSDate(),
+        notes || `Blocked time: ${blockLabel}`
+      );
 
-      console.log('[BlockTimeDialog] Creating appointment with data:', appointmentData);
-
-      const { error: appointmentError } = await supabase
-        .from('appointments')
-        .insert(appointmentData);
-
-      if (appointmentError) {
-        console.error('Failed to create appointment:', appointmentError);
-        throw new Error(`Failed to create appointment: ${appointmentError.message}`);
+      if (!result.success) {
+        throw new Error(result.error?.message || 'Failed to create blocked time');
       }
 
       toast({
         title: "Success",
-        description: "Time block created successfully.",
+        description: "Time block created successfully using new secure method.",
       });
 
       onBlockCreated();
@@ -240,7 +178,7 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
       let errorMessage = "Failed to create time block.";
       
       if (error?.message?.includes('violates foreign key constraint')) {
-        errorMessage = "Database error: Invalid clinician or client reference.";
+        errorMessage = "Database error: Invalid clinician reference.";
       } else if (error?.message?.includes('violates check constraint')) {
         errorMessage = "Database error: Invalid data format.";
       } else if (error?.message?.includes('duplicate key')) {
@@ -265,7 +203,7 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Block Time</DialogTitle>
+          <DialogTitle>Block Time (New Secure Method)</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -355,7 +293,7 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
               Cancel
             </Button>
             <Button onClick={handleSubmit} disabled={isLoading}>
-              {isLoading ? 'Creating...' : 'Block Time'}
+              {isLoading ? 'Creating...' : 'Block Time (Secure)'}
             </Button>
           </div>
         </div>
