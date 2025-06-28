@@ -3144,6 +3144,15 @@ export type Database = {
         }
         Returns: undefined
       }
+      check_blocked_time_integrity: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          check_type: string
+          status: string
+          count: number
+          message: string
+        }[]
+      }
       check_table_exists: {
         Args: { check_table_name: string }
         Returns: boolean

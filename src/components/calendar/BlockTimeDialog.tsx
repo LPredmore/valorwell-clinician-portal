@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -22,7 +23,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { getClinicianTimeZone } from '@/hooks/useClinicianData';
-import { blockedTimeService } from '@/services/BlockedTimeService';
+import { supabase } from '@/integrations/supabase/client';
 import { TimeZoneService } from '@/utils/timeZoneService';
 
 interface BlockTimeDialogProps {
@@ -50,7 +51,7 @@ const generateTimeOptions = () => {
   return options;
 };
 
-// Helper function to convert local date/time to UTC using BlockedTimeService approach
+// Helper function to convert local date/time to UTC
 const convertLocalToUTC = (dateString: string, timeString: string, timezone: string) => {
   try {
     const localDateTimeStr = `${dateString}T${timeString}`;
@@ -143,7 +144,7 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
       const startAtUTC = convertLocalToUTC(dateString, startTime, clinicianTimeZone);
       const endAtUTC = convertLocalToUTC(dateString, endTime, clinicianTimeZone);
 
-      console.log('[BlockTimeDialog] Creating blocked time:', {
+      console.log('[BlockTimeDialog] Creating INTERNAL_BLOCKED_TIME appointment:', {
         dateString,
         startTime,
         endTime,
@@ -152,27 +153,36 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
         endAtUTC: endAtUTC.toISO()
       });
 
-      // Use BlockedTimeService to create the block
-      const result = await blockedTimeService.createBlock(
-        selectedClinicianId!,
-        startAtUTC.toJSDate(),
-        endAtUTC.toJSDate(),
-        notes || `Blocked time: ${blockLabel}`
-      );
+      // Create blocked time using pure INTERNAL_BLOCKED_TIME approach
+      const { data, error } = await supabase
+        .from('appointments')
+        .insert({
+          clinician_id: selectedClinicianId!,
+          client_id: '00000000-0000-0000-0000-000000000001', // Placeholder for compatibility
+          start_at: startAtUTC.toJSDate().toISOString(),
+          end_at: endAtUTC.toJSDate().toISOString(),
+          type: 'INTERNAL_BLOCKED_TIME', // Pure stealth type
+          status: 'hidden', // Stealth status
+          notes: notes || `Blocked time: ${blockLabel}`,
+          appointment_timezone: clinicianTimeZone
+        })
+        .select();
 
-      if (!result.success) {
-        throw new Error(result.error?.message || 'Failed to create blocked time');
+      if (error) {
+        throw error;
       }
+
+      console.log('✅ INTERNAL_BLOCKED_TIME appointment created successfully:', data);
 
       toast({
         title: "Success",
-        description: "Time block created successfully using new secure method.",
+        description: "Time block created successfully using pure stealth method.",
       });
 
       onBlockCreated();
       onClose();
     } catch (error: any) {
-      console.error('Block time save failed:', error);
+      console.error('❌ Block time creation failed:', error);
       
       // Enhanced error messages based on specific error types
       let errorMessage = "Failed to create time block.";
@@ -203,7 +213,7 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Block Time (New Secure Method)</DialogTitle>
+          <DialogTitle>Block Time (Pure Stealth)</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -293,7 +303,7 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
               Cancel
             </Button>
             <Button onClick={handleSubmit} disabled={isLoading}>
-              {isLoading ? 'Creating...' : 'Block Time (Secure)'}
+              {isLoading ? 'Creating...' : 'Block Time (Stealth)'}
             </Button>
           </div>
         </div>
