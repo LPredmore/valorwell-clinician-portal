@@ -100,6 +100,17 @@ export const useAppointments = (
     timeZone || TimeZoneService.DEFAULT_TIMEZONE
   );
 
+  // Debug logging for parameters
+  useEffect(() => {
+    console.log('[useAppointments] Hook called with parameters:', {
+      clinicianId: formattedClinicianId,
+      fromDate: fromDate?.toISOString(),
+      toDate: toDate?.toISOString(),
+      timeZone: safeUserTimeZone,
+      refreshTrigger
+    });
+  }, [formattedClinicianId, fromDate, toDate, safeUserTimeZone, refreshTrigger]);
+
   /**
    * Calculate date range for appointments query
    * Uses current week if no dates provided
@@ -138,9 +149,17 @@ export const useAppointments = (
             .toISO();
       }
       
+      console.log('[useAppointments] Date range calculated:', {
+        fromDate: fromDate?.toISOString(),
+        toDate: toDate?.toISOString(),
+        fromUTCISO: fromISO,
+        toUTCISO: toISO,
+        timeZone: safeUserTimeZone
+      });
+      
       return { fromUTCISO: fromISO, toUTCISO: toISO };
     } catch (e) {
-      console.error("Error converting date range:", e);
+      console.error("[useAppointments] Error converting date range:", e);
       return {};
     }
   }, [fromDate, toDate, safeUserTimeZone]);
@@ -226,6 +245,12 @@ export const useAppointments = (
           clinicianIds: [...new Set(rawDataAny.map((apt: any) => apt.clinician_id))],
           requestedClinicianId: formattedClinicianId,
           clinicianIdMatches: rawDataAny.every((apt: any) => apt.clinician_id === formattedClinicianId),
+          timezoneInfo: rawDataAny.map((apt: any) => ({
+            id: apt.id,
+            appointment_timezone: apt.appointment_timezone,
+            start_at: apt.start_at,
+            end_at: apt.end_at
+          })),
           dateRange: {
             earliest: rawDataAny.length > 0 ? Math.min(...rawDataAny.map((apt: any) => new Date(apt.start_at).getTime())) : null,
             latest: rawDataAny.length > 0 ? Math.max(...rawDataAny.map((apt: any) => new Date(apt.start_at).getTime())) : null
@@ -277,7 +302,7 @@ export const useAppointments = (
       );
 
       // Safely process the data with standardized client name formatting using our shared function
-      return rawDataAny.map((rawAppt: any): Appointment => {
+      const processedAppointments = rawDataAny.map((rawAppt: any): Appointment => {
         // Process client data, ensure we handle nested objects correctly
         const rawClientData = rawAppt.clients;
         let clientData: Appointment["client"] | undefined;
@@ -326,9 +351,39 @@ export const useAppointments = (
           clientName: clientName,
         };
       });
+
+      console.log('[useAppointments] STEP 3 - Final processed appointments:', {
+        count: processedAppointments.length,
+        appointments: processedAppointments.map(apt => ({
+          id: apt.id,
+          clientName: apt.clientName,
+          start_at: apt.start_at,
+          end_at: apt.end_at,
+          appointment_timezone: apt.appointment_timezone
+        }))
+      });
+
+      return processedAppointments;
     },
     enabled: queryEnabled,
   });
+
+  // Log query results
+  useEffect(() => {
+    if (fetchedAppointments) {
+      console.log('[useAppointments] Query completed successfully:', {
+        appointmentsCount: fetchedAppointments.length,
+        isLoading,
+        error: error?.message,
+        sampleData: fetchedAppointments.slice(0, 3).map(apt => ({
+          id: apt.id,
+          clientName: apt.clientName,
+          start_at: apt.start_at,
+          appointment_timezone: apt.appointment_timezone
+        }))
+      });
+    }
+  }, [fetchedAppointments, isLoading, error]);
 
   // Helper function to add display formatting
   const addDisplayFormattingToAppointment = (

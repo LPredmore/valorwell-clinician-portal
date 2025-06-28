@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "../components/layout/Layout";
@@ -14,6 +13,7 @@ import { addWeeks, subWeeks } from "date-fns";
 import { TimeZoneService } from "@/utils/timeZoneService";
 import { getClinicianTimeZone } from "@/hooks/useClinicianData";
 import { DateTime } from "luxon";
+import { useAppointments } from "@/hooks/useAppointments";
 
 const CalendarSimple = React.memo(() => {
   const { userId, authInitialized, userRole } = useUser();
@@ -34,6 +34,28 @@ const CalendarSimple = React.memo(() => {
   const authCheckCountRef = useRef(0);
   const timezoneLoadCountRef = useRef(0);
   const accessDeniedRef = useRef(false);
+
+  // Add appointments data using the enhanced useAppointments hook
+  const { appointments, isLoading: appointmentsLoading } = useAppointments(
+    userId,
+    undefined, // Let it use current week
+    undefined,
+    userTimeZone,
+    0 // No refresh trigger for now
+  );
+
+  // Debug logging for calendar state
+  useEffect(() => {
+    console.log('[CalendarSimple] Component state:', {
+      userId,
+      appointmentsCount: appointments?.length || 0,
+      appointmentsLoading,
+      userTimeZone,
+      currentDate: currentDate.toISOString(),
+      isReady,
+      authInitialized
+    });
+  }, [userId, appointments, appointmentsLoading, userTimeZone, currentDate, isReady, authInitialized]);
 
   // Memoize navigation functions to prevent re-renders
   const navigatePrevious = useCallback(() => {
@@ -247,7 +269,7 @@ const CalendarSimple = React.memo(() => {
               {currentMonthDisplay}
             </h1>
             <div className="text-sm text-gray-500">
-              User: {userRole} | Timezone: {userTimeZone}
+              User: {userRole} | Timezone: {userTimeZone} | Appointments: {appointments?.length || 0}
             </div>
           </div>
 
