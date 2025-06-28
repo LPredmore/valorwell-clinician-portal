@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase, getOrCreateVideoRoom } from "@/integrations/supabase/client";
@@ -170,32 +169,18 @@ export const useAppointments = (
         { from: fromUTCISO, to: toUTCISO, refreshTrigger }
       );
 
-      // FIRST: Test if ANY appointments exist for this clinician (no filters)
-      const { data: allAppointments, error: testError } = await supabase
-        .from("appointments")
-        .select("id, clinician_id, status, start_at, end_at, type")
-        .eq("clinician_id", formattedClinicianId);
-
-      console.log("[useAppointments] DEBUG - Raw appointments for clinician:", {
-        clinicianId: formattedClinicianId,
-        totalFound: allAppointments?.length || 0,
-        allAppointments: allAppointments,
-        testError: testError
-      });
-
       let query = supabase
         .from("appointments")
         .select(
           `id, client_id, clinician_id, start_at, end_at, type, status, appointment_recurring, recurring_group_id, video_room_url, notes, appointment_timezone, clients (client_first_name, client_last_name, client_preferred_name, client_email, client_phone, client_status, client_date_of_birth, client_gender, client_address, client_city, client_state, client_zipcode)`
         )
         .eq("clinician_id", formattedClinicianId)
-        // EXPANDED STATUS FILTER - Include more appointment statuses
-        .in("status", ["scheduled", "blocked", "confirmed", "pending", "completed"]); // Added more statuses
+        .in("status", ["scheduled", "blocked"]); // Updated to include both scheduled and blocked appointments
 
       console.log("[useAppointments] STEP 1 - Supabase Query Building:", {
         baseQuery: "appointments table",
         clinicianFilter: `clinician_id = ${formattedClinicianId}`,
-        statusFilter: "status IN (scheduled, blocked, confirmed, pending, completed)", // Updated log message
+        statusFilter: "status IN (scheduled, blocked)", // Updated log message
         fromDateFilter: fromUTCISO ? `start_at >= ${fromUTCISO}` : 'none',
         toDateFilter: toUTCISO ? `end_at <= ${toUTCISO}` : 'none'
       });
@@ -209,7 +194,7 @@ export const useAppointments = (
         clinician_id: formattedClinicianId,
         start_at: fromUTCISO ? `>= ${fromUTCISO}` : 'any',
         end_at: toUTCISO ? `<= ${toUTCISO}` : 'any',
-        status: 'scheduled OR blocked OR confirmed OR pending OR completed', // Updated log message
+        status: 'scheduled OR blocked', // Updated log message
         orderBy: 'start_at ASC'
       });
       
@@ -230,7 +215,7 @@ export const useAppointments = (
           table: 'appointments',
           clinician_id: formattedClinicianId,
           date_range: { from: fromUTCISO, to: toUTCISO },
-          status: 'scheduled OR blocked OR confirmed OR pending OR completed'
+          status: 'scheduled OR blocked'
         }
       });
 
@@ -261,7 +246,7 @@ export const useAppointments = (
             clinician_id: formattedClinicianId,
             start_at_gte: fromUTCISO,
             end_at_lte: toUTCISO,
-            status: 'scheduled OR blocked OR confirmed OR pending OR completed'
+            status: 'scheduled OR blocked'
           },
           possibleIssues: [
             'No appointments exist for this clinician',

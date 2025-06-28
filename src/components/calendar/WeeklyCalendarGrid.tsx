@@ -1,298 +1,213 @@
 
-import React, { useState, useMemo } from 'react';
-import { format, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, parseISO } from 'date-fns';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Clock, User, Calendar as CalendarIcon } from 'lucide-react';
-import { useAppointments } from '@/hooks/useAppointments';
+import React, { useMemo, useCallback, useState, useEffect } from 'react';
+import { DateTime } from 'luxon';
 import { TimeZoneService } from '@/utils/timeZoneService';
-import { Appointment } from '@/types/appointment';
+import { Card } from '@/components/ui/card';
+import { supabase } from '@/integrations/supabase/client';
 
 interface WeeklyCalendarGridProps {
   currentDate: Date;
   clinicianId: string | null;
   userTimeZone: string;
-  onAvailabilityClick?: (date: Date, startTime: string, endTime: string) => void;
+  onAvailabilityClick?: (date: DateTime, startTime: DateTime, endTime: DateTime) => void;
 }
 
 const WeeklyCalendarGrid: React.FC<WeeklyCalendarGridProps> = ({
   currentDate,
   clinicianId,
   userTimeZone,
-  onAvailabilityClick,
+  onAvailabilityClick
 }) => {
-  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  // Add availability state and fetching
+  const [availabilityData, setAvailabilityData] = useState<any>({});
 
-  // Calculate week dates
-  const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
-  const weekEnd = endOfWeek(currentDate, { weekStartsOn: 0 });
-  const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
-
-  // Fetch appointments using the hook
-  const {
-    appointments,
-    isLoading,
-    error,
-    startVideoSession,
-    openSessionTemplate,
-  } = useAppointments(clinicianId, weekStart, weekEnd, userTimeZone);
-
-  // DEBUG: Log what we're receiving
-  console.log('[WeeklyCalendarGrid] Component State:', {
-    clinicianId,
-    userTimeZone,
-    weekStart: weekStart.toISOString(),
-    weekEnd: weekEnd.toISOString(),
-    appointmentsReceived: appointments?.length || 0,
-    appointments: appointments,
-    isLoading,
-    error: error?.message || null
-  });
-
-  // Group appointments by date
-  const appointmentsByDate = useMemo(() => {
-    const grouped: { [key: string]: Appointment[] } = {};
+  // Fetch availability data - fetches ALL availability blocks (1, 2, 3)
+  useEffect(() => {
+    if (!clinicianId) return;
     
-    if (!appointments || appointments.length === 0) {
-      console.log('[WeeklyCalendarGrid] No appointments to group');
-      return grouped;
-    }
-
-    appointments.forEach((appointment) => {
-      if (!appointment.start_at) {
-        console.warn('[WeeklyCalendarGrid] Appointment missing start_at:', appointment);
-        return;
-      }
-
+    const loadAvailability = async () => {
       try {
-        // Parse the UTC timestamp and convert to local date
-        const appointmentDate = parseISO(appointment.start_at);
-        const dateKey = format(appointmentDate, 'yyyy-MM-dd');
+        const { data, error } = await supabase
+          .from('clinicians')
+          .select(`
+            clinician_availability_start_monday_1, clinician_availability_end_monday_1,
+            clinician_availability_start_monday_2, clinician_availability_end_monday_2,
+            clinician_availability_start_monday_3, clinician_availability_end_monday_3,
+            clinician_availability_start_tuesday_1, clinician_availability_end_tuesday_1,
+            clinician_availability_start_tuesday_2, clinician_availability_end_tuesday_2,
+            clinician_availability_start_tuesday_3, clinician_availability_end_tuesday_3,
+            clinician_availability_start_wednesday_1, clinician_availability_end_wednesday_1,
+            clinician_availability_start_wednesday_2, clinician_availability_end_wednesday_2,
+            clinician_availability_start_wednesday_3, clinician_availability_end_wednesday_3,
+            clinician_availability_start_thursday_1, clinician_availability_end_thursday_1,
+            clinician_availability_start_thursday_2, clinician_availability_end_thursday_2,
+            clinician_availability_start_thursday_3, clinician_availability_end_thursday_3,
+            clinician_availability_start_friday_1, clinician_availability_end_friday_1,
+            clinician_availability_start_friday_2, clinician_availability_end_friday_2,
+            clinician_availability_start_friday_3, clinician_availability_end_friday_3,
+            clinician_availability_start_saturday_1, clinician_availability_end_saturday_1,
+            clinician_availability_start_saturday_2, clinician_availability_end_saturday_2,
+            clinician_availability_start_saturday_3, clinician_availability_end_saturday_3,
+            clinician_availability_start_sunday_1, clinician_availability_end_sunday_1,
+            clinician_availability_start_sunday_2, clinician_availability_end_sunday_2,
+            clinician_availability_start_sunday_3, clinician_availability_end_sunday_3
+          `)
+          .eq('id', clinicianId)
+          .single();
         
-        if (!grouped[dateKey]) {
-          grouped[dateKey] = [];
+        if (!error && data) {
+          console.log('[WeeklyCalendarGrid] Loaded availability data:', data);
+          setAvailabilityData(data);
         }
-        
-        grouped[dateKey].push(appointment);
-        
-        console.log('[WeeklyCalendarGrid] Grouped appointment:', {
-          appointmentId: appointment.id,
-          start_at: appointment.start_at,
-          dateKey,
-          clientName: appointment.clientName
-        });
       } catch (error) {
-        console.error('[WeeklyCalendarGrid] Error parsing appointment date:', error, appointment);
+        console.error('Error loading availability:', error);
       }
+    };
+    
+    loadAvailability();
+  }, [clinicianId]); // Only clinicianId dependency
+
+  // Updated helper function to check ALL availability blocks for a time slot
+  const isTimeSlotAvailable = useCallback((dayName: string, hour: number, minute: number) => {
+    if (!availabilityData) return false;
+    
+    const slotTime = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:00`;
+    
+    // Check all 3 potential blocks for the day
+    for (let i = 1; i <= 3; i++) {
+      const startTime = availabilityData[`clinician_availability_start_${dayName}_${i}`];
+      const endTime = availabilityData[`clinician_availability_end_${dayName}_${i}`];
+      
+      if (startTime && endTime) {
+        const startTimeFormatted = startTime.length === 5 ? `${startTime}:00` : startTime;
+        const endTimeFormatted = endTime.length === 5 ? `${endTime}:00` : endTime;
+        
+        if (slotTime >= startTimeFormatted && slotTime < endTimeFormatted) {
+          return true;
+        }
+      }
+    }
+    
+    return false;
+  }, [availabilityData]);
+
+  // Memoized week boundaries calculation
+  const weekBoundaries = useMemo(() => {
+    const dt = TimeZoneService.fromJSDate(currentDate, userTimeZone);
+    const weekStart = dt.startOf('week');
+    const days = [];
+    for (let i = 0; i < 7; i++) {
+      days.push(weekStart.plus({ days: i }));
+    }
+    return { weekStart, days };
+  }, [currentDate, userTimeZone]);
+
+  // Memoized time range configuration
+  const timeConfig = useMemo(() => ({
+    startHour: 8,
+    endHour: 22 // 10 PM
+  }), []);
+
+  // Memoized time slots generation
+  const timeSlots = useMemo(() => {
+    console.log('[WeeklyCalendarGrid] Generating time slots');
+    const slots = [];
+    for (let hour = timeConfig.startHour; hour <= timeConfig.endHour; hour++) {
+      slots.push({ hour, minute: 0 });
+      if (hour < timeConfig.endHour) {
+        slots.push({ hour, minute: 30 });
+      }
+    }
+    return slots;
+  }, [timeConfig]);
+
+  // Memoized formatting functions
+  const formatters = useMemo(() => ({
+    formatTimeSlot: (hour: number, minute: number) => {
+      const dt = DateTime.now().set({ hour, minute });
+      return dt.toFormat('h:mm a');
+    },
+    getDayName: (date: DateTime) => date.toFormat('EEE'),
+    getDayNumber: (date: DateTime) => date.toFormat('d'),
+    isToday: (date: DateTime) => {
+      const today = TimeZoneService.now(userTimeZone);
+      return date.hasSame(today, 'day');
+    }
+  }), [userTimeZone]);
+
+  // Memoized click handler
+  const handleCellClick = useCallback((day: DateTime, slot: { hour: number; minute: number }) => {
+    if (!onAvailabilityClick) return;
+    
+    const slotDateTime = day.set({ 
+      hour: slot.hour, 
+      minute: slot.minute 
     });
-
-    console.log('[WeeklyCalendarGrid] Final grouped appointments:', grouped);
-    return grouped;
-  }, [appointments]);
-
-  const formatTime = (dateTimeString: string) => {
-    try {
-      const date = parseISO(dateTimeString);
-      return format(date, 'h:mm a');
-    } catch (error) {
-      console.error('Error formatting time:', error);
-      return 'Invalid time';
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'scheduled':
-        return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'confirmed':
-        return 'bg-green-100 text-green-800 border-green-200';
-      case 'completed':
-        return 'bg-gray-100 text-gray-800 border-gray-200';
-      case 'cancelled':
-        return 'bg-red-100 text-red-800 border-red-200';
-      case 'blocked':
-        return 'bg-purple-100 text-purple-800 border-purple-200';
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
-  };
-
-  const handleAppointmentClick = (appointment: Appointment) => {
-    setSelectedAppointment(appointment);
-  };
-
-  if (isLoading) {
-    return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center justify-center h-64">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-              <p>Loading appointments...</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (error) {
-    return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center justify-center h-64">
-            <div className="text-center text-red-600">
-              <p>Error loading appointments: {error.message}</p>
-              <p className="text-sm mt-2">Check console for detailed debugging information</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
+    const endDateTime = slotDateTime.plus({ minutes: 30 });
+    onAvailabilityClick(day, slotDateTime, endDateTime);
+  }, [onAvailabilityClick]);
 
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CalendarIcon className="h-5 w-5" />
-            Weekly Calendar
-          </CardTitle>
-          <div className="text-sm text-gray-600">
-            {format(weekStart, 'MMM d')} - {format(weekEnd, 'MMM d, yyyy')}
-            {appointments && appointments.length > 0 && (
-              <span className="ml-2 bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">
-                {appointments.length} appointment{appointments.length !== 1 ? 's' : ''}
-              </span>
-            )}
+    <Card className="p-4">
+      <div className="grid grid-cols-8 gap-1 min-h-[600px]">
+        {/* Time column header */}
+        <div className="border-r border-gray-200">
+          <div className="h-16 border-b border-gray-200 flex items-center justify-center text-sm font-medium text-gray-600">
+            Time
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-7 gap-2 mb-4">
-            {/* Day headers */}
-            {weekDays.map((day) => (
-              <div key={day.toISOString()} className="text-center p-2 font-medium border-b">
-                <div className="text-sm text-gray-600">{format(day, 'EEE')}</div>
-                <div className="text-lg">{format(day, 'd')}</div>
+        </div>
+
+        {/* Day headers */}
+        {weekBoundaries.days.map((day, index) => (
+          <div key={day.toISO()} className="border-r border-gray-200 last:border-r-0">
+            <div className="h-16 border-b border-gray-200 flex flex-col items-center justify-center">
+              <div className="text-sm font-medium text-gray-900">
+                {formatters.getDayName(day)}
               </div>
-            ))}
+              <div className={`text-lg font-semibold ${
+                formatters.isToday(day) ? 'text-blue-600' : 'text-gray-700'
+              }`}>
+                {formatters.getDayNumber(day)}
+              </div>
+            </div>
           </div>
+        ))}
 
-          <div className="grid grid-cols-7 gap-2 min-h-[400px]">
-            {/* Day columns */}
-            {weekDays.map((day) => {
-              const dateKey = format(day, 'yyyy-MM-dd');
-              const dayAppointments = appointmentsByDate[dateKey] || [];
-              const isToday = isSameDay(day, new Date());
+        {/* Time slots */}
+        {timeSlots.map((slot, slotIndex) => (
+          <React.Fragment key={slotIndex}>
+            {/* Time label */}
+            <div className="border-r border-gray-200 h-12 flex items-center justify-end pr-2 text-xs text-gray-500">
+              {slot.minute === 0 ? formatters.formatTimeSlot(slot.hour, slot.minute) : ''}
+            </div>
 
+            {/* Day cells with availability rendering */}
+            {weekBoundaries.days.map((day, dayIndex) => {
+              const dayName = day.toFormat('cccc').toLowerCase();
+              const isAvailableSlot = isTimeSlotAvailable(dayName, slot.hour, slot.minute);
+              
               return (
                 <div
-                  key={day.toISOString()}
-                  className={`border rounded-lg p-2 min-h-[380px] ${
-                    isToday ? 'bg-blue-50 border-blue-200' : 'bg-white'
+                  key={`${slotIndex}-${dayIndex}`}
+                  className={`border-r border-b border-gray-100 h-12 cursor-pointer transition-colors last:border-r-0 ${
+                    isAvailableSlot 
+                      ? 'bg-green-50 hover:bg-green-100' 
+                      : 'hover:bg-gray-50'
                   }`}
+                  onClick={() => handleCellClick(day, slot)}
                 >
-                  <div className="space-y-2">
-                    {dayAppointments.length === 0 ? (
-                      <div className="text-xs text-gray-400 text-center pt-4">
-                        No appointments
-                      </div>
-                    ) : (
-                      dayAppointments.map((appointment) => (
-                        <div
-                          key={appointment.id}
-                          className={`p-2 rounded border cursor-pointer hover:shadow-sm transition-all ${getStatusColor(
-                            appointment.status
-                          )}`}
-                          onClick={() => handleAppointmentClick(appointment)}
-                        >
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-1 text-xs">
-                              <Clock className="h-3 w-3" />
-                              <span>{formatTime(appointment.start_at)}</span>
-                            </div>
-                            
-                            <div className="flex items-center gap-1 text-xs">
-                              <User className="h-3 w-3" />
-                              <span className="truncate">
-                                {appointment.clientName || 'Unknown Client'}
-                              </span>
-                            </div>
-                            
-                            <div className="text-xs font-medium">
-                              {appointment.type}
-                            </div>
-                            
-                            <Badge variant="outline" className="text-xs">
-                              {appointment.status}
-                            </Badge>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
+                  {isAvailableSlot && (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    </div>
+                  )}
                 </div>
               );
             })}
-          </div>
-
-          {/* Debug Information */}
-          {process.env.NODE_ENV === 'development' && (
-            <div className="mt-4 p-4 bg-gray-100 rounded text-xs">
-              <strong>Debug Info:</strong>
-              <div>Clinician ID: {clinicianId}</div>
-              <div>Week Start: {weekStart.toISOString()}</div>
-              <div>Week End: {weekEnd.toISOString()}</div>
-              <div>Appointments Found: {appointments?.length || 0}</div>
-              <div>Time Zone: {userTimeZone}</div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Appointment Detail Modal/Panel */}
-      {selectedAppointment && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Appointment Details</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div>
-                <strong>Client:</strong> {selectedAppointment.clientName || 'Unknown'}
-              </div>
-              <div>
-                <strong>Time:</strong> {formatTime(selectedAppointment.start_at)} - {formatTime(selectedAppointment.end_at)}
-              </div>
-              <div>
-                <strong>Type:</strong> {selectedAppointment.type}
-              </div>
-              <div>
-                <strong>Status:</strong> {selectedAppointment.status}
-              </div>
-              {selectedAppointment.notes && (
-                <div>
-                  <strong>Notes:</strong> {selectedAppointment.notes}
-                </div>
-              )}
-              <div className="flex gap-2">
-                <Button onClick={() => startVideoSession(selectedAppointment)}>
-                  Start Session
-                </Button>
-                <Button variant="outline" onClick={() => openSessionTemplate(selectedAppointment)}>
-                  Document Session
-                </Button>
-                <Button variant="outline" onClick={() => setSelectedAppointment(null)}>
-                  Close
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-    </div>
+          </React.Fragment>
+        ))}
+      </div>
+    </Card>
   );
 };
 
