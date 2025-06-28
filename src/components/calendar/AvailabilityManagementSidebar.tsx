@@ -1,253 +1,373 @@
 
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Trash2, Plus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { TimeZoneService } from '@/utils/timeZoneService';
-
-interface AvailabilityBlock {
-  id: number;
-  startTime: string;
-  endTime: string;
-}
+import { Clock, Save, Trash2 } from 'lucide-react';
 
 interface AvailabilityManagementSidebarProps {
   clinicianId: string | null;
   userTimeZone: string;
 }
 
-const DAYS_OF_WEEK = [
-  'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'
-];
-
-const DAY_LABELS = [
-  'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
-];
+interface AvailabilitySlot {
+  day: string;
+  slot: number;
+  startTime: string;
+  endTime: string;
+}
 
 const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps> = ({
   clinicianId,
   userTimeZone
 }) => {
-  const [selectedDay, setSelectedDay] = useState('monday');
-  const [availabilityBlocks, setAvailabilityBlocks] = useState<AvailabilityBlock[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [selectedDay, setSelectedDay] = useState<string>('monday');
+  const [selectedSlot, setSelectedSlot] = useState<number>(1);
+  const [startTime, setStartTime] = useState<string>('');
+  const [endTime, setEndTime] = useState<string>('');
+  const [currentAvailability, setCurrentAvailability] = useState<AvailabilitySlot[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
 
-  // Load availability for selected day
+  const daysOfWeek = [
+    { value: 'monday', label: 'Monday' },
+    { value: 'tuesday', label: 'Tuesday' },
+    { value: 'wednesday', label: 'Wednesday' },
+    { value: 'thursday', label: 'Thursday' },
+    { value: 'friday', label: 'Friday' },
+    { value: 'saturday', label: 'Saturday' },
+    { value: 'sunday', label: 'Sunday' }
+  ];
+
+  // Load current availability when component mounts or clinician changes
   useEffect(() => {
     if (clinicianId) {
-      loadAvailabilityForDay(selectedDay);
+      loadCurrentAvailability();
     }
-  }, [clinicianId, selectedDay]);
+  }, [clinicianId]);
 
-  const loadAvailabilityForDay = async (day: string) => {
+  // Load selected slot when day or slot changes
+  useEffect(() => {
+    loadSelectedSlot();
+  }, [selectedDay, selectedSlot, currentAvailability]);
+
+  const loadCurrentAvailability = async () => {
     if (!clinicianId) return;
 
     try {
+      setIsLoading(true);
       const { data, error } = await supabase
         .from('clinicians')
         .select(`
-          clinician_availability_start_${day}_1,
-          clinician_availability_end_${day}_1,
-          clinician_availability_start_${day}_2,
-          clinician_availability_end_${day}_2,
-          clinician_availability_start_${day}_3,
-          clinician_availability_end_${day}_3
+          clinician_availability_start_monday_1, clinician_availability_end_monday_1,
+          clinician_availability_start_monday_2, clinician_availability_end_monday_2,
+          clinician_availability_start_monday_3, clinician_availability_end_monday_3,
+          clinician_availability_start_tuesday_1, clinician_availability_end_tuesday_1,
+          clinician_availability_start_tuesday_2, clinician_availability_end_tuesday_2,
+          clinician_availability_start_tuesday_3, clinician_availability_end_tuesday_3,
+          clinician_availability_start_wednesday_1, clinician_availability_end_wednesday_1,
+          clinician_availability_start_wednesday_2, clinician_availability_end_wednesday_2,
+          clinician_availability_start_wednesday_3, clinician_availability_end_wednesday_3,
+          clinician_availability_start_thursday_1, clinician_availability_end_thursday_1,
+          clinician_availability_start_thursday_2, clinician_availability_end_thursday_2,
+          clinician_availability_start_thursday_3, clinician_availability_end_thursday_3,
+          clinician_availability_start_friday_1, clinician_availability_end_friday_1,
+          clinician_availability_start_friday_2, clinician_availability_end_friday_2,
+          clinician_availability_start_friday_3, clinician_availability_end_friday_3,
+          clinician_availability_start_saturday_1, clinician_availability_end_saturday_1,
+          clinician_availability_start_saturday_2, clinician_availability_end_saturday_2,
+          clinician_availability_start_saturday_3, clinician_availability_end_saturday_3,
+          clinician_availability_start_sunday_1, clinician_availability_end_sunday_1,
+          clinician_availability_start_sunday_2, clinician_availability_end_sunday_2,
+          clinician_availability_start_sunday_3, clinician_availability_end_sunday_3
         `)
         .eq('id', clinicianId)
         .single();
 
       if (error) throw error;
 
-      const blocks: AvailabilityBlock[] = [];
-      for (let i = 1; i <= 3; i++) {
-        const startTime = data?.[`clinician_availability_start_${day}_${i}`];
-        const endTime = data?.[`clinician_availability_end_${day}_${i}`];
-        
-        if (startTime && endTime) {
-          blocks.push({
-            id: i,
-            startTime,
-            endTime
-          });
-        }
-      }
+      // Parse availability data
+      const availability: AvailabilitySlot[] = [];
+      daysOfWeek.forEach(day => {
+        for (let slot = 1; slot <= 3; slot++) {
+          const startKey = `clinician_availability_start_${day.value}_${slot}`;
+          const endKey = `clinician_availability_end_${day.value}_${slot}`;
+          const startTime = data[startKey];
+          const endTime = data[endKey];
 
-      setAvailabilityBlocks(blocks);
+          if (startTime && endTime) {
+            availability.push({
+              day: day.value,
+              slot,
+              startTime,
+              endTime
+            });
+          }
+        }
+      });
+
+      setCurrentAvailability(availability);
     } catch (error) {
       console.error('Error loading availability:', error);
       toast({
-        title: "Error",
-        description: "Failed to load availability",
-        variant: "destructive"
+        title: 'Error',
+        description: 'Failed to load current availability',
+        variant: 'destructive'
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const saveAvailabilityForDay = async () => {
-    if (!clinicianId) return;
+  const loadSelectedSlot = () => {
+    const slot = currentAvailability.find(
+      a => a.day === selectedDay && a.slot === selectedSlot
+    );
+    
+    if (slot) {
+      setStartTime(slot.startTime);
+      setEndTime(slot.endTime);
+    } else {
+      setStartTime('');
+      setEndTime('');
+    }
+  };
 
-    setLoading(true);
-    try {
-      const updates: any = {};
-      
-      // Clear all slots first
-      for (let i = 1; i <= 3; i++) {
-        updates[`clinician_availability_start_${selectedDay}_${i}`] = null;
-        updates[`clinician_availability_end_${selectedDay}_${i}`] = null;
-      }
-
-      // Set active blocks
-      availabilityBlocks.forEach((block, index) => {
-        const slotNum = index + 1;
-        if (slotNum <= 3) {
-          updates[`clinician_availability_start_${selectedDay}_${slotNum}`] = block.startTime;
-          updates[`clinician_availability_end_${selectedDay}_${slotNum}`] = block.endTime;
-        }
+  const saveAvailability = async () => {
+    if (!clinicianId || !userTimeZone) {
+      toast({
+        title: 'Error',
+        description: 'Missing required data for saving availability',
+        variant: 'destructive'
       });
+      return;
+    }
+
+    if (!startTime || !endTime) {
+      toast({
+        title: 'Validation Error',
+        description: 'Please provide both start and end times',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    if (startTime >= endTime) {
+      toast({
+        title: 'Validation Error',
+        description: 'End time must be after start time',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+
+      // Create update object with availability times and timezone sync
+      const updateData = {
+        [`clinician_availability_start_${selectedDay}_${selectedSlot}`]: startTime,
+        [`clinician_availability_end_${selectedDay}_${selectedSlot}`]: endTime,
+        // Force timezone sync by updating clinician_time_zone (triggers the database trigger)
+        clinician_time_zone: userTimeZone
+      };
+
+      console.log('[AvailabilityManagementSidebar] Saving availability:', updateData);
 
       const { error } = await supabase
         .from('clinicians')
-        .update(updates)
+        .update(updateData)
         .eq('id', clinicianId);
 
       if (error) throw error;
 
       toast({
-        title: "Success",
-        description: "Availability saved successfully"
+        title: 'Success',
+        description: 'Availability saved successfully'
       });
+
+      // Reload availability to reflect changes
+      await loadCurrentAvailability();
     } catch (error) {
       console.error('Error saving availability:', error);
       toast({
-        title: "Error",
-        description: "Failed to save availability",
-        variant: "destructive"
+        title: 'Error',
+        description: 'Failed to save availability',
+        variant: 'destructive'
       });
     } finally {
-      setLoading(false);
+      setIsSaving(false);
     }
   };
 
-  const addAvailabilityBlock = () => {
-    if (availabilityBlocks.length < 3) {
-      const newBlock: AvailabilityBlock = {
-        id: availabilityBlocks.length + 1,
-        startTime: '09:00',
-        endTime: '17:00'
+  const deleteAvailability = async () => {
+    if (!clinicianId) return;
+
+    try {
+      setIsSaving(true);
+
+      // Clear the selected slot and force timezone sync
+      const updateData = {
+        [`clinician_availability_start_${selectedDay}_${selectedSlot}`]: null,
+        [`clinician_availability_end_${selectedDay}_${selectedSlot}`]: null,
+        // Force timezone sync
+        clinician_time_zone: userTimeZone
       };
-      setAvailabilityBlocks([...availabilityBlocks, newBlock]);
+
+      const { error } = await supabase
+        .from('clinicians')
+        .update(updateData)
+        .eq('id', clinicianId);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Success',
+        description: 'Availability slot deleted successfully'
+      });
+
+      // Clear form and reload
+      setStartTime('');
+      setEndTime('');
+      await loadCurrentAvailability();
+    } catch (error) {
+      console.error('Error deleting availability:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete availability',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsSaving(false);
     }
-  };
-
-  const removeAvailabilityBlock = (blockId: number) => {
-    setAvailabilityBlocks(availabilityBlocks.filter(block => block.id !== blockId));
-  };
-
-  const updateAvailabilityBlock = (blockId: number, field: 'startTime' | 'endTime', value: string) => {
-    setAvailabilityBlocks(availabilityBlocks.map(block => 
-      block.id === blockId ? { ...block, [field]: value } : block
-    ));
   };
 
   return (
-    <Card className="w-80">
+    <Card>
       <CardHeader>
-        <CardTitle className="text-lg">Availability Management</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          <Clock className="h-5 w-5" />
+          Manage Availability
+        </CardTitle>
+        <CardDescription>
+          Set your available time slots for appointments
+        </CardDescription>
       </CardHeader>
+      
       <CardContent className="space-y-4">
-        {/* Day selector */}
+        {/* Day Selection */}
         <div>
-          <Label htmlFor="day-select">Day of Week</Label>
+          <Label htmlFor="day">Day of Week</Label>
           <Select value={selectedDay} onValueChange={setSelectedDay}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {DAY_LABELS.map((label, index) => (
-                <SelectItem key={DAYS_OF_WEEK[index]} value={DAYS_OF_WEEK[index]}>
-                  {label}
+              {daysOfWeek.map(day => (
+                <SelectItem key={day.value} value={day.value}>
+                  {day.label}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
 
-        {/* Availability blocks */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <Label>Time Blocks</Label>
-            {availabilityBlocks.length < 3 && (
-              <Button
-                onClick={addAvailabilityBlock}
-                size="sm"
-                variant="outline"
-                className="h-8"
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
-            )}
+        {/* Slot Selection */}
+        <div>
+          <Label htmlFor="slot">Time Slot</Label>
+          <Select value={selectedSlot.toString()} onValueChange={(value) => setSelectedSlot(parseInt(value))}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1">Slot 1</SelectItem>
+              <SelectItem value="2">Slot 2</SelectItem>
+              <SelectItem value="3">Slot 3</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Time Inputs */}
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <Label htmlFor="startTime">Start Time</Label>
+            <Input
+              id="startTime"
+              type="time"
+              value={startTime}
+              onChange={(e) => setStartTime(e.target.value)}
+            />
           </div>
+          <div>
+            <Label htmlFor="endTime">End Time</Label>
+            <Input
+              id="endTime"
+              type="time"
+              value={endTime}
+              onChange={(e) => setEndTime(e.target.value)}
+            />
+          </div>
+        </div>
 
-          {availabilityBlocks.map((block) => (
-            <div key={block.id} className="flex items-center space-x-2 p-3 border rounded-lg">
-              <div className="flex-1">
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <Label className="text-xs">Start</Label>
-                    <Input
-                      type="time"
-                      value={block.startTime}
-                      onChange={(e) => updateAvailabilityBlock(block.id, 'startTime', e.target.value)}
-                      className="h-8"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs">End</Label>
-                    <Input
-                      type="time"
-                      value={block.endTime}
-                      onChange={(e) => updateAvailabilityBlock(block.id, 'endTime', e.target.value)}
-                      className="h-8"
-                    />
-                  </div>
-                </div>
-              </div>
-              <Button
-                onClick={() => removeAvailabilityBlock(block.id)}
-                size="sm"
-                variant="ghost"
-                className="h-8 w-8 p-0 text-red-500 hover:text-red-700"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
-          ))}
+        {/* Timezone Info */}
+        <div className="text-sm text-gray-500">
+          Times in: {TimeZoneService.getTimeZoneDisplayName(userTimeZone)}
+        </div>
 
-          {availabilityBlocks.length === 0 && (
-            <div className="text-sm text-gray-500 text-center py-4">
-              No availability blocks set for {DAY_LABELS[DAYS_OF_WEEK.indexOf(selectedDay)]}
-            </div>
+        {/* Action Buttons */}
+        <div className="flex gap-2">
+          <Button
+            onClick={saveAvailability}
+            disabled={isSaving || isLoading}
+            className="flex-1"
+          >
+            <Save className="h-4 w-4 mr-2" />
+            {isSaving ? 'Saving...' : 'Save'}
+          </Button>
+          
+          {(startTime || endTime) && (
+            <Button
+              onClick={deleteAvailability}
+              disabled={isSaving || isLoading}
+              variant="outline"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
           )}
         </div>
 
-        {/* Save button */}
-        <Button 
-          onClick={saveAvailabilityForDay} 
-          disabled={loading}
-          className="w-full"
-        >
-          {loading ? 'Saving...' : 'Save Availability'}
-        </Button>
-
-        {/* Timezone display */}
-        <div className="text-xs text-gray-500 text-center">
-          Times are in: {userTimeZone}
+        {/* Current Availability Summary */}
+        <div className="mt-6">
+          <h4 className="font-medium mb-2">Current Availability</h4>
+          {isLoading ? (
+            <div className="text-sm text-gray-500">Loading...</div>
+          ) : currentAvailability.length === 0 ? (
+            <div className="text-sm text-gray-500">No availability set</div>
+          ) : (
+            <div className="space-y-2">
+              {daysOfWeek.map(day => {
+                const daySlots = currentAvailability.filter(a => a.day === day.value);
+                if (daySlots.length === 0) return null;
+                
+                return (
+                  <div key={day.value} className="text-sm">
+                    <div className="font-medium">{day.label}</div>
+                    {daySlots.map(slot => (
+                      <div key={slot.slot} className="ml-2 text-gray-600">
+                        Slot {slot.slot}: {slot.startTime} - {slot.endTime}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

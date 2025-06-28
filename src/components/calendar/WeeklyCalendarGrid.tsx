@@ -4,22 +4,45 @@ import { DateTime } from 'luxon';
 import { TimeZoneService } from '@/utils/timeZoneService';
 import { Card } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
+import { useAppointments } from '@/hooks/useAppointments';
 
 interface WeeklyCalendarGridProps {
   currentDate: Date;
   clinicianId: string | null;
   userTimeZone: string;
   onAvailabilityClick?: (date: DateTime, startTime: DateTime, endTime: DateTime) => void;
+  onAppointmentClick?: (appointment: any) => void;
 }
 
 const WeeklyCalendarGrid: React.FC<WeeklyCalendarGridProps> = ({
   currentDate,
   clinicianId,
   userTimeZone,
-  onAvailabilityClick
+  onAvailabilityClick,
+  onAppointmentClick
 }) => {
   // Add availability state and fetching
   const [availabilityData, setAvailabilityData] = useState<any>({});
+
+  // Calculate week boundaries for appointment fetching
+  const weekBoundaries = useMemo(() => {
+    const dt = TimeZoneService.fromJSDate(currentDate, userTimeZone);
+    const weekStart = dt.startOf('week');
+    const weekEnd = dt.endOf('week');
+    return { weekStart, weekEnd, days: [] };
+  }, [currentDate, userTimeZone]);
+
+  // Fetch appointments for the current week
+  const { 
+    appointments, 
+    isLoading: appointmentsLoading, 
+    error: appointmentsError 
+  } = useAppointments(
+    clinicianId,
+    weekBoundaries.weekStart.toJSDate(),
+    weekBoundaries.weekEnd.toJSDate(),
+    userTimeZone
+  );
 
   // Fetch availability data - fetches ALL availability blocks (1, 2, 3)
   useEffect(() => {
@@ -65,7 +88,7 @@ const WeeklyCalendarGrid: React.FC<WeeklyCalendarGridProps> = ({
     };
     
     loadAvailability();
-  }, [clinicianId]); // Only clinicianId dependency
+  }, [clinicianId]);
 
   // Updated helper function to check ALL availability blocks for a time slot
   const isTimeSlotAvailable = useCallback((dayName: string, hour: number, minute: number) => {
@@ -91,15 +114,65 @@ const WeeklyCalendarGrid: React.FC<WeeklyCalendarGridProps> = ({
     return false;
   }, [availabilityData]);
 
+  // Helper function to render appointments in a time slot
+  const renderAppointmentsInSlot = useCallback((day: DateTime, slot: { hour: number; minute: number }) => {
+    if (!appointments || appointmentsLoading || !userTimeZone) return null;
+    
+    return appointments
+      .filter(apt => {
+        if (!apt.start_at || !apt.end_at) return false;
+        
+        try {
+          // Convert appointment UTC time to user timezone for comparison
+          const aptStart = TimeZoneService.fromUTC(apt.start_at, userTimeZone);
+          const aptEnd = TimeZoneService.fromUTC(apt.end_at, userTimeZone);
+          
+          const slotStart = day.set({ 
+            hour: slot.hour, 
+            minute: slot.minute 
+          });
+          const slotEnd = slotStart.plus({ minutes: 30 }); // 30-min slots
+          
+          // Check if appointment overlaps with this slot
+          return aptStart < slotEnd && aptEnd > slotStart;
+        } catch (error) {
+          console.error('Error converting appointment times:', error);
+          return false;
+        }
+      })
+      .map(apt => {
+        try {
+          const aptStart = TimeZoneService.fromUTC(apt.start_at, userTimeZone);
+          return (
+            <div 
+              key={apt.id} 
+              className="appointment-block bg-blue-500 text-white p-1 rounded text-xs cursor-pointer hover:bg-blue-600 mb-1"
+              onClick={() => onAppointmentClick?.(apt)}
+              title={`${apt.clientName || 'Unknown Client'} - ${aptStart.toFormat('h:mm a')}`}
+            >
+              <div className="font-medium truncate">{apt.clientName || 'Unknown'}</div>
+              <div className="text-xs opacity-90">
+                {aptStart.toFormat('h:mm a')}
+              </div>
+            </div>
+          );
+        } catch (error) {
+          console.error('Error rendering appointment:', error);
+          return null;
+        }
+      })
+      .filter(Boolean);
+  }, [appointments, appointmentsLoading, userTimeZone, onAppointmentClick]);
+
   // Memoized week boundaries calculation
-  const weekBoundaries = useMemo(() => {
+  const weekDays = useMemo(() => {
     const dt = TimeZoneService.fromJSDate(currentDate, userTimeZone);
     const weekStart = dt.startOf('week');
     const days = [];
     for (let i = 0; i < 7; i++) {
       days.push(weekStart.plus({ days: i }));
     }
-    return { weekStart, days };
+    return days;
   }, [currentDate, userTimeZone]);
 
   // Memoized time range configuration
@@ -158,7 +231,7 @@ const WeeklyCalendarGrid: React.FC<WeeklyCalendarGridProps> = ({
         </div>
 
         {/* Day headers */}
-        {weekBoundaries.days.map((day, index) => (
+        {weekDays.map((day, index) => (
           <div key={day.toISO()} className="border-r border-gray-200 last:border-r-0">
             <div className="h-16 border-b border-gray-200 flex flex-col items-center justify-center">
               <div className="text-sm font-medium text-gray-900">
@@ -181,24 +254,33 @@ const WeeklyCalendarGrid: React.FC<WeeklyCalendarGridProps> = ({
               {slot.minute === 0 ? formatters.formatTimeSlot(slot.hour, slot.minute) : ''}
             </div>
 
-            {/* Day cells with availability rendering */}
-            {weekBoundaries.days.map((day, dayIndex) => {
+            {/* Day cells with availability and appointment rendering */}
+            {weekDays.map((day, dayIndex) => {
               const dayName = day.toFormat('cccc').toLowerCase();
               const isAvailableSlot = isTimeSlotAvailable(dayName, slot.hour, slot.minute);
+              const appointmentBlocks = renderAppointmentsInSlot(day, slot);
               
               return (
                 <div
                   key={`${slotIndex}-${dayIndex}`}
-                  className={`border-r border-b border-gray-100 h-12 cursor-pointer transition-colors last:border-r-0 ${
+                  className={`border-r border-b border-gray-100 h-12 cursor-pointer transition-colors last:border-r-0 relative ${
                     isAvailableSlot 
                       ? 'bg-green-50 hover:bg-green-100' 
                       : 'hover:bg-gray-50'
                   }`}
                   onClick={() => handleCellClick(day, slot)}
                 >
-                  {isAvailableSlot && (
-                    <div className="w-full h-full flex items-center justify-center">
+                  {/* Availability indicator */}
+                  {isAvailableSlot && appointmentBlocks?.length === 0 && (
+                    <div className="absolute inset-0 flex items-center justify-center">
                       <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    </div>
+                  )}
+                  
+                  {/* Appointment blocks */}
+                  {appointmentBlocks && appointmentBlocks.length > 0 && (
+                    <div className="absolute inset-0 p-0.5 overflow-hidden">
+                      {appointmentBlocks}
                     </div>
                   )}
                 </div>
@@ -207,6 +289,19 @@ const WeeklyCalendarGrid: React.FC<WeeklyCalendarGridProps> = ({
           </React.Fragment>
         ))}
       </div>
+      
+      {/* Loading/Error states */}
+      {appointmentsLoading && (
+        <div className="text-center text-sm text-gray-500 mt-2">
+          Loading appointments...
+        </div>
+      )}
+      
+      {appointmentsError && (
+        <div className="text-center text-sm text-red-500 mt-2">
+          Error loading appointments: {appointmentsError.message}
+        </div>
+      )}
     </Card>
   );
 };

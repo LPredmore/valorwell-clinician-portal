@@ -7,11 +7,13 @@ import { useToast } from "@/hooks/use-toast";
 import CalendarErrorBoundary from "../components/calendar/CalendarErrorBoundary";
 import WeeklyCalendarGrid from "../components/calendar/WeeklyCalendarGrid";
 import AvailabilityManagementSidebar from "../components/calendar/AvailabilityManagementSidebar";
+import AppointmentDialog from "../components/calendar/AppointmentDialog";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { addWeeks, subWeeks } from "date-fns";
 import { TimeZoneService } from "@/utils/timeZoneService";
 import { getClinicianTimeZone } from "@/hooks/useClinicianData";
+import { DateTime } from "luxon";
 
 const CalendarSimple = React.memo(() => {
   const { userId, authInitialized, userRole } = useUser();
@@ -19,6 +21,12 @@ const CalendarSimple = React.memo(() => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [userTimeZone, setUserTimeZone] = useState<string>(TimeZoneService.DEFAULT_TIMEZONE);
   const [isMounted, setIsMounted] = useState(true);
+  const [showAppointmentDialog, setShowAppointmentDialog] = useState(false);
+  const [selectedDateTime, setSelectedDateTime] = useState<{
+    date?: DateTime;
+    startTime?: DateTime;
+    endTime?: DateTime;
+  }>({});
   const navigate = useNavigate();
   const { toast } = useToast();
   
@@ -75,6 +83,40 @@ const CalendarSimple = React.memo(() => {
     }
   }, [isMounted]);
 
+  // Handle availability click (opens appointment dialog)
+  const handleAvailabilityClick = useCallback((date: DateTime, startTime: DateTime, endTime: DateTime) => {
+    console.log('[CalendarSimple] Availability clicked:', { date, startTime, endTime });
+    setSelectedDateTime({
+      date,
+      startTime,
+      endTime
+    });
+    setShowAppointmentDialog(true);
+  }, []);
+
+  // Handle appointment click
+  const handleAppointmentClick = useCallback((appointment: any) => {
+    console.log('[CalendarSimple] Appointment clicked:', appointment);
+    // TODO: Implement appointment details modal or editing
+    toast({
+      title: "Appointment Details",
+      description: `${appointment.clientName} - ${appointment.type}`,
+    });
+  }, [toast]);
+
+  // Handle new appointment button
+  const handleNewAppointment = useCallback(() => {
+    setSelectedDateTime({});
+    setShowAppointmentDialog(true);
+  }, []);
+
+  // Handle appointment created
+  const handleAppointmentCreated = useCallback(() => {
+    // Force refresh of appointments by updating a trigger
+    console.log('[CalendarSimple] Appointment created successfully');
+    // The useAppointments hook will automatically refresh due to its query invalidation
+  }, []);
+
   // Component mounting effect
   useEffect(() => {
     setIsMounted(true);
@@ -108,7 +150,7 @@ const CalendarSimple = React.memo(() => {
       console.log('[CalendarSimple] Authorized user, setting ready');
       setIsReady(true);
     }
-  }, [authInitialized, userId, userRole]); // Removed navigate and handleAccessDenied
+  }, [authInitialized, userId, userRole, navigate, handleAccessDenied]);
 
   // Timezone loading effect - SEPARATED with circuit breaker
   useEffect(() => {
@@ -116,7 +158,7 @@ const CalendarSimple = React.memo(() => {
     
     console.log('[CalendarSimple] Loading timezone for ready user:', userId);
     loadUserTimeZone(userId);
-  }, [isReady, userId, isMounted]); // Removed loadUserTimeZone
+  }, [isReady, userId, isMounted, loadUserTimeZone]);
 
   // Memoized display values
   const currentMonthDisplay = useMemo(() => {
@@ -125,11 +167,6 @@ const CalendarSimple = React.memo(() => {
       year: 'numeric' 
     });
   }, [currentDate]);
-
-  const handleAvailabilityClick = useCallback((date: any, startTime: any, endTime: any) => {
-    console.log('Availability clicked:', { date, startTime, endTime });
-    // TODO: Implement availability editing modal
-  }, []);
 
   // Early returns for loading states
   if (!authInitialized) {
@@ -201,6 +238,10 @@ const CalendarSimple = React.memo(() => {
               <Button variant="outline" onClick={navigateNext}>
                 <ChevronRight className="h-4 w-4" />
               </Button>
+              <Button onClick={handleNewAppointment}>
+                <Plus className="h-4 w-4 mr-2" />
+                New Appointment
+              </Button>
             </div>
             <h1 className="text-2xl font-bold text-gray-800">
               {currentMonthDisplay}
@@ -219,6 +260,7 @@ const CalendarSimple = React.memo(() => {
                 clinicianId={userId}
                 userTimeZone={userTimeZone}
                 onAvailabilityClick={handleAvailabilityClick}
+                onAppointmentClick={handleAppointmentClick}
               />
             </div>
 
@@ -231,6 +273,18 @@ const CalendarSimple = React.memo(() => {
             </div>
           </div>
         </div>
+
+        {/* Appointment Dialog */}
+        <AppointmentDialog
+          isOpen={showAppointmentDialog}
+          onClose={() => setShowAppointmentDialog(false)}
+          clinicianId={userId}
+          clinicianTimeZone={userTimeZone}
+          selectedDate={selectedDateTime.date}
+          selectedStartTime={selectedDateTime.startTime}
+          selectedEndTime={selectedDateTime.endTime}
+          onAppointmentCreated={handleAppointmentCreated}
+        />
       </CalendarErrorBoundary>
     </Layout>
   );

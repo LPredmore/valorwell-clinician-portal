@@ -3266,6 +3266,15 @@ export type Database = {
         Args: { user_id: string }
         Returns: boolean
       }
+      validate_timezone_integrity: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          check_type: string
+          status: string
+          count: number
+          message: string
+        }[]
+      }
     }
     Enums: {
       app_role: "admin" | "client" | "clinician"
