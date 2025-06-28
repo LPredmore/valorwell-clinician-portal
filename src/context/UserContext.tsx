@@ -1,3 +1,4 @@
+
 import React, { createContext, useState, useEffect, useContext, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { AuthChangeEvent, Session, User as SupabaseUser } from '@supabase/supabase-js';
@@ -49,6 +50,14 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const fetchAttemptsRef = useRef(0);
   const MAX_FETCH_ATTEMPTS = 3;
   const lastUserIdRef = useRef<string | null>(null);
+
+  // STEP 1: Extract resetCircuitBreaker as standalone useCallback
+  const resetCircuitBreaker = useCallback(() => {
+    fetchAttemptsRef.current = 0;
+    setFetchAttempts(0);
+    lastUserIdRef.current = null;
+    logInfo("[UserContext] Circuit breaker reset");
+  }, []);
 
   /**
    * Determine user role from metadata and database
@@ -168,11 +177,61 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [determineUserRole]);
 
-  // Reset circuit breaker when user changes
-  const resetCircuitBreaker = useCallback(() => {
-    fetchAttemptsRef.current = 0;
+  // STEP 2: Extract refreshUserData as standalone useCallback (before useMemo)
+  const refreshUserData = useCallback(async () => {
+    logInfo("[UserContext] refreshUserData called");
+    setAuthInitialized(true);
+    
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session?.user) {
+        resetCircuitBreaker(); // Reset counter
+        await fetchUserData(session.user);
+      } else {
+        setUser(null);
+        setUserId(null);
+        setUserRole(null);
+        setClientStatus(null);
+        setClientProfile(null);
+        setIsLoading(false);
+      }
+    } catch (error) {
+      logError("[UserContext] Error in refreshUserData:", error);
+      setIsLoading(false);
+    } finally {
+      setAuthInitialized(true);
+    }
+  }, [fetchUserData, resetCircuitBreaker]);
+
+  // STEP 3: Extract logout as standalone useCallback (before useMemo)
+  const logout = useCallback(async () => {
+    logInfo("[UserContext] Logging out user...");
+    setIsLoading(true);
+    setAuthInitialized(true);
+    
+    // Reset local state immediately
+    setUser(null);
+    setUserId(null);
+    setUserRole(null);
+    setClientStatus(null);
+    setClientProfile(null);
     setFetchAttempts(0);
-    lastUserIdRef.current = null;
+    
+    try {
+      await supabase.auth.signOut({ scope: 'global' });
+      setTimeout(() => {
+        window.location.href = '/login';
+      }, 100);
+    } catch (error) {
+      logError("[UserContext] Error during logout:", error);
+      setTimeout(() => {
+        window.location.href = '/login';
+      }, 100);
+    } finally {
+      setAuthInitialized(true);
+      setIsLoading(false);
+    }
   }, []);
 
   // Safety mechanism to ensure auth state is properly initialized
@@ -278,9 +337,9 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isMounted = false;
       authListener?.subscription?.unsubscribe();
     };
-  }, []); // Empty dependency array to prevent infinite loops
+  }, [fetchUserData, resetCircuitBreaker]);
 
-  // Memoize the context value to prevent unnecessary re-renders
+  // STEP 4: Update contextValue useMemo to ONLY reference callbacks (no useCallback inside)
   const contextValue = useMemo(() => ({
     user, 
     userId, 
@@ -289,60 +348,19 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     clientProfile, 
     isLoading, 
     authInitialized, 
-    refreshUserData: useCallback(async () => {
-      logInfo("[UserContext] refreshUserData called");
-      setAuthInitialized(true);
-      
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (session?.user) {
-          resetCircuitBreaker(); // Reset counter
-          await fetchUserData(session.user);
-        } else {
-          setUser(null);
-          setUserId(null);
-          setUserRole(null);
-          setClientStatus(null);
-          setClientProfile(null);
-          setIsLoading(false);
-        }
-      } catch (error) {
-        logError("[UserContext] Error in refreshUserData:", error);
-        setIsLoading(false);
-      } finally {
-        setAuthInitialized(true);
-      }
-    }, [fetchUserData]), 
-    logout: useCallback(async () => {
-      logInfo("[UserContext] Logging out user...");
-      setIsLoading(true);
-      setAuthInitialized(true);
-      
-      // Reset local state immediately
-      setUser(null);
-      setUserId(null);
-      setUserRole(null);
-      setClientStatus(null);
-      setClientProfile(null);
-      setFetchAttempts(0);
-      
-      try {
-        await supabase.auth.signOut({ scope: 'global' });
-        setTimeout(() => {
-          window.location.href = '/login';
-        }, 100);
-      } catch (error) {
-        logError("[UserContext] Error during logout:", error);
-        setTimeout(() => {
-          window.location.href = '/login';
-        }, 100);
-      } finally {
-        setAuthInitialized(true);
-        setIsLoading(false);
-      }
-    }, [])
-  }), [user, userId, userRole, clientStatus, clientProfile, isLoading, authInitialized, fetchUserData]);
+    refreshUserData, // Reference extracted callback - NO useCallback here
+    logout           // Reference extracted callback - NO useCallback here
+  }), [
+    user, 
+    userId, 
+    userRole, 
+    clientStatus, 
+    clientProfile, 
+    isLoading, 
+    authInitialized, 
+    refreshUserData, 
+    logout
+  ]);
 
   return (
     <UserContext.Provider value={contextValue}>

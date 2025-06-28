@@ -19,6 +19,7 @@ import ClinicianDetails from "./pages/ClinicianDetails";
 import Settings from "./pages/Settings";
 import ResetPassword from "./pages/ResetPassword";
 import NylasOAuthCallback from "./pages/NylasOAuthCallback";
+import MonitoringPage from "./pages/MonitoringPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -109,6 +110,14 @@ const App = () => {
                 element={
                   <ProtectedRoute allowedRoles={['admin']}>
                     <Settings />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/monitoring" 
+                element={
+                  <ProtectedRoute allowedRoles={['admin']}>
+                    <MonitoringPage />
                   </ProtectedRoute>
                 } 
               />
