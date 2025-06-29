@@ -115,6 +115,7 @@ serve(async (req) => {
         }
 
         const tokenData = await tokenResponse.json()
+        console.log('Full Nylas token response:', JSON.stringify(tokenData, null, 2));
         console.log('[nylas-auth] Token exchange successful:', {
           email: tokenData.email,
           grant_id: tokenData.grant_id,
