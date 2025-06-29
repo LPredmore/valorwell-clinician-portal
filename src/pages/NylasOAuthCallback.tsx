@@ -26,11 +26,16 @@ const NylasOAuthCallback: React.FC = () => {
           setStatus('error');
           setMessage('Google Calendar connection was cancelled or failed');
           
-          // Close popup after showing error briefly
+          // Notify parent and close popup after showing error briefly
+          if (window.opener) {
+            window.opener.postMessage({ 
+              type: 'NYLAS_AUTH_ERROR', 
+              error: error 
+            }, '*');
+          }
+          
           setTimeout(() => {
-            if (window.opener) {
-              window.close();
-            }
+            window.close();
           }, 2000);
           return;
         }
@@ -41,10 +46,15 @@ const NylasOAuthCallback: React.FC = () => {
           setStatus('error');
           setMessage('Invalid callback - missing authorization code');
           
+          if (window.opener) {
+            window.opener.postMessage({ 
+              type: 'NYLAS_AUTH_ERROR', 
+              error: 'Missing authorization code' 
+            }, '*');
+          }
+          
           setTimeout(() => {
-            if (window.opener) {
-              window.close();
-            }
+            window.close();
           }, 2000);
           return;
         }
@@ -65,10 +75,15 @@ const NylasOAuthCallback: React.FC = () => {
           setStatus('error');
           setMessage(`Connection failed: ${functionError.message}`);
           
+          if (window.opener) {
+            window.opener.postMessage({ 
+              type: 'NYLAS_AUTH_ERROR', 
+              error: functionError.message 
+            }, '*');
+          }
+          
           setTimeout(() => {
-            if (window.opener) {
-              window.close();
-            }
+            window.close();
           }, 3000);
           return;
         }
@@ -90,19 +105,22 @@ const NylasOAuthCallback: React.FC = () => {
           
           // Close popup after success
           setTimeout(() => {
-            if (window.opener) {
-              window.close();
-            }
-          }, 2000);
+            window.close();
+          }, 1500);
         } else {
           console.error('[NylasOAuthCallback] Unexpected response:', data);
           setStatus('error');
           setMessage('Connection completed but response was unexpected');
           
+          if (window.opener) {
+            window.opener.postMessage({ 
+              type: 'NYLAS_AUTH_ERROR', 
+              error: 'Unexpected response from server' 
+            }, '*');
+          }
+          
           setTimeout(() => {
-            if (window.opener) {
-              window.close();
-            }
+            window.close();
           }, 3000);
         }
 
@@ -111,15 +129,28 @@ const NylasOAuthCallback: React.FC = () => {
         setStatus('error');
         setMessage(`Connection error: ${error.message || 'Unknown error'}`);
         
+        if (window.opener) {
+          window.opener.postMessage({ 
+            type: 'NYLAS_AUTH_ERROR', 
+            error: error.message || 'Unknown error' 
+          }, '*');
+        }
+        
         setTimeout(() => {
-          if (window.opener) {
-            window.close();
-          }
+          window.close();
         }, 3000);
       }
     };
 
     handleCallback();
+
+    // Fallback: Close window after 10 seconds if something goes wrong
+    const fallbackTimer = setTimeout(() => {
+      console.log('[NylasOAuthCallback] Fallback timer - closing window');
+      window.close();
+    }, 10000);
+
+    return () => clearTimeout(fallbackTimer);
   }, []);
 
   const getIcon = () => {

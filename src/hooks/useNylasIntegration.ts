@@ -25,7 +25,7 @@ export const useNylasIntegration = () => {
   const { toast } = useToast();
   const { userId, authInitialized } = useUser();
 
-  // Listen for callback success messages
+  // Listen for callback success and error messages
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === 'NYLAS_AUTH_SUCCESS') {
@@ -33,10 +33,18 @@ export const useNylasIntegration = () => {
         setIsConnecting(false);
         toast({
           title: 'Google Calendar Connected',
-          description: 'Successfully connected your Google Calendar via Nylas',
+          description: `Successfully connected ${event.data.email} via Nylas`,
           variant: 'default'
         });
         fetchConnections();
+      } else if (event.data?.type === 'NYLAS_AUTH_ERROR') {
+        console.log('[useNylasIntegration] Received Google Calendar auth error message:', event.data.error);
+        setIsConnecting(false);
+        toast({
+          title: 'Connection Failed',
+          description: `Google Calendar connection failed: ${event.data.error}`,
+          variant: 'destructive'
+        });
       }
     };
 
@@ -147,6 +155,7 @@ export const useNylasIntegration = () => {
             variant: 'destructive'
           });
         }
+        setIsConnecting(false);
         return;
       }
 
@@ -155,7 +164,7 @@ export const useNylasIntegration = () => {
         const popup = window.open(
           data.authUrl,
           'google-calendar-auth',
-          'width=500,height=600,scrollbars=yes,resizable=yes'
+          'width=500,height=600,scrollbars=yes,resizable=yes,popup=yes'
         );
 
         if (!popup) {
@@ -165,20 +174,32 @@ export const useNylasIntegration = () => {
             description: 'Please allow popups and try again.',
             variant: 'destructive'
           });
+          setIsConnecting(false);
           return;
         }
 
-        // Monitor popup closure
+        // Monitor popup closure without message (user closed manually)
         const checkClosed = setInterval(() => {
           if (popup?.closed) {
             clearInterval(checkClosed);
+            // Only set connecting to false if we didn't receive a message
             setTimeout(() => {
               setIsConnecting(false);
             }, 1000);
           }
         }, 1000);
+
+        // Cleanup interval after 5 minutes
+        setTimeout(() => {
+          clearInterval(checkClosed);
+          if (popup && !popup.closed) {
+            popup.close();
+          }
+          setIsConnecting(false);
+        }, 300000);
       } else {
         setInfrastructureError('No authorization URL received from server');
+        setIsConnecting(false);
         throw new Error('No authorization URL received');
       }
     } catch (error: any) {
