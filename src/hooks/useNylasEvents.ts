@@ -34,22 +34,46 @@ export const useNylasEvents = (startDate?: Date, endDate?: Date) => {
       setIsLoading(true);
       setError(null);
 
+      console.log('[useNylasEvents] Fetching events with parameters:', {
+        startDate: startDate?.toISOString(),
+        endDate: endDate?.toISOString(),
+        startDateLocal: startDate?.toLocaleString(),
+        endDateLocal: endDate?.toLocaleString()
+      });
+
       const requestBody = {
         action: 'fetch_events',
         startDate: startDate?.toISOString(),
         endDate: endDate?.toISOString()
       };
 
+      console.log('[useNylasEvents] Calling nylas-events function with body:', requestBody);
+
       const { data, error } = await supabase.functions.invoke('nylas-events', {
         body: requestBody
       });
 
-      if (error) throw error;
+      console.log('[useNylasEvents] Function response:', { data, error });
 
-      setEvents(data?.events || []);
-      setConnections(data?.connections || []);
+      if (error) {
+        console.error('[useNylasEvents] Function error:', error);
+        throw error;
+      }
+
+      const fetchedEvents = data?.events || [];
+      const fetchedConnections = data?.connections || [];
+
+      console.log('[useNylasEvents] Processed response:', {
+        eventsCount: fetchedEvents.length,
+        connectionsCount: fetchedConnections.length,
+        events: fetchedEvents,
+        connections: fetchedConnections
+      });
+
+      setEvents(fetchedEvents);
+      setConnections(fetchedConnections);
     } catch (error) {
-      console.error('Error fetching Nylas events:', error);
+      console.error('[useNylasEvents] Error fetching Nylas events:', error);
       setError(error.message || 'Failed to fetch calendar events');
       toast({
         title: "Error",
@@ -62,8 +86,22 @@ export const useNylasEvents = (startDate?: Date, endDate?: Date) => {
   };
 
   useEffect(() => {
+    console.log('[useNylasEvents] Effect triggered with dates:', {
+      startDate: startDate?.toISOString(),
+      endDate: endDate?.toISOString()
+    });
     fetchEvents();
   }, [startDate, endDate]);
+
+  useEffect(() => {
+    console.log('[useNylasEvents] State updated:', {
+      eventsCount: events.length,
+      connectionsCount: connections.length,
+      isLoading,
+      error,
+      events
+    });
+  }, [events, connections, isLoading, error]);
 
   return {
     events,

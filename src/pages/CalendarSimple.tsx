@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "../components/layout/Layout";
@@ -20,6 +19,7 @@ import { DateTime } from "luxon";
 import { useAppointments } from "@/hooks/useAppointments";
 import { useNylasEvents } from "@/hooks/useNylasEvents";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
 const CalendarSimple = React.memo(() => {
   const { userId, authInitialized, userRole } = useUser();
@@ -92,6 +92,14 @@ const CalendarSimple = React.memo(() => {
       end_time: event.when?.end_time
     })) || [];
 
+    console.log('[CalendarSimple] Merging events:', {
+      internalEventsCount: internalEvents.length,
+      externalEventsCount: externalEvents.length,
+      totalEventsCount: internalEvents.length + externalEvents.length,
+      internalEvents: internalEvents.map(e => ({ id: e.id, title: e.title, start: e.start_time })),
+      externalEvents: externalEvents.map(e => ({ id: e.id, title: e.title, start: e.start_time }))
+    });
+
     return [...internalEvents, ...externalEvents];
   }, [appointments, nylasEvents]);
 
@@ -110,7 +118,20 @@ const CalendarSimple = React.memo(() => {
       weekEnd: weekEnd.toISOString(),
       isReady,
       authInitialized,
-      calendarView
+      calendarView,
+      appointments: appointments?.map(apt => ({
+        id: apt.id,
+        clientName: apt.clientName,
+        start_at: apt.start_at,
+        end_at: apt.end_at,
+        type: apt.type
+      })),
+      nylasEvents: nylasEvents?.map(event => ({
+        id: event.id,
+        title: event.title,
+        start_time: event.when?.start_time,
+        connection_provider: event.connection_provider
+      }))
     });
   }, [userId, appointments, nylasEvents, allEvents, appointmentsLoading, nylasLoading, userTimeZone, currentDate, weekStart, weekEnd, isReady, authInitialized, calendarView]);
 
@@ -332,7 +353,10 @@ const CalendarSimple = React.memo(() => {
               {currentMonthDisplay}
             </h1>
             <div className="flex items-center space-x-4">
-              <Tabs value={calendarView} onValueChange={(value) => setCalendarView(value as 'internal' | 'hybrid' | 'debug')}>
+              <Tabs value={calendarView} onValueChange={(value) => {
+                console.log('[CalendarSimple] Calendar view changed to:', value);
+                setCalendarView(value as 'internal' | 'hybrid' | 'debug');
+              }}>
                 <TabsList>
                   <TabsTrigger value="internal">Internal</TabsTrigger>
                   <TabsTrigger value="hybrid">Hybrid</TabsTrigger>
@@ -369,7 +393,28 @@ const CalendarSimple = React.memo(() => {
                   />
                 </TabsContent>
                 <TabsContent value="debug">
-                  <NylasConnectionTest />
+                  <div className="space-y-4">
+                    <NylasConnectionTest />
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Debug Information</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2 text-sm">
+                          <div><strong>User ID:</strong> {userId}</div>
+                          <div><strong>Time Zone:</strong> {userTimeZone}</div>
+                          <div><strong>Current Date:</strong> {currentDate.toISOString()}</div>
+                          <div><strong>Week Start:</strong> {weekStart.toISOString()}</div>
+                          <div><strong>Week End:</strong> {weekEnd.toISOString()}</div>
+                          <div><strong>Internal Appointments:</strong> {appointments?.length || 0}</div>
+                          <div><strong>Nylas Events:</strong> {nylasEvents?.length || 0}</div>
+                          <div><strong>All Events:</strong> {allEvents?.length || 0}</div>
+                          <div><strong>Appointments Loading:</strong> {appointmentsLoading ? 'Yes' : 'No'}</div>
+                          <div><strong>Nylas Loading:</strong> {nylasLoading ? 'Yes' : 'No'}</div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
                 </TabsContent>
               </Tabs>
             </div>

@@ -1,5 +1,5 @@
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useNylasIntegration } from '@/hooks/useNylasIntegration';
 import { useNylasEvents } from '@/hooks/useNylasEvents';
 import { Calendar, ExternalLink, Plus } from 'lucide-react';
@@ -26,8 +26,25 @@ const NylasHybridCalendar: React.FC<NylasHybridCalendarProps> = ({
   const { connections, isLoading: isLoadingConnections, connectCalendar } = useNylasIntegration();
   
   // Calculate date range for fetching events (current week)
-  const startDate = useMemo(() => startOfWeek(currentDate), [currentDate]);
-  const endDate = useMemo(() => endOfWeek(currentDate), [currentDate]);
+  const startDate = useMemo(() => {
+    const start = startOfWeek(currentDate);
+    console.log('[NylasHybridCalendar] Calculated start date:', {
+      currentDate: currentDate.toISOString(),
+      startDate: start.toISOString(),
+      startDateLocal: start.toLocaleString()
+    });
+    return start;
+  }, [currentDate]);
+  
+  const endDate = useMemo(() => {
+    const end = endOfWeek(currentDate);
+    console.log('[NylasHybridCalendar] Calculated end date:', {
+      currentDate: currentDate.toISOString(),
+      endDate: end.toISOString(),
+      endDateLocal: end.toLocaleString()
+    });
+    return end;
+  }, [currentDate]);
   
   const { 
     events, 
@@ -40,12 +57,19 @@ const NylasHybridCalendar: React.FC<NylasHybridCalendarProps> = ({
 
   // Generate week days for the calendar grid
   const weekDays = useMemo(() => {
-    return eachDayOfInterval({ start: startDate, end: endDate });
+    const days = eachDayOfInterval({ start: startDate, end: endDate });
+    console.log('[NylasHybridCalendar] Generated week days:', {
+      daysCount: days.length,
+      days: days.map(d => ({ iso: d.toISOString(), local: d.toLocaleDateString() }))
+    });
+    return days;
   }, [startDate, endDate]);
 
   // Group events by date for calendar display
   const eventsByDate = useMemo(() => {
     const grouped: { [key: string]: any[] } = {};
+    
+    console.log('[NylasHybridCalendar] Grouping events by date - input events:', events);
     
     events.forEach(event => {
       if (event.when?.start_time) {
@@ -57,22 +81,64 @@ const NylasHybridCalendar: React.FC<NylasHybridCalendarProps> = ({
         }
         
         grouped[dateKey].push(event);
+        
+        console.log('[NylasHybridCalendar] Grouped event:', {
+          eventId: event.id,
+          eventTitle: event.title,
+          startTime: event.when.start_time,
+          eventStartTime: eventStartTime.toISOString(),
+          dateKey,
+          groupedCount: grouped[dateKey].length
+        });
+      } else {
+        console.warn('[NylasHybridCalendar] Event missing start_time:', event);
       }
+    });
+    
+    console.log('[NylasHybridCalendar] Final grouped events:', {
+      totalGroups: Object.keys(grouped).length,
+      grouped,
+      eventsByDateSummary: Object.entries(grouped).map(([date, events]) => ({
+        date,
+        eventCount: events.length,
+        eventTitles: events.map(e => e.title)
+      }))
     });
     
     return grouped;
   }, [events]);
 
+  // Debug effect to log all component state changes
+  useEffect(() => {
+    console.log('[NylasHybridCalendar] Component state updated:', {
+      clinicianId,
+      userTimeZone,
+      currentDate: currentDate.toISOString(),
+      connectionsCount: connections.length,
+      eventsCount: events.length,
+      isLoadingConnections,
+      isLoadingEvents,
+      isLoading,
+      error,
+      weekDaysCount: weekDays.length,
+      eventsByDateKeys: Object.keys(eventsByDate),
+      eventsByDateCount: Object.values(eventsByDate).reduce((sum, events) => sum + events.length, 0)
+    });
+  }, [clinicianId, userTimeZone, currentDate, connections, events, isLoadingConnections, isLoadingEvents, isLoading, error, weekDays, eventsByDate]);
+
   const handleConnectCalendar = async () => {
     try {
+      console.log('[NylasHybridCalendar] Connecting calendar...');
       await connectCalendar();
+      console.log('[NylasHybridCalendar] Calendar connection initiated');
     } catch (error) {
-      console.error('Error connecting calendar:', error);
+      console.error('[NylasHybridCalendar] Error connecting calendar:', error);
     }
   };
 
   // Show error state for database/deployment issues
   if (error && (error.includes('does not exist') || error.includes('Failed to send a request'))) {
+    console.log('[NylasHybridCalendar] Showing setup required error state');
     return (
       <CalendarErrorState
         title="Setup Required"
@@ -85,6 +151,7 @@ const NylasHybridCalendar: React.FC<NylasHybridCalendarProps> = ({
 
   // Show error state for other errors
   if (error) {
+    console.log('[NylasHybridCalendar] Showing general error state:', error);
     return (
       <CalendarErrorState
         message={`Error loading calendar events: ${error}`}
@@ -95,11 +162,13 @@ const NylasHybridCalendar: React.FC<NylasHybridCalendarProps> = ({
 
   // Show loading state
   if (isLoading) {
+    console.log('[NylasHybridCalendar] Showing loading state');
     return <CalendarLoadingState message="Loading calendar events..." />;
   }
 
   // Show connect calendar prompt if no connections
   if (!connections.length) {
+    console.log('[NylasHybridCalendar] Showing connect calendar prompt - no connections');
     return (
       <Card>
         <CardHeader>
@@ -127,6 +196,8 @@ const NylasHybridCalendar: React.FC<NylasHybridCalendarProps> = ({
       </Card>
     );
   }
+
+  console.log('[NylasHybridCalendar] Rendering hybrid calendar with data');
 
   return (
     <div className="space-y-6">
@@ -161,31 +232,53 @@ const NylasHybridCalendar: React.FC<NylasHybridCalendarProps> = ({
             const dateKey = format(day, 'yyyy-MM-dd');
             const dayEvents = eventsByDate[dateKey] || [];
             
+            console.log('[NylasHybridCalendar] Rendering day:', {
+              day: day.toISOString(),
+              dayLocal: day.toLocaleDateString(),
+              dateKey,
+              dayEventsCount: dayEvents.length,
+              dayEvents
+            });
+            
             return (
               <div key={day.toISOString()} className="border-r last:border-r-0 p-2 min-h-[400px]">
                 <div className="space-y-1">
-                  {dayEvents.map((event) => (
-                    <div
-                      key={event.id}
-                      className="p-2 bg-blue-100 border-l-4 border-blue-500 rounded text-xs cursor-pointer hover:bg-blue-200 transition-colors"
-                      onClick={() => onEventClick?.(event)}
-                    >
-                      <div className="font-medium text-blue-900 truncate">
-                        {event.title || 'Untitled Event'}
-                      </div>
-                      {event.when?.start_time && (
-                        <div className="text-blue-700">
-                          {format(new Date(event.when.start_time), 'h:mm a')}
-                        </div>
-                      )}
-                      <div className="flex items-center gap-1 mt-1">
-                        <Badge variant="outline" className="text-xs">
-                          {event.connection_provider}
-                        </Badge>
-                        <ExternalLink className="h-3 w-3 text-blue-500" />
-                      </div>
+                  {dayEvents.length === 0 ? (
+                    <div className="text-xs text-gray-400 p-2">
+                      No events
                     </div>
-                  ))}
+                  ) : (
+                    dayEvents.map((event) => {
+                      console.log('[NylasHybridCalendar] Rendering event:', {
+                        eventId: event.id,
+                        eventTitle: event.title,
+                        eventStartTime: event.when?.start_time
+                      });
+                      
+                      return (
+                        <div
+                          key={event.id}
+                          className="p-2 bg-blue-100 border-l-4 border-blue-500 rounded text-xs cursor-pointer hover:bg-blue-200 transition-colors"
+                          onClick={() => onEventClick?.(event)}
+                        >
+                          <div className="font-medium text-blue-900 truncate">
+                            {event.title || 'Untitled Event'}
+                          </div>
+                          {event.when?.start_time && (
+                            <div className="text-blue-700">
+                              {format(new Date(event.when.start_time), 'h:mm a')}
+                            </div>
+                          )}
+                          <div className="flex items-center gap-1 mt-1">
+                            <Badge variant="outline" className="text-xs">
+                              {event.connection_provider}
+                            </Badge>
+                            <ExternalLink className="h-3 w-3 text-blue-500" />
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
               </div>
             );
@@ -196,6 +289,11 @@ const NylasHybridCalendar: React.FC<NylasHybridCalendarProps> = ({
       {/* Events summary */}
       <div className="text-sm text-gray-600">
         Showing {events.length} events from {connections.length} connected calendar{connections.length !== 1 ? 's' : ''}
+        {events.length === 0 && connections.length > 0 && (
+          <div className="text-yellow-600 mt-1">
+            ⚠️ No events found for the current week. Check your calendar for events in this date range.
+          </div>
+        )}
       </div>
     </div>
   );
