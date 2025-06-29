@@ -32,27 +32,69 @@ const NylasConnectionTest: React.FC = () => {
     setResults([...testSteps]);
 
     try {
-      // Test 1: Edge Functions
-      console.log('[NylasTest] Testing edge functions...');
-      const { data: authTest, error: authError } = await supabase.functions.invoke('nylas-auth', {
+      // Test 1: Edge Functions Deployment
+      console.log('[NylasTest] Testing edge function deployment...');
+      const { data: deploymentTest, error: deploymentError } = await supabase.functions.invoke('nylas-auth', {
         body: { action: 'test_connectivity' }
       });
       
-      testSteps[0] = authError 
-        ? { step: 'Edge Functions', status: 'error', message: `Deployment issue: ${authError.message}` }
-        : { step: 'Edge Functions', status: 'success', message: 'Functions deployed successfully' };
+      if (deploymentError) {
+        if (deploymentError.message?.includes('Failed to send a request') || deploymentError.message?.includes('FetchError')) {
+          testSteps[0] = { 
+            step: 'Edge Functions', 
+            status: 'error', 
+            message: 'Functions not deployed. Run: supabase functions deploy nylas-auth' 
+          };
+        } else {
+          testSteps[0] = { 
+            step: 'Edge Functions', 
+            status: 'error', 
+            message: `Deployment issue: ${deploymentError.message}` 
+          };
+        }
+      } else {
+        testSteps[0] = { 
+          step: 'Edge Functions', 
+          status: 'success', 
+          message: 'All functions deployed and responding' 
+        };
+      }
       
       setResults([...testSteps]);
 
-      // Test 2: API Credentials  
-      console.log('[NylasTest] Testing API credentials...');
-      const { data: initTest, error: initError } = await supabase.functions.invoke('nylas-auth', {
-        body: { action: 'initialize' }
-      });
+      // Test 2: API Credentials (only if functions are deployed)
+      if (testSteps[0].status === 'success') {
+        console.log('[NylasTest] Testing API credentials...');
+        const { data: initTest, error: initError } = await supabase.functions.invoke('nylas-auth', {
+          body: { action: 'initialize' }
+        });
 
-      testSteps[1] = initError?.message?.includes('configuration missing')
-        ? { step: 'API Credentials', status: 'error', message: 'Missing NYLAS_CLIENT_ID, NYLAS_CLIENT_SECRET, or NYLAS_API_KEY' }
-        : { step: 'API Credentials', status: 'success', message: 'Credentials configured' };
+        if (initError?.message?.includes('configuration missing')) {
+          testSteps[1] = { 
+            step: 'API Credentials', 
+            status: 'error', 
+            message: 'Missing NYLAS_CLIENT_ID, NYLAS_CLIENT_SECRET, or NYLAS_API_KEY' 
+          };
+        } else if (initError) {
+          testSteps[1] = { 
+            step: 'API Credentials', 
+            status: 'error', 
+            message: `Credential error: ${initError.message}` 
+          };
+        } else {
+          testSteps[1] = { 
+            step: 'API Credentials', 
+            status: 'success', 
+            message: 'Nylas API credentials configured correctly' 
+          };
+        }
+      } else {
+        testSteps[1] = { 
+          step: 'API Credentials', 
+          status: 'error', 
+          message: 'Skipped - deploy functions first' 
+        };
+      }
       
       setResults([...testSteps]);
 
@@ -63,20 +105,48 @@ const NylasConnectionTest: React.FC = () => {
         .select('count')
         .limit(1);
 
-      testSteps[2] = dbError 
-        ? { step: 'Database Access', status: 'error', message: `RLS issue: ${dbError.message}` }
-        : { step: 'Database Access', status: 'success', message: 'Database access working' };
+      if (dbError) {
+        testSteps[2] = { 
+          step: 'Database Access', 
+          status: 'error', 
+          message: `Database error: ${dbError.message}` 
+        };
+      } else {
+        testSteps[2] = { 
+          step: 'Database Access', 
+          status: 'success', 
+          message: 'Database access working correctly' 
+        };
+      }
       
       setResults([...testSteps]);
 
       // Test 4: Full Auth Flow (only if previous tests pass)
-      if (!authError && !initError && !dbError) {
-        console.log('[NylasTest] Testing full auth flow...');
-        testSteps[3] = initTest?.authUrl 
-          ? { step: 'Auth Flow', status: 'success', message: 'OAuth flow ready' }
-          : { step: 'Auth Flow', status: 'error', message: 'Auth URL generation failed' };
+      if (testSteps[0].status === 'success' && testSteps[1].status === 'success' && testSteps[2].status === 'success') {
+        console.log('[NylasTest] Testing full OAuth flow...');
+        const { data: authTest, error: authError } = await supabase.functions.invoke('nylas-auth', {
+          body: { action: 'initialize' }
+        });
+        
+        if (authTest?.authUrl) {
+          testSteps[3] = { 
+            step: 'Auth Flow', 
+            status: 'success', 
+            message: 'OAuth flow ready - you can now connect calendars!' 
+          };
+        } else {
+          testSteps[3] = { 
+            step: 'Auth Flow', 
+            status: 'error', 
+            message: 'Auth URL generation failed' 
+          };
+        }
       } else {
-        testSteps[3] = { step: 'Auth Flow', status: 'error', message: 'Skipped due to previous failures' };
+        testSteps[3] = { 
+          step: 'Auth Flow', 
+          status: 'error', 
+          message: 'Skipped due to previous failures' 
+        };
       }
       
       setResults([...testSteps]);
@@ -85,7 +155,7 @@ const NylasConnectionTest: React.FC = () => {
       const failures = testSteps.filter(t => t.status === 'error').length;
       if (failures === 0) {
         toast({
-          title: "Infrastructure Ready! ✅",
+          title: "🎉 Infrastructure Ready!",
           description: "All Nylas components are working. You can now connect calendars.",
         });
       } else {
@@ -138,7 +208,7 @@ const NylasConnectionTest: React.FC = () => {
           Nylas Infrastructure Test
         </CardTitle>
         <CardDescription>
-          Test and debug your existing Nylas calendar integration
+          Test and debug your Nylas calendar integration infrastructure
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -150,7 +220,7 @@ const NylasConnectionTest: React.FC = () => {
           {testing ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Running Tests...
+              Running Infrastructure Tests...
             </>
           ) : (
             'Test Nylas Infrastructure'
@@ -177,18 +247,44 @@ const NylasConnectionTest: React.FC = () => {
 
         {results.length > 0 && results.some(r => r.status === 'error') && (
           <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <h5 className="font-medium text-yellow-800 mb-2">Next Steps:</h5>
-            <ul className="text-sm text-yellow-700 space-y-1">
+            <h5 className="font-medium text-yellow-800 mb-2">🔧 Next Steps:</h5>
+            <ul className="text-sm text-yellow-700 space-y-2">
               {results.find(r => r.step === 'Edge Functions' && r.status === 'error') && (
-                <li>• Deploy edge functions: <code>supabase functions deploy nylas-auth</code></li>
+                <li>
+                  <strong>1. Deploy edge functions:</strong>
+                  <div className="mt-1 p-2 bg-yellow-100 rounded font-mono text-xs">
+                    supabase functions deploy nylas-auth<br/>
+                    supabase functions deploy nylas-events<br/>
+                    supabase functions deploy nylas-sync-appointments
+                  </div>
+                </li>
               )}
               {results.find(r => r.step === 'API Credentials' && r.status === 'error') && (
-                <li>• Configure Nylas secrets in Supabase dashboard</li>
+                <li>
+                  <strong>2. Configure Nylas secrets in Supabase dashboard:</strong>
+                  <div className="mt-1 text-xs">
+                    • NYLAS_CLIENT_ID<br/>
+                    • NYLAS_CLIENT_SECRET<br/>
+                    • NYLAS_API_KEY<br/>
+                    • NYLAS_CONNECTOR_ID
+                  </div>
+                </li>
               )}
               {results.find(r => r.step === 'Database Access' && r.status === 'error') && (
-                <li>• Check RLS policies on nylas_connections table</li>
+                <li>
+                  <strong>3. Check RLS policies on nylas_connections table</strong>
+                </li>
               )}
             </ul>
+          </div>
+        )}
+
+        {results.length > 0 && !results.some(r => r.status === 'error') && (
+          <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+            <h5 className="font-medium text-green-800 mb-2">🎉 Ready to Connect!</h5>
+            <p className="text-sm text-green-700">
+              All infrastructure tests passed. You can now go to the "Hybrid" tab to connect your Google Calendar and view external events.
+            </p>
           </div>
         )}
       </CardContent>

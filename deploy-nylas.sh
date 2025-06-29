@@ -32,15 +32,25 @@ supabase functions deploy nylas-scheduler-config
 echo "📊 Applying database migrations..."
 supabase db push
 
+# List deployed functions
+echo "📋 Checking deployed functions..."
+supabase functions list
+
 echo "✅ Nylas infrastructure deployment complete!"
 echo ""
 echo "📋 Next Steps:"
-echo "1. Configure Nylas API credentials in Supabase secrets:"
-echo "   - NYLAS_CLIENT_ID"
-echo "   - NYLAS_CLIENT_SECRET"
-echo "   - NYLAS_REDIRECT_URI"
-echo ""
+echo "1. Verify all functions are listed above"
 echo "2. Test the calendar connection in your app"
-echo ""
 echo "3. Check edge function logs for any issues:"
-echo "   supabase functions logs"
+echo "   supabase functions logs nylas-auth"
+echo "   supabase functions logs nylas-events"
+echo ""
+echo "🔧 If you encounter issues:"
+echo "1. Check your Nylas API credentials are configured:"
+echo "   - NYLAS_CLIENT_ID"
+echo "   - NYLAS_CLIENT_SECRET" 
+echo "   - NYLAS_API_KEY"
+echo "   - NYLAS_CONNECTOR_ID"
+echo ""
+echo "2. Test infrastructure using the Debug tab in your calendar"
+
