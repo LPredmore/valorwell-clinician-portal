@@ -7,6 +7,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Use US regional endpoint
+const NYLAS_API_BASE = 'https://api.us.nylas.com'
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -71,8 +74,8 @@ serve(async (req) => {
         let accessToken = connection.access_token
 
         if (tokenExpiresAt <= now && connection.refresh_token) {
-          // Refresh token
-          const refreshResponse = await fetch('https://api.nylas.com/v3/connect/token', {
+          // Refresh token using US regional endpoint
+          const refreshResponse = await fetch(`${NYLAS_API_BASE}/v3/connect/token`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -100,8 +103,8 @@ serve(async (req) => {
           }
         }
 
-        // Build events query
-        const eventsUrl = new URL(`https://api.nylas.com/v3/grants/${connection.id}/events`)
+        // Build events query using US regional endpoint
+        const eventsUrl = new URL(`${NYLAS_API_BASE}/v3/grants/${connection.id}/events`)
         if (startDate) eventsUrl.searchParams.set('start', new Date(startDate).getTime().toString())
         if (endDate) eventsUrl.searchParams.set('end', new Date(endDate).getTime().toString())
         if (calendarIds && calendarIds.length > 0) {

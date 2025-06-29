@@ -7,6 +7,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Use US regional endpoint
+const NYLAS_API_BASE = 'https://api.us.nylas.com'
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -61,8 +64,8 @@ serve(async (req) => {
       case 'initialize': {
         console.log('[nylas-auth] Initializing with redirect URI:', redirectUri)
         
-        // Create OAuth authorization URL
-        const authUrl = `https://api.nylas.com/v3/connect/auth?client_id=${nylasClientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&provider=google`
+        // Create OAuth authorization URL using US regional endpoint
+        const authUrl = `${NYLAS_API_BASE}/v3/connect/auth?client_id=${nylasClientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&provider=google`
 
         return new Response(
           JSON.stringify({ authUrl, redirectUri }),
@@ -79,8 +82,8 @@ serve(async (req) => {
 
         console.log('[nylas-auth] Processing callback with redirect URI:', redirectUri)
 
-        // Exchange code for access token
-        const tokenResponse = await fetch('https://api.nylas.com/v3/connect/token', {
+        // Exchange code for access token using US regional endpoint
+        const tokenResponse = await fetch(`${NYLAS_API_BASE}/v3/connect/token`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
