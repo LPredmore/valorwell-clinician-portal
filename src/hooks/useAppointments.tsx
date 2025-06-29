@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase, getOrCreateVideoRoom } from "@/integrations/supabase/client";
@@ -81,19 +80,27 @@ export const useAppointments = (
   }, [formattedClinicianId, fromDate, toDate, safeUserTimeZone, refreshTrigger]);
 
   /**
-   * Calculate date range for appointments query
-   * Uses current week if no dates provided
+   * Calculate date range for appointments query using proper UTC boundaries
+   * CRITICAL FIX: Extend range to include adjacent appointments
    */
   const { fromUTCISO, toUTCISO } = useMemo(() => {
-    // Use current week if no dates provided
+    // Use current week if no dates provided, but extend range for better coverage
     if (!fromDate && !toDate) {
-      const now = DateTime.now().setZone(safeUserTimeZone);
+      const now = DateTime.utc(); // Use UTC for consistency
+      // Start from beginning of current week (Monday)
       const startOfWeek = now.startOf('week');
-      const endOfWeek = now.endOf('week');
+      // End at end of next week to catch Monday appointments
+      const endOfWeek = now.endOf('week').plus({ days: 7 });
+      
+      console.log('[useAppointments] Extended week range for better coverage:', {
+        startOfWeek: startOfWeek.toISO(),
+        endOfWeek: endOfWeek.toISO(),
+        currentDate: now.toISO()
+      });
       
       return {
-        fromUTCISO: startOfWeek.toUTC().toISO(),
-        toUTCISO: endOfWeek.toUTC().toISO()
+        fromUTCISO: startOfWeek.toISO(),
+        toUTCISO: endOfWeek.toISO()
       };
     }
     
@@ -101,29 +108,26 @@ export const useAppointments = (
     let toISO: string | undefined;
     try {
       if (fromDate) {
-        fromISO =
-          DateTime.fromJSDate(fromDate)
-            .setZone(safeUserTimeZone)
-            .startOf('day')
-            .toUTC()
-            .toISO();
+        // CRITICAL FIX: Use UTC for boundary calculations to avoid timezone misalignment
+        fromISO = DateTime.fromJSDate(fromDate, { zone: 'utc' })
+          .startOf('day')
+          .toISO();
       }
       
       if (toDate) {
-        toISO =
-          DateTime.fromJSDate(toDate)
-            .setZone(safeUserTimeZone)
-            .endOf('day')
-            .toUTC()
-            .toISO();
+        // CRITICAL FIX: Extend end date by one day to catch adjacent appointments
+        toISO = DateTime.fromJSDate(toDate, { zone: 'utc' })
+          .endOf('day')
+          .plus({ days: 1 }) // Extend to next day to catch Monday appointments
+          .toISO();
       }
       
-      console.log('[useAppointments] Date range calculated:', {
+      console.log('[useAppointments] FIXED Date range calculated:', {
         fromDate: fromDate?.toISOString(),
         toDate: toDate?.toISOString(),
         fromUTCISO: fromISO,
         toUTCISO: toISO,
-        timeZone: safeUserTimeZone
+        extendedRange: true
       });
       
       return { fromUTCISO: fromISO, toUTCISO: toISO };
@@ -131,7 +135,7 @@ export const useAppointments = (
       console.error("[useAppointments] Error converting date range:", e);
       return {};
     }
-  }, [fromDate, toDate, safeUserTimeZone]);
+  }, [fromDate, toDate]);
 
   // Enable query if we have a clinician ID
   const queryEnabled = Boolean(formattedClinicianId);
@@ -152,13 +156,12 @@ export const useAppointments = (
       }
       
       console.log(
-        "[useAppointments] STEP 1 - Building Supabase Query for clinician:",
+        "[useAppointments] STEP 1 - Building FIXED Supabase Query for clinician:",
         formattedClinicianId,
         { from: fromUTCISO, to: toUTCISO, refreshTrigger }
       );
 
-      // CRITICAL FIX: Simplify the query to debug 400 errors
-      // First try without the clients join to isolate the issue
+      // Build the simplified query
       let query = supabase
         .from("appointments")
         .select(`
@@ -178,34 +181,45 @@ export const useAppointments = (
         .eq("clinician_id", formattedClinicianId)
         .in("status", ["scheduled", "blocked"]);
 
-      console.log("[useAppointments] STEP 1 - Simplified Query Building:", {
+      console.log("[useAppointments] STEP 1 - FIXED Query Building:", {
         baseQuery: "appointments table",
         clinicianFilter: `clinician_id = ${formattedClinicianId}`,
         statusFilter: "status IN (scheduled, blocked)",
-        fromDateFilter: fromUTCISO ? `start_at >= ${fromUTCISO}` : 'none',
-        toDateFilter: toUTCISO ? `end_at <= ${toUTCISO}` : 'none'
+        fromDateFilter: fromUTCISO ? `start_at <= ${toUTCISO}` : 'none',
+        toDateFilter: toUTCISO ? `end_at >= ${fromUTCISO}` : 'none',
+        overlapLogic: 'FIXED: Using proper temporal overlap detection'
       });
       
-      if (fromUTCISO) query = query.gte("start_at", fromUTCISO);
-      if (toUTCISO) query = query.lte("end_at", toUTCISO);
+      // CRITICAL FIX: Use proper temporal overlap detection
+      // Appointments overlap with query range if:
+      // appointment.start_at <= queryEnd && appointment.end_at >= queryStart
+      if (fromUTCISO && toUTCISO) {
+        query = query
+          .lte("start_at", toUTCISO)     // Appointment starts before query ends
+          .gte("end_at", fromUTCISO);    // Appointment ends after query starts
+      } else if (fromUTCISO) {
+        query = query.gte("end_at", fromUTCISO);
+      } else if (toUTCISO) {
+        query = query.lte("start_at", toUTCISO);
+      }
       
       query = query.order("start_at", { ascending: true });
         
-      console.log("[useAppointments] STEP 1 - Final Query Details:", {
+      console.log("[useAppointments] STEP 1 - FIXED Final Query Details:", {
         clinician_id: formattedClinicianId,
-        start_at: fromUTCISO ? `>= ${fromUTCISO}` : 'any',
-        end_at: toUTCISO ? `<= ${toUTCISO}` : 'any',
+        overlap_logic: `start_at <= ${toUTCISO} AND end_at >= ${fromUTCISO}`,
         status: 'scheduled OR blocked',
-        orderBy: 'start_at ASC'
+        orderBy: 'start_at ASC',
+        queryType: 'TEMPORAL_OVERLAP_DETECTION'
       });
       
-      console.log("[useAppointments] STEP 1 - EXECUTING SIMPLIFIED SUPABASE QUERY NOW...");
+      console.log("[useAppointments] STEP 1 - EXECUTING FIXED SUPABASE QUERY NOW...");
       
       try {
         const { data: rawDataAny, error: queryError } = await query;
 
         // STEP 1: COMPREHENSIVE SUPABASE RESPONSE LOGGING
-        console.log('[useAppointments] STEP 1 - Supabase Query Response:', {
+        console.log('[useAppointments] STEP 1 - FIXED Supabase Query Response:', {
           hasData: !!rawDataAny,
           recordCount: rawDataAny?.length || 0,
           hasError: !!queryError,
@@ -213,12 +227,12 @@ export const useAppointments = (
           errorDetails: queryError?.details || null,
           errorHint: queryError?.hint || null,
           errorCode: queryError?.code || null,
+          queryType: 'TEMPORAL_OVERLAP_DETECTION',
           rawResponse: rawDataAny,
-          queryExecuted: {
-            table: 'appointments',
-            clinician_id: formattedClinicianId,
-            date_range: { from: fromUTCISO, to: toUTCISO },
-            status: 'scheduled OR blocked'
+          queryBoundaries: {
+            from: fromUTCISO,
+            to: toUTCISO,
+            overlapFormula: 'start_at <= queryEnd AND end_at >= queryStart'
           }
         });
 
@@ -236,9 +250,9 @@ export const useAppointments = (
           throw new Error(`Supabase Query Failed: ${queryError.message} (${queryError.code})`);
         }
 
-        // STEP 2: DATABASE VERIFICATION LOGGING
+        // STEP 2: DATABASE VERIFICATION LOGGING with OVERLAP VALIDATION
         if (rawDataAny && rawDataAny.length > 0) {
-          console.log('[useAppointments] STEP 2 - Database Verification - Appointments Found:', {
+          console.log('[useAppointments] STEP 2 - FIXED Database Verification - Appointments Found:', {
             totalCount: rawDataAny.length,
             clinicianIds: [...new Set(rawDataAny.map((apt: any) => apt.clinician_id))],
             requestedClinicianId: formattedClinicianId,
@@ -247,11 +261,17 @@ export const useAppointments = (
               id: apt.id,
               appointment_timezone: apt.appointment_timezone,
               start_at: apt.start_at,
-              end_at: apt.end_at
+              end_at: apt.end_at,
+              overlapCheck: {
+                startBeforeQueryEnd: apt.start_at <= toUTCISO,
+                endAfterQueryStart: apt.end_at >= fromUTCISO,
+                validOverlap: apt.start_at <= toUTCISO && apt.end_at >= fromUTCISO
+              }
             })),
-            dateRange: {
-              earliest: rawDataAny.length > 0 ? Math.min(...rawDataAny.map((apt: any) => new Date(apt.start_at).getTime())) : null,
-              latest: rawDataAny.length > 0 ? Math.max(...rawDataAny.map((apt: any) => new Date(apt.start_at).getTime())) : null
+            queryBoundaries: {
+              queryStart: fromUTCISO,
+              queryEnd: toUTCISO,
+              overlapLogic: 'FIXED_TEMPORAL_OVERLAP'
             },
             sampleAppointments: rawDataAny.slice(0, 2).map((apt: any) => ({
               id: apt.id,
@@ -260,20 +280,21 @@ export const useAppointments = (
               end_at: apt.end_at,
               appointment_timezone: apt.appointment_timezone,
               status: apt.status,
-              hasValidTimes: !!(apt.start_at && apt.end_at)
+              hasValidTimes: !!(apt.start_at && apt.end_at),
+              isInRange: apt.start_at <= toUTCISO && apt.end_at >= fromUTCISO
             }))
           });
         } else {
-          console.log('[useAppointments] STEP 2 - Database Verification - NO APPOINTMENTS FOUND:', {
+          console.log('[useAppointments] STEP 2 - FIXED Database Verification - NO APPOINTMENTS FOUND:', {
             queryParams: {
               clinician_id: formattedClinicianId,
-              start_at_gte: fromUTCISO,
-              end_at_lte: toUTCISO,
+              overlap_query: `start_at <= ${toUTCISO} AND end_at >= ${fromUTCISO}`,
               status: 'scheduled OR blocked'
             },
+            queryType: 'TEMPORAL_OVERLAP_DETECTION',
             possibleIssues: [
               'No appointments exist for this clinician',
-              'Date range excludes all appointments',
+              'Date range excludes all appointments (SHOULD BE FIXED)',
               'Clinician ID mismatch',
               'All appointments have different status',
               'Timezone conversion error',
@@ -310,19 +331,24 @@ export const useAppointments = (
             video_room_url: rawAppt.video_room_url,
             notes: rawAppt.notes,
             appointment_timezone: rawAppt.appointment_timezone,
-            client: undefined, // Temporarily remove client data to isolate 400 error
+            client: undefined, // Temporarily remove client data to isolate issue
             clientName: clientName,
           };
         });
 
-        console.log('[useAppointments] STEP 3 - Final processed appointments:', {
+        console.log('[useAppointments] STEP 3 - FIXED Final processed appointments:', {
           count: processedAppointments.length,
+          queryType: 'TEMPORAL_OVERLAP_DETECTION',
           appointments: processedAppointments.map(apt => ({
             id: apt.id,
             clientName: apt.clientName,
             start_at: apt.start_at,
             end_at: apt.end_at,
-            appointment_timezone: apt.appointment_timezone
+            appointment_timezone: apt.appointment_timezone,
+            overlapValidation: {
+              startBeforeEnd: apt.start_at <= (toUTCISO || apt.start_at),
+              endAfterStart: apt.end_at >= (fromUTCISO || apt.end_at)
+            }
           }))
         });
 
@@ -347,10 +373,11 @@ export const useAppointments = (
   // Log query results
   useEffect(() => {
     if (fetchedAppointments) {
-      console.log('[useAppointments] Query completed successfully:', {
+      console.log('[useAppointments] FIXED Query completed successfully:', {
         appointmentsCount: fetchedAppointments.length,
         isLoading,
         error: error?.message,
+        queryType: 'TEMPORAL_OVERLAP_DETECTION',
         sampleData: fetchedAppointments.slice(0, 3).map(apt => ({
           id: apt.id,
           clientName: apt.clientName,

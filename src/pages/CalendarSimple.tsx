@@ -9,7 +9,7 @@ import AvailabilityManagementSidebar from "../components/calendar/AvailabilityMa
 import AppointmentDialog from "../components/calendar/AppointmentDialog";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
-import { addWeeks, subWeeks } from "date-fns";
+import { addWeeks, subWeeks, startOfWeek, endOfWeek } from "date-fns";
 import { TimeZoneService } from "@/utils/timeZoneService";
 import { getClinicianTimeZone } from "@/hooks/useClinicianData";
 import { DateTime } from "luxon";
@@ -35,11 +35,31 @@ const CalendarSimple = React.memo(() => {
   const timezoneLoadCountRef = useRef(0);
   const accessDeniedRef = useRef(false);
 
-  // Add appointments data using the enhanced useAppointments hook
+  // FIXED: Calculate week range using UTC for consistency
+  const { weekStart, weekEnd } = useMemo(() => {
+    // Use UTC to avoid timezone boundary issues
+    const current = DateTime.fromJSDate(currentDate, { zone: 'utc' });
+    const weekStartUTC = current.startOf('week'); // Monday
+    const weekEndUTC = current.endOf('week');     // Sunday
+    
+    console.log('[CalendarSimple] FIXED Week boundaries calculated in UTC:', {
+      currentDate: currentDate.toISOString(),
+      weekStart: weekStartUTC.toJSDate().toISOString(),
+      weekEnd: weekEndUTC.toJSDate().toISOString(),
+      calculatedInUTC: true
+    });
+    
+    return {
+      weekStart: weekStartUTC.toJSDate(),
+      weekEnd: weekEndUTC.toJSDate()
+    };
+  }, [currentDate]);
+
+  // Add appointments data using the FIXED useAppointments hook
   const { appointments, isLoading: appointmentsLoading } = useAppointments(
     userId,
-    undefined, // Let it use current week
-    undefined,
+    weekStart,  // Pass explicit week boundaries
+    weekEnd,
     userTimeZone,
     0 // No refresh trigger for now
   );
@@ -52,10 +72,12 @@ const CalendarSimple = React.memo(() => {
       appointmentsLoading,
       userTimeZone,
       currentDate: currentDate.toISOString(),
+      weekStart: weekStart.toISOString(),
+      weekEnd: weekEnd.toISOString(),
       isReady,
       authInitialized
     });
-  }, [userId, appointments, appointmentsLoading, userTimeZone, currentDate, isReady, authInitialized]);
+  }, [userId, appointments, appointmentsLoading, userTimeZone, currentDate, weekStart, weekEnd, isReady, authInitialized]);
 
   // Memoize navigation functions to prevent re-renders
   const navigatePrevious = useCallback(() => {
@@ -269,7 +291,7 @@ const CalendarSimple = React.memo(() => {
               {currentMonthDisplay}
             </h1>
             <div className="text-sm text-gray-500">
-              User: {userRole} | Timezone: {userTimeZone} | Appointments: {appointments?.length || 0}
+              User: {userRole} | Timezone: {userTimeZone} | Appointments: {appointments?.length || 0} | Week: {weekStart.toLocaleDateString()} - {weekEnd.toLocaleDateString()}
             </div>
           </div>
 
