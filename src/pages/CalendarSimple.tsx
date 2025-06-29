@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "../components/layout/Layout";
@@ -9,8 +10,9 @@ import AvailabilityManagementSidebar from "../components/calendar/AvailabilityMa
 import AppointmentDialog from "../components/calendar/AppointmentDialog";
 import NylasHybridCalendar from "../components/calendar/NylasHybridCalendar";
 import CalendarConnectionsPanel from "../components/calendar/CalendarConnectionsPanel";
+import NylasConnectionTest from "../components/calendar/NylasConnectionTest";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Plus, Calendar } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Calendar, Settings } from "lucide-react";
 import { addWeeks, subWeeks, startOfWeek, endOfWeek } from "date-fns";
 import { TimeZoneService } from "@/utils/timeZoneService";
 import { getClinicianTimeZone } from "@/hooks/useClinicianData";
@@ -31,7 +33,7 @@ const CalendarSimple = React.memo(() => {
     startTime?: DateTime;
     endTime?: DateTime;
   }>({});
-  const [calendarView, setCalendarView] = useState<'internal' | 'hybrid'>('internal');
+  const [calendarView, setCalendarView] = useState<'internal' | 'hybrid' | 'debug'>('internal');
   const navigate = useNavigate();
   const { toast } = useToast();
   
@@ -330,10 +332,11 @@ const CalendarSimple = React.memo(() => {
               {currentMonthDisplay}
             </h1>
             <div className="flex items-center space-x-4">
-              <Tabs value={calendarView} onValueChange={(value) => setCalendarView(value as 'internal' | 'hybrid')}>
+              <Tabs value={calendarView} onValueChange={(value) => setCalendarView(value as 'internal' | 'hybrid' | 'debug')}>
                 <TabsList>
                   <TabsTrigger value="internal">Internal</TabsTrigger>
                   <TabsTrigger value="hybrid">Hybrid</TabsTrigger>
+                  <TabsTrigger value="debug">Debug</TabsTrigger>
                 </TabsList>
               </Tabs>
               <div className="text-sm text-gray-500">
@@ -347,7 +350,7 @@ const CalendarSimple = React.memo(() => {
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
             {/* Calendar display */}
             <div className="lg:col-span-3">
-              <Tabs value={calendarView} onValueChange={(value) => setCalendarView(value as 'internal' | 'hybrid')}>
+              <Tabs value={calendarView} onValueChange={(value) => setCalendarView(value as 'internal' | 'hybrid' | 'debug')}>
                 <TabsContent value="internal">
                   <WeeklyCalendarGrid
                     currentDate={currentDate}
@@ -364,6 +367,9 @@ const CalendarSimple = React.memo(() => {
                     currentDate={currentDate}
                     onEventClick={handleAppointmentClick}
                   />
+                </TabsContent>
+                <TabsContent value="debug">
+                  <NylasConnectionTest />
                 </TabsContent>
               </Tabs>
             </div>
