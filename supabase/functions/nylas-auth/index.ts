@@ -37,7 +37,17 @@ serve(async (req) => {
       throw new Error('Authentication failed')
     }
 
-    const { action } = await req.json()
+    // Read the request body only once to prevent "Body already consumed" error
+    let body;
+    try {
+      const requestText = await req.text();
+      body = requestText ? JSON.parse(requestText) : {};
+    } catch (error) {
+      console.error('[nylas-auth] Error parsing request body:', error);
+      body = {};
+    }
+
+    const { action } = body;
 
     // Required environment variables
     const nylasClientId = Deno.env.get('NYLAS_CLIENT_ID')
@@ -74,7 +84,7 @@ serve(async (req) => {
       }
 
       case 'callback': {
-        const { code } = await req.json()
+        const { code } = body
         
         if (!code) {
           throw new Error('No authorization code received')
