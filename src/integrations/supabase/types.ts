@@ -2229,6 +2229,7 @@ export type Database = {
           connector_id: string | null
           created_at: string | null
           email: string
+          grant_id: string | null
           grant_status: string | null
           id: string
           is_active: boolean | null
@@ -2247,6 +2248,7 @@ export type Database = {
           connector_id?: string | null
           created_at?: string | null
           email: string
+          grant_id?: string | null
           grant_status?: string | null
           id?: string
           is_active?: boolean | null
@@ -2265,6 +2267,7 @@ export type Database = {
           connector_id?: string | null
           created_at?: string | null
           email?: string
+          grant_id?: string | null
           grant_status?: string | null
           id?: string
           is_active?: boolean | null

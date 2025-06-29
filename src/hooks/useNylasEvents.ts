@@ -67,7 +67,12 @@ export const useNylasEvents = (startDate?: Date, endDate?: Date) => {
         eventsCount: fetchedEvents.length,
         connectionsCount: fetchedConnections.length,
         events: fetchedEvents,
-        connections: fetchedConnections
+        connections: fetchedConnections.map((conn: any) => ({
+          id: conn.id,
+          grant_id: conn.grant_id,
+          email: conn.email,
+          provider: conn.provider
+        }))
       });
 
       setEvents(fetchedEvents);
@@ -99,7 +104,13 @@ export const useNylasEvents = (startDate?: Date, endDate?: Date) => {
       connectionsCount: connections.length,
       isLoading,
       error,
-      events
+      events: events.map(e => ({
+        id: e.id,
+        title: e.title,
+        start_time: e.when?.start_time,
+        connection_email: e.connection_email,
+        connection_provider: e.connection_provider
+      }))
     });
   }, [events, connections, isLoading, error]);
 

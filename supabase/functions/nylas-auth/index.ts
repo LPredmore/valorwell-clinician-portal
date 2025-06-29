@@ -50,12 +50,12 @@ serve(async (req) => {
       body = {};
     }
 
-    const { action } = body;
+    const { action, connectionId, code, state } = body;
 
     // Required environment variables
     const nylasClientId = Deno.env.get('NYLAS_CLIENT_ID')
     const nylasClientSecret = Deno.env.get('NYLAS_CLIENT_SECRET')
-    const nylasConnectorId = Deno.env.get('NYLAS_CONNECTOR_ID')
+    const nylasApiKey = Deno.env.get('NYLAS_API_KEY')
     
     // Use dynamic redirect URI based on the request origin
     const origin = req.headers.get('origin') || req.headers.get('referer')?.replace(/\/$/, '') || 'http://localhost:3000'
@@ -69,7 +69,7 @@ serve(async (req) => {
       )
     }
 
-    if (!nylasClientId || !nylasClientSecret || !nylasConnectorId) {
+    if (!nylasClientId || !nylasClientSecret || !nylasApiKey) {
       throw new Error('Nylas configuration missing')
     }
 
@@ -87,8 +87,6 @@ serve(async (req) => {
       }
 
       case 'callback': {
-        const { code } = body
-        
         if (!code) {
           throw new Error('No authorization code received')
         }
@@ -117,18 +115,23 @@ serve(async (req) => {
         }
 
         const tokenData = await tokenResponse.json()
-        console.log('[nylas-auth] Token exchange successful for email:', tokenData.email)
+        console.log('[nylas-auth] Token exchange successful:', {
+          email: tokenData.email,
+          grant_id: tokenData.grant_id,
+          provider: tokenData.provider
+        })
 
-        // Store connection in database with authenticated user ID
+        // CRITICAL FIX: Store grant_id from Nylas response
         const { error: dbError } = await supabaseClient
           .from('nylas_connections')
           .insert({
             user_id: user.id, // Use authenticated user ID from JWT
+            grant_id: tokenData.grant_id, // CRITICAL: Store Nylas grant ID
             email: tokenData.email,
-            provider: 'google',
+            provider: tokenData.provider || 'google',
             access_token: tokenData.access_token,
             refresh_token: tokenData.refresh_token,
-            token_expires_at: new Date(Date.now() + (tokenData.expires_in * 1000)).toISOString(),
+            token_expires_at: tokenData.expires_at ? new Date(tokenData.expires_at * 1000).toISOString() : null,
             is_active: true,
           })
 
@@ -137,10 +140,80 @@ serve(async (req) => {
           throw new Error(`Database error: ${dbError.message}`)
         }
 
-        console.log('[nylas-auth] Connection stored successfully for user:', user.id)
+        console.log('[nylas-auth] Connection stored successfully for user:', user.id, 'with grant_id:', tokenData.grant_id)
 
         return new Response(
-          JSON.stringify({ success: true, email: tokenData.email, connection: tokenData }),
+          JSON.stringify({ 
+            success: true, 
+            email: tokenData.email,
+            grant_id: tokenData.grant_id,
+            connection: tokenData 
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      case 'disconnect': {
+        if (!connectionId) {
+          throw new Error('No connection ID provided for disconnect')
+        }
+
+        console.log('[nylas-auth] Disconnecting connection:', connectionId)
+
+        // Get the connection to get grant_id
+        const { data: connection, error: fetchError } = await supabaseClient
+          .from('nylas_connections')
+          .select('grant_id, email')
+          .eq('user_id', user.id)
+          .eq('id', connectionId)
+          .single()
+
+        if (fetchError || !connection) {
+          console.error('[nylas-auth] Connection not found:', fetchError)
+          throw new Error('Connection not found')
+        }
+
+        // STEP 1: Revoke the grant via Nylas API first
+        if (connection.grant_id) {
+          try {
+            const revokeResponse = await fetch(`${NYLAS_API_BASE}/v3/grants/${connection.grant_id}`, {
+              method: 'DELETE',
+              headers: {
+                'Authorization': `Bearer ${nylasApiKey}`,
+                'Content-Type': 'application/json'
+              }
+            })
+
+            if (revokeResponse.ok) {
+              console.log('[nylas-auth] Grant revoked successfully:', connection.grant_id)
+            } else {
+              const revokeError = await revokeResponse.text()
+              console.warn('[nylas-auth] Grant revocation failed (continuing with local cleanup):', revokeError)
+            }
+          } catch (revokeError) {
+            console.warn('[nylas-auth] Grant revocation error (continuing with local cleanup):', revokeError)
+          }
+        }
+
+        // STEP 2: Delete the local database record
+        const { error: deleteError } = await supabaseClient
+          .from('nylas_connections')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('id', connectionId)
+
+        if (deleteError) {
+          console.error('[nylas-auth] Error deleting connection:', deleteError)
+          throw new Error(`Failed to delete connection: ${deleteError.message}`)
+        }
+
+        console.log('[nylas-auth] Connection disconnected successfully:', connectionId)
+
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            message: `Calendar ${connection.email} disconnected successfully`
+          }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }

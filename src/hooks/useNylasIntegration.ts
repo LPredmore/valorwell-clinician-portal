@@ -6,6 +6,7 @@ import { useUser } from '@/context/UserContext';
 
 interface NylasConnection {
   id: string;
+  grant_id?: string;
   email: string;
   provider: string;
   is_active: boolean;
@@ -29,7 +30,10 @@ export const useNylasIntegration = () => {
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === 'NYLAS_AUTH_SUCCESS') {
-        console.log('[useNylasIntegration] Received Google Calendar auth success message');
+        console.log('[useNylasIntegration] Received Google Calendar auth success message:', {
+          email: event.data.email,
+          grant_id: event.data.grant_id
+        });
         setIsConnecting(false);
         toast({
           title: 'Google Calendar Connected',
@@ -66,7 +70,7 @@ export const useNylasIntegration = () => {
       
       const { data, error } = await supabase
         .from('nylas_connections')
-        .select('id, email, provider, is_active, created_at, calendar_ids, connector_id, grant_status, scopes, last_sync_at')
+        .select('id, grant_id, email, provider, is_active, created_at, calendar_ids, scopes, token_expires_at')
         .eq('is_active', true)
         .order('created_at', { ascending: false });
 
@@ -95,7 +99,12 @@ export const useNylasIntegration = () => {
         return;
       }
 
-      console.log('[useNylasIntegration] Fetched connections:', data);
+      console.log('[useNylasIntegration] Fetched connections:', data?.map(conn => ({
+        id: conn.id,
+        grant_id: conn.grant_id,
+        email: conn.email,
+        provider: conn.provider
+      })));
       setConnections(data || []);
     } catch (error: any) {
       console.error('[useNylasIntegration] Error fetching connections:', error);
@@ -214,12 +223,12 @@ export const useNylasIntegration = () => {
     }
   };
 
-  // Disconnect calendar
+  // Disconnect calendar with proper grant revocation
   const disconnectCalendar = async (connectionId: string) => {
     try {
       console.log('[useNylasIntegration] Disconnecting calendar:', connectionId);
       
-      const { error } = await supabase.functions.invoke('nylas-auth', {
+      const { data, error } = await supabase.functions.invoke('nylas-auth', {
         body: {
           action: 'disconnect',
           connectionId
@@ -227,6 +236,7 @@ export const useNylasIntegration = () => {
       });
 
       if (error) {
+        console.error('[useNylasIntegration] Disconnect error:', error);
         if (error.message?.includes('Failed to send a request')) {
           setInfrastructureError('Edge function not available for disconnect');
           toast({
@@ -238,9 +248,10 @@ export const useNylasIntegration = () => {
         throw error;
       }
 
+      console.log('[useNylasIntegration] Disconnect successful:', data);
       toast({
         title: 'Calendar Disconnected',
-        description: 'Google Calendar has been successfully disconnected'
+        description: data?.message || 'Calendar has been successfully disconnected'
       });
 
       fetchConnections();
