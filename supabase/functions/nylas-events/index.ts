@@ -132,8 +132,50 @@ serve(async (req) => {
           }
         }
 
-        // CRITICAL FIX: Use grant_id instead of connection id for Nylas API calls
+        // First, get the available calendars for this grant
+        const calendarsUrl = `${NYLAS_API_BASE}/v3/grants/${connection.grant_id}/calendars`
+        console.log('[nylas-events] Fetching calendars from URL:', calendarsUrl)
+
+        const calendarsResponse = await fetch(calendarsUrl, {
+          headers: {
+            'Authorization': `Bearer ${nylasApiKey}`,
+            'Accept': 'application/json',
+          },
+        })
+
+        if (!calendarsResponse.ok) {
+          const calendarError = await calendarsResponse.text()
+          console.error('[nylas-events] Calendars fetch failed for connection:', connection.id, calendarError)
+          continue
+        }
+
+        const calendarsData = await calendarsResponse.json()
+        console.log('[nylas-events] Available calendars:', calendarsData.data?.length || 0)
+
+        if (!calendarsData.data || calendarsData.data.length === 0) {
+          console.warn('[nylas-events] No calendars found for connection:', connection.id)
+          continue
+        }
+
+        // Get the primary calendar (or first available calendar)
+        const primaryCalendar = calendarsData.data.find(cal => cal.is_primary) || calendarsData.data[0]
+        
+        if (!primaryCalendar) {
+          console.warn('[nylas-events] No primary calendar found for connection:', connection.id)
+          continue
+        }
+
+        console.log('[nylas-events] Using calendar:', {
+          id: primaryCalendar.id,
+          name: primaryCalendar.name,
+          is_primary: primaryCalendar.is_primary
+        })
+
+        // Now fetch events from this calendar
         const eventsUrl = new URL(`${NYLAS_API_BASE}/v3/grants/${connection.grant_id}/events`)
+        
+        // Add calendar_id parameter (required by Nylas API)
+        eventsUrl.searchParams.set('calendar_id', primaryCalendar.id)
         
         // Format dates as Unix timestamps for Nylas API
         if (startDate) {
@@ -143,9 +185,6 @@ serve(async (req) => {
         if (endDate) {
           const endUnix = Math.floor(new Date(endDate).getTime() / 1000)
           eventsUrl.searchParams.set('end', endUnix.toString())
-        }
-        if (calendarIds && calendarIds.length > 0) {
-          eventsUrl.searchParams.set('calendar_id', calendarIds.join(','))
         }
 
         console.log('[nylas-events] Fetching events from URL:', eventsUrl.toString())
@@ -162,6 +201,7 @@ serve(async (req) => {
           console.log('[nylas-events] Events fetched successfully:', {
             connection_id: connection.id,
             grant_id: connection.grant_id,
+            calendar_id: primaryCalendar.id,
             events_count: eventsData.data?.length || 0
           })
           
@@ -179,8 +219,8 @@ serve(async (req) => {
             connection_id: connection.id,
             connection_email: connection.email,
             connection_provider: connection.provider,
-            calendar_id: event.calendar_id,
-            calendar_name: event.calendar_name,
+            calendar_id: event.calendar_id || primaryCalendar.id,
+            calendar_name: event.calendar_name || primaryCalendar.name,
             status: event.status,
             location: event.location,
           })) || []
@@ -197,6 +237,8 @@ serve(async (req) => {
           email: connection.email,
           provider: connection.provider,
           is_active: true,
+          calendar_id: primaryCalendar.id,
+          calendar_name: primaryCalendar.name,
         })
 
       } catch (error) {
