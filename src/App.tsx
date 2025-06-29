@@ -63,6 +63,9 @@ const App = () => {
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/portal" element={<PatientDashboard />} />
               <Route path="/nylas-oauth-callback" element={<NylasOAuthCallback />} />
+              
+              {/* Add API callback route for Nylas OAuth */}
+              <Route path="/api/nylas/callback" element={<NylasOAuthCallback />} />
 
               {/* Protected Routes */}
               <Route 

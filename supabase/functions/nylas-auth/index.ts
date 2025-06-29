@@ -40,7 +40,10 @@ serve(async (req) => {
     const nylasClientId = Deno.env.get('NYLAS_CLIENT_ID')
     const nylasClientSecret = Deno.env.get('NYLAS_CLIENT_SECRET')
     const nylasConnectorId = Deno.env.get('NYLAS_CONNECTOR_ID')
-    const redirectUri = Deno.env.get('NYLAS_REDIRECT_URI')
+    
+    // Use dynamic redirect URI based on the request origin
+    const origin = req.headers.get('origin') || req.headers.get('referer')?.replace(/\/$/, '') || 'http://localhost:3000'
+    const redirectUri = `${origin}/api/nylas/callback`
 
     if (action === 'test_connectivity') {
       // Simple connectivity test
@@ -56,11 +59,13 @@ serve(async (req) => {
 
     switch (action) {
       case 'initialize': {
+        console.log('[nylas-auth] Initializing with redirect URI:', redirectUri)
+        
         // Create OAuth authorization URL
-        const authUrl = `https://api.nylas.com/v3/connect/auth?client_id=${nylasClientId}&redirect_uri=${encodeURIComponent(redirectUri || 'https://api.us.nylas.com/v3/connect/callback')}&response_type=code&provider=google`
+        const authUrl = `https://api.nylas.com/v3/connect/auth?client_id=${nylasClientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&provider=google`
 
         return new Response(
-          JSON.stringify({ authUrl }),
+          JSON.stringify({ authUrl, redirectUri }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
@@ -71,6 +76,8 @@ serve(async (req) => {
         if (!code) {
           throw new Error('No authorization code received')
         }
+
+        console.log('[nylas-auth] Processing callback with redirect URI:', redirectUri)
 
         // Exchange code for access token
         const tokenResponse = await fetch('https://api.nylas.com/v3/connect/token', {
@@ -89,10 +96,12 @@ serve(async (req) => {
 
         if (!tokenResponse.ok) {
           const error = await tokenResponse.text()
+          console.error('[nylas-auth] Token exchange failed:', error)
           throw new Error(`Token exchange failed: ${error}`)
         }
 
         const tokenData = await tokenResponse.json()
+        console.log('[nylas-auth] Token exchange successful for email:', tokenData.email)
 
         // Store connection in database
         const { error: dbError } = await supabaseClient
@@ -108,11 +117,12 @@ serve(async (req) => {
           })
 
         if (dbError) {
+          console.error('[nylas-auth] Database error:', dbError)
           throw new Error(`Database error: ${dbError.message}`)
         }
 
         return new Response(
-          JSON.stringify({ success: true, email: tokenData.email }),
+          JSON.stringify({ success: true, email: tokenData.email, connection: tokenData }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
@@ -122,7 +132,7 @@ serve(async (req) => {
     }
 
   } catch (error) {
-    console.error('Nylas auth error:', error)
+    console.error('[nylas-auth] Error:', error)
     return new Response(
       JSON.stringify({ error: error.message }),
       { 

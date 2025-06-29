@@ -12,6 +12,7 @@ const NylasOAuthCallback: React.FC = () => {
     const handleCallback = async () => {
       try {
         console.log('[NylasOAuthCallback] Processing OAuth callback for Google Calendar');
+        console.log('[NylasOAuthCallback] Current URL:', window.location.href);
         
         // Extract parameters from URL
         const urlParams = new URLSearchParams(window.location.search);
@@ -27,19 +28,23 @@ const NylasOAuthCallback: React.FC = () => {
           
           // Close popup after showing error briefly
           setTimeout(() => {
-            window.close();
+            if (window.opener) {
+              window.close();
+            }
           }, 2000);
           return;
         }
 
         // Validate required parameters
-        if (!code || !state) {
-          console.error('[NylasOAuthCallback] Missing required parameters:', { code: !!code, state: !!state });
+        if (!code) {
+          console.error('[NylasOAuthCallback] Missing authorization code');
           setStatus('error');
-          setMessage('Invalid callback parameters');
+          setMessage('Invalid callback - missing authorization code');
           
           setTimeout(() => {
-            window.close();
+            if (window.opener) {
+              window.close();
+            }
           }, 2000);
           return;
         }
@@ -61,7 +66,9 @@ const NylasOAuthCallback: React.FC = () => {
           setMessage(`Connection failed: ${functionError.message}`);
           
           setTimeout(() => {
-            window.close();
+            if (window.opener) {
+              window.close();
+            }
           }, 3000);
           return;
         }
@@ -69,20 +76,23 @@ const NylasOAuthCallback: React.FC = () => {
         if (data?.success) {
           console.log('[NylasOAuthCallback] Google Calendar connected successfully:', data.connection);
           setStatus('success');
-          setMessage(`Successfully connected Google Calendar!`);
+          setMessage(`Successfully connected Google Calendar for ${data.email}!`);
           
           // Notify parent window (calendar page) to refresh connections
           if (window.opener) {
             window.opener.postMessage({ 
               type: 'NYLAS_AUTH_SUCCESS', 
               connection: data.connection,
-              provider: 'google'
+              provider: 'google',
+              email: data.email
             }, '*');
           }
           
           // Close popup after success
           setTimeout(() => {
-            window.close();
+            if (window.opener) {
+              window.close();
+            }
           }, 2000);
         } else {
           console.error('[NylasOAuthCallback] Unexpected response:', data);
@@ -90,7 +100,9 @@ const NylasOAuthCallback: React.FC = () => {
           setMessage('Connection completed but response was unexpected');
           
           setTimeout(() => {
-            window.close();
+            if (window.opener) {
+              window.close();
+            }
           }, 3000);
         }
 
@@ -100,7 +112,9 @@ const NylasOAuthCallback: React.FC = () => {
         setMessage(`Connection error: ${error.message || 'Unknown error'}`);
         
         setTimeout(() => {
-          window.close();
+          if (window.opener) {
+            window.close();
+          }
         }, 3000);
       }
     };
