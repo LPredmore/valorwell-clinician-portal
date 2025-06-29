@@ -2248,7 +2248,7 @@ export type Database = {
           created_at?: string | null
           email: string
           grant_status?: string | null
-          id: string
+          id?: string
           is_active?: boolean | null
           last_sync_at?: string | null
           provider?: string

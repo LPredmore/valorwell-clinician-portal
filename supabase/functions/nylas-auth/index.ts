@@ -26,7 +26,7 @@ serve(async (req) => {
       }
     )
 
-    // Verify JWT and get user
+    // Verify JWT and get user - this is critical for RLS policies
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
       throw new Error('No authorization header')
@@ -34,8 +34,11 @@ serve(async (req) => {
 
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser()
     if (authError || !user) {
+      console.error('[nylas-auth] Authentication failed:', authError)
       throw new Error('Authentication failed')
     }
+
+    console.log('[nylas-auth] Authenticated user:', user.id)
 
     // Read the request body only once to prevent "Body already consumed" error
     let body;
@@ -116,11 +119,11 @@ serve(async (req) => {
         const tokenData = await tokenResponse.json()
         console.log('[nylas-auth] Token exchange successful for email:', tokenData.email)
 
-        // Store connection in database
+        // Store connection in database with authenticated user ID
         const { error: dbError } = await supabaseClient
           .from('nylas_connections')
           .insert({
-            user_id: user.id,
+            user_id: user.id, // Use authenticated user ID from JWT
             email: tokenData.email,
             provider: 'google',
             access_token: tokenData.access_token,
@@ -133,6 +136,8 @@ serve(async (req) => {
           console.error('[nylas-auth] Database error:', dbError)
           throw new Error(`Database error: ${dbError.message}`)
         }
+
+        console.log('[nylas-auth] Connection stored successfully for user:', user.id)
 
         return new Response(
           JSON.stringify({ success: true, email: tokenData.email, connection: tokenData }),
