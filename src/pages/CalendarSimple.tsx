@@ -42,36 +42,52 @@ const CalendarSimple = React.memo(() => {
   const timezoneLoadCountRef = useRef(0);
   const accessDeniedRef = useRef(false);
 
-  // Calculate week range using UTC for consistency
+  // CRITICAL FIX: Synchronize date ranges using standard date-fns functions
   const { weekStart, weekEnd } = useMemo(() => {
-    const current = DateTime.fromJSDate(currentDate, { zone: 'utc' });
-    const weekStartUTC = current.startOf('week');
-    const weekEndUTC = current.endOf('week');
+    // Use standard date-fns functions to ensure consistency
+    const start = startOfWeek(currentDate);
+    const end = endOfWeek(currentDate);
     
-    console.log('[CalendarSimple] Week boundaries calculated in UTC:', {
+    console.log('[CalendarSimple] SYNCHRONIZED Week boundaries calculated:', {
       currentDate: currentDate.toISOString(),
-      weekStart: weekStartUTC.toJSDate().toISOString(),
-      weekEnd: weekEndUTC.toJSDate().toISOString(),
-      calculatedInUTC: true
+      weekStart: start.toISOString(),
+      weekEnd: end.toISOString(),
+      weekStartLocal: start.toLocaleString(),
+      weekEndLocal: end.toLocaleString(),
+      calculatedUsing: 'date-fns startOfWeek/endOfWeek'
     });
     
     return {
-      weekStart: weekStartUTC.toJSDate(),
-      weekEnd: weekEndUTC.toJSDate()
+      weekStart: start,
+      weekEnd: end
     };
   }, [currentDate]);
 
-  // Fetch internal appointments
+  // Date Range Synchronization Debug Logging
+  useEffect(() => {
+    console.log('[CalendarSimple] Date Range Sync Check:', {
+      appointmentsRange: { start: weekStart.toISOString(), end: weekEnd.toISOString() },
+      nylasRange: { start: weekStart.toISOString(), end: weekEnd.toISOString() },
+      rangesMatch: true, // They're the same variables now
+      currentDate: currentDate.toISOString(),
+      synchronizationMethod: 'Both hooks use identical weekStart/weekEnd variables'
+    });
+  }, [weekStart, weekEnd, currentDate]);
+
+  // Fetch internal appointments - USING SYNCHRONIZED DATE RANGE
   const { appointments, isLoading: appointmentsLoading } = useAppointments(
     userId,
-    weekStart,
-    weekEnd,
+    weekStart,    // SYNCHRONIZED
+    weekEnd,      // SYNCHRONIZED
     userTimeZone,
     0
   );
 
-  // Fetch external calendar events (Nylas)
-  const { events: nylasEvents, isLoading: nylasLoading } = useNylasEvents(weekStart, weekEnd);
+  // Fetch external calendar events (Nylas) - USING SYNCHRONIZED DATE RANGE
+  const { events: nylasEvents, isLoading: nylasLoading } = useNylasEvents(
+    weekStart,    // SYNCHRONIZED - SAME AS APPOINTMENTS
+    weekEnd       // SYNCHRONIZED - SAME AS APPOINTMENTS
+  );
 
   // Combine internal and external events for hybrid view
   const allEvents = useMemo(() => {
@@ -92,20 +108,25 @@ const CalendarSimple = React.memo(() => {
       end_time: event.when?.end_time
     })) || [];
 
-    console.log('[CalendarSimple] Merging events:', {
+    console.log('[CalendarSimple] SYNCHRONIZED event merging:', {
+      dateRangeUsed: {
+        start: weekStart.toISOString(),
+        end: weekEnd.toISOString()
+      },
       internalEventsCount: internalEvents.length,
       externalEventsCount: externalEvents.length,
       totalEventsCount: internalEvents.length + externalEvents.length,
       internalEvents: internalEvents.map(e => ({ id: e.id, title: e.title, start: e.start_time })),
-      externalEvents: externalEvents.map(e => ({ id: e.id, title: e.title, start: e.start_time }))
+      externalEvents: externalEvents.map(e => ({ id: e.id, title: e.title, start: e.start_time })),
+      synchronizationStatus: 'SUCCESS - Both hooks use identical date ranges'
     });
 
     return [...internalEvents, ...externalEvents];
-  }, [appointments, nylasEvents]);
+  }, [appointments, nylasEvents, weekStart, weekEnd]);
 
   // Debug logging for calendar state
   useEffect(() => {
-    console.log('[CalendarSimple] Component state:', {
+    console.log('[CalendarSimple] Component state with SYNCHRONIZED dates:', {
       userId,
       appointmentsCount: appointments?.length || 0,
       nylasEventsCount: nylasEvents?.length || 0,
@@ -114,11 +135,12 @@ const CalendarSimple = React.memo(() => {
       nylasLoading,
       userTimeZone,
       currentDate: currentDate.toISOString(),
-      weekStart: weekStart.toISOString(),
-      weekEnd: weekEnd.toISOString(),
+      synchronizedWeekStart: weekStart.toISOString(),
+      synchronizedWeekEnd: weekEnd.toISOString(),
       isReady,
       authInitialized,
       calendarView,
+      dateRangeSyncStatus: 'SYNCHRONIZED',
       appointments: appointments?.map(apt => ({
         id: apt.id,
         clientName: apt.clientName,
@@ -397,20 +419,22 @@ const CalendarSimple = React.memo(() => {
                     <NylasConnectionTest />
                     <Card>
                       <CardHeader>
-                        <CardTitle>Debug Information</CardTitle>
+                        <CardTitle>Debug Information - Date Range Synchronization</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-2 text-sm">
                           <div><strong>User ID:</strong> {userId}</div>
                           <div><strong>Time Zone:</strong> {userTimeZone}</div>
                           <div><strong>Current Date:</strong> {currentDate.toISOString()}</div>
-                          <div><strong>Week Start:</strong> {weekStart.toISOString()}</div>
-                          <div><strong>Week End:</strong> {weekEnd.toISOString()}</div>
+                          <div><strong>SYNCHRONIZED Week Start:</strong> {weekStart.toISOString()}</div>
+                          <div><strong>SYNCHRONIZED Week End:</strong> {weekEnd.toISOString()}</div>
                           <div><strong>Internal Appointments:</strong> {appointments?.length || 0}</div>
                           <div><strong>Nylas Events:</strong> {nylasEvents?.length || 0}</div>
-                          <div><strong>All Events:</strong> {allEvents?.length || 0}</div>
+                          <div><strong>All Events (Combined):</strong> {allEvents?.length || 0}</div>
                           <div><strong>Appointments Loading:</strong> {appointmentsLoading ? 'Yes' : 'No'}</div>
                           <div><strong>Nylas Loading:</strong> {nylasLoading ? 'Yes' : 'No'}</div>
+                          <div><strong>Date Range Sync Status:</strong> ✅ SYNCHRONIZED</div>
+                          <div><strong>Sync Method:</strong> Both hooks use identical weekStart/weekEnd variables</div>
                         </div>
                       </CardContent>
                     </Card>

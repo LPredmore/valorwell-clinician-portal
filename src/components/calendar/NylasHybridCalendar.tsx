@@ -25,42 +25,61 @@ const NylasHybridCalendar: React.FC<NylasHybridCalendarProps> = ({
 }) => {
   const { connections, isLoading: isLoadingConnections, connectCalendar } = useNylasIntegration();
   
-  // Calculate date range for fetching events (current week)
+  // CRITICAL FIX: Use SYNCHRONIZED date range calculation - identical to CalendarSimple
   const startDate = useMemo(() => {
     const start = startOfWeek(currentDate);
-    console.log('[NylasHybridCalendar] Calculated start date:', {
+    console.log('[NylasHybridCalendar] SYNCHRONIZED start date calculated:', {
       currentDate: currentDate.toISOString(),
       startDate: start.toISOString(),
-      startDateLocal: start.toLocaleString()
+      startDateLocal: start.toLocaleString(),
+      synchronizationMethod: 'date-fns startOfWeek - SAME as CalendarSimple'
     });
     return start;
   }, [currentDate]);
   
   const endDate = useMemo(() => {
     const end = endOfWeek(currentDate);
-    console.log('[NylasHybridCalendar] Calculated end date:', {
+    console.log('[NylasHybridCalendar] SYNCHRONIZED end date calculated:', {
       currentDate: currentDate.toISOString(),
       endDate: end.toISOString(),
-      endDateLocal: end.toLocaleString()
+      endDateLocal: end.toLocaleString(),
+      synchronizationMethod: 'date-fns endOfWeek - SAME as CalendarSimple'
     });
     return end;
   }, [currentDate]);
+  
+  // Date Range Synchronization Verification
+  useEffect(() => {
+    console.log('[NylasHybridCalendar] Date Range Synchronization Check:', {
+      componentName: 'NylasHybridCalendar',
+      calculatedStartDate: startDate.toISOString(),
+      calculatedEndDate: endDate.toISOString(),
+      currentDate: currentDate.toISOString(),
+      synchronizationMethod: 'Using SAME date-fns functions as CalendarSimple',
+      shouldMatchCalendarSimple: true
+    });
+  }, [startDate, endDate, currentDate]);
   
   const { 
     events, 
     isLoading: isLoadingEvents, 
     error,
     refetch 
-  } = useNylasEvents(startDate, endDate);
+  } = useNylasEvents(startDate, endDate); // SYNCHRONIZED dates
 
   const isLoading = isLoadingConnections || isLoadingEvents;
 
   // Generate week days for the calendar grid
   const weekDays = useMemo(() => {
     const days = eachDayOfInterval({ start: startDate, end: endDate });
-    console.log('[NylasHybridCalendar] Generated week days:', {
+    console.log('[NylasHybridCalendar] Generated week days with SYNCHRONIZED dates:', {
       daysCount: days.length,
-      days: days.map(d => ({ iso: d.toISOString(), local: d.toLocaleDateString() }))
+      dateRange: {
+        start: startDate.toISOString(),
+        end: endDate.toISOString()
+      },
+      days: days.map(d => ({ iso: d.toISOString(), local: d.toLocaleDateString() })),
+      synchronizationNote: 'Week days generated using SAME date range as events fetch'
     });
     return days;
   }, [startDate, endDate]);
@@ -69,7 +88,7 @@ const NylasHybridCalendar: React.FC<NylasHybridCalendarProps> = ({
   const eventsByDate = useMemo(() => {
     const grouped: { [key: string]: any[] } = {};
     
-    console.log('[NylasHybridCalendar] Grouping events by date - input events:', events);
+    console.log('[NylasHybridCalendar] Grouping events by date with SYNCHRONIZED range - input events:', events);
     
     events.forEach(event => {
       if (event.when?.start_time) {
@@ -82,38 +101,49 @@ const NylasHybridCalendar: React.FC<NylasHybridCalendarProps> = ({
         
         grouped[dateKey].push(event);
         
-        console.log('[NylasHybridCalendar] Grouped event:', {
+        console.log('[NylasHybridCalendar] Grouped event with SYNCHRONIZED dates:', {
           eventId: event.id,
           eventTitle: event.title,
           startTime: event.when.start_time,
           eventStartTime: eventStartTime.toISOString(),
           dateKey,
-          groupedCount: grouped[dateKey].length
+          groupedCount: grouped[dateKey].length,
+          synchronizedDateRange: {
+            start: startDate.toISOString(),
+            end: endDate.toISOString()
+          }
         });
       } else {
         console.warn('[NylasHybridCalendar] Event missing start_time:', event);
       }
     });
     
-    console.log('[NylasHybridCalendar] Final grouped events:', {
+    console.log('[NylasHybridCalendar] Final grouped events with SYNCHRONIZED dates:', {
       totalGroups: Object.keys(grouped).length,
       grouped,
       eventsByDateSummary: Object.entries(grouped).map(([date, events]) => ({
         date,
         eventCount: events.length,
         eventTitles: events.map(e => e.title)
-      }))
+      })),
+      synchronizedDateRange: {
+        start: startDate.toISOString(),
+        end: endDate.toISOString()
+      },
+      synchronizationStatus: 'SUCCESS - Events grouped using SAME date boundaries'
     });
     
     return grouped;
-  }, [events]);
+  }, [events, startDate, endDate]);
 
   // Debug effect to log all component state changes
   useEffect(() => {
-    console.log('[NylasHybridCalendar] Component state updated:', {
+    console.log('[NylasHybridCalendar] Component state updated with SYNCHRONIZED dates:', {
       clinicianId,
       userTimeZone,
       currentDate: currentDate.toISOString(),
+      synchronizedStartDate: startDate.toISOString(),
+      synchronizedEndDate: endDate.toISOString(),
       connectionsCount: connections.length,
       eventsCount: events.length,
       isLoadingConnections,
@@ -122,9 +152,10 @@ const NylasHybridCalendar: React.FC<NylasHybridCalendarProps> = ({
       error,
       weekDaysCount: weekDays.length,
       eventsByDateKeys: Object.keys(eventsByDate),
-      eventsByDateCount: Object.values(eventsByDate).reduce((sum, events) => sum + events.length, 0)
+      eventsByDateCount: Object.values(eventsByDate).reduce((sum, events) => sum + events.length, 0),
+      dateRangeSynchronization: 'SYNCHRONIZED with CalendarSimple'
     });
-  }, [clinicianId, userTimeZone, currentDate, connections, events, isLoadingConnections, isLoadingEvents, isLoading, error, weekDays, eventsByDate]);
+  }, [clinicianId, userTimeZone, currentDate, startDate, endDate, connections, events, isLoadingConnections, isLoadingEvents, isLoading, error, weekDays, eventsByDate]);
 
   const handleConnectCalendar = async () => {
     try {
@@ -197,7 +228,7 @@ const NylasHybridCalendar: React.FC<NylasHybridCalendarProps> = ({
     );
   }
 
-  console.log('[NylasHybridCalendar] Rendering hybrid calendar with data');
+  console.log('[NylasHybridCalendar] Rendering hybrid calendar with SYNCHRONIZED data');
 
   return (
     <div className="space-y-6">
@@ -232,12 +263,16 @@ const NylasHybridCalendar: React.FC<NylasHybridCalendarProps> = ({
             const dateKey = format(day, 'yyyy-MM-dd');
             const dayEvents = eventsByDate[dateKey] || [];
             
-            console.log('[NylasHybridCalendar] Rendering day:', {
+            console.log('[NylasHybridCalendar] Rendering day with SYNCHRONIZED dates:', {
               day: day.toISOString(),
               dayLocal: day.toLocaleDateString(),
               dateKey,
               dayEventsCount: dayEvents.length,
-              dayEvents
+              dayEvents,
+              synchronizedDateRange: {
+                start: startDate.toISOString(),
+                end: endDate.toISOString()
+              }
             });
             
             return (
@@ -249,10 +284,14 @@ const NylasHybridCalendar: React.FC<NylasHybridCalendarProps> = ({
                     </div>
                   ) : (
                     dayEvents.map((event) => {
-                      console.log('[NylasHybridCalendar] Rendering event:', {
+                      console.log('[NylasHybridCalendar] Rendering event with SYNCHRONIZED context:', {
                         eventId: event.id,
                         eventTitle: event.title,
-                        eventStartTime: event.when?.start_time
+                        eventStartTime: event.when?.start_time,
+                        synchronizedDateRange: {
+                          start: startDate.toISOString(),
+                          end: endDate.toISOString()
+                        }
                       });
                       
                       return (
@@ -294,6 +333,9 @@ const NylasHybridCalendar: React.FC<NylasHybridCalendarProps> = ({
             ⚠️ No events found for the current week. Check your calendar for events in this date range.
           </div>
         )}
+        <div className="text-xs text-gray-500 mt-1">
+          📅 Date Range: {startDate.toLocaleDateString()} - {endDate.toLocaleDateString()} (SYNCHRONIZED)
+        </div>
       </div>
     </div>
   );

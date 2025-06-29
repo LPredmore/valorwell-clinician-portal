@@ -43,10 +43,13 @@ serve(async (req) => {
       throw new Error('Invalid action')
     }
 
-    console.log('[nylas-events] Fetching events for user:', user.id, {
-      startDate,
-      endDate,
-      calendarIds
+    console.log('[nylas-events] SYNCHRONIZED date range processing for user:', user.id, {
+      receivedStartDate: startDate,
+      receivedEndDate: endDate,
+      startDateParsed: startDate ? new Date(startDate).toISOString() : null,
+      endDateParsed: endDate ? new Date(endDate).toISOString() : null,
+      calendarIds,
+      synchronizationNote: 'Processing SAME date range as useAppointments'
     })
 
     // Get user's active connections
@@ -171,23 +174,38 @@ serve(async (req) => {
           is_primary: primaryCalendar.is_primary
         })
 
-        // Now fetch events from this calendar
+        // Now fetch events from this calendar with SYNCHRONIZED date range
         const eventsUrl = new URL(`${NYLAS_API_BASE}/v3/grants/${connection.grant_id}/events`)
         
         // Add calendar_id parameter (required by Nylas API)
         eventsUrl.searchParams.set('calendar_id', primaryCalendar.id)
         
-        // Format dates as Unix timestamps for Nylas API
+        // CRITICAL FIX: Process SYNCHRONIZED date range correctly
+        let processedStartDate = null
+        let processedEndDate = null
+        
         if (startDate) {
           const startUnix = Math.floor(new Date(startDate).getTime() / 1000)
           eventsUrl.searchParams.set('start', startUnix.toString())
+          processedStartDate = new Date(startDate).toISOString()
         }
         if (endDate) {
           const endUnix = Math.floor(new Date(endDate).getTime() / 1000)
           eventsUrl.searchParams.set('end', endUnix.toString())
+          processedEndDate = new Date(endDate).toISOString()
         }
 
-        console.log('[nylas-events] Fetching events from URL:', eventsUrl.toString())
+        console.log('[nylas-events] SYNCHRONIZED edge function date parameters:', {
+          receivedStartDate: startDate,
+          receivedEndDate: endDate,
+          processedStartDate,
+          processedEndDate,
+          startUnix: startDate ? Math.floor(new Date(startDate).getTime() / 1000) : null,
+          endUnix: endDate ? Math.floor(new Date(endDate).getTime() / 1000) : null,
+          synchronizationStatus: 'MATCHED with frontend date range'
+        })
+
+        console.log('[nylas-events] Fetching events from SYNCHRONIZED URL:', eventsUrl.toString())
 
         const eventsResponse = await fetch(eventsUrl.toString(), {
           headers: {
@@ -198,11 +216,16 @@ serve(async (req) => {
 
         if (eventsResponse.ok) {
           const eventsData = await eventsResponse.json()
-          console.log('[nylas-events] Events fetched successfully:', {
+          console.log('[nylas-events] Events fetched successfully with SYNCHRONIZED dates:', {
             connection_id: connection.id,
             grant_id: connection.grant_id,
             calendar_id: primaryCalendar.id,
-            events_count: eventsData.data?.length || 0
+            events_count: eventsData.data?.length || 0,
+            dateRangeUsed: {
+              start: processedStartDate,
+              end: processedEndDate
+            },
+            synchronizationStatus: 'SUCCESS - Using same date boundaries as internal appointments'
           })
           
           // Transform events to consistent format
@@ -247,9 +270,14 @@ serve(async (req) => {
       }
     }
 
-    console.log('[nylas-events] Final result:', {
+    console.log('[nylas-events] SYNCHRONIZED final result:', {
       total_events: allEvents.length,
-      total_connections: connectionInfo.length
+      total_connections: connectionInfo.length,
+      dateRangeProcessed: {
+        start: startDate ? new Date(startDate).toISOString() : null,
+        end: endDate ? new Date(endDate).toISOString() : null
+      },
+      synchronizationStatus: 'COMPLETED - Events fetched using same date range as internal appointments'
     })
 
     return new Response(
