@@ -55,16 +55,76 @@ const WeeklyCalendarGrid: React.FC<WeeklyCalendarGridProps> = ({
     }))
   });
 
-  // Generate time slots (9 AM to 5 PM in 30-minute intervals)
+  // Robust timezone fallback function
+  const getAppointmentTimezone = (appointment: any, fallbackTimezone: string) => {
+    if (appointment.appointment_timezone) {
+      return appointment.appointment_timezone;
+    }
+    console.warn(`Appointment ${appointment.id} missing timezone, using fallback: ${fallbackTimezone}`);
+    return fallbackTimezone || 'America/New_York';
+  };
+
+  // Calculate dynamic time range based on appointments
+  const [startHour, endHour] = useMemo(() => {
+    if (!appointments || appointments.length === 0) {
+      // Default range if no appointments
+      console.log('[WeeklyCalendarGrid] No appointments, using default time range 8am-6pm');
+      return [8, 18]; // 8am–6pm
+    }
+
+    // Get all start and end hours from appointments
+    const allHours = appointments.flatMap(apt => {
+      try {
+        const tz = getAppointmentTimezone(apt, userTimeZone);
+        const startHour = DateTime.fromISO(apt.start_at, { zone: 'utc' }).setZone(tz).hour;
+        const endHour = DateTime.fromISO(apt.end_at, { zone: 'utc' }).setZone(tz).hour;
+        
+        console.log(`[WeeklyCalendarGrid] Appointment ${apt.id} time range:`, {
+          startHour,
+          endHour,
+          timezone: tz,
+          start_at: apt.start_at,
+          end_at: apt.end_at
+        });
+        
+        return [startHour, endHour];
+      } catch (error) {
+        console.error(`[WeeklyCalendarGrid] Error processing appointment ${apt.id} time:`, error);
+        return [9, 17]; // Fallback to default business hours
+      }
+    });
+
+    // Add a buffer (e.g., 1 hour before/after)
+    const minHour = Math.max(0, Math.min(...allHours) - 1);
+    const maxHour = Math.min(23, Math.max(...allHours) + 1);
+    
+    console.log('[WeeklyCalendarGrid] Dynamic time range calculated:', {
+      appointmentHours: allHours,
+      minHour,
+      maxHour,
+      buffer: '1 hour padding'
+    });
+    
+    return [minHour, maxHour];
+  }, [appointments, userTimeZone]);
+
+  // Generate time slots based on dynamic range
   const timeSlots = useMemo((): TimeSlot[] => {
     const slots: TimeSlot[] = [];
-    for (let hour = 9; hour <= 17; hour++) {
+    
+    console.log('[WeeklyCalendarGrid] Generating time slots:', {
+      startHour,
+      endHour,
+      totalHours: endHour - startHour + 1
+    });
+    
+    for (let hour = startHour; hour <= endHour; hour++) {
       slots.push({
         hour,
         minute: 0,
         label: DateTime.fromObject({ hour, minute: 0 }).toFormat('h:mm a')
       });
-      if (hour < 17) { // Don't add 5:30 PM slot
+      if (hour < endHour) { // Don't add 30-minute slot for the last hour
         slots.push({
           hour,
           minute: 30,
@@ -72,8 +132,15 @@ const WeeklyCalendarGrid: React.FC<WeeklyCalendarGridProps> = ({
         });
       }
     }
+    
+    console.log('[WeeklyCalendarGrid] Generated time slots:', {
+      slotsCount: slots.length,
+      firstSlot: slots[0]?.label,
+      lastSlot: slots[slots.length - 1]?.label
+    });
+    
     return slots;
-  }, []);
+  }, [startHour, endHour]);
 
   // Generate days of the week
   const weekDays = useMemo(() => {
@@ -85,15 +152,6 @@ const WeeklyCalendarGrid: React.FC<WeeklyCalendarGridProps> = ({
     }
     return days;
   }, [weekStart, userTimeZone]);
-
-  // Robust timezone fallback function
-  const getAppointmentTimezone = (appointment: any, fallbackTimezone: string) => {
-    if (appointment.appointment_timezone) {
-      return appointment.appointment_timezone;
-    }
-    console.warn(`Appointment ${appointment.id} missing timezone, using fallback: ${fallbackTimezone}`);
-    return fallbackTimezone || 'America/New_York';
-  };
 
   // Render appointments for a specific time slot
   const renderAppointmentsInSlot = (day: DateTime, slot: TimeSlot) => {
@@ -244,7 +302,7 @@ const WeeklyCalendarGrid: React.FC<WeeklyCalendarGridProps> = ({
       {process.env.NODE_ENV === 'development' && (
         <div className="bg-gray-100 p-2 text-xs text-gray-600 border-t">
           <strong>Debug:</strong> {appointments?.length || 0} appointments loaded for clinician {clinicianId} 
-          in timezone {userTimeZone}
+          in timezone {userTimeZone} | Time range: {startHour}:00 - {endHour}:00
         </div>
       )}
     </div>
