@@ -1,39 +1,31 @@
+
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "../components/layout/Layout";
 import { useUser } from "@/context/UserContext";
 import { useToast } from "@/hooks/use-toast";
 import CalendarErrorBoundary from "../components/calendar/CalendarErrorBoundary";
-import WeeklyCalendarGrid from "../components/calendar/WeeklyCalendarGrid";
-import AvailabilityManagementSidebar from "../components/calendar/AvailabilityManagementSidebar";
-import AppointmentDialog from "../components/calendar/AppointmentDialog";
-import NylasHybridCalendar from "../components/calendar/NylasHybridCalendar";
-import CalendarConnectionsPanel from "../components/calendar/CalendarConnectionsPanel";
-import NylasConnectionTest from "../components/calendar/NylasConnectionTest";
+import ReactBigCalendar from "@/components/calendar/ReactBigCalendar";
+import { AppointmentDialog } from "@/components/AppointmentDialog";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Plus, Calendar, Settings } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { addWeeks, subWeeks, startOfWeek, endOfWeek } from "date-fns";
 import { TimeZoneService } from "@/utils/timeZoneService";
 import { getClinicianTimeZone } from "@/hooks/useClinicianData";
 import { DateTime } from "luxon";
 import { useAppointments } from "@/hooks/useAppointments";
 import { useNylasEvents } from "@/hooks/useNylasEvents";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
 const CalendarSimple = React.memo(() => {
   const { userId, authInitialized, userRole } = useUser();
+  const { user } = useAuth();
   const [isReady, setIsReady] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [userTimeZone, setUserTimeZone] = useState<string>(TimeZoneService.DEFAULT_TIMEZONE);
   const [isMounted, setIsMounted] = useState(true);
   const [showAppointmentDialog, setShowAppointmentDialog] = useState(false);
-  const [selectedDateTime, setSelectedDateTime] = useState<{
-    date?: DateTime;
-    startTime?: DateTime;
-    endTime?: DateTime;
-  }>({});
-  const [calendarView, setCalendarView] = useState<'internal' | 'hybrid' | 'debug'>('internal');
+  const [selectedSlot, setSelectedSlot] = useState<any>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
   
@@ -89,39 +81,53 @@ const CalendarSimple = React.memo(() => {
     weekEnd       // SYNCHRONIZED - SAME AS APPOINTMENTS
   );
 
-  // Combine internal and external events for hybrid view
+  // Combine internal and external events
   const allEvents = useMemo(() => {
-    const internalEvents = appointments?.map(apt => ({
-      ...apt,
-      eventType: 'internal',
-      id: apt.id,
-      title: apt.clientName || 'Internal Appointment',
-      start_time: apt.start_at,
-      end_time: apt.end_at
-    })) || [];
-
-    const externalEvents = nylasEvents?.map(event => ({
-      ...event,
-      eventType: 'external',
-      id: event.id,
-      start_time: event.when?.start_time,
-      end_time: event.when?.end_time
-    })) || [];
+    const events = [];
+    
+    // Add internal appointments with proper source tagging
+    if (appointments) {
+      events.push(...appointments.map(apt => ({
+        ...apt,
+        source: 'internal',
+        type: 'appointment',
+        id: apt.id,
+        title: apt.clientName || 'Internal Appointment',
+        start_time: apt.start_at,
+        end_time: apt.end_at,
+        start: apt.start_at,
+        end: apt.end_at
+      })));
+    }
+    
+    // Add Nylas events with proper source tagging  
+    if (nylasEvents) {
+      events.push(...nylasEvents.map(evt => ({
+        ...evt,
+        source: 'nylas',
+        type: 'external',
+        id: evt.id,
+        start_time: evt.when?.start_time,
+        end_time: evt.when?.end_time,
+        start: evt.when?.start_time,
+        end: evt.when?.end_time
+      })));
+    }
 
     console.log('[CalendarSimple] SYNCHRONIZED event merging:', {
       dateRangeUsed: {
         start: weekStart.toISOString(),
         end: weekEnd.toISOString()
       },
-      internalEventsCount: internalEvents.length,
-      externalEventsCount: externalEvents.length,
-      totalEventsCount: internalEvents.length + externalEvents.length,
-      internalEvents: internalEvents.map(e => ({ id: e.id, title: e.title, start: e.start_time })),
-      externalEvents: externalEvents.map(e => ({ id: e.id, title: e.title, start: e.start_time })),
+      internalEventsCount: appointments?.length || 0,
+      externalEventsCount: nylasEvents?.length || 0,
+      totalEventsCount: events.length,
+      internalEvents: appointments?.map(e => ({ id: e.id, title: e.clientName, start: e.start_at })) || [],
+      externalEvents: nylasEvents?.map(e => ({ id: e.id, title: e.title, start: e.when?.start_time })) || [],
       synchronizationStatus: 'SUCCESS - Both hooks use identical date ranges'
     });
 
-    return [...internalEvents, ...externalEvents];
+    return events;
   }, [appointments, nylasEvents, weekStart, weekEnd]);
 
   // Debug logging for calendar state
@@ -139,7 +145,6 @@ const CalendarSimple = React.memo(() => {
       synchronizedWeekEnd: weekEnd.toISOString(),
       isReady,
       authInitialized,
-      calendarView,
       dateRangeSyncStatus: 'SYNCHRONIZED',
       appointments: appointments?.map(apt => ({
         id: apt.id,
@@ -155,7 +160,7 @@ const CalendarSimple = React.memo(() => {
         connection_provider: event.connection_provider
       }))
     });
-  }, [userId, appointments, nylasEvents, allEvents, appointmentsLoading, nylasLoading, userTimeZone, currentDate, weekStart, weekEnd, isReady, authInitialized, calendarView]);
+  }, [userId, appointments, nylasEvents, allEvents, appointmentsLoading, nylasLoading, userTimeZone, currentDate, weekStart, weekEnd, isReady, authInitialized]);
 
   // Navigation functions
   const navigatePrevious = useCallback(() => {
@@ -168,6 +173,38 @@ const CalendarSimple = React.memo(() => {
 
   const navigateToday = useCallback(() => {
     setCurrentDate(new Date());
+  }, []);
+
+  // Handle slot selection for new appointments
+  const handleSelectSlot = useCallback((slotInfo: { start: Date; end: Date }) => {
+    console.log('[CalendarSimple] Slot selected:', slotInfo);
+    setSelectedSlot({
+      start: slotInfo.start,
+      end: slotInfo.end
+    });
+    setShowAppointmentDialog(true);
+  }, []);
+
+  // Handle event click
+  const handleSelectEvent = useCallback((event: any) => {
+    console.log('[CalendarSimple] Event selected:', event);
+    if (event.source === 'internal') {
+      // Open appointment details/edit for internal appointments
+      setSelectedSlot(event.resource || event);
+      setShowAppointmentDialog(true);
+    } else if (event.source === 'nylas') {
+      // Show toast for external events
+      toast({
+        title: "External Event",
+        description: `${event.title} - Synced from ${event.connection_provider}`,
+      });
+    }
+  }, [toast]);
+
+  // Handle new appointment button
+  const handleNewAppointment = useCallback(() => {
+    setSelectedSlot(null);
+    setShowAppointmentDialog(true);
   }, []);
 
   // Stabilized access control handler with circuit breaker
@@ -204,46 +241,6 @@ const CalendarSimple = React.memo(() => {
       }
     }
   }, [isMounted]);
-
-  // Handle availability click (opens appointment dialog)
-  const handleAvailabilityClick = useCallback((date: DateTime, startTime: DateTime, endTime: DateTime) => {
-    console.log('[CalendarSimple] Availability clicked:', { date, startTime, endTime });
-    setSelectedDateTime({
-      date,
-      startTime,
-      endTime
-    });
-    setShowAppointmentDialog(true);
-  }, []);
-
-  // Handle appointment/event click
-  const handleAppointmentClick = useCallback((appointment: any) => {
-    console.log('[CalendarSimple] Appointment clicked:', appointment);
-    if (appointment.eventType === 'external') {
-      toast({
-        title: "External Event",
-        description: `${appointment.title} - Synced from ${appointment.connection_provider}`,
-      });
-    } else {
-      toast({
-        title: "Appointment Details",
-        description: `${appointment.clientName} - ${appointment.type}`,
-      });
-    }
-  }, [toast]);
-
-  // Handle new appointment button
-  const handleNewAppointment = useCallback(() => {
-    setSelectedDateTime({});
-    setShowAppointmentDialog(true);
-  }, []);
-
-  // Handle appointment created
-  const handleAppointmentCreated = useCallback(() => {
-    // Force refresh of appointments by updating a trigger
-    console.log('[CalendarSimple] Appointment created successfully');
-    // The useAppointments hook will automatically refresh due to its query invalidation
-  }, []);
 
   // Component mounting effect
   useEffect(() => {
@@ -353,9 +350,9 @@ const CalendarSimple = React.memo(() => {
   return (
     <Layout>
       <CalendarErrorBoundary>
-        <div className="space-y-6">
-          {/* Header with navigation and view toggle */}
-          <div className="flex items-center justify-between">
+        <div className="p-6">
+          {/* Header with navigation */}
+          <div className="flex items-center justify-between mb-6">
             <div className="flex items-center space-x-4">
               <Button variant="outline" onClick={navigatePrevious}>
                 <ChevronLeft className="h-4 w-4" />
@@ -374,97 +371,35 @@ const CalendarSimple = React.memo(() => {
             <h1 className="text-2xl font-bold text-gray-800">
               {currentMonthDisplay}
             </h1>
-            <div className="flex items-center space-x-4">
-              <Tabs value={calendarView} onValueChange={(value) => {
-                console.log('[CalendarSimple] Calendar view changed to:', value);
-                setCalendarView(value as 'internal' | 'hybrid' | 'debug');
-              }}>
-                <TabsList>
-                  <TabsTrigger value="internal">Internal</TabsTrigger>
-                  <TabsTrigger value="hybrid">Hybrid</TabsTrigger>
-                  <TabsTrigger value="debug">Debug</TabsTrigger>
-                </TabsList>
-              </Tabs>
-              <div className="text-sm text-gray-500">
-                Events: {calendarView === 'internal' ? appointments?.length || 0 : allEvents?.length || 0} | 
-                Timezone: {userTimeZone}
-              </div>
+            <div className="text-sm text-gray-600">
+              <p>
+                Showing {allEvents.length} events | 
+                Internal: {appointments?.length || 0} | 
+                External: {nylasEvents?.length || 0}
+              </p>
+              <p>Timezone: {userTimeZone}</p>
             </div>
           </div>
 
-          {/* Main content with tab-based calendar views */}
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            {/* Calendar display */}
-            <div className="lg:col-span-3">
-              <Tabs value={calendarView} onValueChange={(value) => setCalendarView(value as 'internal' | 'hybrid' | 'debug')}>
-                <TabsContent value="internal">
-                  <WeeklyCalendarGrid
-                    currentDate={currentDate}
-                    clinicianId={userId}
-                    userTimeZone={userTimeZone}
-                    onAvailabilityClick={handleAvailabilityClick}
-                    onAppointmentClick={handleAppointmentClick}
-                  />
-                </TabsContent>
-                <TabsContent value="hybrid">
-                  <NylasHybridCalendar
-                    clinicianId={userId}
-                    userTimeZone={userTimeZone}
-                    currentDate={currentDate}
-                    onEventClick={handleAppointmentClick}
-                  />
-                </TabsContent>
-                <TabsContent value="debug">
-                  <div className="space-y-4">
-                    <NylasConnectionTest />
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>Debug Information - Date Range Synchronization</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-2 text-sm">
-                          <div><strong>User ID:</strong> {userId}</div>
-                          <div><strong>Time Zone:</strong> {userTimeZone}</div>
-                          <div><strong>Current Date:</strong> {currentDate.toISOString()}</div>
-                          <div><strong>SYNCHRONIZED Week Start:</strong> {weekStart.toISOString()}</div>
-                          <div><strong>SYNCHRONIZED Week End:</strong> {weekEnd.toISOString()}</div>
-                          <div><strong>Internal Appointments:</strong> {appointments?.length || 0}</div>
-                          <div><strong>Nylas Events:</strong> {nylasEvents?.length || 0}</div>
-                          <div><strong>All Events (Combined):</strong> {allEvents?.length || 0}</div>
-                          <div><strong>Appointments Loading:</strong> {appointmentsLoading ? 'Yes' : 'No'}</div>
-                          <div><strong>Nylas Loading:</strong> {nylasLoading ? 'Yes' : 'No'}</div>
-                          <div><strong>Date Range Sync Status:</strong> ✅ SYNCHRONIZED</div>
-                          <div><strong>Sync Method:</strong> Both hooks use identical weekStart/weekEnd variables</div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-                </TabsContent>
-              </Tabs>
-            </div>
+          {/* React Big Calendar */}
+          <ReactBigCalendar
+            events={allEvents}
+            onSelectSlot={handleSelectSlot}
+            onSelectEvent={handleSelectEvent}
+          />
 
-            {/* Sidebar */}
-            <div className="lg:col-span-1 space-y-4">
-              <AvailabilityManagementSidebar
-                clinicianId={userId}
-                userTimeZone={userTimeZone}
-              />
-              <CalendarConnectionsPanel />
-            </div>
-          </div>
+          {/* Appointment Dialog */}
+          {showAppointmentDialog && (
+            <AppointmentDialog
+              isOpen={showAppointmentDialog}
+              onClose={() => {
+                setShowAppointmentDialog(false);
+                setSelectedSlot(null);
+              }}
+              initialData={selectedSlot}
+            />
+          )}
         </div>
-
-        {/* Appointment Dialog */}
-        <AppointmentDialog
-          isOpen={showAppointmentDialog}
-          onClose={() => setShowAppointmentDialog(false)}
-          clinicianId={userId}
-          clinicianTimeZone={userTimeZone}
-          selectedDate={selectedDateTime.date}
-          selectedStartTime={selectedDateTime.startTime}
-          selectedEndTime={selectedDateTime.endTime}
-          onAppointmentCreated={handleAppointmentCreated}
-        />
       </CalendarErrorBoundary>
     </Layout>
   );
