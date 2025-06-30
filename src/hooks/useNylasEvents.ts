@@ -64,6 +64,20 @@ export const useNylasEvents = (startDate?: Date, endDate?: Date) => {
       const fetchedEvents = data?.events || [];
       const fetchedConnections = data?.connections || [];
 
+      // Add detailed logging for event data verification
+      console.log('[useNylasEvents] Nylas events date range verification:', {
+        startDate: startDate?.toISOString(),
+        endDate: endDate?.toISOString(),
+        totalEvents: fetchedEvents.length,
+        eventDates: fetchedEvents.map((e: any) => ({
+          title: e.title,
+          when: e.when,
+          start_time: e.when?.start_time,
+          date: e.when?.date,
+          object_type: e.when?.object
+        }))
+      });
+
       console.log('[useNylasEvents] SYNCHRONIZED response processed:', {
         eventsCount: fetchedEvents.length,
         connectionsCount: fetchedConnections.length,
