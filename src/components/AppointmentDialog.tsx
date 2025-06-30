@@ -1,18 +1,32 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem
+} from '@/components/ui/select';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 import { DateTime } from 'luxon';
-import { useUser } from '@/context/UserContext';
-import { getClinicianTimeZone } from '@/hooks/useClinicianData';
-import { useEffect } from 'react';
+
+interface Client {
+  id: string;
+  name: string;
+}
 
 interface AppointmentDialogProps {
   isOpen: boolean;
   onClose: () => void;
+  clinicianId: string;
+  clinicianTimeZone: string;
+  onAppointmentCreated: () => void;
   initialData?: {
     start?: Date;
     end?: Date;
@@ -28,87 +42,77 @@ interface AppointmentDialogProps {
 export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
   isOpen,
   onClose,
+  clinicianId,
+  clinicianTimeZone,
+  onAppointmentCreated,
   initialData,
 }) => {
-  const { userId } = useUser();
-  const [userTimeZone, setUserTimeZone] = useState<string>('America/New_York');
+  const { toast } = useToast();
+  const [clients, setClients] = useState<Client[]>([]);
+  const [isLoadingClients, setIsLoadingClients] = useState(false);
   const [formData, setFormData] = useState({
-    title: '',
-    clientName: '',
+    clientId: '',
     notes: '',
     startTime: '',
-    endTime: '',
   });
 
-  // Load user timezone
+  // Load clients when dialog opens
   useEffect(() => {
-    if (userId) {
-      getClinicianTimeZone(userId)
-        .then(tz => setUserTimeZone(tz))
-        .catch(err => console.error('Error loading timezone:', err));
-    }
-  }, [userId]);
+    if (!isOpen || !clinicianId) return;
+    
+    const loadClients = async () => {
+      setIsLoadingClients(true);
+      try {
+        const { data, error } = await supabase
+          .from('clients')
+          .select('id, client_first_name, client_last_name, client_preferred_name')
+          .eq('client_assigned_therapist', clinicianId)
+          .order('client_first_name');
 
-  // Convert times to clinician timezone for display
-  useEffect(() => {
-    if (initialData) {
-      let startTime = '';
-      let endTime = '';
-
-      if (initialData.start_at && initialData.end_at) {
-        // For existing appointments, convert UTC to clinician timezone
-        const appointmentTz = initialData.appointment_timezone || userTimeZone;
-        const startDT = DateTime.fromISO(initialData.start_at)
-          .setZone(appointmentTz);
-        const endDT = DateTime.fromISO(initialData.end_at)
-          .setZone(appointmentTz);
-          
-        startTime = startDT.toFormat("yyyy-MM-dd'T'HH:mm");
-        endTime = endDT.toFormat("yyyy-MM-dd'T'HH:mm");
+        if (error) throw error;
         
-        console.log('[AppointmentDialog] Converting existing appointment times:', {
-          originalStart: initialData.start_at,
-          originalEnd: initialData.end_at,
-          appointmentTimezone: appointmentTz,
-          convertedStart: startTime,
-          convertedEnd: endTime,
-          startDT: startDT.toISO(),
-          endDT: endDT.toISO()
+        const clientList = (data || []).map(c => ({
+          id: c.id,
+          name: `${c.client_preferred_name || c.client_first_name || ''} ${c.client_last_name || ''}`.trim() || 'Unknown Client'
+        }));
+        
+        setClients(clientList);
+      } catch (error) {
+        console.error('Error loading clients:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load clients',
+          variant: 'destructive'
         });
-      } else if (initialData.start && initialData.end) {
-        // For new appointments from slot selection, the Date objects are already in correct timezone
-        const startDT = DateTime.fromJSDate(initialData.start);
-        const endDT = DateTime.fromJSDate(initialData.end);
-        
-        startTime = startDT.toFormat("yyyy-MM-dd'T'HH:mm");
-        endTime = endDT.toFormat("yyyy-MM-dd'T'HH:mm");
-        
-        console.log('[AppointmentDialog] Using slot selection times:', {
-          slotStart: initialData.start.toISOString(),
-          slotEnd: initialData.end.toISOString(),
-          formattedStart: startTime,
-          formattedEnd: endTime
-        });
+      } finally {
+        setIsLoadingClients(false);
       }
+    };
 
+    loadClients();
+  }, [isOpen, clinicianId, toast]);
+
+  // Set initial values from props
+  useEffect(() => {
+    if (initialData && initialData.start) {
+      // Convert the selected slot time to local datetime-local format
+      const startDT = DateTime.fromJSDate(initialData.start);
+      const startTime = startDT.toFormat("yyyy-MM-dd'T'HH:mm");
+      
       setFormData({
-        title: initialData.title || '',
-        clientName: initialData.clientName || '',
+        clientId: '',
         notes: initialData.notes || '',
         startTime,
-        endTime,
       });
     } else {
       // Reset form for new appointments
       setFormData({
-        title: '',
-        clientName: '',
+        clientId: '',
         notes: '',
         startTime: '',
-        endTime: '',
       });
     }
-  }, [initialData, userTimeZone]);
+  }, [initialData]);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
@@ -117,53 +121,115 @@ export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
     }));
   };
 
-  const handleSave = () => {
-    console.log('[AppointmentDialog] Saving appointment with timezone context:', {
-      formData,
-      userTimeZone,
-      initialData
-    });
-    // TODO: Implement save logic with proper timezone handling
-    onClose();
+  const handleSave = async () => {
+    // Validate required fields
+    if (!formData.clientId || !formData.startTime) {
+      toast({
+        title: 'Validation Error',
+        description: 'Please select a client and start time',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    try {
+      // Parse start time and compute end time (start + 1 hour)
+      const startDT = DateTime.fromISO(formData.startTime, { zone: clinicianTimeZone });
+      const endDT = startDT.plus({ hours: 1 });
+      
+      // Convert to UTC for storage
+      const startUtc = startDT.toUTC().toISO();
+      const endUtc = endDT.toUTC().toISO();
+
+      console.log('[AppointmentDialog] Creating appointment:', {
+        client_id: formData.clientId,
+        clinician_id: clinicianId,
+        start_at: startUtc,
+        end_at: endUtc,
+        type: 'therapy_session',
+        status: 'scheduled',
+        notes: formData.notes,
+        appointment_timezone: clinicianTimeZone
+      });
+
+      const { error } = await supabase
+        .from('appointments')
+        .insert({
+          client_id: formData.clientId,
+          clinician_id: clinicianId,
+          start_at: startUtc,
+          end_at: endUtc,
+          type: 'therapy_session',
+          status: 'scheduled',
+          notes: formData.notes || null,
+          appointment_timezone: clinicianTimeZone
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Success',
+        description: 'Appointment created successfully'
+      });
+
+      // Reset form and close dialog
+      setFormData({
+        clientId: '',
+        notes: '',
+        startTime: '',
+      });
+      
+      onAppointmentCreated();
+      onClose();
+    } catch (error) {
+      console.error('Error creating appointment:', error);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to create appointment',
+        variant: 'destructive'
+      });
+    }
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>
-            {initialData ? 'Edit Appointment' : 'New Appointment'}
-          </DialogTitle>
+          <DialogTitle>New Appointment</DialogTitle>
         </DialogHeader>
         
         <div className="grid gap-4 py-4">
+          {/* Title (read-only) */}
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="title" className="text-right">
-              Title
-            </Label>
-            <Input
-              id="title"
-              value={formData.title}
-              onChange={(e) => handleInputChange('title', e.target.value)}
-              className="col-span-3"
-            />
+            <Label className="text-right">Title</Label>
+            <div className="col-span-3 py-2 text-sm">Therapy Session</div>
           </div>
           
+          {/* Client (searchable dropdown) */}
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="clientName" className="text-right">
-              Client
-            </Label>
-            <Input
-              id="clientName"
-              value={formData.clientName}
-              onChange={(e) => handleInputChange('clientName', e.target.value)}
-              className="col-span-3"
-            />
+            <Label className="text-right">Client *</Label>
+            <Select
+              value={formData.clientId}
+              onValueChange={(value) => handleInputChange('clientId', value)}
+              disabled={isLoadingClients}
+            >
+              <SelectTrigger className="col-span-3">
+                <SelectValue placeholder={isLoadingClients ? "Loading clients..." : "Select a client"} />
+              </SelectTrigger>
+              <SelectContent>
+                {clients.map((client) => (
+                  <SelectItem key={client.id} value={client.id}>
+                    {client.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           
+          {/* Start Time */}
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="startTime" className="text-right">
-              Start
+              Start *
             </Label>
             <Input
               id="startTime"
@@ -174,19 +240,7 @@ export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
             />
           </div>
           
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="endTime" className="text-right">
-              End
-            </Label>
-            <Input
-              id="endTime"
-              type="datetime-local"
-              value={formData.endTime}
-              onChange={(e) => handleInputChange('endTime', e.target.value)}
-              className="col-span-3"
-            />
-          </div>
-          
+          {/* Notes */}
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="notes" className="text-right">
               Notes
@@ -197,12 +251,13 @@ export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
               onChange={(e) => handleInputChange('notes', e.target.value)}
               className="col-span-3"
               rows={3}
+              placeholder="Additional notes for this appointment..."
             />
           </div>
 
           {/* Timezone indicator */}
           <div className="text-xs text-gray-500 text-center">
-            Times displayed in: {userTimeZone}
+            Times displayed in: {clinicianTimeZone} | Duration: 1 hour
           </div>
         </div>
         
@@ -211,7 +266,7 @@ export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
             Cancel
           </Button>
           <Button onClick={handleSave}>
-            Save
+            Save Appointment
           </Button>
         </div>
       </DialogContent>

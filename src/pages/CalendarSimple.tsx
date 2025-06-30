@@ -580,6 +580,9 @@ const CalendarSimple = React.memo(() => {
                 setSelectedSlot(null);
               }}
               initialData={selectedSlot}
+              clinicianId={userId}
+              clinicianTimeZone={userTimeZone}
+              onAppointmentCreated={triggerRefresh}
             />
           )}
 
@@ -592,6 +595,9 @@ const CalendarSimple = React.memo(() => {
                 setSelectedSlot(null);
               }}
               initialData={selectedSlot}
+              clinicianId={userId}
+              clinicianTimeZone={userTimeZone}
+              onAppointmentCreated={triggerRefresh}
             />
           )}
         </div>
