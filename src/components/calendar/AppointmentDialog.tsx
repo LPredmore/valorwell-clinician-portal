@@ -41,10 +41,8 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
 }) => {
   const [clients, setClients] = useState<Client[]>([]);
   const [selectedClientId, setSelectedClientId] = useState<string>('');
-  const [appointmentType, setAppointmentType] = useState<string>('therapy_session');
   const [date, setDate] = useState<string>('');
   const [startTime, setStartTime] = useState<string>('');
-  const [endTime, setEndTime] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingClients, setIsLoadingClients] = useState(false);
@@ -65,9 +63,6 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
       }
       if (selectedStartTime) {
         setStartTime(selectedStartTime.toFormat('HH:mm'));
-      }
-      if (selectedEndTime) {
-        setEndTime(selectedEndTime.toFormat('HH:mm'));
       }
     }
   }, [isOpen, selectedDate, selectedStartTime, selectedEndTime]);
@@ -98,7 +93,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!selectedClientId || !date || !startTime || !endTime) {
+    if (!selectedClientId || !date || !startTime) {
       toast({
         title: 'Validation Error',
         description: 'Please fill in all required fields',
@@ -117,16 +112,14 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
 
       // Convert local date/time to UTC for storage
       const localDateTimeStart = `${date}T${startTime}`;
-      const localDateTimeEnd = `${date}T${endTime}`;
       
       console.log('[AppointmentDialog] Converting times:', {
         localDateTimeStart,
-        localDateTimeEnd,
         clinicianTimeZone
       });
 
       const startAtUTC = TimeZoneService.convertLocalToUTC(localDateTimeStart, clinicianTimeZone);
-      const endAtUTC = TimeZoneService.convertLocalToUTC(localDateTimeEnd, clinicianTimeZone);
+      const endAtUTC = startAtUTC.plus({ hours: 1 }); // Add 1 hour for appointment duration
 
       // Create appointment with proper timezone data
       const appointmentData = {
@@ -135,7 +128,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
         start_at: startAtUTC.toISO(),
         end_at: endAtUTC.toISO(),
         appointment_timezone: clinicianTimeZone, // CRITICAL: Save the timezone
-        type: appointmentType,
+        type: 'therapy_session',
         status: 'scheduled',
         notes: notes || null
       };
@@ -155,10 +148,8 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
 
       // Reset form
       setSelectedClientId('');
-      setAppointmentType('therapy_session');
       setDate('');
       setStartTime('');
-      setEndTime('');
       setNotes('');
       
       onAppointmentCreated?.();
@@ -189,11 +180,22 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Label htmlFor="client">Client *</Label>
-            <Select value={selectedClientId} onValueChange={setSelectedClientId} disabled={isLoadingClients}>
-              <SelectTrigger>
-                <SelectValue placeholder={isLoadingClients ? "Loading clients..." : "Select a client"} />
+          <div className="grid grid-cols-4 gap-4">
+            {/* Title (read-only) */}
+            <Label className="text-right">Title</Label>
+            <div className="col-span-3 py-2 text-sm">Therapy Session</div>
+            
+            {/* Client (searchable dropdown) */}
+            <Label htmlFor="client" className="text-right">Client *</Label>
+            <Select
+              value={selectedClientId}
+              onValueChange={setSelectedClientId}
+              disabled={isLoadingClients}
+            >
+              <SelectTrigger asChild>
+                <Button variant="outline" className="col-span-3" disabled={isLoadingClients}>
+                  <SelectValue placeholder={isLoadingClients ? "Loading clients..." : "Select client..."} />
+                </Button>
               </SelectTrigger>
               <SelectContent>
                 {clients.map((client) => (
@@ -203,73 +205,46 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
                 ))}
               </SelectContent>
             </Select>
-          </div>
 
-          <div>
-            <Label htmlFor="type">Appointment Type</Label>
-            <Select value={appointmentType} onValueChange={setAppointmentType}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="therapy_session">Therapy Session</SelectItem>
-                <SelectItem value="consultation">Consultation</SelectItem>
-                <SelectItem value="follow_up">Follow Up</SelectItem>
-                <SelectItem value="assessment">Assessment</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div>
-            <Label htmlFor="date">Date *</Label>
+            {/* Date */}
+            <Label htmlFor="date" className="text-right">Date *</Label>
             <Input
               id="date"
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
               required
+              className="col-span-3"
             />
-          </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="startTime">Start Time *</Label>
-              <Input
-                id="startTime"
-                type="time"
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-                required
-              />
-            </div>
-            <div>
-              <Label htmlFor="endTime">End Time *</Label>
-              <Input
-                id="endTime"
-                type="time"
-                value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
-                required
-              />
-            </div>
-          </div>
+            {/* Start Time */}
+            <Label htmlFor="startTime" className="text-right">Start Time *</Label>
+            <Input
+              id="startTime"
+              type="time"
+              value={startTime}
+              onChange={(e) => setStartTime(e.target.value)}
+              required
+              className="col-span-3"
+            />
 
-          <div>
-            <Label htmlFor="notes">Notes</Label>
+            {/* Notes */}
+            <Label htmlFor="notes" className="text-right">Notes</Label>
             <Textarea
               id="notes"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Additional notes for this appointment..."
               rows={3}
+              className="col-span-4 w-full"
             />
-          </div>
 
-          {clinicianTimeZone && (
-            <div className="text-sm text-gray-500">
-              Times will be saved in timezone: {clinicianTimeZone}
-            </div>
-          )}
+            {clinicianTimeZone && (
+              <div className="col-span-4 text-sm text-gray-500 text-center">
+                Times will be saved in timezone: {clinicianTimeZone} | Duration: 1 hour
+              </div>
+            )}
+          </div>
 
           <div className="flex justify-end space-x-2 pt-4">
             <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
