@@ -9,13 +9,22 @@ import ReactBigCalendar from "@/components/calendar/ReactBigCalendar";
 import { AppointmentDialog } from "@/components/AppointmentDialog";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Clock, Calendar as CalendarIcon } from "lucide-react";
 import { addWeeks, subWeeks, startOfWeek, endOfWeek } from "date-fns";
 import { TimeZoneService } from "@/utils/timeZoneService";
 import { getClinicianTimeZone } from "@/hooks/useClinicianData";
 import { DateTime } from "luxon";
 import { useAppointments } from "@/hooks/useAppointments";
 import { useNylasEvents } from "@/hooks/useNylasEvents";
+import {
+  Sheet,
+  SheetTrigger,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import AvailabilityManagementSidebar from "@/components/calendar/AvailabilityManagementSidebar";
+import CalendarConnectionsPanel from "@/components/calendar/CalendarConnectionsPanel";
 
 const CalendarSimple = React.memo(() => {
   const { userId, authInitialized, userRole } = useUser();
@@ -25,7 +34,9 @@ const CalendarSimple = React.memo(() => {
   const [userTimeZone, setUserTimeZone] = useState<string>(TimeZoneService.DEFAULT_TIMEZONE);
   const [isMounted, setIsMounted] = useState(true);
   const [showAppointmentDialog, setShowAppointmentDialog] = useState(false);
+  const [showBlockTimeDialog, setShowBlockTimeDialog] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<any>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const navigate = useNavigate();
   const { toast } = useToast();
   
@@ -72,7 +83,7 @@ const CalendarSimple = React.memo(() => {
     weekStart,    // SYNCHRONIZED
     weekEnd,      // SYNCHRONIZED
     userTimeZone,
-    0
+    refreshTrigger  // Add refresh trigger for data refresh
   );
 
   // Fetch external calendar events (Nylas) - USING SYNCHRONIZED DATE RANGE
@@ -80,6 +91,11 @@ const CalendarSimple = React.memo(() => {
     weekStart,    // SYNCHRONIZED - SAME AS APPOINTMENTS
     weekEnd       // SYNCHRONIZED - SAME AS APPOINTMENTS
   );
+
+  // Refresh callback for availability changes
+  const triggerRefresh = useCallback(() => {
+    setRefreshTrigger(prev => prev + 1);
+  }, []);
 
   // Combine internal and external events
   const allEvents = useMemo(() => {
@@ -205,6 +221,12 @@ const CalendarSimple = React.memo(() => {
   const handleNewAppointment = useCallback(() => {
     setSelectedSlot(null);
     setShowAppointmentDialog(true);
+  }, []);
+
+  // Handle block time button
+  const handleBlockTime = useCallback(() => {
+    setSelectedSlot(null);
+    setShowBlockTimeDialog(true);
   }, []);
 
   // Stabilized access control handler with circuit breaker
@@ -351,7 +373,7 @@ const CalendarSimple = React.memo(() => {
     <Layout>
       <CalendarErrorBoundary>
         <div className="p-6">
-          {/* Header with navigation */}
+          {/* Header with navigation and controls */}
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center space-x-4">
               <Button variant="outline" onClick={navigatePrevious}>
@@ -363,15 +385,51 @@ const CalendarSimple = React.memo(() => {
               <Button variant="outline" onClick={navigateNext}>
                 <ChevronRight className="h-4 w-4" />
               </Button>
+              
+              {/* New Appointment Button */}
               <Button onClick={handleNewAppointment}>
                 <Plus className="h-4 w-4 mr-2" />
                 New Appointment
               </Button>
+
+              {/* Availability Sheet */}
+              <Sheet>
+                <SheetTrigger asChild>
+                  <Button variant="outline">
+                    <Clock className="h-4 w-4 mr-2" />
+                    Availability
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="right" className="sm:max-w-md overflow-y-auto">
+                  <SheetHeader>
+                    <SheetTitle>Manage Availability</SheetTitle>
+                  </SheetHeader>
+                  
+                  <div className="mt-6 space-y-6">
+                    {/* Availability Management */}
+                    <AvailabilityManagementSidebar
+                      clinicianId={userId}
+                      userTimeZone={userTimeZone}
+                    />
+
+                    {/* Calendar Connections */}
+                    <CalendarConnectionsPanel />
+                  </div>
+                </SheetContent>
+              </Sheet>
+
+              {/* Block Time Button */}
+              <Button variant="outline" onClick={handleBlockTime}>
+                <CalendarIcon className="h-4 w-4 mr-2" />
+                Block Time
+              </Button>
             </div>
+            
             <h1 className="text-2xl font-bold text-gray-800">
               {currentMonthDisplay}
             </h1>
-            <div className="text-sm text-gray-600">
+            
+            <div className="text-sm text-gray-600 text-right">
               <p>
                 Showing {allEvents.length} events | 
                 Internal: {appointments?.length || 0} | 
@@ -388,12 +446,24 @@ const CalendarSimple = React.memo(() => {
             onSelectEvent={handleSelectEvent}
           />
 
-          {/* Appointment Dialog */}
+          {/* New Appointment Dialog */}
           {showAppointmentDialog && (
             <AppointmentDialog
               isOpen={showAppointmentDialog}
               onClose={() => {
                 setShowAppointmentDialog(false);
+                setSelectedSlot(null);
+              }}
+              initialData={selectedSlot}
+            />
+          )}
+
+          {/* Block Time Dialog */}
+          {showBlockTimeDialog && (
+            <AppointmentDialog
+              isOpen={showBlockTimeDialog}
+              onClose={() => {
+                setShowBlockTimeDialog(false);
                 setSelectedSlot(null);
               }}
               initialData={selectedSlot}
