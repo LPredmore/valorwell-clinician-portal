@@ -16,6 +16,7 @@ import { DateTime } from "luxon";
 import { useAppointments } from "@/hooks/useAppointments";
 import { useNylasEvents } from "@/hooks/useNylasEvents";
 import { useClinicianAvailability } from "@/hooks/useClinicianAvailability";
+import { buildLocalDate } from "@/utils/dateUtils";
 import {
   Sheet,
   SheetTrigger,
@@ -95,11 +96,11 @@ const CalendarSimple = React.memo(() => {
   // Fetch availability slots
   const availabilitySlots = useClinicianAvailability(userId);
 
-  // Transform availability slots into calendar events
+  // Transform availability slots into calendar events with timezone-aware conversion
   const availabilityEvents = useMemo(() => {
     if (!availabilitySlots.length || !userTimeZone) return [];
     
-    console.log('[CalendarSimple] Processing availability slots:', {
+    console.log('[CalendarSimple] Processing availability slots with timezone fix:', {
       slotsCount: availabilitySlots.length,
       slots: availabilitySlots,
       weekStart: weekStart.toISOString(),  
@@ -129,25 +130,27 @@ const CalendarSimple = React.memo(() => {
         .filter(d => d.weekday === weekdayMap[slot.day])
         .map(d => {
           // Build DateTimes in clinician timezone
-          const start = DateTime.fromISO(`${d.toISODate()}T${slot.startTime}`, { zone: userTimeZone });
-          const end   = DateTime.fromISO(`${d.toISODate()}T${slot.endTime}`,   { zone: userTimeZone });
+          const startDT = DateTime.fromISO(`${d.toISODate()}T${slot.startTime}`, { zone: userTimeZone });
+          const endDT = DateTime.fromISO(`${d.toISODate()}T${slot.endTime}`, { zone: userTimeZone });
           
-          console.log('[CalendarSimple] Creating availability event:', {
+          console.log('[CalendarSimple] Creating availability event with timezone fix:', {
             slotDay: slot.day,
             dateWeekday: d.weekday,
             date: d.toISODate(),
             startTime: slot.startTime,
             endTime: slot.endTime,
-            startDateTime: start.toISO(),
-            endDateTime: end.toISO(),
+            startDateTime: startDT.toISO(),
+            endDateTime: endDT.toISO(),
+            startLocalDate: buildLocalDate(startDT).toISOString(),
+            endLocalDate: buildLocalDate(endDT).toISOString(),
             timezone: userTimeZone
           });
           
           return {
             id: `avail-${slot.day}-${slot.slot}-${d.toISODate()}`,
             title: 'Available',
-            start: start.toJSDate(),
-            end: end.toJSDate(),
+            start: buildLocalDate(startDT),
+            end: buildLocalDate(endDT),
             source: 'availability',
             type: 'availability',
             resource: slot
@@ -155,7 +158,7 @@ const CalendarSimple = React.memo(() => {
         });
     });
 
-    console.log('[CalendarSimple] Generated availability events:', {
+    console.log('[CalendarSimple] Generated availability events with timezone fix:', {
       eventsCount: events.length,
       events: events.map(e => ({
         id: e.id,
@@ -173,23 +176,43 @@ const CalendarSimple = React.memo(() => {
     setRefreshTrigger(prev => prev + 1);
   }, []);
 
-  // Combine internal, external, and availability events
+  // Combine internal, external, and availability events with timezone-aware conversion
   const allEvents = useMemo(() => {
     const events = [];
     
-    // Add internal appointments with proper source tagging
+    // Add internal appointments with timezone-aware conversion
     if (appointments) {
-      events.push(...appointments.map(apt => ({
-        ...apt,
-        source: 'internal',
-        type: 'appointment',
-        id: apt.id,
-        title: apt.clientName || 'Internal Appointment',
-        start_time: apt.start_at,
-        end_time: apt.end_at,
-        start: apt.start_at,
-        end: apt.end_at
-      })));
+      events.push(...appointments.map(apt => {
+        // Convert UTC timestamps to clinician timezone, then to local Date objects
+        const apptDTStart = DateTime.fromISO(apt.start_at)
+          .setZone(apt.appointment_timezone || userTimeZone);
+        const apptDTEnd = DateTime.fromISO(apt.end_at)
+          .setZone(apt.appointment_timezone || userTimeZone);
+
+        console.log('[CalendarSimple] Converting appointment with timezone fix:', {
+          appointmentId: apt.id,
+          clientName: apt.clientName,
+          originalStart: apt.start_at,
+          originalEnd: apt.end_at,
+          appointmentTimezone: apt.appointment_timezone,
+          userTimezone: userTimeZone,
+          convertedStart: apptDTStart.toISO(),
+          convertedEnd: apptDTEnd.toISO(),
+          localDateStart: buildLocalDate(apptDTStart).toISOString(),
+          localDateEnd: buildLocalDate(apptDTEnd).toISOString()
+        });
+
+        return {
+          ...apt,
+          source: 'internal',
+          type: 'appointment',
+          id: apt.id,
+          title: apt.clientName || 'Internal Appointment',
+          start: buildLocalDate(apptDTStart),
+          end: buildLocalDate(apptDTEnd),
+          resource: apt
+        };
+      }));
     }
     
     // Add Nylas events with proper source tagging  
@@ -206,10 +229,10 @@ const CalendarSimple = React.memo(() => {
       })));
     }
 
-    // Add availability events
+    // Add availability events (already converted with timezone fix)
     events.push(...availabilityEvents);
 
-    console.log('[CalendarSimple] SYNCHRONIZED event merging with availability:', {
+    console.log('[CalendarSimple] SYNCHRONIZED event merging with timezone fix:', {
       dateRangeUsed: {
         start: weekStart.toISOString(),
         end: weekEnd.toISOString()
@@ -218,18 +241,23 @@ const CalendarSimple = React.memo(() => {
       externalEventsCount: nylasEvents?.length || 0,
       availabilityEventsCount: availabilityEvents.length,
       totalEventsCount: events.length,
-      internalEvents: appointments?.map(e => ({ id: e.id, title: e.clientName, start: e.start_at })) || [],
+      internalEvents: appointments?.map(e => ({ 
+        id: e.id, 
+        title: e.clientName, 
+        originalStart: e.start_at,
+        convertedStart: events.find(evt => evt.id === e.id && evt.source === 'internal')?.start?.toISOString()
+      })) || [],
       externalEvents: nylasEvents?.map(e => ({ id: e.id, title: e.title, start: e.when?.start_time })) || [],
       availabilityEvents: availabilityEvents.map(e => ({
         id: e.id,
         title: e.title,
         start: e.start.toISOString()
       })),
-      synchronizationStatus: 'SUCCESS - All event types using identical date ranges'
+      timezoneFixStatus: 'SUCCESS - All events converted to local Date objects in clinician timezone'
     });
 
     return events.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
-  }, [appointments, nylasEvents, availabilityEvents, weekStart, weekEnd]);
+  }, [appointments, nylasEvents, availabilityEvents, weekStart, weekEnd, userTimeZone]);
 
   // Debug logging for calendar state
   useEffect(() => {

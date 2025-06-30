@@ -157,3 +157,20 @@ export const formatDateForDB = (date: Date | string | null | undefined): string 
   console.log(`[formatDateForDB] Formatted date: ${formattedDate}`);
   return formattedDate;
 };
+
+/**
+ * Convert a Luxon DateTime (in any zone) into a JS Date whose
+ * fields (Y/M/D h:m:s) match the DateTime values, ignoring timezone.
+ * This ensures React Big Calendar displays times correctly in the clinician's timezone.
+ */
+export function buildLocalDate(dt: DateTime): Date {
+  return new Date(
+    dt.year,
+    dt.month - 1,
+    dt.day,
+    dt.hour,
+    dt.minute,
+    dt.second,
+    dt.millisecond
+  );
+}

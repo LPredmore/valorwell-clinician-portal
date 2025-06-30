@@ -5,6 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { DateTime } from 'luxon';
+import { useUser } from '@/context/UserContext';
+import { getClinicianTimeZone } from '@/hooks/useClinicianData';
+import { useEffect } from 'react';
 
 interface AppointmentDialogProps {
   isOpen: boolean;
@@ -12,9 +16,12 @@ interface AppointmentDialogProps {
   initialData?: {
     start?: Date;
     end?: Date;
+    start_at?: string;
+    end_at?: string;
     title?: string;
     clientName?: string;
     notes?: string;
+    appointment_timezone?: string;
   } | null;
 }
 
@@ -23,13 +30,85 @@ export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
   onClose,
   initialData,
 }) => {
+  const { userId } = useUser();
+  const [userTimeZone, setUserTimeZone] = useState<string>('America/New_York');
   const [formData, setFormData] = useState({
-    title: initialData?.title || '',
-    clientName: initialData?.clientName || '',
-    notes: initialData?.notes || '',
-    startTime: initialData?.start ? new Date(initialData.start).toISOString().slice(0, 16) : '',
-    endTime: initialData?.end ? new Date(initialData.end).toISOString().slice(0, 16) : '',
+    title: '',
+    clientName: '',
+    notes: '',
+    startTime: '',
+    endTime: '',
   });
+
+  // Load user timezone
+  useEffect(() => {
+    if (userId) {
+      getClinicianTimeZone(userId)
+        .then(tz => setUserTimeZone(tz))
+        .catch(err => console.error('Error loading timezone:', err));
+    }
+  }, [userId]);
+
+  // Convert times to clinician timezone for display
+  useEffect(() => {
+    if (initialData) {
+      let startTime = '';
+      let endTime = '';
+
+      if (initialData.start_at && initialData.end_at) {
+        // For existing appointments, convert UTC to clinician timezone
+        const appointmentTz = initialData.appointment_timezone || userTimeZone;
+        const startDT = DateTime.fromISO(initialData.start_at)
+          .setZone(appointmentTz);
+        const endDT = DateTime.fromISO(initialData.end_at)
+          .setZone(appointmentTz);
+          
+        startTime = startDT.toFormat("yyyy-MM-dd'T'HH:mm");
+        endTime = endDT.toFormat("yyyy-MM-dd'T'HH:mm");
+        
+        console.log('[AppointmentDialog] Converting existing appointment times:', {
+          originalStart: initialData.start_at,
+          originalEnd: initialData.end_at,
+          appointmentTimezone: appointmentTz,
+          convertedStart: startTime,
+          convertedEnd: endTime,
+          startDT: startDT.toISO(),
+          endDT: endDT.toISO()
+        });
+      } else if (initialData.start && initialData.end) {
+        // For new appointments from slot selection, the Date objects are already in correct timezone
+        const startDT = DateTime.fromJSDate(initialData.start);
+        const endDT = DateTime.fromJSDate(initialData.end);
+        
+        startTime = startDT.toFormat("yyyy-MM-dd'T'HH:mm");
+        endTime = endDT.toFormat("yyyy-MM-dd'T'HH:mm");
+        
+        console.log('[AppointmentDialog] Using slot selection times:', {
+          slotStart: initialData.start.toISOString(),
+          slotEnd: initialData.end.toISOString(),
+          formattedStart: startTime,
+          formattedEnd: endTime
+        });
+      }
+
+      setFormData({
+        title: initialData.title || '',
+        clientName: initialData.clientName || '',
+        notes: initialData.notes || '',
+        startTime,
+        endTime,
+      });
+    } else {
+      // Reset form for new appointments
+      setFormData({
+        title: '',
+        clientName: '',
+        notes: '',
+        startTime: '',
+        endTime: '',
+      });
+    }
+  }, [initialData, userTimeZone]);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
@@ -39,8 +118,12 @@ export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
   };
 
   const handleSave = () => {
-    // TODO: Implement save logic
-    console.log('Saving appointment:', formData);
+    console.log('[AppointmentDialog] Saving appointment with timezone context:', {
+      formData,
+      userTimeZone,
+      initialData
+    });
+    // TODO: Implement save logic with proper timezone handling
     onClose();
   };
 
@@ -115,6 +198,11 @@ export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
               className="col-span-3"
               rows={3}
             />
+          </div>
+
+          {/* Timezone indicator */}
+          <div className="text-xs text-gray-500 text-center">
+            Times displayed in: {userTimeZone}
           </div>
         </div>
         
