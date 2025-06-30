@@ -5,7 +5,7 @@ import { useUser } from "@/context/UserContext";
 import { useToast } from "@/hooks/use-toast";
 import CalendarErrorBoundary from "../components/calendar/CalendarErrorBoundary";
 import ReactBigCalendar from "@/components/calendar/ReactBigCalendar";
-import { AppointmentDialog } from "@/components/AppointmentDialog";
+import AppointmentDialog from "@/components/calendar/AppointmentDialog";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Plus, Clock, Calendar as CalendarIcon } from "lucide-react";
@@ -579,9 +579,11 @@ const CalendarSimple = React.memo(() => {
                 setShowAppointmentDialog(false);
                 setSelectedSlot(null);
               }}
-              initialData={selectedSlot}
               clinicianId={userId}
               clinicianTimeZone={userTimeZone}
+              selectedDate={selectedSlot?.start ? DateTime.fromJSDate(selectedSlot.start) : undefined}
+              selectedStartTime={selectedSlot?.start ? DateTime.fromJSDate(selectedSlot.start) : undefined}
+              selectedEndTime={selectedSlot?.end ? DateTime.fromJSDate(selectedSlot.end) : undefined}
               onAppointmentCreated={triggerRefresh}
             />
           )}
@@ -594,9 +596,11 @@ const CalendarSimple = React.memo(() => {
                 setShowBlockTimeDialog(false);
                 setSelectedSlot(null);
               }}
-              initialData={selectedSlot}
               clinicianId={userId}
               clinicianTimeZone={userTimeZone}
+              selectedDate={selectedSlot?.start ? DateTime.fromJSDate(selectedSlot.start) : undefined}
+              selectedStartTime={selectedSlot?.start ? DateTime.fromJSDate(selectedSlot.start) : undefined}
+              selectedEndTime={selectedSlot?.end ? DateTime.fromJSDate(selectedSlot.end) : undefined}
               onAppointmentCreated={triggerRefresh}
             />
           )}
