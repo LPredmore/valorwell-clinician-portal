@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "../components/layout/Layout";
@@ -16,6 +15,7 @@ import { getClinicianTimeZone } from "@/hooks/useClinicianData";
 import { DateTime } from "luxon";
 import { useAppointments } from "@/hooks/useAppointments";
 import { useNylasEvents } from "@/hooks/useNylasEvents";
+import { useClinicianAvailability } from "@/hooks/useClinicianAvailability";
 import {
   Sheet,
   SheetTrigger,
@@ -92,12 +92,88 @@ const CalendarSimple = React.memo(() => {
     weekEnd       // SYNCHRONIZED - SAME AS APPOINTMENTS
   );
 
+  // Fetch availability slots
+  const availabilitySlots = useClinicianAvailability(userId);
+
+  // Transform availability slots into calendar events
+  const availabilityEvents = useMemo(() => {
+    if (!availabilitySlots.length || !userTimeZone) return [];
+    
+    console.log('[CalendarSimple] Processing availability slots:', {
+      slotsCount: availabilitySlots.length,
+      slots: availabilitySlots,
+      weekStart: weekStart.toISOString(),  
+      weekEnd: weekEnd.toISOString(),
+      userTimeZone
+    });
+    
+    // Generate all dates in the week range
+    const dates = [];
+    let cursor = DateTime.fromJSDate(weekStart).startOf('day');
+    const endDate = DateTime.fromJSDate(weekEnd).startOf('day');
+    while (cursor <= endDate) {
+      dates.push(cursor);
+      cursor = cursor.plus({ days: 1 });
+    }
+
+    console.log('[CalendarSimple] Generated dates for availability:', dates.map(d => d.toISODate()));
+
+    const events = availabilitySlots.flatMap(slot => {
+      // Match slot.day to weekday number (1=Monday … 7=Sunday)
+      const weekdayMap = { 
+        monday: 1, tuesday: 2, wednesday: 3, thursday: 4, 
+        friday: 5, saturday: 6, sunday: 7 
+      };
+      
+      return dates
+        .filter(d => d.weekday === weekdayMap[slot.day])
+        .map(d => {
+          // Build DateTimes in clinician timezone
+          const start = DateTime.fromISO(`${d.toISODate()}T${slot.startTime}`, { zone: userTimeZone });
+          const end   = DateTime.fromISO(`${d.toISODate()}T${slot.endTime}`,   { zone: userTimeZone });
+          
+          console.log('[CalendarSimple] Creating availability event:', {
+            slotDay: slot.day,
+            dateWeekday: d.weekday,
+            date: d.toISODate(),
+            startTime: slot.startTime,
+            endTime: slot.endTime,
+            startDateTime: start.toISO(),
+            endDateTime: end.toISO(),
+            timezone: userTimeZone
+          });
+          
+          return {
+            id: `avail-${slot.day}-${slot.slot}-${d.toISODate()}`,
+            title: 'Available',
+            start: start.toJSDate(),
+            end: end.toJSDate(),
+            source: 'availability',
+            type: 'availability',
+            resource: slot
+          };
+        });
+    });
+
+    console.log('[CalendarSimple] Generated availability events:', {
+      eventsCount: events.length,
+      events: events.map(e => ({
+        id: e.id,
+        title: e.title,
+        start: e.start.toISOString(),
+        end: e.end.toISOString()
+      }))
+    });
+
+    return events;
+  }, [availabilitySlots, weekStart, weekEnd, userTimeZone]);
+
   // Refresh callback for availability changes
   const triggerRefresh = useCallback(() => {
     setRefreshTrigger(prev => prev + 1);
   }, []);
 
-  // Combine internal and external events
+  // Combine internal, external, and availability events
   const allEvents = useMemo(() => {
     const events = [];
     
@@ -130,21 +206,30 @@ const CalendarSimple = React.memo(() => {
       })));
     }
 
-    console.log('[CalendarSimple] SYNCHRONIZED event merging:', {
+    // Add availability events
+    events.push(...availabilityEvents);
+
+    console.log('[CalendarSimple] SYNCHRONIZED event merging with availability:', {
       dateRangeUsed: {
         start: weekStart.toISOString(),
         end: weekEnd.toISOString()
       },
       internalEventsCount: appointments?.length || 0,
       externalEventsCount: nylasEvents?.length || 0,
+      availabilityEventsCount: availabilityEvents.length,
       totalEventsCount: events.length,
       internalEvents: appointments?.map(e => ({ id: e.id, title: e.clientName, start: e.start_at })) || [],
       externalEvents: nylasEvents?.map(e => ({ id: e.id, title: e.title, start: e.when?.start_time })) || [],
-      synchronizationStatus: 'SUCCESS - Both hooks use identical date ranges'
+      availabilityEvents: availabilityEvents.map(e => ({
+        id: e.id,
+        title: e.title,
+        start: e.start.toISOString()
+      })),
+      synchronizationStatus: 'SUCCESS - All event types using identical date ranges'
     });
 
-    return events;
-  }, [appointments, nylasEvents, weekStart, weekEnd]);
+    return events.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+  }, [appointments, nylasEvents, availabilityEvents, weekStart, weekEnd]);
 
   // Debug logging for calendar state
   useEffect(() => {
@@ -174,6 +259,11 @@ const CalendarSimple = React.memo(() => {
         title: event.title,
         start_time: event.when?.start_time,
         connection_provider: event.connection_provider
+      })),
+      availabilityEvents: availabilityEvents.map(e => ({
+        id: e.id,
+        title: e.title,
+        start: e.start.toISOString()
       }))
     });
   }, [userId, appointments, nylasEvents, allEvents, appointmentsLoading, nylasLoading, userTimeZone, currentDate, weekStart, weekEnd, isReady, authInitialized]);
@@ -213,6 +303,12 @@ const CalendarSimple = React.memo(() => {
       toast({
         title: "External Event",
         description: `${event.title} - Synced from ${event.connection_provider}`,
+      });
+    } else if (event.source === 'availability') {
+      // Show toast for availability events
+      toast({
+        title: "Availability Block",
+        description: `Available time: ${event.resource.startTime} - ${event.resource.endTime}`,
       });
     }
   }, [toast]);
@@ -433,7 +529,8 @@ const CalendarSimple = React.memo(() => {
               <p>
                 Showing {allEvents.length} events | 
                 Internal: {appointments?.length || 0} | 
-                External: {nylasEvents?.length || 0}
+                External: {nylasEvents?.length || 0} | 
+                Availability: {availabilityEvents.length}
               </p>
               <p>Timezone: {userTimeZone}</p>
             </div>

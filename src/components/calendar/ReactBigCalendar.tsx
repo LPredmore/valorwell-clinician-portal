@@ -17,7 +17,7 @@ interface Event {
   end_time?: string;
   clientName?: string;
   client_name?: string;
-  source?: 'internal' | 'nylas';
+  source?: 'internal' | 'nylas' | 'availability';
   type?: string;
   when?: {
     object?: string;
@@ -44,6 +44,7 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
   // Debug logging for raw event data
   console.log('Raw Nylas events:', events.filter(e => e.source === 'nylas'));
   console.log('Raw Internal events:', events.filter(e => e.source === 'internal'));
+  console.log('Raw Availability events:', events.filter(e => e.source === 'availability'));
 
   // Transform events to react-big-calendar format
   const calendarEvents = events.map((event) => {
@@ -58,6 +59,11 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
       start = new Date(event.start_at || event.start || new Date());
       end = new Date(event.end_at || event.end || new Date());
       title = event.client_name || event.clientName || event.title || 'Internal Appointment';
+    } else if (event.source === 'availability') {
+      // Availability events
+      start = new Date(event.start || new Date());
+      end = new Date(event.end || new Date());
+      title = event.title || 'Available';
     } else {
       // Nylas events - handle all-day events properly
       if (event.when?.object === 'date') {
@@ -111,24 +117,34 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
   console.log('Transformed calendar events:', calendarEvents);
   console.log('All-day events:', calendarEvents.filter(e => e.allDay));
   console.log('Timed events:', calendarEvents.filter(e => !e.allDay));
+  console.log('Availability events:', calendarEvents.filter(e => e.source === 'availability'));
 
   // Custom event style getter
   const eventStyleGetter = (event: any) => {
     let backgroundColor = '#3174ad';
+    let borderColor = '#3174ad';
+    let opacity = 0.8;
     
     if (event.source === 'internal') {
       backgroundColor = '#3174ad'; // Blue for internal
+      borderColor = '#3174ad';
     } else if (event.source === 'nylas') {
       backgroundColor = '#f57c00'; // Orange for external
+      borderColor = '#f57c00';
+    } else if (event.source === 'availability') {
+      backgroundColor = '#e0e0e0'; // Light gray for availability
+      borderColor = '#bdbdbd';
+      opacity = 0.5; // More transparent for availability blocks
     }
 
     return {
       style: {
         backgroundColor,
+        borderColor,
         borderRadius: '4px',
-        opacity: 0.8,
-        color: 'white',
-        border: 'none',
+        opacity,
+        color: event.source === 'availability' ? '#666' : 'white',
+        border: `1px solid ${borderColor}`,
         display: 'block',
       },
     };
@@ -140,6 +156,9 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
       <strong>{event.title}</strong>
       {event.source === 'nylas' && (
         <div className="text-xs opacity-75">External</div>
+      )}
+      {event.source === 'availability' && (
+        <div className="text-xs opacity-75">Available</div>
       )}
       {event.allDay && (
         <div className="text-xs opacity-75">All Day</div>
