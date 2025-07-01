@@ -55,10 +55,10 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
 
     // Handle different event formats
     if (event.source === 'internal') {
-      // Internal appointments
-      start = new Date(event.start_at || event.start || new Date());
-      end = new Date(event.end_at || event.end || new Date());
-      title = event.client_name || event.clientName || event.title || 'Internal Appointment';
+      // Internal appointments - use the Date objects injected by CalendarSimple
+      start = event.start instanceof Date ? event.start : new Date(event.start as string);
+      end = event.end instanceof Date ? event.end : new Date(event.end as string);
+      title = event.clientName || event.client_name || event.title || 'Internal Appointment';
     } else if (event.source === 'availability') {
       // Availability events
       start = new Date(event.start || new Date());

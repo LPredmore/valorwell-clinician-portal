@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -26,6 +27,10 @@ interface AppointmentDialogProps {
   selectedStartTime?: DateTime;
   selectedEndTime?: DateTime;
   onAppointmentCreated?: () => void;
+  onAppointmentUpdated?: () => void;
+  isEdit?: boolean;
+  fixedClientId?: string;
+  appointmentId?: string;
 }
 
 const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
@@ -36,7 +41,11 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
   selectedDate,
   selectedStartTime,
   selectedEndTime,
-  onAppointmentCreated
+  onAppointmentCreated,
+  onAppointmentUpdated,
+  isEdit = false,
+  fixedClientId,
+  appointmentId
 }) => {
   const [clients, setClients] = useState<Client[]>([]);
   const [selectedClientId, setSelectedClientId] = useState<string>('');
@@ -47,16 +56,19 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
   const [isLoadingClients, setIsLoadingClients] = useState(false);
   const { toast } = useToast();
 
-  // Load clients when dialog opens
+  // Load clients when dialog opens (unless in edit mode with fixed client)
   useEffect(() => {
-    if (isOpen && clinicianId) {
+    if (isOpen && clinicianId && !isEdit) {
       loadClients();
     }
-  }, [isOpen, clinicianId]);
+  }, [isOpen, clinicianId, isEdit]);
 
   // Set initial values from props
   useEffect(() => {
     if (isOpen) {
+      if (isEdit && fixedClientId) {
+        setSelectedClientId(fixedClientId);
+      }
       if (selectedDate) {
         setDate(selectedDate.toFormat('yyyy-MM-dd'));
       }
@@ -64,7 +76,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
         setStartTime(selectedStartTime.toFormat('HH:mm'));
       }
     }
-  }, [isOpen, selectedDate, selectedStartTime, selectedEndTime]);
+  }, [isOpen, selectedDate, selectedStartTime, selectedEndTime, isEdit, fixedClientId]);
 
   const loadClients = async () => {
     try {
@@ -114,35 +126,47 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
       
       console.log('[AppointmentDialog] Converting times:', {
         localDateTimeStart,
-        clinicianTimeZone
+        clinicianTimeZone,
+        isEdit
       });
 
       const startAtUTC = TimeZoneService.convertLocalToUTC(localDateTimeStart, clinicianTimeZone);
       const endAtUTC = startAtUTC.plus({ hours: 1 }); // Add 1 hour for appointment duration
 
-      // Create appointment with proper timezone data
       const appointmentData = {
         client_id: selectedClientId,
         clinician_id: clinicianId,
         start_at: startAtUTC.toISO(),
         end_at: endAtUTC.toISO(),
-        appointment_timezone: clinicianTimeZone, // CRITICAL: Save the timezone
+        appointment_timezone: clinicianTimeZone,
         type: 'therapy_session',
         status: 'scheduled',
         notes: notes || null
       };
 
-      console.log('[AppointmentDialog] Creating appointment:', appointmentData);
+      console.log('[AppointmentDialog] Appointment data:', appointmentData);
 
-      const { error } = await supabase
-        .from('appointments')
-        .insert(appointmentData);
+      let error;
+      if (isEdit && appointmentId) {
+        // Update existing appointment
+        const result = await supabase
+          .from('appointments')
+          .update(appointmentData)
+          .eq('id', appointmentId);
+        error = result.error;
+      } else {
+        // Create new appointment
+        const result = await supabase
+          .from('appointments')
+          .insert(appointmentData);
+        error = result.error;
+      }
 
       if (error) throw error;
 
       toast({
         title: 'Success',
-        description: 'Appointment created successfully'
+        description: isEdit ? 'Appointment updated successfully' : 'Appointment created successfully'
       });
 
       // Reset form
@@ -151,13 +175,17 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
       setStartTime('');
       setNotes('');
       
-      onAppointmentCreated?.();
+      if (isEdit) {
+        onAppointmentUpdated?.();
+      } else {
+        onAppointmentCreated?.();
+      }
       onClose();
     } catch (error) {
-      console.error('Error creating appointment:', error);
+      console.error('Error saving appointment:', error);
       toast({
         title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to create appointment',
+        description: error instanceof Error ? error.message : 'Failed to save appointment',
         variant: 'destructive'
       });
     } finally {
@@ -175,7 +203,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Create New Appointment</DialogTitle>
+          <DialogTitle>{isEdit ? 'Edit Appointment' : 'Create New Appointment'}</DialogTitle>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -184,24 +212,28 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
             <Label className="text-right">Title</Label>
             <div className="col-span-3 py-2 text-sm">Therapy Session</div>
             
-            {/* Client (searchable dropdown) */}
+            {/* Client (conditional rendering based on edit mode) */}
             <Label htmlFor="client" className="text-right">Client *</Label>
-            <Select
-              value={selectedClientId}
-              onValueChange={setSelectedClientId}
-              disabled={isLoadingClients}
-            >
-              <SelectTrigger className="col-span-3">
-                <SelectValue placeholder={isLoadingClients ? "Loading clients..." : "Select client..."} />
-              </SelectTrigger>
-              <SelectContent>
-                {clients.map((client) => (
-                  <SelectItem key={client.id} value={client.id}>
-                    {formatClientName(client)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {isEdit ? (
+              <div className="col-span-3 py-2 text-sm text-gray-600">Client assigned (cannot be changed)</div>
+            ) : (
+              <Select
+                value={selectedClientId}
+                onValueChange={setSelectedClientId}
+                disabled={isLoadingClients}
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder={isLoadingClients ? "Loading clients..." : "Select client..."} />
+                </SelectTrigger>
+                <SelectContent>
+                  {clients.map((client) => (
+                    <SelectItem key={client.id} value={client.id}>
+                      {formatClientName(client)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
 
             {/* Date */}
             <Label htmlFor="date" className="text-right">Date *</Label>
@@ -248,7 +280,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
               Cancel
             </Button>
             <Button type="submit" disabled={isLoading}>
-              {isLoading ? 'Creating...' : 'Create Appointment'}
+              {isLoading ? (isEdit ? 'Updating...' : 'Creating...') : (isEdit ? 'Update Appointment' : 'Create Appointment')}
             </Button>
           </div>
         </form>

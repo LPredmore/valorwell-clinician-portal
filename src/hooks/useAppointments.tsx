@@ -156,12 +156,12 @@ export const useAppointments = (
       }
       
       console.log(
-        "[useAppointments] STEP 1 - Building FIXED Supabase Query for clinician:",
+        "[useAppointments] STEP 1 - Building Supabase Query with CLIENT DATA for clinician:",
         formattedClinicianId,
         { from: fromUTCISO, to: toUTCISO, refreshTrigger }
       );
 
-      // Build the simplified query
+      // Build the query WITH client data
       let query = supabase
         .from("appointments")
         .select(`
@@ -176,27 +176,37 @@ export const useAppointments = (
           recurring_group_id,
           video_room_url,
           notes,
-          appointment_timezone
+          appointment_timezone,
+          clients!inner(
+            client_first_name,
+            client_last_name,
+            client_preferred_name,
+            client_email,
+            client_phone,
+            client_status,
+            client_date_of_birth,
+            client_gender,
+            client_address,
+            client_city,
+            client_state,
+            client_zipcode
+          )
         `)
         .eq("clinician_id", formattedClinicianId)
         .in("status", ["scheduled", "blocked"]);
 
-      console.log("[useAppointments] STEP 1 - FIXED Query Building:", {
-        baseQuery: "appointments table",
+      console.log("[useAppointments] STEP 1 - Query with CLIENT DATA:", {
+        baseQuery: "appointments table WITH clients join",
         clinicianFilter: `clinician_id = ${formattedClinicianId}`,
         statusFilter: "status IN (scheduled, blocked)",
-        fromDateFilter: fromUTCISO ? `start_at <= ${toUTCISO}` : 'none',
-        toDateFilter: toUTCISO ? `end_at >= ${fromUTCISO}` : 'none',
-        overlapLogic: 'FIXED: Using proper temporal overlap detection'
+        clientDataIncluded: true
       });
       
-      // CRITICAL FIX: Use proper temporal overlap detection
-      // Appointments overlap with query range if:
-      // appointment.start_at <= queryEnd && appointment.end_at >= queryStart
+      // Use proper temporal overlap detection
       if (fromUTCISO && toUTCISO) {
         query = query
-          .lte("start_at", toUTCISO)     // Appointment starts before query ends
-          .gte("end_at", fromUTCISO);    // Appointment ends after query starts
+          .lte("start_at", toUTCISO)
+          .gte("end_at", fromUTCISO);
       } else if (fromUTCISO) {
         query = query.gte("end_at", fromUTCISO);
       } else if (toUTCISO) {
@@ -205,118 +215,37 @@ export const useAppointments = (
       
       query = query.order("start_at", { ascending: true });
         
-      console.log("[useAppointments] STEP 1 - FIXED Final Query Details:", {
-        clinician_id: formattedClinicianId,
-        overlap_logic: `start_at <= ${toUTCISO} AND end_at >= ${fromUTCISO}`,
-        status: 'scheduled OR blocked',
-        orderBy: 'start_at ASC',
-        queryType: 'TEMPORAL_OVERLAP_DETECTION'
-      });
-      
-      console.log("[useAppointments] STEP 1 - EXECUTING FIXED SUPABASE QUERY NOW...");
+      console.log("[useAppointments] STEP 1 - EXECUTING SUPABASE QUERY WITH CLIENT DATA...");
       
       try {
         const { data: rawDataAny, error: queryError } = await query;
 
-        // STEP 1: COMPREHENSIVE SUPABASE RESPONSE LOGGING
-        console.log('[useAppointments] STEP 1 - FIXED Supabase Query Response:', {
+        console.log('[useAppointments] STEP 1 - Supabase Query Response WITH CLIENT DATA:', {
           hasData: !!rawDataAny,
           recordCount: rawDataAny?.length || 0,
           hasError: !!queryError,
           errorMessage: queryError?.message || null,
-          errorDetails: queryError?.details || null,
-          errorHint: queryError?.hint || null,
-          errorCode: queryError?.code || null,
-          queryType: 'TEMPORAL_OVERLAP_DETECTION',
-          rawResponse: rawDataAny,
-          queryBoundaries: {
-            from: fromUTCISO,
-            to: toUTCISO,
-            overlapFormula: 'start_at <= queryEnd AND end_at >= queryStart'
-          }
+          sampleClientData: rawDataAny?.[0]?.clients || null
         });
 
         if (queryError) {
-          console.error(
-            "[useAppointments] STEP 1 - Detailed Supabase Query Error:",
-            {
-              message: queryError.message,
-              details: queryError.details,
-              hint: queryError.hint,
-              code: queryError.code,
-              stack: queryError
-            }
-          );
+          console.error("[useAppointments] STEP 1 - Detailed Supabase Query Error:", queryError);
           throw new Error(`Supabase Query Failed: ${queryError.message} (${queryError.code})`);
         }
 
-        // STEP 2: DATABASE VERIFICATION LOGGING with OVERLAP VALIDATION
-        if (rawDataAny && rawDataAny.length > 0) {
-          console.log('[useAppointments] STEP 2 - FIXED Database Verification - Appointments Found:', {
-            totalCount: rawDataAny.length,
-            clinicianIds: [...new Set(rawDataAny.map((apt: any) => apt.clinician_id))],
-            requestedClinicianId: formattedClinicianId,
-            clinicianIdMatches: rawDataAny.every((apt: any) => apt.clinician_id === formattedClinicianId),
-            timezoneInfo: rawDataAny.map((apt: any) => ({
-              id: apt.id,
-              appointment_timezone: apt.appointment_timezone,
-              start_at: apt.start_at,
-              end_at: apt.end_at,
-              overlapCheck: {
-                startBeforeQueryEnd: apt.start_at <= toUTCISO,
-                endAfterQueryStart: apt.end_at >= fromUTCISO,
-                validOverlap: apt.start_at <= toUTCISO && apt.end_at >= fromUTCISO
-              }
-            })),
-            queryBoundaries: {
-              queryStart: fromUTCISO,
-              queryEnd: toUTCISO,
-              overlapLogic: 'FIXED_TEMPORAL_OVERLAP'
-            },
-            sampleAppointments: rawDataAny.slice(0, 2).map((apt: any) => ({
-              id: apt.id,
-              clinician_id: apt.clinician_id,
-              start_at: apt.start_at,
-              end_at: apt.end_at,
-              appointment_timezone: apt.appointment_timezone,
-              status: apt.status,
-              hasValidTimes: !!(apt.start_at && apt.end_at),
-              isInRange: apt.start_at <= toUTCISO && apt.end_at >= fromUTCISO
-            }))
-          });
-        } else {
-          console.log('[useAppointments] STEP 2 - FIXED Database Verification - NO APPOINTMENTS FOUND:', {
-            queryParams: {
-              clinician_id: formattedClinicianId,
-              overlap_query: `start_at <= ${toUTCISO} AND end_at >= ${fromUTCISO}`,
-              status: 'scheduled OR blocked'
-            },
-            queryType: 'TEMPORAL_OVERLAP_DETECTION',
-            possibleIssues: [
-              'No appointments exist for this clinician',
-              'Date range excludes all appointments (SHOULD BE FIXED)',
-              'Clinician ID mismatch',
-              'All appointments have different status',
-              'Timezone conversion error',
-              'RLS policies blocking access'
-            ]
-          });
-        }
-
-        // Cast the raw data while ensuring proper validation
         if (!rawDataAny) {
           console.warn("[useAppointments] STEP 1 - No data returned from Supabase");
           return [];
         }
 
-        console.log(
-          `[useAppointments] STEP 1 - Processing ${rawDataAny.length || 0} raw appointments.`
-        );
+        console.log(`[useAppointments] STEP 1 - Processing ${rawDataAny.length || 0} raw appointments WITH CLIENT DATA.`);
 
-        // Process the simplified data (without client joins for now)
+        // Process the data WITH client information
         const processedAppointments = rawDataAny.map((rawAppt: any): Appointment => {
-          // For now, without client data, use basic formatting
-          const clientName = "Client"; // Simplified until we fix the client join
+          const clientData = rawAppt.clients;
+          const clientName = clientData 
+            ? `${clientData.client_preferred_name || clientData.client_first_name || ''} ${clientData.client_last_name || ''}`.trim() || 'Unknown Client'
+            : 'Unknown Client';
 
           return {
             id: rawAppt.id,
@@ -331,25 +260,14 @@ export const useAppointments = (
             video_room_url: rawAppt.video_room_url,
             notes: rawAppt.notes,
             appointment_timezone: rawAppt.appointment_timezone,
-            client: undefined, // Temporarily remove client data to isolate issue
+            client: clientData,
             clientName: clientName,
           };
         });
 
-        console.log('[useAppointments] STEP 3 - FIXED Final processed appointments:', {
+        console.log('[useAppointments] STEP 3 - Final processed appointments WITH CLIENT DATA:', {
           count: processedAppointments.length,
-          queryType: 'TEMPORAL_OVERLAP_DETECTION',
-          appointments: processedAppointments.map(apt => ({
-            id: apt.id,
-            clientName: apt.clientName,
-            start_at: apt.start_at,
-            end_at: apt.end_at,
-            appointment_timezone: apt.appointment_timezone,
-            overlapValidation: {
-              startBeforeEnd: apt.start_at <= (toUTCISO || apt.start_at),
-              endAfterStart: apt.end_at >= (fromUTCISO || apt.end_at)
-            }
-          }))
+          sampleClientNames: processedAppointments.slice(0, 3).map(apt => apt.clientName)
         });
 
         return processedAppointments;
@@ -359,8 +277,6 @@ export const useAppointments = (
           errorType: typeof err,
           errorMessage: err?.message || 'Unknown error',
           errorStack: err?.stack || 'No stack trace',
-          errorName: err?.name || 'Unknown error name',
-          errorCode: err?.code || 'No error code',
           fullError: err
         });
         throw err;

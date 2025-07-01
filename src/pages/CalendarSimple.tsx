@@ -35,8 +35,9 @@ const CalendarSimple = React.memo(() => {
   const [userTimeZone, setUserTimeZone] = useState<string>(TimeZoneService.DEFAULT_TIMEZONE);
   const [isMounted, setIsMounted] = useState(true);
   const [showAppointmentDialog, setShowAppointmentDialog] = useState(false);
-  const [showBlockTimeDialog, setShowBlockTimeDialog] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<any>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingAppointment, setEditingAppointment] = useState<any>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -327,6 +328,8 @@ const CalendarSimple = React.memo(() => {
       start: slotInfo.start,
       end: slotInfo.end
     });
+    setEditingAppointment(null);
+    setIsEditMode(false);
     setShowAppointmentDialog(true);
   }, []);
 
@@ -334,8 +337,13 @@ const CalendarSimple = React.memo(() => {
   const handleSelectEvent = useCallback((event: any) => {
     console.log('[CalendarSimple] Event selected:', event);
     if (event.source === 'internal') {
-      // Open appointment details/edit for internal appointments
-      setSelectedSlot(event.resource || event);
+      // Open appointment edit dialog for internal appointments
+      setEditingAppointment(event.resource || event);
+      setSelectedSlot({
+        start: event.start || new Date(event.start_at),
+        end: event.end || new Date(event.end_at)
+      });
+      setIsEditMode(true);
       setShowAppointmentDialog(true);
     } else if (event.source === 'nylas') {
       // Show toast for external events
@@ -355,6 +363,8 @@ const CalendarSimple = React.memo(() => {
   // Handle new appointment button
   const handleNewAppointment = useCallback(() => {
     setSelectedSlot(null);
+    setEditingAppointment(null);
+    setIsEditMode(false);
     setShowAppointmentDialog(true);
   }, []);
 
@@ -582,13 +592,15 @@ const CalendarSimple = React.memo(() => {
             onSelectEvent={handleSelectEvent}
           />
 
-          {/* New Appointment Dialog */}
+          {/* Appointment Dialog - UPDATED to handle both create and edit */}
           {showAppointmentDialog && (
             <AppointmentDialog
               isOpen={showAppointmentDialog}
               onClose={() => {
                 setShowAppointmentDialog(false);
                 setSelectedSlot(null);
+                setEditingAppointment(null);
+                setIsEditMode(false);
               }}
               clinicianId={userId}
               clinicianTimeZone={userTimeZone}
@@ -596,23 +608,10 @@ const CalendarSimple = React.memo(() => {
               selectedStartTime={selectedSlot?.start ? DateTime.fromJSDate(selectedSlot.start) : undefined}
               selectedEndTime={selectedSlot?.end ? DateTime.fromJSDate(selectedSlot.end) : undefined}
               onAppointmentCreated={triggerRefresh}
-            />
-          )}
-
-          {/* Block Time Dialog */}
-          {showBlockTimeDialog && (
-            <AppointmentDialog
-              isOpen={showBlockTimeDialog}
-              onClose={() => {
-                setShowBlockTimeDialog(false);
-                setSelectedSlot(null);
-              }}
-              clinicianId={userId}
-              clinicianTimeZone={userTimeZone}
-              selectedDate={selectedSlot?.start ? DateTime.fromJSDate(selectedSlot.start) : undefined}
-              selectedStartTime={selectedSlot?.start ? DateTime.fromJSDate(selectedSlot.start) : undefined}
-              selectedEndTime={selectedSlot?.end ? DateTime.fromJSDate(selectedSlot.end) : undefined}
-              onAppointmentCreated={triggerRefresh}
+              onAppointmentUpdated={triggerRefresh}
+              isEdit={isEditMode}
+              fixedClientId={editingAppointment?.client_id}
+              appointmentId={editingAppointment?.id}
             />
           )}
         </div>
