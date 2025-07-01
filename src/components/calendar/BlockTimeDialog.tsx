@@ -23,8 +23,8 @@ import {
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { getClinicianTimeZone } from '@/hooks/useClinicianData';
-import { supabase } from '@/integrations/supabase/client';
 import { TimeZoneService } from '@/utils/timeZoneService';
+import { useBlockedTime } from '@/hooks/useBlockedTime';
 
 interface BlockTimeDialogProps {
   isOpen: boolean;
@@ -82,6 +82,7 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
   const [notes, setNotes] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const { createBlockedTime } = useBlockedTime(selectedClinicianId || '');
 
   const timeOptions = generateTimeOptions();
 
@@ -202,73 +203,51 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
       const startAtUTC = convertLocalToUTC(dateString, startTime, clinicianTimeZone);
       const endAtUTC = convertLocalToUTC(dateString, endTime, clinicianTimeZone);
 
-      console.log(`[BlockTimeDialog] ${timestamp} Creating visible blocked time appointment:`, {
+      console.log(`[BlockTimeDialog] ${timestamp} Creating blocked time slot:`, {
         clinician_id: selectedClinicianId,
         dateString,
         startTime,
         endTime,
         clinicianTimeZone,
         startAtUTC: startAtUTC.toISO(),
-        endAtUTC: endAtUTC.toISO()
+        endAtUTC: endAtUTC.toISO(),
+        label: blockLabel,
+        notes
       });
 
-      // Create visible blocked time appointment with enhanced error handling
-      const { data, error } = await supabase
-        .from('appointments')
-        .insert({
-          clinician_id: selectedClinicianId!,
-          client_id: '00000000-0000-0000-0000-000000000001', // Placeholder for compatibility
-          start_at: startAtUTC.toJSDate().toISOString(),
-          end_at: endAtUTC.toJSDate().toISOString(),
-          type: 'blocked_time', // NEW: Visible type instead of INTERNAL_BLOCKED_TIME
-          status: 'blocked', // NEW: Use existing 'blocked' status
-          notes: notes || `Blocked time: ${blockLabel}`,
-          appointment_timezone: clinicianTimeZone
-        })
-        .select();
+      // Create blocked time using the new hook
+      const success = await createBlockedTime(
+        startAtUTC.toJSDate().toISOString(),
+        endAtUTC.toJSDate().toISOString(),
+        blockLabel,
+        notes || undefined,
+        clinicianTimeZone
+      );
 
-      if (error) {
-        console.error(`[BlockTimeDialog] ${timestamp} Database error:`, {
-          error,
-          errorCode: error.code,
-          errorMessage: error.message,
-          errorDetails: error.details,
-          errorHint: error.hint,
-          selectedClinicianId
-        });
-        throw error;
+      if (success) {
+        console.log(`[BlockTimeDialog] ${timestamp} ✅ Blocked time created successfully`);
+        onBlockCreated();
+        onClose();
       }
-
-      console.log(`[BlockTimeDialog] ${timestamp} ✅ Visible blocked time appointment created successfully:`, data);
-
-      toast({
-        title: "Success",
-        description: "Time blocked successfully and will appear on your calendar.",
-      });
-
-      onBlockCreated();
-      onClose();
     } catch (error: any) {
       const timestamp = new Date().toISOString();
       console.error(`[BlockTimeDialog] ${timestamp} ❌ Block time creation failed:`, {
         error,
         errorMessage: error?.message,
-        selectedClinicianId,
-        errorCode: error?.code,
-        errorDetails: error?.details
+        selectedClinicianId
       });
       
       // Enhanced error messages based on specific error types
       let errorMessage = "Failed to create time block.";
       
-      if (error?.message?.includes('violates foreign key constraint')) {
+      if (error?.message?.includes('Overlapping blocked time slot')) {
+        errorMessage = "This time slot overlaps with an existing blocked time. Please choose a different time.";
+      } else if (error?.message?.includes('violates foreign key constraint')) {
         errorMessage = `Database error: Invalid clinician reference. Clinician ID: ${selectedClinicianId}`;
       } else if (error?.message?.includes('violates check constraint')) {
         errorMessage = "Database error: Invalid data format.";
-      } else if (error?.message?.includes('duplicate key')) {
-        errorMessage = "A conflicting time block already exists.";
       } else if (error?.message?.includes('permission denied')) {
-        errorMessage = "Permission denied: You don't have access to create appointments.";
+        errorMessage = "Permission denied: You don't have access to create blocked time.";
       } else if (error?.message) {
         errorMessage = `Error: ${error.message}`;
       }

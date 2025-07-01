@@ -484,6 +484,50 @@ export type Database = {
           },
         ]
       }
+      blocked_time: {
+        Row: {
+          clinician_id: string
+          created_at: string
+          end_at: string
+          id: string
+          label: string
+          notes: string | null
+          start_at: string
+          timezone: string
+          updated_at: string
+        }
+        Insert: {
+          clinician_id: string
+          created_at?: string
+          end_at: string
+          id?: string
+          label?: string
+          notes?: string | null
+          start_at: string
+          timezone?: string
+          updated_at?: string
+        }
+        Update: {
+          clinician_id?: string
+          created_at?: string
+          end_at?: string
+          id?: string
+          label?: string
+          notes?: string | null
+          start_at?: string
+          timezone?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "blocked_time_clinician_id_fkey"
+            columns: ["clinician_id"]
+            isOneToOne: false
+            referencedRelation: "clinicians"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       calendar_sync_logs: {
         Row: {
           appointment_id: string | null

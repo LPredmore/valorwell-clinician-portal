@@ -17,6 +17,7 @@ import { DateTime } from "luxon";
 import { useAppointments } from "@/hooks/useAppointments";
 import { useNylasEvents } from "@/hooks/useNylasEvents";
 import { useClinicianAvailability } from "@/hooks/useClinicianAvailability";
+import { useBlockedTime } from "@/hooks/useBlockedTime";
 import { buildLocalDate } from "@/utils/dateUtils";
 import {
   Sheet,
@@ -76,9 +77,10 @@ const CalendarSimple = React.memo(() => {
     console.log('[CalendarSimple] Date Range Sync Check:', {
       appointmentsRange: { start: weekStart.toISOString(), end: weekEnd.toISOString() },
       nylasRange: { start: weekStart.toISOString(), end: weekEnd.toISOString() },
+      blockedTimeRange: { start: weekStart.toISOString(), end: weekEnd.toISOString() },
       rangesMatch: true, // They're the same variables now
       currentDate: currentDate.toISOString(),
-      synchronizationMethod: 'Both hooks use identical weekStart/weekEnd variables'
+      synchronizationMethod: 'All hooks use identical weekStart/weekEnd variables'
     });
   }, [weekStart, weekEnd, currentDate]);
 
@@ -95,6 +97,13 @@ const CalendarSimple = React.memo(() => {
   const { events: nylasEvents, isLoading: nylasLoading } = useNylasEvents(
     weekStart,    // SYNCHRONIZED - SAME AS APPOINTMENTS
     weekEnd       // SYNCHRONIZED - SAME AS APPOINTMENTS
+  );
+
+  // Fetch blocked times - NEW: USING SYNCHRONIZED DATE RANGE
+  const { blockedTimes, isLoading: blockedTimesLoading } = useBlockedTime(
+    userId || '',
+    weekStart,    // SYNCHRONIZED - SAME AS APPOINTMENTS AND NYLAS
+    weekEnd       // SYNCHRONIZED - SAME AS APPOINTMENTS AND NYLAS
   );
 
   // Fetch availability slots
@@ -175,12 +184,72 @@ const CalendarSimple = React.memo(() => {
     return events;
   }, [availabilitySlots, weekStart, weekEnd, userTimeZone]);
 
+  // Transform blocked times into calendar events - NEW
+  const blockedTimeEvents = useMemo(() => {
+    if (!blockedTimes.length || !userTimeZone) return [];
+    
+    console.log('[CalendarSimple] Processing blocked times:', {
+      blockedTimesCount: blockedTimes.length,
+      blockedTimes: blockedTimes.map(bt => ({
+        id: bt.id,
+        label: bt.label,
+        start_at: bt.start_at,
+        end_at: bt.end_at,
+        timezone: bt.timezone
+      })),
+      userTimeZone
+    });
+
+    const events = blockedTimes.map(blockedTime => {
+      // Parse the UTC timestamps and convert to clinician's timezone
+      const startDT = DateTime.fromISO(blockedTime.start_at, { zone: 'UTC' })
+        .setZone(blockedTime.timezone || userTimeZone);
+      const endDT = DateTime.fromISO(blockedTime.end_at, { zone: 'UTC' })
+        .setZone(blockedTime.timezone || userTimeZone);
+
+      console.log('[CalendarSimple] Creating blocked time event:', {
+        id: blockedTime.id,
+        label: blockedTime.label,
+        originalStartUTC: blockedTime.start_at,
+        originalEndUTC: blockedTime.end_at,
+        blockedTimeTimezone: blockedTime.timezone,
+        userTimezone: userTimeZone,
+        convertedStart: startDT.toISO(),
+        convertedEnd: endDT.toISO(),
+        localDateStart: buildLocalDate(startDT).toISOString(),
+        localDateEnd: buildLocalDate(endDT).toISOString()
+      });
+
+      return {
+        id: blockedTime.id,
+        title: blockedTime.label,
+        start: buildLocalDate(startDT),
+        end: buildLocalDate(endDT),
+        source: 'blocked_time',
+        type: 'blocked_time',
+        resource: blockedTime
+      };
+    });
+
+    console.log('[CalendarSimple] Generated blocked time events:', {
+      eventsCount: events.length,
+      events: events.map(e => ({
+        id: e.id,
+        title: e.title,
+        start: e.start.toISOString(),
+        end: e.end.toISOString()
+      }))
+    });
+
+    return events;
+  }, [blockedTimes, userTimeZone]);
+
   // Refresh callback for availability changes
   const triggerRefresh = useCallback(() => {
     setRefreshTrigger(prev => prev + 1);
   }, []);
 
-  // Combine internal, external, and availability events with timezone-aware conversion
+  // Combine internal, external, blocked time, and availability events with timezone-aware conversion
   const allEvents = useMemo(() => {
     const events = [];
     
@@ -248,16 +317,20 @@ const CalendarSimple = React.memo(() => {
       })));
     }
 
+    // Add blocked time events (NEW: from dedicated blocked_time table)
+    events.push(...blockedTimeEvents);
+
     // Add availability events (already converted with timezone fix)
     events.push(...availabilityEvents);
 
-    console.log('[CalendarSimple] FIXED event merging with timezone correction:', {
+    console.log('[CalendarSimple] FIXED event merging with blocked time integration:', {
       dateRangeUsed: {
         start: weekStart.toISOString(),
         end: weekEnd.toISOString()
       },
       internalEventsCount: appointments?.length || 0,
       externalEventsCount: nylasEvents?.length || 0,
+      blockedTimeEventsCount: blockedTimeEvents.length,
       availabilityEventsCount: availabilityEvents.length,
       totalEventsCount: events.length,
       fixedInternalEvents: appointments?.map(e => { 
@@ -272,26 +345,33 @@ const CalendarSimple = React.memo(() => {
         };
       }) || [],
       externalEvents: nylasEvents?.map(e => ({ id: e.id, title: e.title, start: e.when?.start_time })) || [],
+      blockedTimeEvents: blockedTimeEvents.map(e => ({
+        id: e.id,
+        title: e.title,
+        start: e.start.toISOString()
+      })),
       availabilityEvents: availabilityEvents.map(e => ({
         id: e.id,
         title: e.title,
         start: e.start.toISOString()
       })),
-      timezoneFixStatus: 'SUCCESS - All internal appointments now parse UTC correctly'
+      timezoneFixStatus: 'SUCCESS - All events now parse UTC correctly and blocked time integrated'
     });
 
     return events.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
-  }, [appointments, nylasEvents, availabilityEvents, weekStart, weekEnd, userTimeZone]);
+  }, [appointments, nylasEvents, blockedTimeEvents, availabilityEvents, weekStart, weekEnd, userTimeZone]);
 
   // Debug logging for calendar state
   useEffect(() => {
-    console.log('[CalendarSimple] Component state with SYNCHRONIZED dates:', {
+    console.log('[CalendarSimple] Component state with SYNCHRONIZED dates and blocked time:', {
       userId,
       appointmentsCount: appointments?.length || 0,
       nylasEventsCount: nylasEvents?.length || 0,
+      blockedTimesCount: blockedTimes?.length || 0,
       allEventsCount: allEvents?.length || 0,
       appointmentsLoading,
       nylasLoading,
+      blockedTimesLoading,
       userTimeZone,
       currentDate: currentDate.toISOString(),
       synchronizedWeekStart: weekStart.toISOString(),
@@ -312,13 +392,19 @@ const CalendarSimple = React.memo(() => {
         start_time: event.when?.start_time,
         connection_provider: event.connection_provider
       })),
+      blockedTimes: blockedTimes?.map(bt => ({
+        id: bt.id,
+        label: bt.label,
+        start_at: bt.start_at,
+        end_at: bt.end_at
+      })),
       availabilityEvents: availabilityEvents.map(e => ({
         id: e.id,
         title: e.title,
         start: e.start.toISOString()
       }))
     });
-  }, [userId, appointments, nylasEvents, allEvents, appointmentsLoading, nylasLoading, userTimeZone, currentDate, weekStart, weekEnd, isReady, authInitialized]);
+  }, [userId, appointments, nylasEvents, blockedTimes, allEvents, appointmentsLoading, nylasLoading, blockedTimesLoading, userTimeZone, currentDate, weekStart, weekEnd, isReady, authInitialized]);
 
   // Navigation functions
   const navigatePrevious = useCallback(() => {
@@ -358,7 +444,6 @@ const CalendarSimple = React.memo(() => {
           duration: 4000,
         });
         
-        // TODO: Future enhancement - could open BlockTimeEditDialog here
         console.log('[CalendarSimple] Blocked time clicked:', {
           id: event.id,
           title: event.title,
@@ -382,6 +467,23 @@ const CalendarSimple = React.memo(() => {
         title: "📅 External Event",
         description: `${event.title} - Synced from ${event.connection_provider || 'external calendar'}`,
         duration: 3000,
+      });
+    } else if (event.source === 'blocked_time') {
+      // NEW: Handle clicks on blocked time events from dedicated table
+      const blockLabel = event.title || 'Blocked Time';
+      toast({
+        title: "🚫 Blocked Time",
+        description: `${blockLabel} - This time slot is blocked and unavailable for appointments`,
+        duration: 4000,
+      });
+      
+      console.log('[CalendarSimple] Dedicated blocked time clicked:', {
+        id: event.id,
+        title: event.title,
+        start: event.start,
+        end: event.end,
+        source: event.source,
+        resource: event.resource
       });
     } else if (event.source === 'availability') {
       // Enhanced availability feedback
@@ -669,12 +771,8 @@ const CalendarSimple = React.memo(() => {
                 Showing {allEvents.length} events | 
                 Internal: {appointments?.length || 0} | 
                 External: {nylasEvents?.length || 0} | 
+                Blocked: {blockedTimeEvents.length} |
                 Available: {availabilityEvents.length}
-                {allEvents.filter(e => e.type === 'blocked_time').length > 0 && (
-                  <span className="text-gray-500">
-                    {' '}| Blocked: {allEvents.filter(e => e.type === 'blocked_time').length}
-                  </span>
-                )}
               </p>
               <p>Timezone: {userTimeZone}</p>
               {/* Debug info for development */}
@@ -686,7 +784,7 @@ const CalendarSimple = React.memo(() => {
 
           {/* Calendar Legend */}
           <CalendarLegend
-            blockedCount={allEvents.filter(e => e.type === 'blocked_time').length}
+            blockedCount={blockedTimeEvents.length}
             internalCount={(appointments?.filter(a => a.type !== 'blocked_time')?.length || 0)}
             externalCount={nylasEvents?.length || 0}
             availableCount={availabilityEvents.length}
