@@ -16,7 +16,12 @@ interface BlockedTime {
   updated_at: string;
 }
 
-export const useBlockedTime = (clinicianId: string, startDate?: Date, endDate?: Date) => {
+export const useBlockedTime = (
+  clinicianId: string, 
+  startDate?: Date, 
+  endDate?: Date, 
+  refreshTrigger = 0
+) => {
   const [blockedTimes, setBlockedTimes] = useState<BlockedTime[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,6 +38,7 @@ export const useBlockedTime = (clinicianId: string, startDate?: Date, endDate?: 
         clinicianId,
         startDate: startDate?.toISOString(),
         endDate: endDate?.toISOString(),
+        refreshTrigger,
         queryType: 'temporal_overlap'
       });
 
@@ -59,6 +65,7 @@ export const useBlockedTime = (clinicianId: string, startDate?: Date, endDate?: 
       console.log('[useBlockedTime] FIXED fetch results:', {
         clinicianId,
         count: data?.length || 0,
+        refreshTrigger,
         dateRange: { 
           startDate: startDate?.toISOString(), 
           endDate: endDate?.toISOString() 
@@ -194,7 +201,7 @@ export const useBlockedTime = (clinicianId: string, startDate?: Date, endDate?: 
 
   useEffect(() => {
     fetchBlockedTimes();
-  }, [clinicianId, startDate, endDate]);
+  }, [clinicianId, startDate, endDate, refreshTrigger]);
 
   return {
     blockedTimes,

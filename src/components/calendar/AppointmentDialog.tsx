@@ -33,14 +33,20 @@ interface AppointmentDialogProps {
   onClose: () => void;
   clinicianId: string;
   clinicianTimeZone: string;
-  selectedDate?: DateTime;
-  selectedStartTime?: DateTime;
-  selectedEndTime?: DateTime;
   onAppointmentCreated?: () => void;
   onAppointmentUpdated?: () => void;
-  isEdit?: boolean;
-  fixedClientId?: string;
-  appointmentId?: string;
+  initialData?: {
+    start?: Date;
+    end?: Date;
+    start_at?: string;
+    end_at?: string;
+    title?: string;
+    clientName?: string;
+    notes?: string;
+    appointment_timezone?: string;
+    id?: string;
+    client_id?: string;
+  } | null;
 }
 
 const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
@@ -48,14 +54,9 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
   onClose,
   clinicianId,
   clinicianTimeZone,
-  selectedDate,
-  selectedStartTime,
-  selectedEndTime,
   onAppointmentCreated,
   onAppointmentUpdated,
-  isEdit = false,
-  fixedClientId,
-  appointmentId
+  initialData
 }) => {
   const [clients, setClients] = useState<Client[]>([]);
   const [selectedClientId, setSelectedClientId] = useState<string>('');
@@ -69,45 +70,65 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
   const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
 
-  // Load clients when dialog opens (unless in edit mode with fixed client)
+  const isEdit = Boolean(initialData?.id);
+  const appointmentId = initialData?.id;
+
+  // Load clients when dialog opens
   useEffect(() => {
-    if (isOpen && clinicianId && !isEdit) {
+    if (isOpen && clinicianId) {
       loadClients();
     }
-  }, [isOpen, clinicianId, isEdit]);
+  }, [isOpen, clinicianId]);
 
-  // FIXED: Stabilized initialization to prevent flickering
+  // Initialize form data when dialog opens
   useEffect(() => {
     if (isOpen && !isInitialized) {
       console.log('[AppointmentDialog] Initializing form state', {
         isEdit,
         appointmentId,
-        fixedClientId,
-        selectedDate: selectedDate?.toISO(),
-        selectedStartTime: selectedStartTime?.toISO()
+        initialData
       });
 
-      if (isEdit && appointmentId) {
-        // Load existing appointment data
-        loadAppointmentData();
+      if (initialData) {
+        // Handle existing appointment data
+        if (initialData.client_id) {
+          setSelectedClientId(initialData.client_id);
+        }
+        
+        setNotes(initialData.notes || '');
+        
+        // Handle date/time from various possible sources
+        let startDateTime: DateTime | null = null;
+        
+        if (initialData.start_at) {
+          // From database - ISO string in UTC
+          startDateTime = DateTime.fromISO(initialData.start_at, { zone: 'UTC' })
+            .setZone(initialData.appointment_timezone || clinicianTimeZone);
+        } else if (initialData.start) {
+          // From slot selection - Date object
+          startDateTime = DateTime.fromJSDate(initialData.start)
+            .setZone(clinicianTimeZone);
+        }
+        
+        if (startDateTime) {
+          setDate(startDateTime.toFormat('yyyy-MM-dd'));
+          setStartTime(startDateTime.toFormat('HH:mm'));
+        }
       } else {
-        // New appointment - use passed props
-        if (selectedDate) {
-          setDate(selectedDate.toFormat('yyyy-MM-dd'));
-        }
-        if (selectedStartTime) {
-          setStartTime(selectedStartTime.toFormat('HH:mm'));
-        }
+        // Reset form for new appointments
         setSelectedClientId('');
+        setDate('');
+        setStartTime('');
         setNotes('');
       }
+      
       setIsInitialized(true);
     } else if (!isOpen) {
       // Reset when dialog closes
       setIsInitialized(false);
       resetForm();
     }
-  }, [isOpen, isEdit, appointmentId, selectedDate, selectedStartTime, isInitialized]);
+  }, [isOpen, initialData, isInitialized, clinicianTimeZone]);
 
   const resetForm = () => {
     setSelectedClientId('');
@@ -115,53 +136,6 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
     setStartTime('');
     setNotes('');
     setShowDeleteConfirm(false);
-  };
-
-  const loadAppointmentData = async () => {
-    if (!appointmentId) return;
-
-    try {
-      console.log('[AppointmentDialog] Loading appointment data for ID:', appointmentId);
-      
-      const { data, error } = await supabase
-        .from('appointments')
-        .select('*')
-        .eq('id', appointmentId)
-        .single();
-
-      if (error) throw error;
-
-      if (data) {
-        console.log('[AppointmentDialog] Loaded appointment data:', data);
-        
-        // Set client ID
-        setSelectedClientId(fixedClientId || data.client_id);
-        
-        // Set notes
-        setNotes(data.notes || '');
-        
-        // Handle date/time from the appointment
-        const apptStart = DateTime.fromISO(data.start_at, { zone: 'UTC' })
-          .setZone(data.appointment_timezone || clinicianTimeZone);
-        
-        setDate(apptStart.toFormat('yyyy-MM-dd'));
-        setStartTime(apptStart.toFormat('HH:mm'));
-        
-        console.log('[AppointmentDialog] Form initialized with:', {
-          date: apptStart.toFormat('yyyy-MM-dd'),
-          startTime: apptStart.toFormat('HH:mm'),
-          notes: data.notes,
-          clientId: fixedClientId || data.client_id
-        });
-      }
-    } catch (error) {
-      console.error('[AppointmentDialog] Error loading appointment data:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load appointment data',
-        variant: 'destructive'
-      });
-    }
   };
 
   const loadClients = async () => {
@@ -189,17 +163,6 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Validation for edit mode
-    if (isEdit && !appointmentId) {
-      toast({
-        title: 'Error',
-        description: 'Cannot edit appointment: Invalid appointment ID',
-        variant: 'destructive'
-      });
-      onClose();
-      return;
-    }
     
     if (!selectedClientId || !date || !startTime) {
       toast({
@@ -339,28 +302,24 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
               <Label className="text-right">Title</Label>
               <div className="col-span-3 py-2 text-sm">Therapy Session</div>
               
-              {/* Client (conditional rendering based on edit mode) */}
+              {/* Client */}
               <Label htmlFor="client" className="text-right">Client *</Label>
-              {isEdit ? (
-                <div className="col-span-3 py-2 text-sm text-gray-600">Client assigned (cannot be changed)</div>
-              ) : (
-                <Select
-                  value={selectedClientId}
-                  onValueChange={setSelectedClientId}
-                  disabled={isLoadingClients}
-                >
-                  <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder={isLoadingClients ? "Loading clients..." : "Select client..."} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {clients.map((client) => (
-                      <SelectItem key={client.id} value={client.id}>
-                        {formatClientName(client)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
+              <Select
+                value={selectedClientId}
+                onValueChange={setSelectedClientId}
+                disabled={isLoadingClients}
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder={isLoadingClients ? "Loading clients..." : "Select client..."} />
+                </SelectTrigger>
+                <SelectContent>
+                  {clients.map((client) => (
+                    <SelectItem key={client.id} value={client.id}>
+                      {formatClientName(client)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
               {/* Date */}
               <Label htmlFor="date" className="text-right">Date *</Label>
