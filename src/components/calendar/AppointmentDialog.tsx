@@ -6,6 +6,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { TimeZoneService } from '@/utils/timeZoneService';
@@ -54,6 +64,9 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
   const [notes, setNotes] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingClients, setIsLoadingClients] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
 
   // Load clients when dialog opens (unless in edit mode with fixed client)
@@ -63,20 +76,93 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
     }
   }, [isOpen, clinicianId, isEdit]);
 
-  // Set initial values from props
+  // FIXED: Stabilized initialization to prevent flickering
   useEffect(() => {
-    if (isOpen) {
-      if (isEdit && fixedClientId) {
-        setSelectedClientId(fixedClientId);
+    if (isOpen && !isInitialized) {
+      console.log('[AppointmentDialog] Initializing form state', {
+        isEdit,
+        appointmentId,
+        fixedClientId,
+        selectedDate: selectedDate?.toISO(),
+        selectedStartTime: selectedStartTime?.toISO()
+      });
+
+      if (isEdit && appointmentId) {
+        // Load existing appointment data
+        loadAppointmentData();
+      } else {
+        // New appointment - use passed props
+        if (selectedDate) {
+          setDate(selectedDate.toFormat('yyyy-MM-dd'));
+        }
+        if (selectedStartTime) {
+          setStartTime(selectedStartTime.toFormat('HH:mm'));
+        }
+        setSelectedClientId('');
+        setNotes('');
       }
-      if (selectedDate) {
-        setDate(selectedDate.toFormat('yyyy-MM-dd'));
-      }
-      if (selectedStartTime) {
-        setStartTime(selectedStartTime.toFormat('HH:mm'));
-      }
+      setIsInitialized(true);
+    } else if (!isOpen) {
+      // Reset when dialog closes
+      setIsInitialized(false);
+      resetForm();
     }
-  }, [isOpen, selectedDate, selectedStartTime, selectedEndTime, isEdit, fixedClientId]);
+  }, [isOpen, isEdit, appointmentId, selectedDate, selectedStartTime, isInitialized]);
+
+  const resetForm = () => {
+    setSelectedClientId('');
+    setDate('');
+    setStartTime('');
+    setNotes('');
+    setShowDeleteConfirm(false);
+  };
+
+  const loadAppointmentData = async () => {
+    if (!appointmentId) return;
+
+    try {
+      console.log('[AppointmentDialog] Loading appointment data for ID:', appointmentId);
+      
+      const { data, error } = await supabase
+        .from('appointments')
+        .select('*')
+        .eq('id', appointmentId)
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        console.log('[AppointmentDialog] Loaded appointment data:', data);
+        
+        // Set client ID
+        setSelectedClientId(fixedClientId || data.client_id);
+        
+        // Set notes
+        setNotes(data.notes || '');
+        
+        // Handle date/time from the appointment
+        const apptStart = DateTime.fromISO(data.start_at, { zone: 'UTC' })
+          .setZone(data.appointment_timezone || clinicianTimeZone);
+        
+        setDate(apptStart.toFormat('yyyy-MM-dd'));
+        setStartTime(apptStart.toFormat('HH:mm'));
+        
+        console.log('[AppointmentDialog] Form initialized with:', {
+          date: apptStart.toFormat('yyyy-MM-dd'),
+          startTime: apptStart.toFormat('HH:mm'),
+          notes: data.notes,
+          clientId: fixedClientId || data.client_id
+        });
+      }
+    } catch (error) {
+      console.error('[AppointmentDialog] Error loading appointment data:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load appointment data',
+        variant: 'destructive'
+      });
+    }
+  };
 
   const loadClients = async () => {
     try {
@@ -103,6 +189,17 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validation for edit mode
+    if (isEdit && !appointmentId) {
+      toast({
+        title: 'Error',
+        description: 'Cannot edit appointment: Invalid appointment ID',
+        variant: 'destructive'
+      });
+      onClose();
+      return;
+    }
     
     if (!selectedClientId || !date || !startTime) {
       toast({
@@ -170,10 +267,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
       });
 
       // Reset form
-      setSelectedClientId('');
-      setDate('');
-      setStartTime('');
-      setNotes('');
+      resetForm();
       
       if (isEdit) {
         onAppointmentUpdated?.();
@@ -193,6 +287,38 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
     }
   };
 
+  const handleDelete = async () => {
+    if (!appointmentId) return;
+    
+    try {
+      setIsDeleting(true);
+      const { error } = await supabase
+        .from('appointments')
+        .delete()
+        .eq('id', appointmentId);
+        
+      if (error) throw error;
+      
+      toast({
+        title: 'Success',
+        description: 'Appointment deleted successfully'
+      });
+      
+      onAppointmentUpdated?.();
+      onClose();
+    } catch (error) {
+      console.error('Error deleting appointment:', error);
+      toast({
+        title: 'Error', 
+        description: 'Failed to delete appointment',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  };
+
   const formatClientName = (client: Client) => {
     const preferredName = client.client_preferred_name || client.client_first_name;
     const lastName = client.client_last_name;
@@ -200,92 +326,131 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
-          <DialogTitle>{isEdit ? 'Edit Appointment' : 'Create New Appointment'}</DialogTitle>
-        </DialogHeader>
-        
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-4 gap-4">
-            {/* Title (read-only) */}
-            <Label className="text-right">Title</Label>
-            <div className="col-span-3 py-2 text-sm">Therapy Session</div>
-            
-            {/* Client (conditional rendering based on edit mode) */}
-            <Label htmlFor="client" className="text-right">Client *</Label>
-            {isEdit ? (
-              <div className="col-span-3 py-2 text-sm text-gray-600">Client assigned (cannot be changed)</div>
-            ) : (
-              <Select
-                value={selectedClientId}
-                onValueChange={setSelectedClientId}
-                disabled={isLoadingClients}
-              >
-                <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder={isLoadingClients ? "Loading clients..." : "Select client..."} />
-                </SelectTrigger>
-                <SelectContent>
-                  {clients.map((client) => (
-                    <SelectItem key={client.id} value={client.id}>
-                      {formatClientName(client)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
+    <>
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>{isEdit ? 'Edit Appointment' : 'Create New Appointment'}</DialogTitle>
+          </DialogHeader>
+          
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-4 gap-4">
+              {/* Title (read-only) */}
+              <Label className="text-right">Title</Label>
+              <div className="col-span-3 py-2 text-sm">Therapy Session</div>
+              
+              {/* Client (conditional rendering based on edit mode) */}
+              <Label htmlFor="client" className="text-right">Client *</Label>
+              {isEdit ? (
+                <div className="col-span-3 py-2 text-sm text-gray-600">Client assigned (cannot be changed)</div>
+              ) : (
+                <Select
+                  value={selectedClientId}
+                  onValueChange={setSelectedClientId}
+                  disabled={isLoadingClients}
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder={isLoadingClients ? "Loading clients..." : "Select client..."} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {clients.map((client) => (
+                      <SelectItem key={client.id} value={client.id}>
+                        {formatClientName(client)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
 
-            {/* Date */}
-            <Label htmlFor="date" className="text-right">Date *</Label>
-            <Input
-              id="date"
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              required
-              className="col-span-3"
-            />
+              {/* Date */}
+              <Label htmlFor="date" className="text-right">Date *</Label>
+              <Input
+                id="date"
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                required
+                className="col-span-3"
+              />
 
-            {/* Start Time */}
-            <Label htmlFor="startTime" className="text-right">Start Time *</Label>
-            <Input
-              id="startTime"
-              type="time"
-              value={startTime}
-              onChange={(e) => setStartTime(e.target.value)}
-              required
-              className="col-span-3"
-            />
+              {/* Start Time */}
+              <Label htmlFor="startTime" className="text-right">Start Time *</Label>
+              <Input
+                id="startTime"
+                type="time"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+                required
+                className="col-span-3"
+              />
 
-            {/* Notes */}
-            <Label htmlFor="notes" className="text-right">Notes</Label>
-            <Textarea
-              id="notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Additional notes for this appointment..."
-              rows={3}
-              className="col-span-4 w-full"
-            />
+              {/* Notes */}
+              <Label htmlFor="notes" className="text-right">Notes</Label>
+              <Textarea
+                id="notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Additional notes for this appointment..."
+                rows={3}
+                className="col-span-4 w-full"
+              />
 
-            {clinicianTimeZone && (
-              <div className="col-span-4 text-sm text-gray-500 text-center">
-                Times will be saved in timezone: {clinicianTimeZone} | Duration: 1 hour
+              {clinicianTimeZone && (
+                <div className="col-span-4 text-sm text-gray-500 text-center">
+                  Times will be saved in timezone: {clinicianTimeZone} | Duration: 1 hour
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-between pt-4">
+              <div>
+                {isEdit && (
+                  <Button 
+                    type="button" 
+                    variant="destructive"
+                    onClick={() => setShowDeleteConfirm(true)}
+                    disabled={isLoading}
+                  >
+                    Delete Appointment
+                  </Button>
+                )}
               </div>
-            )}
-          </div>
+              
+              <div className="flex space-x-2">
+                <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isLoading}>
+                  {isLoading ? (isEdit ? 'Updating...' : 'Creating...') : (isEdit ? 'Update Appointment' : 'Create Appointment')}
+                </Button>
+              </div>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
-          <div className="flex justify-end space-x-2 pt-4">
-            <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? (isEdit ? 'Updating...' : 'Creating...') : (isEdit ? 'Update Appointment' : 'Create Appointment')}
-            </Button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Appointment</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this appointment? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isDeleting ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 };
 
