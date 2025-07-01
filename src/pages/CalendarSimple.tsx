@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/sheet";
 import AvailabilityManagementSidebar from "@/components/calendar/AvailabilityManagementSidebar";
 import CalendarConnectionsPanel from "@/components/calendar/CalendarConnectionsPanel";
+import CalendarLegend from "../components/calendar/CalendarLegend";
 
 const CalendarSimple = React.memo(() => {
   const { userId, authInitialized, userRole } = useUser();
@@ -620,6 +621,14 @@ const CalendarSimple = React.memo(() => {
               <p>Timezone: {userTimeZone}</p>
             </div>
           </div>
+
+          {/* Calendar Legend */}
+          <CalendarLegend
+            blockedCount={allEvents.filter(e => e.type === 'blocked_time').length}
+            internalCount={(appointments?.filter(a => a.type !== 'blocked_time')?.length || 0)}
+            externalCount={nylasEvents?.length || 0}
+            availableCount={availabilityEvents.length}
+          />
 
           {/* React Big Calendar */}
           <ReactBigCalendar
