@@ -34,7 +34,7 @@ interface RawSupabaseAppointment {
     client_address: string | null;
     client_city: string | null;
     client_state: string | null;
-    client_zip_code: string | null; // FIXED: Updated to match database schema
+    client_zip_code: string | null;
   } | null;
 }
 
@@ -162,7 +162,7 @@ export const useAppointments = (
         { from: fromUTCISO, to: toUTCISO, refreshTrigger }
       );
 
-      // Build the query WITH client data - FIXED column name
+      // Build the query WITH client data - only get regular appointments (no legacy blocked time filtering needed)
       let query = supabase
         .from("appointments")
         .select(`
@@ -194,14 +194,14 @@ export const useAppointments = (
           )
         `)
         .eq("clinician_id", formattedClinicianId)
-        .in("status", ["scheduled", "blocked"]);
+        .in("status", ["scheduled"]); // Only get real appointments
 
       console.log("[useAppointments] STEP 1 - Query with CLIENT DATA:", {
         baseQuery: "appointments table WITH clients join",
         clinicianFilter: `clinician_id = ${formattedClinicianId}`,
-        statusFilter: "status IN (scheduled, blocked)",
+        statusFilter: "status = scheduled",
         clientDataIncluded: true,
-        fixedColumnName: "client_zip_code"
+        cleanQuery: "No legacy blocked time filtering"
       });
       
       // Use proper temporal overlap detection
@@ -217,11 +217,11 @@ export const useAppointments = (
       
       query = query.order("start_at", { ascending: true });
         
-      console.log("[useAppointments] STEP 1 - EXECUTING SUPABASE QUERY WITH CLIENT DATA...");
+      console.log("[useAppointments] STEP 1 - EXECUTING CLEAN SUPABASE QUERY...");
       
       const { data: rawDataAny, error: queryError } = await query;
 
-      console.log('[useAppointments] STEP 1 - Supabase Query Response WITH CLIENT DATA:', {
+      console.log('[useAppointments] STEP 1 - Clean Supabase Query Response:', {
         hasData: !!rawDataAny,
         recordCount: rawDataAny?.length || 0,
         hasError: !!queryError,
@@ -239,9 +239,9 @@ export const useAppointments = (
         return [];
       }
 
-      console.log(`[useAppointments] STEP 1 - Processing ${rawDataAny.length || 0} raw appointments WITH CLIENT DATA.`);
+      console.log(`[useAppointments] STEP 1 - Processing ${rawDataAny.length || 0} clean appointments WITH CLIENT DATA.`);
 
-      // Process the data WITH client information
+      // Process the data WITH client information - no legacy filtering needed
       const processedAppointments = rawDataAny.map((rawAppt: any): Appointment => {
         const clientData = rawAppt.clients;
         const clientName = clientData 
@@ -266,7 +266,7 @@ export const useAppointments = (
         };
       });
 
-      console.log('[useAppointments] STEP 3 - Final processed appointments WITH CLIENT DATA:', {
+      console.log('[useAppointments] STEP 3 - Final processed clean appointments:', {
         count: processedAppointments.length,
         sampleClientNames: processedAppointments.slice(0, 3).map(apt => apt.clientName)
       });
@@ -274,10 +274,10 @@ export const useAppointments = (
       return processedAppointments;
     },
     enabled: queryEnabled,
-    retry: false, // FIXED: Disable retry to prevent infinite loops
+    retry: false,
   });
 
-  // FIXED: Handle errors with separate useEffect instead of onError callback
+  // Handle errors with separate useEffect
   useEffect(() => {
     if (error) {
       console.error('[useAppointments] Query Error Details:', {
@@ -295,17 +295,17 @@ export const useAppointments = (
     }
   }, [error, toast]);
 
-  // FIXED: Properly type and handle fetchedAppointments array
+  // Properly type and handle fetchedAppointments array
   const appointments = fetchedAppointments || [];
 
   // Log query results
   useEffect(() => {
     if (appointments) {
-      console.log('[useAppointments] FIXED Query completed successfully:', {
+      console.log('[useAppointments] Clean Query completed successfully:', {
         appointmentsCount: appointments.length,
         isLoading,
         error: error?.message,
-        queryType: 'TEMPORAL_OVERLAP_DETECTION',
+        queryType: 'CLEAN_APPOINTMENTS_ONLY',
         sampleData: appointments.slice(0, 3).map(apt => ({
           id: apt.id,
           clientName: apt.clientName,

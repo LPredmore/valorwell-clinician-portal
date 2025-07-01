@@ -1,9 +1,10 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { Appointment } from '@/types/appointment';
 
 export const fetchClinicianAppointments = async (clinicianId: string): Promise<Appointment[]> => {
   try {
-    console.log('[fetchClinicianAppointments] Fetching appointments for clinician:', clinicianId);
+    console.log('[fetchClinicianAppointments] Fetching clean appointments for clinician:', clinicianId);
     
     const { data, error } = await supabase
       .from('appointments')
@@ -25,6 +26,7 @@ export const fetchClinicianAppointments = async (clinicianId: string): Promise<A
         )
       `)
       .eq('clinician_id', clinicianId)
+      .eq('status', 'scheduled') // Only get real scheduled appointments
       .order('start_at', { ascending: true });
 
     if (error) {
@@ -32,7 +34,7 @@ export const fetchClinicianAppointments = async (clinicianId: string): Promise<A
       throw error;
     }
 
-    console.log(`[fetchClinicianAppointments] Found ${data?.length || 0} appointments`);
+    console.log(`[fetchClinicianAppointments] Found ${data?.length || 0} clean appointments`);
 
     const processedAppointments: Appointment[] = (data || [])
       .map(appointment => ({
@@ -56,7 +58,7 @@ export const fetchClinicianAppointments = async (clinicianId: string): Promise<A
           : 'Unknown Client'
       }));
 
-    console.log(`[fetchClinicianAppointments] Returning ${processedAppointments.length} appointments`);
+    console.log(`[fetchClinicianAppointments] Returning ${processedAppointments.length} clean appointments`);
     return processedAppointments;
   } catch (error) {
     console.error('[fetchClinicianAppointments] Error fetching appointments:', error);

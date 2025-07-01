@@ -28,7 +28,7 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
   onSelectSlot,
   onSelectEvent,
 }) => {
-  // Simplified event style getter - CLEANED UP to remove legacy blocked time logic
+  // Clean event style getter - only handles new blocked_time table events
   const eventPropGetter = useCallback((event: CalendarEvent) => {
     console.log('[ReactBigCalendar] Styling event:', {
       id: event.id,
@@ -40,10 +40,10 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
     let style: React.CSSProperties = {};
     let className = '';
 
-    // Style based on source - SIMPLIFIED without legacy patterns
+    // Style based on source - clean implementation
     switch (event.source) {
       case 'internal':
-        // Regular internal appointments only (no more legacy blocked time types)
+        // Regular internal appointments
         className = 'internal-event';
         style = {
           backgroundColor: '#3174ad',
@@ -54,7 +54,7 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
         break;
         
       case 'blocked_time':
-        // NEW: Blocked time from dedicated blocked_time table
+        // Blocked time from dedicated blocked_time table
         className = 'blocked-time-event';
         style = {
           backgroundColor: '#6b7280',
@@ -100,7 +100,7 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
         };
     }
 
-    console.log('[ReactBigCalendar] Applied styling:', {
+    console.log('[ReactBigCalendar] Applied clean styling:', {
       eventId: event.id,
       eventSource: event.source,
       eventType: event.type,
@@ -114,7 +114,7 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
     };
   }, []);
 
-  // Simplified component getter - CLEANED UP
+  // Clean component getter
   const components = useMemo(() => ({
     event: ({ event }: { event: CalendarEvent }) => {
       const isBlockedTime = event.source === 'blocked_time';
@@ -161,7 +161,7 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
     dayLayoutAlgorithm: 'no-overlap',
   }), [events, eventPropGetter, components, onSelectSlot, onSelectEvent]);
 
-  console.log('[ReactBigCalendar] Rendering calendar with events:', {
+  console.log('[ReactBigCalendar] Rendering clean calendar with events:', {
     totalEvents: events.length,
     eventsBySource: {
       internal: events.filter(e => e.source === 'internal').length,

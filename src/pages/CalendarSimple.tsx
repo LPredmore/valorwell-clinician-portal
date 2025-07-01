@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "../components/layout/Layout";
@@ -51,9 +52,8 @@ const CalendarSimple = React.memo(() => {
   const timezoneLoadCountRef = useRef(0);
   const accessDeniedRef = useRef(false);
 
-  // CRITICAL FIX: Synchronize date ranges using standard date-fns functions
+  // SYNCHRONIZED date ranges using standard date-fns functions
   const { weekStart, weekEnd } = useMemo(() => {
-    // Use standard date-fns functions to ensure consistency
     const start = startOfWeek(currentDate);
     const end = endOfWeek(currentDate);
     
@@ -78,32 +78,32 @@ const CalendarSimple = React.memo(() => {
       appointmentsRange: { start: weekStart.toISOString(), end: weekEnd.toISOString() },
       nylasRange: { start: weekStart.toISOString(), end: weekEnd.toISOString() },
       blockedTimeRange: { start: weekStart.toISOString(), end: weekEnd.toISOString() },
-      rangesMatch: true, // They're the same variables now
+      rangesMatch: true,
       currentDate: currentDate.toISOString(),
       synchronizationMethod: 'All hooks use identical weekStart/weekEnd variables'
     });
   }, [weekStart, weekEnd, currentDate]);
 
-  // Fetch internal appointments - USING SYNCHRONIZED DATE RANGE
+  // Fetch clean internal appointments - USING SYNCHRONIZED DATE RANGE
   const { appointments, isLoading: appointmentsLoading } = useAppointments(
     userId,
-    weekStart,    // SYNCHRONIZED
-    weekEnd,      // SYNCHRONIZED
+    weekStart,
+    weekEnd,
     userTimeZone,
-    refreshTrigger  // Add refresh trigger for data refresh
+    refreshTrigger
   );
 
   // Fetch external calendar events (Nylas) - USING SYNCHRONIZED DATE RANGE
   const { events: nylasEvents, isLoading: nylasLoading } = useNylasEvents(
-    weekStart,    // SYNCHRONIZED - SAME AS APPOINTMENTS
-    weekEnd       // SYNCHRONIZED - SAME AS APPOINTMENTS
+    weekStart,
+    weekEnd
   );
 
-  // Fetch blocked times - NEW: USING SYNCHRONIZED DATE RANGE
+  // Fetch blocked times - USING SYNCHRONIZED DATE RANGE
   const { blockedTimes, isLoading: blockedTimesLoading } = useBlockedTime(
     userId || '',
-    weekStart,    // SYNCHRONIZED - SAME AS APPOINTMENTS AND NYLAS
-    weekEnd       // SYNCHRONIZED - SAME AS APPOINTMENTS AND NYLAS
+    weekStart,
+    weekEnd
   );
 
   // Fetch availability slots
@@ -184,7 +184,7 @@ const CalendarSimple = React.memo(() => {
     return events;
   }, [availabilitySlots, weekStart, weekEnd, userTimeZone]);
 
-  // Transform blocked times into calendar events - NEW
+  // Transform blocked times into calendar events
   const blockedTimeEvents = useMemo(() => {
     if (!blockedTimes.length || !userTimeZone) return [];
     
@@ -244,28 +244,27 @@ const CalendarSimple = React.memo(() => {
     return events;
   }, [blockedTimes, userTimeZone]);
 
-  // Refresh callback for availability changes
+  // Refresh callback for data changes
   const triggerRefresh = useCallback(() => {
     setRefreshTrigger(prev => prev + 1);
   }, []);
 
-  // Combine internal, external, blocked time, and availability events with timezone-aware conversion
+  // Combine clean internal, external, blocked time, and availability events
   const allEvents = useMemo(() => {
     const events = [];
     
-    // Add internal appointments with FIXED timezone-aware conversion - CLEANED UP
+    // Add clean internal appointments
     if (appointments) {
       events.push(...appointments.map(apt => {
-        // SIMPLIFIED: Only handle regular appointments now, no legacy blocked time types
         const title = apt.clientName || 'Internal Appointment';
 
-        // CRITICAL FIX: Parse ISO string explicitly as UTC, then convert to clinician's zone
+        // Parse ISO string explicitly as UTC, then convert to clinician's zone
         const apptDTStart = DateTime.fromISO(apt.start_at, { zone: 'UTC' })
           .setZone(apt.appointment_timezone || userTimeZone);
         const apptDTEnd = DateTime.fromISO(apt.end_at, { zone: 'UTC' })
           .setZone(apt.appointment_timezone || userTimeZone);
 
-        console.log('[CalendarSimple] FIXED appointment timezone conversion:', {
+        console.log('[CalendarSimple] Processing clean appointment:', {
           appointmentId: apt.id,
           clientName: apt.clientName,
           originalStartUTC: apt.start_at,
@@ -278,13 +277,13 @@ const CalendarSimple = React.memo(() => {
           convertedToClinicianTZ_End: apptDTEnd.toISO(),
           localDateStart: buildLocalDate(apptDTStart).toISOString(),
           localDateEnd: buildLocalDate(apptDTEnd).toISOString(),
-          fixStatus: 'SUCCESS - UTC timestamp parsed correctly'
+          status: 'CLEAN - No legacy blocked time processing'
         });
 
         return {
           ...apt,
           source: 'internal',
-          type: 'appointment', // SIMPLIFIED: No more legacy blocked time types
+          type: 'appointment',
           id: apt.id,
           title: title,
           start: buildLocalDate(apptDTStart),
@@ -308,13 +307,13 @@ const CalendarSimple = React.memo(() => {
       })));
     }
 
-    // Add blocked time events (NEW: from dedicated blocked_time table)
+    // Add blocked time events (from dedicated blocked_time table)
     events.push(...blockedTimeEvents);
 
-    // Add availability events (already converted with timezone fix)
+    // Add availability events
     events.push(...availabilityEvents);
 
-    console.log('[CalendarSimple] CLEANED event merging with blocked time integration:', {
+    console.log('[CalendarSimple] Clean event merging completed:', {
       dateRangeUsed: {
         start: weekStart.toISOString(),
         end: weekEnd.toISOString()
@@ -324,7 +323,7 @@ const CalendarSimple = React.memo(() => {
       blockedTimeEventsCount: blockedTimeEvents.length,
       availabilityEventsCount: availabilityEvents.length,
       totalEventsCount: events.length,
-      cleanupStatus: 'SUCCESS - All legacy blocked time patterns removed'
+      cleanupStatus: 'SUCCESS - All legacy patterns removed'
     });
 
     return events.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
@@ -332,7 +331,7 @@ const CalendarSimple = React.memo(() => {
 
   // Debug logging for calendar state
   useEffect(() => {
-    console.log('[CalendarSimple] Component state with SYNCHRONIZED dates and blocked time:', {
+    console.log('[CalendarSimple] Clean component state:', {
       userId,
       appointmentsCount: appointments?.length || 0,
       nylasEventsCount: nylasEvents?.length || 0,
@@ -347,31 +346,7 @@ const CalendarSimple = React.memo(() => {
       synchronizedWeekEnd: weekEnd.toISOString(),
       isReady,
       authInitialized,
-      dateRangeSyncStatus: 'SYNCHRONIZED',
-      appointments: appointments?.map(apt => ({
-        id: apt.id,
-        clientName: apt.clientName,
-        start_at: apt.start_at,
-        end_at: apt.end_at,
-        type: apt.type
-      })),
-      nylasEvents: nylasEvents?.map(event => ({
-        id: event.id,
-        title: event.title,
-        start_time: event.when?.start_time,
-        connection_provider: event.connection_provider
-      })),
-      blockedTimes: blockedTimes?.map(bt => ({
-        id: bt.id,
-        label: bt.label,
-        start_at: bt.start_at,
-        end_at: bt.end_at
-      })),
-      availabilityEvents: availabilityEvents.map(e => ({
-        id: e.id,
-        title: e.title,
-        start: e.start.toISOString()
-      }))
+      cleanupStatus: 'COMPLETE - Legacy code removed'
     });
   }, [userId, appointments, nylasEvents, blockedTimes, allEvents, appointmentsLoading, nylasLoading, blockedTimesLoading, userTimeZone, currentDate, weekStart, weekEnd, isReady, authInitialized]);
 
@@ -400,11 +375,11 @@ const CalendarSimple = React.memo(() => {
     setShowAppointmentDialog(true);
   }, []);
 
-  // Handle event click - CLEANED UP to remove legacy blocked time handling
+  // Handle event click - clean implementation
   const handleSelectEvent = useCallback((event: any) => {
     console.log('[CalendarSimple] Event selected:', event);
     if (event.source === 'internal') {
-      // SIMPLIFIED: Only handle regular appointments now
+      // Handle regular appointments
       setEditingAppointment(event.resource || event);
       setSelectedSlot({
         start: event.start || new Date(event.start_at),
@@ -420,7 +395,7 @@ const CalendarSimple = React.memo(() => {
         duration: 3000,
       });
     } else if (event.source === 'blocked_time') {
-      // NEW: Handle clicks on blocked time events from dedicated table
+      // Handle clicks on blocked time events from dedicated table
       const blockLabel = event.title || 'Blocked Time';
       toast({
         title: "🚫 Blocked Time",
@@ -428,7 +403,7 @@ const CalendarSimple = React.memo(() => {
         duration: 4000,
       });
       
-      console.log('[CalendarSimple] Dedicated blocked time clicked:', {
+      console.log('[CalendarSimple] Blocked time clicked:', {
         id: event.id,
         title: event.title,
         start: event.start,
@@ -454,10 +429,10 @@ const CalendarSimple = React.memo(() => {
     setShowAppointmentDialog(true);
   }, []);
 
-  // Enhanced block time handler with validation and logging
+  // Clean block time handler
   const handleBlockTime = useCallback(() => {
     const timestamp = new Date().toISOString();
-    console.log(`[CalendarSimple] ${timestamp} handleBlockTime called with userId:`, {
+    console.log(`[CalendarSimple] ${timestamp} Clean handleBlockTime called with userId:`, {
       userId,
       type: typeof userId,
       isNull: userId === null,
@@ -513,7 +488,7 @@ const CalendarSimple = React.memo(() => {
       return;
     }
 
-    console.log(`[CalendarSimple] ${timestamp} Opening BlockTimeDialog with valid userId:`, userId);
+    console.log(`[CalendarSimple] ${timestamp} Opening clean BlockTimeDialog with valid userId:`, userId);
     setShowBlockTimeDialog(true);
   }, [userId, isReady, authInitialized, userRole, toast]);
 
@@ -560,7 +535,7 @@ const CalendarSimple = React.memo(() => {
     };
   }, []);
 
-  // Primary auth effect - SEPARATED with circuit breaker
+  // Primary auth effect with circuit breaker
   useEffect(() => {
     if (!authInitialized || authCheckCountRef.current >= 3) return;
     
@@ -587,7 +562,7 @@ const CalendarSimple = React.memo(() => {
     }
   }, [authInitialized, userId, userRole, navigate, handleAccessDenied]);
 
-  // Timezone loading effect - SEPARATED with circuit breaker
+  // Timezone loading effect with circuit breaker
   useEffect(() => {
     if (!isReady || !userId || !isMounted || timezoneLoadCountRef.current >= 3) return;
     
@@ -736,7 +711,7 @@ const CalendarSimple = React.memo(() => {
           {/* Calendar Legend */}
           <CalendarLegend
             blockedCount={blockedTimeEvents.length}
-            internalCount={(appointments?.filter(a => a.type !== 'blocked_time')?.length || 0)}
+            internalCount={appointments?.length || 0}
             externalCount={nylasEvents?.length || 0}
             availableCount={availabilityEvents.length}
           />
@@ -748,7 +723,7 @@ const CalendarSimple = React.memo(() => {
             onSelectEvent={handleSelectEvent}
           />
 
-          {/* Appointment Dialog - UPDATED to handle both create and edit */}
+          {/* Calendar-specific Appointment Dialog */}
           {showAppointmentDialog && (
             <AppointmentDialog
               isOpen={showAppointmentDialog}
@@ -761,29 +736,22 @@ const CalendarSimple = React.memo(() => {
               clinicianId={userId}
               clinicianTimeZone={userTimeZone}
               selectedDate={selectedSlot?.start ? DateTime.fromJSDate(selectedSlot.start) : undefined}
-              selectedStartTime={selectedSlot?.start ? DateTime.fromJSDate(selectedSlot.start) : undefined}
-              selectedEndTime={selectedSlot?.end ? DateTime.fromJSDate(selectedSlot.end) : undefined}
+              selectedStartTime={selectedSlot?.start ? DateTime.fromJSDate(selectedSlot.start).toFormat('HH:mm') : undefined}
+              selectedEndTime={selectedSlot?.end ? DateTime.fromJSDate(selectedSlot.end).toFormat('HH:mm') : undefined}
+              existingAppointment={isEditMode ? editingAppointment : undefined}
               onAppointmentCreated={triggerRefresh}
               onAppointmentUpdated={triggerRefresh}
-              isEdit={isEditMode}
-              fixedClientId={editingAppointment?.client_id}
-              appointmentId={editingAppointment?.id}
+              onAppointmentDeleted={triggerRefresh}
             />
           )}
 
-          {/* Enhanced Block Time Dialog with fresh userId and validation */}
+          {/* Block Time Dialog */}
           {showBlockTimeDialog && (
             <BlockTimeDialog
               isOpen={showBlockTimeDialog}
-              onClose={() => {
-                console.log('[CalendarSimple] Closing BlockTimeDialog');
-                setShowBlockTimeDialog(false);
-              }}
-              selectedClinicianId={userId} // Always pass fresh userId
-              onBlockCreated={() => {
-                console.log('[CalendarSimple] Block time created, triggering refresh');
-                triggerRefresh();
-              }}
+              onClose={() => setShowBlockTimeDialog(false)}
+              selectedClinicianId={userId}
+              onBlockCreated={triggerRefresh}
             />
           )}
         </div>
@@ -791,7 +759,5 @@ const CalendarSimple = React.memo(() => {
     </Layout>
   );
 });
-
-CalendarSimple.displayName = 'CalendarSimple';
 
 export default CalendarSimple;
