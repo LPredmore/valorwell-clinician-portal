@@ -62,6 +62,13 @@ const convertLocalToUTC = (dateString: string, timeString: string, timezone: str
   }
 };
 
+// Enhanced validation function for UUID format
+const isValidUUID = (uuid: string | null): boolean => {
+  if (!uuid) return false;
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(uuid);
+};
+
 const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
   isOpen,
   onClose,
@@ -78,38 +85,87 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
 
   const timeOptions = generateTimeOptions();
 
-  // Reset form when dialog opens
+  // Enhanced logging and validation on dialog open
   useEffect(() => {
     if (isOpen) {
+      const timestamp = new Date().toISOString();
+      console.log(`[BlockTimeDialog] ${timestamp} Dialog opened with clinician ID:`, {
+        selectedClinicianId,
+        type: typeof selectedClinicianId,
+        isNull: selectedClinicianId === null,
+        isUndefined: selectedClinicianId === undefined,
+        isEmpty: selectedClinicianId === '',
+        trimmedValue: selectedClinicianId?.trim(),
+        isValidUUID: isValidUUID(selectedClinicianId)
+      });
+
+      // Reset form when dialog opens
       setSelectedDate(new Date());
       setStartTime('09:00');
       setEndTime('10:00');
       setBlockLabel('Blocked');
       setNotes('');
     }
-  }, [isOpen]);
+  }, [isOpen, selectedClinicianId]);
 
-  // Validate form inputs
+  // Enhanced validation function
   const validateInputs = () => {
+    const timestamp = new Date().toISOString();
+    console.log(`[BlockTimeDialog] ${timestamp} Starting validation with clinician ID:`, {
+      selectedClinicianId,
+      type: typeof selectedClinicianId,
+      trimmed: selectedClinicianId?.trim()
+    });
+
     if (!selectedDate) {
       return 'Please select a date';
     }
 
+    // Enhanced clinician ID validation
     if (!selectedClinicianId) {
-      return 'No clinician selected';
+      console.error(`[BlockTimeDialog] ${timestamp} Clinician ID is null/undefined:`, selectedClinicianId);
+      return 'No clinician selected - clinician ID is null or undefined';
+    }
+
+    if (typeof selectedClinicianId !== 'string') {
+      console.error(`[BlockTimeDialog] ${timestamp} Clinician ID is not a string:`, {
+        selectedClinicianId,
+        type: typeof selectedClinicianId
+      });
+      return 'Invalid clinician ID type - expected string';
+    }
+
+    if (selectedClinicianId.trim() === '') {
+      console.error(`[BlockTimeDialog] ${timestamp} Clinician ID is empty string after trim`);
+      return 'No clinician selected - clinician ID is empty';
+    }
+
+    if (!isValidUUID(selectedClinicianId)) {
+      console.error(`[BlockTimeDialog] ${timestamp} Clinician ID is not a valid UUID:`, selectedClinicianId);
+      return 'Invalid clinician ID format - must be a valid UUID';
     }
 
     if (startTime >= endTime) {
       return 'End time must be after start time';
     }
 
+    console.log(`[BlockTimeDialog] ${timestamp} Validation passed for clinician ID:`, selectedClinicianId);
     return null;
   };
 
   const handleSubmit = async () => {
-    // Validate inputs
+    const timestamp = new Date().toISOString();
+    console.log(`[BlockTimeDialog] ${timestamp} Starting handleSubmit with clinician ID:`, {
+      selectedClinicianId,
+      type: typeof selectedClinicianId,
+      isValidUUID: isValidUUID(selectedClinicianId),
+      trimmedValue: selectedClinicianId?.trim()
+    });
+
+    // Validate inputs with enhanced logging
     const validationError = validateInputs();
     if (validationError) {
+      console.error(`[BlockTimeDialog] ${timestamp} Validation failed:`, validationError);
       toast({
         title: "Validation Error",
         description: validationError,
@@ -121,21 +177,23 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
     setIsLoading(true);
 
     try {
+      console.log(`[BlockTimeDialog] ${timestamp} Proceeding with valid clinician ID:`, selectedClinicianId);
+
       // Get clinician's timezone with fallback
       let clinicianTimeZone;
       try {
+        console.log(`[BlockTimeDialog] ${timestamp} Fetching timezone for clinician:`, selectedClinicianId);
         const timeZoneResult = await getClinicianTimeZone(selectedClinicianId!);
         clinicianTimeZone = Array.isArray(timeZoneResult) ? timeZoneResult[0] : timeZoneResult;
         
         if (!clinicianTimeZone) {
           clinicianTimeZone = 'America/New_York'; // Default fallback
         }
+        console.log(`[BlockTimeDialog] ${timestamp} Using clinician timezone:`, clinicianTimeZone);
       } catch (tzError) {
-        console.error('Error getting clinician timezone, using default:', tzError);
+        console.error(`[BlockTimeDialog] ${timestamp} Error getting clinician timezone, using default:`, tzError);
         clinicianTimeZone = 'America/New_York';
       }
-
-      console.log('[BlockTimeDialog] Using clinician timezone:', clinicianTimeZone);
 
       // Format date for conversion
       const dateString = format(selectedDate!, 'yyyy-MM-dd');
@@ -144,7 +202,8 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
       const startAtUTC = convertLocalToUTC(dateString, startTime, clinicianTimeZone);
       const endAtUTC = convertLocalToUTC(dateString, endTime, clinicianTimeZone);
 
-      console.log('[BlockTimeDialog] Creating visible blocked time appointment:', {
+      console.log(`[BlockTimeDialog] ${timestamp} Creating visible blocked time appointment:`, {
+        clinician_id: selectedClinicianId,
         dateString,
         startTime,
         endTime,
@@ -153,7 +212,7 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
         endAtUTC: endAtUTC.toISO()
       });
 
-      // Create visible blocked time appointment
+      // Create visible blocked time appointment with enhanced error handling
       const { data, error } = await supabase
         .from('appointments')
         .insert({
@@ -169,10 +228,18 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
         .select();
 
       if (error) {
+        console.error(`[BlockTimeDialog] ${timestamp} Database error:`, {
+          error,
+          errorCode: error.code,
+          errorMessage: error.message,
+          errorDetails: error.details,
+          errorHint: error.hint,
+          selectedClinicianId
+        });
         throw error;
       }
 
-      console.log('✅ Visible blocked time appointment created successfully:', data);
+      console.log(`[BlockTimeDialog] ${timestamp} ✅ Visible blocked time appointment created successfully:`, data);
 
       toast({
         title: "Success",
@@ -182,13 +249,20 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
       onBlockCreated();
       onClose();
     } catch (error: any) {
-      console.error('❌ Block time creation failed:', error);
+      const timestamp = new Date().toISOString();
+      console.error(`[BlockTimeDialog] ${timestamp} ❌ Block time creation failed:`, {
+        error,
+        errorMessage: error?.message,
+        selectedClinicianId,
+        errorCode: error?.code,
+        errorDetails: error?.details
+      });
       
       // Enhanced error messages based on specific error types
       let errorMessage = "Failed to create time block.";
       
       if (error?.message?.includes('violates foreign key constraint')) {
-        errorMessage = "Database error: Invalid clinician reference.";
+        errorMessage = `Database error: Invalid clinician reference. Clinician ID: ${selectedClinicianId}`;
       } else if (error?.message?.includes('violates check constraint')) {
         errorMessage = "Database error: Invalid data format.";
       } else if (error?.message?.includes('duplicate key')) {
@@ -217,6 +291,16 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Debug info for development */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="p-2 bg-gray-100 rounded text-xs">
+              <strong>Debug Info:</strong><br />
+              Clinician ID: {selectedClinicianId || 'null/undefined'}<br />
+              Type: {typeof selectedClinicianId}<br />
+              Valid UUID: {isValidUUID(selectedClinicianId) ? 'Yes' : 'No'}
+            </div>
+          )}
+
           <div>
             <Label htmlFor="blockLabel">Block Label</Label>
             <Input

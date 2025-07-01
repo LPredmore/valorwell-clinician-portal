@@ -401,10 +401,68 @@ const CalendarSimple = React.memo(() => {
     setShowAppointmentDialog(true);
   }, []);
 
-  // Handle block time button
+  // Enhanced block time handler with validation and logging
   const handleBlockTime = useCallback(() => {
+    const timestamp = new Date().toISOString();
+    console.log(`[CalendarSimple] ${timestamp} handleBlockTime called with userId:`, {
+      userId,
+      type: typeof userId,
+      isNull: userId === null,
+      isUndefined: userId === undefined,
+      isReady,
+      authInitialized,
+      userRole
+    });
+
+    // Validate user ID before opening dialog
+    if (!userId) {
+      console.error(`[CalendarSimple] ${timestamp} Cannot open BlockTimeDialog - userId is null/undefined`);
+      toast({
+        title: "Error",
+        description: "No user ID available. Please refresh the page and try again.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (typeof userId !== 'string') {
+      console.error(`[CalendarSimple] ${timestamp} Invalid userId type:`, {
+        userId,
+        type: typeof userId
+      });
+      toast({
+        title: "Error", 
+        description: "Invalid user ID format. Please refresh the page and try again.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (userId.trim() === '') {
+      console.error(`[CalendarSimple] ${timestamp} userId is empty string`);
+      toast({
+        title: "Error",
+        description: "Empty user ID. Please refresh the page and try again.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // UUID format validation
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(userId)) {
+      console.error(`[CalendarSimple] ${timestamp} userId is not a valid UUID:`, userId);
+      toast({
+        title: "Error",
+        description: "Invalid user ID format. Please refresh the page and try again.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    console.log(`[CalendarSimple] ${timestamp} Opening BlockTimeDialog with valid userId:`, userId);
     setShowBlockTimeDialog(true);
-  }, []);
+  }, [userId, isReady, authInitialized, userRole, toast]);
 
   // Stabilized access control handler with circuit breaker
   const handleAccessDenied = useCallback((message: string) => {
@@ -619,6 +677,10 @@ const CalendarSimple = React.memo(() => {
                 )}
               </p>
               <p>Timezone: {userTimeZone}</p>
+              {/* Debug info for development */}
+              {process.env.NODE_ENV === 'development' && (
+                <p className="text-xs text-blue-600">Debug: UserID: {userId}</p>
+              )}
             </div>
           </div>
 
@@ -660,13 +722,19 @@ const CalendarSimple = React.memo(() => {
             />
           )}
 
-          {/* Block Time Dialog */}
+          {/* Enhanced Block Time Dialog with fresh userId and validation */}
           {showBlockTimeDialog && (
             <BlockTimeDialog
               isOpen={showBlockTimeDialog}
-              onClose={() => setShowBlockTimeDialog(false)}
-              selectedClinicianId={userId}
-              onBlockCreated={triggerRefresh}
+              onClose={() => {
+                console.log('[CalendarSimple] Closing BlockTimeDialog');
+                setShowBlockTimeDialog(false);
+              }}
+              selectedClinicianId={userId} // Always pass fresh userId
+              onBlockCreated={() => {
+                console.log('[CalendarSimple] Block time created, triggering refresh');
+                triggerRefresh();
+              }}
             />
           )}
         </div>
