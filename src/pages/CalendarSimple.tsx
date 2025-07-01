@@ -764,8 +764,8 @@ const CalendarSimple = React.memo(() => {
               clinicianId={userId}
               clinicianTimeZone={userTimeZone}
               selectedDate={selectedSlot?.start ? DateTime.fromJSDate(selectedSlot.start) : undefined}
-              selectedStartTime={selectedSlot?.start ? DateTime.fromJSDate(selectedSlot.start).toFormat('HH:mm') : undefined}
-              selectedEndTime={selectedSlot?.end ? DateTime.fromJSDate(selectedSlot.end).toFormat('HH:mm') : undefined}
+              selectedStartTime={selectedSlot?.start ? DateTime.fromJSDate(selectedSlot.start) : undefined}
+              selectedEndTime={selectedSlot?.end ? DateTime.fromJSDate(selectedSlot.end) : undefined}
               existingAppointment={isEditMode ? editingAppointment : undefined}
               onAppointmentCreated={triggerRefresh}
               onAppointmentUpdated={triggerRefresh}
