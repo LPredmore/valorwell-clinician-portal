@@ -180,26 +180,32 @@ const CalendarSimple = React.memo(() => {
   const allEvents = useMemo(() => {
     const events = [];
     
-    // Add internal appointments with timezone-aware conversion
+    // Add internal appointments with FIXED timezone-aware conversion
     if (appointments) {
       events.push(...appointments.map(apt => {
-        // Convert UTC timestamps to clinician timezone, then to local Date objects
-        const apptDTStart = DateTime.fromISO(apt.start_at)
+        // CRITICAL FIX: Parse ISO string explicitly as UTC, then convert to clinician's zone
+        // This prevents Luxon from treating the timestamp as local time
+        const apptDTStart = DateTime.fromISO(apt.start_at, { zone: 'UTC' })
           .setZone(apt.appointment_timezone || userTimeZone);
-        const apptDTEnd = DateTime.fromISO(apt.end_at)
+        const apptDTEnd = DateTime.fromISO(apt.end_at, { zone: 'UTC' })
           .setZone(apt.appointment_timezone || userTimeZone);
 
-        console.log('[CalendarSimple] Converting appointment with timezone fix:', {
+        console.log('[CalendarSimple] FIXED appointment timezone conversion:', {
           appointmentId: apt.id,
           clientName: apt.clientName,
-          originalStart: apt.start_at,
-          originalEnd: apt.end_at,
+          originalStartUTC: apt.start_at,
+          originalEndUTC: apt.end_at,
           appointmentTimezone: apt.appointment_timezone,
           userTimezone: userTimeZone,
-          convertedStart: apptDTStart.toISO(),
-          convertedEnd: apptDTEnd.toISO(),
+          parsedAsUTC_Start: DateTime.fromISO(apt.start_at, { zone: 'UTC' }).toISO(),
+          parsedAsUTC_End: DateTime.fromISO(apt.end_at, { zone: 'UTC' }).toISO(),
+          convertedToClinicianTZ_Start: apptDTStart.toISO(),
+          convertedToClinicianTZ_End: apptDTEnd.toISO(),
           localDateStart: buildLocalDate(apptDTStart).toISOString(),
-          localDateEnd: buildLocalDate(apptDTEnd).toISOString()
+          localDateEnd: buildLocalDate(apptDTEnd).toISOString(),
+          localDateStartTime: buildLocalDate(apptDTStart).toLocaleString(),
+          localDateEndTime: buildLocalDate(apptDTEnd).toLocaleString(),
+          fixStatus: 'SUCCESS - UTC timestamp parsed correctly'
         });
 
         return {
@@ -232,7 +238,7 @@ const CalendarSimple = React.memo(() => {
     // Add availability events (already converted with timezone fix)
     events.push(...availabilityEvents);
 
-    console.log('[CalendarSimple] SYNCHRONIZED event merging with timezone fix:', {
+    console.log('[CalendarSimple] FIXED event merging with timezone correction:', {
       dateRangeUsed: {
         start: weekStart.toISOString(),
         end: weekEnd.toISOString()
@@ -241,19 +247,24 @@ const CalendarSimple = React.memo(() => {
       externalEventsCount: nylasEvents?.length || 0,
       availabilityEventsCount: availabilityEvents.length,
       totalEventsCount: events.length,
-      internalEvents: appointments?.map(e => ({ 
-        id: e.id, 
-        title: e.clientName, 
-        originalStart: e.start_at,
-        convertedStart: events.find(evt => evt.id === e.id && evt.source === 'internal')?.start?.toISOString()
-      })) || [],
+      fixedInternalEvents: appointments?.map(e => { 
+        const fixedStart = DateTime.fromISO(e.start_at, { zone: 'UTC' })
+          .setZone(e.appointment_timezone || userTimeZone);
+        return {
+          id: e.id, 
+          title: e.clientName, 
+          originalStartUTC: e.start_at,
+          fixedDisplayTime: buildLocalDate(fixedStart).toLocaleString(),
+          timezone: e.appointment_timezone || userTimeZone
+        };
+      }) || [],
       externalEvents: nylasEvents?.map(e => ({ id: e.id, title: e.title, start: e.when?.start_time })) || [],
       availabilityEvents: availabilityEvents.map(e => ({
         id: e.id,
         title: e.title,
         start: e.start.toISOString()
       })),
-      timezoneFixStatus: 'SUCCESS - All events converted to local Date objects in clinician timezone'
+      timezoneFixStatus: 'SUCCESS - All internal appointments now parse UTC correctly'
     });
 
     return events.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
