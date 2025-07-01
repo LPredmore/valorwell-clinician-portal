@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "../components/layout/Layout";
@@ -30,6 +31,7 @@ import {
 import AvailabilityManagementSidebar from "@/components/calendar/AvailabilityManagementSidebar";
 import CalendarConnectionsPanel from "@/components/calendar/CalendarConnectionsPanel";
 import CalendarLegend from "../components/calendar/CalendarLegend";
+import { getWeekRange, logWeekNavigation } from "@/utils/dateRangeUtils";
 
 const CalendarSimple = React.memo(() => {
   const { userId, authInitialized, userRole } = useUser();
@@ -54,28 +56,16 @@ const CalendarSimple = React.memo(() => {
   const timezoneLoadCountRef = useRef(0);
   const accessDeniedRef = useRef(false);
 
-  // FIXED: Enhanced week boundary calculation with timezone awareness
+  // FIXED: Enhanced week boundary calculation with timezone awareness using utility function
   const { weekStart, weekEnd } = useMemo(() => {
-    // Use clinician's timezone for proper week boundaries
     const tz = userTimeZone || TimeZoneService.DEFAULT_TIMEZONE;
-    const currentDT = DateTime.fromJSDate(currentDate).setZone(tz);
+    const range = getWeekRange(currentDate, tz);
     
-    const start = currentDT.startOf('week').toJSDate();
-    const end = currentDT.endOf('week').toJSDate();
-    
-    console.log('[CalendarSimple] FIXED Week boundaries with timezone awareness:', {
-      currentDate: currentDate.toISOString(),
-      userTimeZone: tz,
-      weekStart: start.toISOString(),
-      weekEnd: end.toISOString(),
-      weekStartLocal: DateTime.fromJSDate(start).setZone(tz).toFormat('yyyy-MM-dd HH:mm'),
-      weekEndLocal: DateTime.fromJSDate(end).setZone(tz).toFormat('yyyy-MM-dd HH:mm'),
-      calculatedUsing: 'Luxon with clinician timezone'
-    });
+    logWeekNavigation(range.start, range.end, tz);
     
     return {
-      weekStart: start,
-      weekEnd: end
+      weekStart: range.start,
+      weekEnd: range.end
     };
   }, [currentDate, userTimeZone]);
 
@@ -105,11 +95,12 @@ const CalendarSimple = React.memo(() => {
     weekEnd
   );
 
-  // FIXED: Fetch blocked times with proper temporal overlap
+  // FIXED: Fetch blocked times with proper temporal overlap and refresh trigger
   const { blockedTimes, isLoading: blockedTimesLoading } = useBlockedTime(
     userId || '',
     weekStart,
-    weekEnd
+    weekEnd,
+    refreshTrigger  // Added refresh trigger for proper week navigation
   );
 
   // Fetch availability slots
@@ -751,7 +742,7 @@ const CalendarSimple = React.memo(() => {
             onSelectEvent={handleSelectEvent}
           />
 
-          {/* FIXED: Calendar-specific Appointment Dialog with proper DateTime conversion */}
+          {/* FIXED: Calendar-specific Appointment Dialog - Use the correct component and props */}
           {showAppointmentDialog && (
             <AppointmentDialog
               isOpen={showAppointmentDialog}
@@ -763,13 +754,15 @@ const CalendarSimple = React.memo(() => {
               }}
               clinicianId={userId}
               clinicianTimeZone={userTimeZone}
-              selectedDate={selectedSlot?.start ? DateTime.fromJSDate(selectedSlot.start) : undefined}
-              selectedStartTime={selectedSlot?.start ? DateTime.fromJSDate(selectedSlot.start) : undefined}
-              selectedEndTime={selectedSlot?.end ? DateTime.fromJSDate(selectedSlot.end) : undefined}
-              existingAppointment={isEditMode ? editingAppointment : undefined}
               onAppointmentCreated={triggerRefresh}
-              onAppointmentUpdated={triggerRefresh}
-              onAppointmentDeleted={triggerRefresh}
+              initialData={isEditMode ? editingAppointment : (selectedSlot ? {
+                start: selectedSlot.start,
+                end: selectedSlot.end,
+                title: '',
+                clientName: '',
+                notes: '',
+                appointment_timezone: userTimeZone
+              } : null)}
             />
           )}
 
@@ -811,3 +804,4 @@ const CalendarSimple = React.memo(() => {
 });
 
 export default CalendarSimple;
+
