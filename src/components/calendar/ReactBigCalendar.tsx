@@ -110,6 +110,7 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
       allDay,
       resource: event, // Store original event data
       source: event.source,
+      type: event.type, // Preserve event type for styling
     };
   });
 
@@ -118,14 +119,22 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
   console.log('All-day events:', calendarEvents.filter(e => e.allDay));
   console.log('Timed events:', calendarEvents.filter(e => !e.allDay));
   console.log('Availability events:', calendarEvents.filter(e => e.source === 'availability'));
+  console.log('Blocked time events:', calendarEvents.filter(e => e.type === 'blocked_time'));
 
-  // Custom event style getter
+  // Enhanced event style getter with blocked time support
   const eventStyleGetter = (event: any) => {
     let backgroundColor = '#3174ad';
     let borderColor = '#3174ad';
     let opacity = 0.8;
+    let color = 'white';
     
-    if (event.source === 'internal') {
+    if (event.type === 'blocked_time') {
+      // Distinct styling for blocked time
+      backgroundColor = '#9ca3af'; // Gray-400
+      borderColor = '#6b7280'; // Gray-500
+      opacity = 0.9;
+      color = 'white';
+    } else if (event.source === 'internal') {
       backgroundColor = '#3174ad'; // Blue for internal
       borderColor = '#3174ad';
     } else if (event.source === 'nylas') {
@@ -135,6 +144,7 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
       backgroundColor = '#e0e0e0'; // Light gray for availability
       borderColor = '#bdbdbd';
       opacity = 0.5; // More transparent for availability blocks
+      color = '#666';
     }
 
     return {
@@ -143,17 +153,25 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
         borderColor,
         borderRadius: '4px',
         opacity,
-        color: event.source === 'availability' ? '#666' : 'white',
+        color,
         border: `1px solid ${borderColor}`,
         display: 'block',
+        fontWeight: event.type === 'blocked_time' ? '600' : 'normal',
       },
     };
   };
 
-  // Custom event component
+  // Enhanced event component with blocked time indicators
   const EventComponent = ({ event }: { event: any }) => (
     <div className="text-sm">
-      <strong>{event.title}</strong>
+      <div className="flex items-center justify-between">
+        <strong className="truncate">{event.title}</strong>
+        {event.type === 'blocked_time' && (
+          <span className="text-xs font-bold ml-1 px-1 bg-gray-600 rounded">
+            BLOCKED
+          </span>
+        )}
+      </div>
       {event.source === 'nylas' && (
         <div className="text-xs opacity-75">External</div>
       )}
