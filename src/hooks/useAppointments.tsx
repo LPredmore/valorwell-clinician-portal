@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase, getOrCreateVideoRoom } from "@/integrations/supabase/client";
@@ -33,7 +34,7 @@ interface RawSupabaseAppointment {
     client_address: string | null;
     client_city: string | null;
     client_state: string | null;
-    client_zipcode: string | null;
+    client_zip_code: string | null; // FIXED: Updated to match database schema
   } | null;
 }
 
@@ -161,7 +162,7 @@ export const useAppointments = (
         { from: fromUTCISO, to: toUTCISO, refreshTrigger }
       );
 
-      // Build the query WITH client data
+      // Build the query WITH client data - FIXED column name
       let query = supabase
         .from("appointments")
         .select(`
@@ -189,7 +190,7 @@ export const useAppointments = (
             client_address,
             client_city,
             client_state,
-            client_zipcode
+            client_zip_code
           )
         `)
         .eq("clinician_id", formattedClinicianId)
@@ -199,7 +200,8 @@ export const useAppointments = (
         baseQuery: "appointments table WITH clients join",
         clinicianFilter: `clinician_id = ${formattedClinicianId}`,
         statusFilter: "status IN (scheduled, blocked)",
-        clientDataIncluded: true
+        clientDataIncluded: true,
+        fixedColumnName: "client_zip_code"
       });
       
       // Use proper temporal overlap detection
@@ -217,73 +219,76 @@ export const useAppointments = (
         
       console.log("[useAppointments] STEP 1 - EXECUTING SUPABASE QUERY WITH CLIENT DATA...");
       
-      try {
-        const { data: rawDataAny, error: queryError } = await query;
+      const { data: rawDataAny, error: queryError } = await query;
 
-        console.log('[useAppointments] STEP 1 - Supabase Query Response WITH CLIENT DATA:', {
-          hasData: !!rawDataAny,
-          recordCount: rawDataAny?.length || 0,
-          hasError: !!queryError,
-          errorMessage: queryError?.message || null,
-          sampleClientData: rawDataAny?.[0]?.clients || null
-        });
+      console.log('[useAppointments] STEP 1 - Supabase Query Response WITH CLIENT DATA:', {
+        hasData: !!rawDataAny,
+        recordCount: rawDataAny?.length || 0,
+        hasError: !!queryError,
+        errorMessage: queryError?.message || null,
+        sampleClientData: rawDataAny?.[0]?.clients || null
+      });
 
-        if (queryError) {
-          console.error("[useAppointments] STEP 1 - Detailed Supabase Query Error:", queryError);
-          throw new Error(`Supabase Query Failed: ${queryError.message} (${queryError.code})`);
-        }
-
-        if (!rawDataAny) {
-          console.warn("[useAppointments] STEP 1 - No data returned from Supabase");
-          return [];
-        }
-
-        console.log(`[useAppointments] STEP 1 - Processing ${rawDataAny.length || 0} raw appointments WITH CLIENT DATA.`);
-
-        // Process the data WITH client information
-        const processedAppointments = rawDataAny.map((rawAppt: any): Appointment => {
-          const clientData = rawAppt.clients;
-          const clientName = clientData 
-            ? `${clientData.client_preferred_name || clientData.client_first_name || ''} ${clientData.client_last_name || ''}`.trim() || 'Unknown Client'
-            : 'Unknown Client';
-
-          return {
-            id: rawAppt.id,
-            client_id: rawAppt.client_id,
-            clinician_id: rawAppt.clinician_id,
-            start_at: rawAppt.start_at,
-            end_at: rawAppt.end_at,
-            type: rawAppt.type,
-            status: rawAppt.status,
-            appointment_recurring: rawAppt.appointment_recurring,
-            recurring_group_id: rawAppt.recurring_group_id,
-            video_room_url: rawAppt.video_room_url,
-            notes: rawAppt.notes,
-            appointment_timezone: rawAppt.appointment_timezone,
-            client: clientData,
-            clientName: clientName,
-          };
-        });
-
-        console.log('[useAppointments] STEP 3 - Final processed appointments WITH CLIENT DATA:', {
-          count: processedAppointments.length,
-          sampleClientNames: processedAppointments.slice(0, 3).map(apt => apt.clientName)
-        });
-
-        return processedAppointments;
-
-      } catch (err: any) {
-        console.error("[useAppointments] CRITICAL ERROR - Full Error Analysis:", {
-          errorType: typeof err,
-          errorMessage: err?.message || 'Unknown error',
-          errorStack: err?.stack || 'No stack trace',
-          fullError: err
-        });
-        throw err;
+      if (queryError) {
+        console.error("[useAppointments] STEP 1 - Detailed Supabase Query Error:", queryError);
+        throw new Error(`Supabase Query Failed: ${queryError.message} (${queryError.code})`);
       }
+
+      if (!rawDataAny) {
+        console.warn("[useAppointments] STEP 1 - No data returned from Supabase");
+        return [];
+      }
+
+      console.log(`[useAppointments] STEP 1 - Processing ${rawDataAny.length || 0} raw appointments WITH CLIENT DATA.`);
+
+      // Process the data WITH client information
+      const processedAppointments = rawDataAny.map((rawAppt: any): Appointment => {
+        const clientData = rawAppt.clients;
+        const clientName = clientData 
+          ? `${clientData.client_preferred_name || clientData.client_first_name || ''} ${clientData.client_last_name || ''}`.trim() || 'Unknown Client'
+          : 'Unknown Client';
+
+        return {
+          id: rawAppt.id,
+          client_id: rawAppt.client_id,
+          clinician_id: rawAppt.clinician_id,
+          start_at: rawAppt.start_at,
+          end_at: rawAppt.end_at,
+          type: rawAppt.type,
+          status: rawAppt.status,
+          appointment_recurring: rawAppt.appointment_recurring,
+          recurring_group_id: rawAppt.recurring_group_id,
+          video_room_url: rawAppt.video_room_url,
+          notes: rawAppt.notes,
+          appointment_timezone: rawAppt.appointment_timezone,
+          client: clientData,
+          clientName: clientName,
+        };
+      });
+
+      console.log('[useAppointments] STEP 3 - Final processed appointments WITH CLIENT DATA:', {
+        count: processedAppointments.length,
+        sampleClientNames: processedAppointments.slice(0, 3).map(apt => apt.clientName)
+      });
+
+      return processedAppointments;
     },
     enabled: queryEnabled,
-    retry: false, // Disable retry to see errors immediately
+    retry: false, // FIXED: Disable retry to prevent infinite loops
+    onError: (error: Error) => { // FIXED: Move error handling to onError callback
+      console.error('[useAppointments] Query Error Details:', {
+        errorMessage: error.message,
+        errorStack: error.stack,
+        errorName: error.name,
+        fullError: error
+      });
+      
+      toast({
+        title: "Database Query Error",
+        description: `Failed to load appointments: ${error.message}`,
+        variant: "destructive"
+      });
+    }
   });
 
   // Log query results
@@ -303,24 +308,6 @@ export const useAppointments = (
       });
     }
   }, [fetchedAppointments, isLoading, error]);
-
-  // Show error details in console and UI
-  useEffect(() => {
-    if (error) {
-      console.error('[useAppointments] Query Error Details:', {
-        errorMessage: error.message,
-        errorStack: error.stack,
-        errorName: error.name,
-        fullError: error
-      });
-      
-      toast({
-        title: "Database Query Error",
-        description: `Failed to load appointments: ${error.message}`,
-        variant: "destructive"
-      });
-    }
-  }, [error, toast]);
 
   // Helper function to add display formatting
   const addDisplayFormattingToAppointment = (

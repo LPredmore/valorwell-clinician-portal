@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "../components/layout/Layout";
@@ -8,7 +9,7 @@ import ReactBigCalendar from "@/components/calendar/ReactBigCalendar";
 import AppointmentDialog from "@/components/calendar/AppointmentDialog";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Plus, Clock, Calendar as CalendarIcon } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Clock } from "lucide-react";
 import { addWeeks, subWeeks, startOfWeek, endOfWeek } from "date-fns";
 import { TimeZoneService } from "@/utils/timeZoneService";
 import { getClinicianTimeZone } from "@/hooks/useClinicianData";
@@ -368,12 +369,6 @@ const CalendarSimple = React.memo(() => {
     setShowAppointmentDialog(true);
   }, []);
 
-  // Handle block time button
-  const handleBlockTime = useCallback(() => {
-    setSelectedSlot(null);
-    setShowBlockTimeDialog(true);
-  }, []);
-
   // Stabilized access control handler with circuit breaker
   const handleAccessDenied = useCallback((message: string) => {
     if (!isMounted || accessDeniedRef.current) return;
@@ -562,12 +557,6 @@ const CalendarSimple = React.memo(() => {
                   </div>
                 </SheetContent>
               </Sheet>
-
-              {/* Block Time Button */}
-              <Button variant="outline" onClick={handleBlockTime}>
-                <CalendarIcon className="h-4 w-4 mr-2" />
-                Block Time
-              </Button>
             </div>
             
             <h1 className="text-2xl font-bold text-gray-800">
