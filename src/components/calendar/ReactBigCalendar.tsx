@@ -14,6 +14,7 @@ interface CalendarEvent {
   end: Date;
   source?: 'internal' | 'nylas' | 'availability' | 'blocked_time';
   type?: string;
+  className?: string;
   resource?: any;
 }
 
@@ -32,84 +33,31 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
   date,
   onNavigate,
 }) => {
-  // Clean event style getter - only handles new blocked_time table events
+  // Updated event style getter - preserve className and minimal inline styles
   const eventPropGetter = useCallback((event: CalendarEvent) => {
-    console.log('[ReactBigCalendar] Styling event:', {
+    console.log('[ReactBigCalendar] Styling event with preserved className:', {
       id: event.id,
       title: event.title,
       source: event.source,
-      type: event.type
+      type: event.type,
+      className: event.className
     });
 
-    let style: React.CSSProperties = {};
-    let className = '';
+    // Use the className from the event object (set in CalendarSimple.tsx)
+    const className = event.className || `${event.source}-event` || 'default-event';
+    
+    // Minimal inline styles - let CSS handle the heavy lifting
+    const style: React.CSSProperties = {
+      // Only set essential styles, let CSS z-index take precedence
+      cursor: 'pointer',
+    };
 
-    // Style based on source - clean implementation
-    switch (event.source) {
-      case 'internal':
-        // Regular internal appointments
-        className = 'internal-event';
-        style = {
-          backgroundColor: '#3174ad',
-          border: '1px solid #1e3a8a',
-          color: 'white',
-          borderRadius: '4px',
-        };
-        break;
-        
-      case 'blocked_time':
-        // Blocked time from dedicated blocked_time table
-        className = 'blocked-time-event';
-        style = {
-          backgroundColor: '#6b7280',
-          border: '2px solid #374151',
-          color: 'white',
-          borderRadius: '6px',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.2), inset 0 1px 2px rgba(255,255,255,0.1)',
-          position: 'relative',
-          overflow: 'hidden',
-        };
-        break;
-        
-      case 'nylas':
-        // External calendar events
-        className = 'external-event';
-        style = {
-          backgroundColor: '#f57c00',
-          border: '1px solid #d84315',
-          color: 'white',
-          borderRadius: '4px',
-        };
-        break;
-        
-      case 'availability':
-        // Availability slots
-        className = 'availability-event';
-        style = {
-          backgroundColor: 'rgba(34, 197, 94, 0.1)',
-          border: '1px dashed #22c55e',
-          color: '#15803d',
-          borderRadius: '4px',
-        };
-        break;
-        
-      default:
-        // Default styling
-        className = 'default-event';
-        style = {
-          backgroundColor: '#3174ad',
-          border: '1px solid #1e3a8a',
-          color: 'white',
-          borderRadius: '4px',
-        };
-    }
-
-    console.log('[ReactBigCalendar] Applied clean styling:', {
+    console.log('[ReactBigCalendar] Applied layering-friendly styling:', {
       eventId: event.id,
       eventSource: event.source,
       eventType: event.type,
-      className,
-      backgroundColor: style.backgroundColor
+      finalClassName: className,
+      preservedFromEvent: event.className
     });
 
     return {
@@ -118,20 +66,22 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
     };
   }, []);
 
-  // Clean component getter
+  // Clean component getter with enhanced visual indicators
   const components = useMemo(() => ({
     event: ({ event }: { event: CalendarEvent }) => {
       const isBlockedTime = event.source === 'blocked_time';
+      const isAvailability = event.source === 'availability';
+      const isExternal = event.source === 'nylas';
       
       return (
         <div className="rbc-event-content">
           {isBlockedTime && (
             <span style={{ marginRight: '4px', fontSize: '12px' }}>🚫</span>
           )}
-          {event.source === 'nylas' && (
+          {isExternal && (
             <span style={{ marginRight: '4px', fontSize: '12px' }}>📅</span>
           )}
-          {event.source === 'availability' && (
+          {isAvailability && (
             <span style={{ marginRight: '4px', fontSize: '12px' }}>✅</span>
           )}
           <span>{event.title}</span>
@@ -151,7 +101,7 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
     onNavigate(newDate);
   }, [onNavigate, date]);
 
-  // Memoized calendar configuration with controlled date and navigation
+  // Memoized calendar configuration - REMOVED dayLayoutAlgorithm to allow overlapping
   const calendarConfig = useMemo(() => ({
     localizer,
     events,
@@ -175,11 +125,11 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
     selectable: true,
     popup: true,
     showMultiDayTimes: true,
-    dayLayoutAlgorithm: 'no-overlap',
+    // REMOVED: dayLayoutAlgorithm: 'no-overlap' - this was preventing our z-index layering
     toolbar: true, // Enable native toolbar
   }), [events, eventPropGetter, components, onSelectSlot, onSelectEvent, date, handleNavigate]);
 
-  console.log('[ReactBigCalendar] Rendering calendar with native navigation:', {
+  console.log('[ReactBigCalendar] Rendering calendar with z-index layering (no layout algorithm interference):', {
     totalEvents: events.length,
     currentDate: date.toISOString(),
     eventsBySource: {
@@ -188,11 +138,18 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
       nylas: events.filter(e => e.source === 'nylas').length,
       availability: events.filter(e => e.source === 'availability').length,
     },
+    eventsByClassName: {
+      'availability-event': events.filter(e => e.className === 'availability-event').length,
+      'internal-event': events.filter(e => e.className === 'internal-event').length,
+      'external-event': events.filter(e => e.className === 'external-event').length,
+      'blocked-time-event': events.filter(e => e.className === 'blocked-time-event').length,
+    },
     eventsPreview: events.slice(0, 3).map(e => ({
       id: e.id,
       title: e.title,
       source: e.source,
       type: e.type,
+      className: e.className,
       start: e.start?.toISOString(),
       end: e.end?.toISOString()
     }))

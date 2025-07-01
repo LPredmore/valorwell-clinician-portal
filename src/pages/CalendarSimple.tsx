@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "../components/layout/Layout";
@@ -278,11 +277,11 @@ const CalendarSimple = React.memo(() => {
     triggerRefresh();
   }, [currentDate, triggerRefresh]);
 
-  // Combine all events with comprehensive logging
+  // Combine all events with comprehensive logging and proper className assignment
   const allEvents = useMemo(() => {
     const events = [];
     
-    // Add clean internal appointments
+    // Add clean internal appointments with proper className
     if (appointments) {
       events.push(...appointments.map(apt => {
         const title = apt.clientName || 'Internal Appointment';
@@ -297,6 +296,7 @@ const CalendarSimple = React.memo(() => {
           ...apt,
           source: 'internal',
           type: 'appointment',
+          className: 'internal-event',
           id: apt.id,
           title: title,
           start: buildLocalDate(apptDTStart),
@@ -307,12 +307,13 @@ const CalendarSimple = React.memo(() => {
       }));
     }
     
-    // Add Nylas events with proper source tagging  
+    // Add Nylas events with proper source tagging and className
     if (nylasEvents) {
       events.push(...nylasEvents.map(evt => ({
         ...evt,
         source: 'nylas',
         type: 'external',
+        className: 'external-event',
         id: evt.id,
         start_time: evt.when?.start_time,
         end_time: evt.when?.end_time,
@@ -322,19 +323,21 @@ const CalendarSimple = React.memo(() => {
       })));
     }
 
-    // Add blocked time events (from dedicated blocked_time table)
+    // Add blocked time events with proper className
     events.push(...blockedTimeEvents.map(evt => ({
       ...evt,
+      className: 'blocked-time-event',
       priority: 2
     })));
 
-    // Add availability events
+    // Add availability events with proper className
     events.push(...availabilityEvents.map(evt => ({
       ...evt,
+      className: 'availability-event',
       priority: 0
     })));
 
-    console.group('📊 Calendar Data Summary');
+    console.group('📊 Calendar Data Summary with Priority Layering');
     console.log('Week Range:', {
       start: weekStart.toISOString(),
       end: weekEnd.toISOString(),
@@ -346,6 +349,17 @@ const CalendarSimple = React.memo(() => {
     console.log('  Blocked Time Events:', blockedTimeEvents.length);
     console.log('  Availability Events:', availabilityEvents.length);
     console.log('  Total Events:', events.length);
+    console.log('Priority Distribution:', {
+      'priority-0 (availability)': events.filter(e => e.priority === 0).length,
+      'priority-1 (appointments)': events.filter(e => e.priority === 1).length,
+      'priority-2 (blocked)': events.filter(e => e.priority === 2).length
+    });
+    console.log('ClassName Distribution:', {
+      'availability-event': events.filter(e => e.className === 'availability-event').length,
+      'internal-event': events.filter(e => e.className === 'internal-event').length,
+      'external-event': events.filter(e => e.className === 'external-event').length,
+      'blocked-time-event': events.filter(e => e.className === 'blocked-time-event').length
+    });
     console.log('Loading States:', {
       appointmentsLoading,
       nylasLoading,
