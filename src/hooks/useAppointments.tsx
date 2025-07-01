@@ -142,7 +142,7 @@ export const useAppointments = (
   const queryEnabled = Boolean(formattedClinicianId);
 
   const {
-    data: fetchedAppointments = [],
+    data: fetchedAppointments,
     isLoading,
     error,
     refetch: refetchAppointments,
@@ -275,7 +275,11 @@ export const useAppointments = (
     },
     enabled: queryEnabled,
     retry: false, // FIXED: Disable retry to prevent infinite loops
-    onError: (error: Error) => { // FIXED: Move error handling to onError callback
+  });
+
+  // FIXED: Handle errors with separate useEffect instead of onError callback
+  useEffect(() => {
+    if (error) {
       console.error('[useAppointments] Query Error Details:', {
         errorMessage: error.message,
         errorStack: error.stack,
@@ -289,17 +293,20 @@ export const useAppointments = (
         variant: "destructive"
       });
     }
-  });
+  }, [error, toast]);
+
+  // FIXED: Properly type and handle fetchedAppointments array
+  const appointments = fetchedAppointments || [];
 
   // Log query results
   useEffect(() => {
-    if (fetchedAppointments) {
+    if (appointments) {
       console.log('[useAppointments] FIXED Query completed successfully:', {
-        appointmentsCount: fetchedAppointments.length,
+        appointmentsCount: appointments.length,
         isLoading,
         error: error?.message,
         queryType: 'TEMPORAL_OVERLAP_DETECTION',
-        sampleData: fetchedAppointments.slice(0, 3).map(apt => ({
+        sampleData: appointments.slice(0, 3).map(apt => ({
           id: apt.id,
           clientName: apt.clientName,
           start_at: apt.start_at,
@@ -307,7 +314,7 @@ export const useAppointments = (
         }))
       });
     }
-  }, [fetchedAppointments, isLoading, error]);
+  }, [appointments, isLoading, error]);
 
   // Helper function to add display formatting
   const addDisplayFormattingToAppointment = (
@@ -367,12 +374,12 @@ export const useAppointments = (
 
   // Memoized formatted appointments - now using each appointment's saved timezone
   const appointmentsWithDisplayFormatting = useMemo(() => {
-    return fetchedAppointments.map((appt) => {
+    return appointments.map((appt) => {
       // Use the appointment's saved timezone if available, otherwise fall back to user timezone
       const appointmentTimeZone = appt.appointment_timezone || safeUserTimeZone;
       return addDisplayFormattingToAppointment(appt, appointmentTimeZone);
     });
-  }, [fetchedAppointments, safeUserTimeZone]);
+  }, [appointments, safeUserTimeZone]);
   
 
   // Memoized filtered appointments
