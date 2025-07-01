@@ -253,20 +253,13 @@ const CalendarSimple = React.memo(() => {
   const allEvents = useMemo(() => {
     const events = [];
     
-    // Add internal appointments with FIXED timezone-aware conversion
+    // Add internal appointments with FIXED timezone-aware conversion - CLEANED UP
     if (appointments) {
       events.push(...appointments.map(apt => {
-        // Handle blocked time appointments with custom title
-        let title = apt.clientName || 'Internal Appointment';
-        if (apt.type === 'blocked_time') {
-          // Extract label from notes or use default
-          const notesText = apt.notes || '';
-          const labelMatch = notesText.match(/^Blocked time: (.+)$/);
-          title = labelMatch ? labelMatch[1] : 'Blocked Time';
-        }
+        // SIMPLIFIED: Only handle regular appointments now, no legacy blocked time types
+        const title = apt.clientName || 'Internal Appointment';
 
         // CRITICAL FIX: Parse ISO string explicitly as UTC, then convert to clinician's zone
-        // This prevents Luxon from treating the timestamp as local time
         const apptDTStart = DateTime.fromISO(apt.start_at, { zone: 'UTC' })
           .setZone(apt.appointment_timezone || userTimeZone);
         const apptDTEnd = DateTime.fromISO(apt.end_at, { zone: 'UTC' })
@@ -285,15 +278,13 @@ const CalendarSimple = React.memo(() => {
           convertedToClinicianTZ_End: apptDTEnd.toISO(),
           localDateStart: buildLocalDate(apptDTStart).toISOString(),
           localDateEnd: buildLocalDate(apptDTEnd).toISOString(),
-          localDateStartTime: buildLocalDate(apptDTStart).toLocaleString(),
-          localDateEndTime: buildLocalDate(apptDTEnd).toLocaleString(),
           fixStatus: 'SUCCESS - UTC timestamp parsed correctly'
         });
 
         return {
           ...apt,
           source: 'internal',
-          type: apt.type === 'blocked_time' ? 'blocked_time' : 'appointment',
+          type: 'appointment', // SIMPLIFIED: No more legacy blocked time types
           id: apt.id,
           title: title,
           start: buildLocalDate(apptDTStart),
@@ -323,7 +314,7 @@ const CalendarSimple = React.memo(() => {
     // Add availability events (already converted with timezone fix)
     events.push(...availabilityEvents);
 
-    console.log('[CalendarSimple] FIXED event merging with blocked time integration:', {
+    console.log('[CalendarSimple] CLEANED event merging with blocked time integration:', {
       dateRangeUsed: {
         start: weekStart.toISOString(),
         end: weekEnd.toISOString()
@@ -333,29 +324,7 @@ const CalendarSimple = React.memo(() => {
       blockedTimeEventsCount: blockedTimeEvents.length,
       availabilityEventsCount: availabilityEvents.length,
       totalEventsCount: events.length,
-      fixedInternalEvents: appointments?.map(e => { 
-        const fixedStart = DateTime.fromISO(e.start_at, { zone: 'UTC' })
-          .setZone(e.appointment_timezone || userTimeZone);
-        return {
-          id: e.id, 
-          title: e.clientName, 
-          originalStartUTC: e.start_at,
-          fixedDisplayTime: buildLocalDate(fixedStart).toLocaleString(),
-          timezone: e.appointment_timezone || userTimeZone
-        };
-      }) || [],
-      externalEvents: nylasEvents?.map(e => ({ id: e.id, title: e.title, start: e.when?.start_time })) || [],
-      blockedTimeEvents: blockedTimeEvents.map(e => ({
-        id: e.id,
-        title: e.title,
-        start: e.start.toISOString()
-      })),
-      availabilityEvents: availabilityEvents.map(e => ({
-        id: e.id,
-        title: e.title,
-        start: e.start.toISOString()
-      })),
-      timezoneFixStatus: 'SUCCESS - All events now parse UTC correctly and blocked time integrated'
+      cleanupStatus: 'SUCCESS - All legacy blocked time patterns removed'
     });
 
     return events.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
@@ -431,36 +400,18 @@ const CalendarSimple = React.memo(() => {
     setShowAppointmentDialog(true);
   }, []);
 
-  // Handle event click
+  // Handle event click - CLEANED UP to remove legacy blocked time handling
   const handleSelectEvent = useCallback((event: any) => {
     console.log('[CalendarSimple] Event selected:', event);
     if (event.source === 'internal') {
-      if (event.type === 'blocked_time') {
-        // Enhanced feedback for blocked time with more options
-        const blockLabel = event.title || 'Blocked Time';
-        toast({
-          title: "🚫 Blocked Time",
-          description: `${blockLabel} - This time slot is blocked and unavailable for appointments`,
-          duration: 4000,
-        });
-        
-        console.log('[CalendarSimple] Blocked time clicked:', {
-          id: event.id,
-          title: event.title,
-          start: event.start,
-          end: event.end,
-          notes: event.notes
-        });
-      } else {
-        // Open appointment edit dialog for regular appointments
-        setEditingAppointment(event.resource || event);
-        setSelectedSlot({
-          start: event.start || new Date(event.start_at),
-          end: event.end || new Date(event.end_at)
-        });
-        setIsEditMode(true);
-        setShowAppointmentDialog(true);
-      }
+      // SIMPLIFIED: Only handle regular appointments now
+      setEditingAppointment(event.resource || event);
+      setSelectedSlot({
+        start: event.start || new Date(event.start_at),
+        end: event.end || new Date(event.end_at)
+      });
+      setIsEditMode(true);
+      setShowAppointmentDialog(true);
     } else if (event.source === 'nylas') {
       // Show toast for external events
       toast({

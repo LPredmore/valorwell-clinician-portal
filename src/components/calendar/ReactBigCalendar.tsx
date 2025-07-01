@@ -28,7 +28,7 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
   onSelectSlot,
   onSelectEvent,
 }) => {
-  // Enhanced event style getter with blocked time support
+  // Simplified event style getter - CLEANED UP to remove legacy blocked time logic
   const eventPropGetter = useCallback((event: CalendarEvent) => {
     console.log('[ReactBigCalendar] Styling event:', {
       id: event.id,
@@ -40,29 +40,17 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
     let style: React.CSSProperties = {};
     let className = '';
 
-    // Style based on source and type
+    // Style based on source - SIMPLIFIED without legacy patterns
     switch (event.source) {
       case 'internal':
-        if (event.type === 'blocked_time') {
-          // Legacy blocked time from appointments table (should be rare now)
-          className = 'blocked-time-event';
-          style = {
-            backgroundColor: '#6b7280',
-            border: '2px solid #374151',
-            color: 'white',
-            borderRadius: '6px',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-          };
-        } else {
-          // Regular internal appointments
-          className = 'internal-event';
-          style = {
-            backgroundColor: '#3174ad',
-            border: '1px solid #1e3a8a',
-            color: 'white',
-            borderRadius: '4px',
-          };
-        }
+        // Regular internal appointments only (no more legacy blocked time types)
+        className = 'internal-event';
+        style = {
+          backgroundColor: '#3174ad',
+          border: '1px solid #1e3a8a',
+          color: 'white',
+          borderRadius: '4px',
+        };
         break;
         
       case 'blocked_time':
@@ -126,11 +114,10 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
     };
   }, []);
 
-  // Enhanced component getter for custom event content
+  // Simplified component getter - CLEANED UP
   const components = useMemo(() => ({
     event: ({ event }: { event: CalendarEvent }) => {
-      const isBlockedTime = event.source === 'blocked_time' || 
-                           (event.source === 'internal' && event.type === 'blocked_time');
+      const isBlockedTime = event.source === 'blocked_time';
       
       return (
         <div className="rbc-event-content">

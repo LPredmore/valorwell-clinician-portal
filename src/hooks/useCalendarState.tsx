@@ -1,9 +1,8 @@
+
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { getClinicianTimeZone, getClinicianById } from '@/hooks/useClinicianData';
 import { TimeZoneService } from '@/utils/timeZoneService';
-import { filterRealClients } from '@/utils/clientFilterUtils';
-import { BLOCKED_TIME_CLIENT_ID } from '@/utils/blockedTimeUtils';
 
 interface Client {
   id: string;
@@ -113,7 +112,7 @@ export const useCalendarState = (initialClinicianId: string | null = null) => {
     }
   }, [isMounted, selectedClinicianId, initialClinicianId]);
 
-  // Stabilized clients fetch function
+  // Stabilized clients fetch function - CLEANED UP to remove legacy blocked time filtering
   const fetchClientsForClinician = useCallback(async (clinicianId: string) => {
     if (!isMounted) return;
     
@@ -137,11 +136,11 @@ export const useCalendarState = (initialClinicianId: string | null = null) => {
       const databaseClinicianId = clinicianRecord.id;
       console.log('[useCalendarState] Database-retrieved clinician ID:', databaseClinicianId);
       
+      // CLEANED: Removed .neq('id', BLOCKED_TIME_CLIENT_ID) filter - no more legacy filtering needed
       const { data: clientData, error } = await supabase
         .from('clients')
         .select('id, client_first_name, client_preferred_name, client_last_name')
         .eq('client_assigned_therapist', databaseClinicianId.toString())
-        .neq('id', BLOCKED_TIME_CLIENT_ID) // Exclude blocked time client at database level
         .order('client_last_name');
         
       if (!isMounted) return;
@@ -149,18 +148,14 @@ export const useCalendarState = (initialClinicianId: string | null = null) => {
       if (error) {
         console.error('[useCalendarState] Error fetching clients:', error);
       } else {
-        console.log(`[useCalendarState] Found ${clientData?.length || 0} real clients for clinician:`, databaseClinicianId);
+        console.log(`[useCalendarState] Found ${clientData?.length || 0} clients for clinician:`, databaseClinicianId);
         
         const formattedClients = (clientData || []).map(client => ({
           id: client.id,
           displayName: `${client.client_preferred_name || client.client_first_name || ''} ${client.client_last_name || ''}`.trim() || 'Unnamed Client'
         }));
         
-        // Apply additional filtering as defense in depth
-        const filteredClients = filterRealClients(formattedClients);
-        console.log(`[useCalendarState] After additional filtering: ${filteredClients.length} clients`);
-        
-        setClients(filteredClients);
+        setClients(formattedClients);
       }
     } catch (error) {
       console.error('[useCalendarState] Error fetching clients:', error);
@@ -192,12 +187,17 @@ export const useCalendarState = (initialClinicianId: string | null = null) => {
     fetchClientsForClinician(formattedClinicianId);
   }, [formattedClinicianId, fetchClientsForClinician, isMounted]);
 
+  // Refresh callback
+  const triggerAppointmentRefresh = useCallback(() => {
+    setAppointmentRefreshTrigger(prev => prev + 1);
+  }, []);
+
   return {
     view,
     setView,
     showAvailability,
     setShowAvailability,
-    selectedClinicianId,
+    selectedClinicianId: formattedClinicianId,
     setSelectedClinicianId,
     clinicians,
     loadingClinicians,
@@ -206,12 +206,10 @@ export const useCalendarState = (initialClinicianId: string | null = null) => {
     clients,
     loadingClients,
     appointmentRefreshTrigger,
-    setAppointmentRefreshTrigger,
+    triggerAppointmentRefresh,
     isDialogOpen,
     setIsDialogOpen,
     userTimeZone,
-    isLoadingTimeZone,
+    isLoadingTimeZone
   };
 };
-
-export default useCalendarState;
