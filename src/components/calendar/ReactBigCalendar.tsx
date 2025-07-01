@@ -2,10 +2,9 @@
 import React, { useCallback, useMemo } from 'react';
 import { Calendar, momentLocalizer, Views } from 'react-big-calendar';
 import moment from 'moment';
+import 'moment-timezone';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import '@/styles/calendar.css';
-
-const localizer = momentLocalizer(moment);
 
 interface CalendarEvent {
   id: string;
@@ -24,6 +23,7 @@ interface ReactBigCalendarProps {
   onSelectEvent: (event: CalendarEvent) => void;
   date: Date;
   onNavigate: (date: Date) => void;
+  userTimeZone?: string;
 }
 
 const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
@@ -32,7 +32,14 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
   onSelectEvent,
   date,
   onNavigate,
+  userTimeZone = 'America/New_York',
 }) => {
+  // Configure moment with clinician's timezone
+  const localizer = useMemo(() => {
+    moment.tz.setDefault(userTimeZone);
+    return momentLocalizer(moment);
+  }, [userTimeZone]);
+
   // Updated event style getter - preserve className and minimal inline styles
   const eventPropGetter = useCallback((event: CalendarEvent) => {
     console.log('[ReactBigCalendar] Styling event with preserved className:', {
@@ -101,7 +108,7 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
     onNavigate(newDate);
   }, [onNavigate, date]);
 
-  // Memoized calendar configuration - REMOVED dayLayoutAlgorithm to allow overlapping
+  // Memoized calendar configuration - FORCE OVERLAPPING LAYOUT
   const calendarConfig = useMemo(() => ({
     localizer,
     events,
@@ -125,13 +132,15 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
     selectable: true,
     popup: true,
     showMultiDayTimes: true,
-    // REMOVED: dayLayoutAlgorithm: 'no-overlap' - this was preventing our z-index layering
+    dayLayoutAlgorithm: 'overlap', // FORCE overlapping layout
     toolbar: true, // Enable native toolbar
-  }), [events, eventPropGetter, components, onSelectSlot, onSelectEvent, date, handleNavigate]);
+  }), [events, eventPropGetter, components, onSelectSlot, onSelectEvent, date, handleNavigate, localizer]);
 
-  console.log('[ReactBigCalendar] Rendering calendar with z-index layering (no layout algorithm interference):', {
+  console.log('[ReactBigCalendar] Rendering calendar with FORCED overlapping layout:', {
     totalEvents: events.length,
     currentDate: date.toISOString(),
+    userTimeZone,
+    layoutAlgorithm: 'overlap',
     eventsBySource: {
       internal: events.filter(e => e.source === 'internal').length,
       blocked_time: events.filter(e => e.source === 'blocked_time').length,

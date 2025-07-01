@@ -1,4 +1,6 @@
 
+/* Import react-big-calendar styles first, then override */
+@import 'react-big-calendar/lib/css/react-big-calendar.css';
 
 /* Enhanced blocked time styling with visual patterns and HIGHEST z-index */
 .rbc-event.blocked-time-event {
@@ -74,7 +76,7 @@
   z-index: 75 !important; /* HIGH priority - above availability and external */
 }
 
-/* Ensure all events have proper stacking context */
+/* Ensure all events have proper stacking context and allow overlapping */
 .rbc-event {
   position: relative !important;
   transition: all 0.2s ease-in-out !important;
@@ -83,6 +85,16 @@
 .rbc-event:hover {
   transform: translateY(-1px) !important;
   box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important;
+}
+
+/* Force overlapping layout by overriding React Big Calendar's positioning */
+.rbc-calendar .rbc-event-container {
+  position: relative !important;
+}
+
+.rbc-calendar .rbc-event {
+  position: absolute !important;
+  width: 100% !important;
 }
 
 /* Calendar tooltip enhancements */
@@ -176,4 +188,3 @@
 .rbc-calendar .rbc-event.blocked-time-event {
   z-index: 100 !important;
 }
-

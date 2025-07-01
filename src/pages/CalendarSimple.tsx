@@ -104,14 +104,14 @@ const CalendarSimple = React.memo(() => {
   // Fetch availability slots
   const availabilitySlots = useClinicianAvailability(userId);
 
-  // Transform availability slots with proper timezone-aware date projection
+  // Transform availability slots with FIXED timezone-aware date projection - NO buildLocalDate
   const availabilityEvents = useMemo(() => {
     if (!availabilitySlots.length || !userTimeZone) {
       console.log('[CalendarSimple] No availability slots or timezone, returning empty array');
       return [];
     }
     
-    console.log('[CalendarSimple] Processing availability with timezone-aware date projection:', {
+    console.log('[CalendarSimple] Processing availability with DIRECT DateTime conversion (no buildLocalDate):', {
       slotsCount: availabilitySlots.length,
       slots: availabilitySlots,
       userTimeZone,
@@ -156,7 +156,7 @@ const CalendarSimple = React.memo(() => {
         const startDT = DateTime.fromISO(`${d.toISODate()}T${slot.startTime}`, { zone: tz });
         const endDT = DateTime.fromISO(`${d.toISODate()}T${slot.endTime}`, { zone: tz });
         
-        console.log('[CalendarSimple] Availability event creation:', {
+        console.log('[CalendarSimple] Availability event creation with DIRECT conversion:', {
           slotDay: slot.day,
           dateWeekday: d.weekday,
           date: d.toISODate(),
@@ -164,16 +164,16 @@ const CalendarSimple = React.memo(() => {
           endTime: slot.endTime,
           startDateTime: startDT.toISO(),
           endDateTime: endDT.toISO(),
-          startLocalDate: buildLocalDate(startDT).toISOString(),
-          endLocalDate: buildLocalDate(endDT).toISOString(),
+          startJSDate: startDT.toJSDate().toISOString(),
+          endJSDate: endDT.toJSDate().toISOString(),
           timezone: tz
         });
         
         return {
           id: `avail-${slot.day}-${slot.slot}-${d.toISODate()}`,
           title: 'Available',
-          start: buildLocalDate(startDT),
-          end: buildLocalDate(endDT),
+          start: startDT.toJSDate(), // DIRECT conversion - no buildLocalDate
+          end: endDT.toJSDate(), // DIRECT conversion - no buildLocalDate
           source: 'availability',
           type: 'availability',
           resource: slot
@@ -181,7 +181,7 @@ const CalendarSimple = React.memo(() => {
       });
     });
 
-    console.log('[CalendarSimple] Availability events generation completed:', {
+    console.log('[CalendarSimple] Availability events generation completed with DIRECT conversion:', {
       eventsCount: events.length,
       weekRange: `${startDT.toISODate()} to ${endDT.toISODate()}`,
       timezone: tz,
@@ -196,14 +196,14 @@ const CalendarSimple = React.memo(() => {
     return events;
   }, [availabilitySlots, weekStart, weekEnd, userTimeZone]);
 
-  // Transform blocked times with enhanced logging
+  // Transform blocked times with FIXED timezone handling - NO buildLocalDate
   const blockedTimeEvents = useMemo(() => {
     if (!blockedTimes.length || !userTimeZone) {
       console.log('[CalendarSimple] No blocked times or timezone');
       return [];
     }
     
-    console.log('[CalendarSimple] Processing blocked times:', {
+    console.log('[CalendarSimple] Processing blocked times with DIRECT DateTime conversion:', {
       blockedTimesCount: blockedTimes.length,
       userTimeZone,
       weekRange: `${weekStart.toISOString()} to ${weekEnd.toISOString()}`,
@@ -223,7 +223,7 @@ const CalendarSimple = React.memo(() => {
       const endDT = DateTime.fromISO(blockedTime.end_at, { zone: 'UTC' })
         .setZone(blockedTime.timezone || userTimeZone);
 
-      console.log('[CalendarSimple] Blocked time event creation:', {
+      console.log('[CalendarSimple] Blocked time event creation with DIRECT conversion:', {
         id: blockedTime.id,
         label: blockedTime.label,
         originalStartUTC: blockedTime.start_at,
@@ -232,22 +232,22 @@ const CalendarSimple = React.memo(() => {
         userTimezone: userTimeZone,
         convertedStart: startDT.toISO(),
         convertedEnd: endDT.toISO(),
-        localDateStart: buildLocalDate(startDT).toISOString(),
-        localDateEnd: buildLocalDate(endDT).toISOString()
+        startJSDate: startDT.toJSDate().toISOString(),
+        endJSDate: endDT.toJSDate().toISOString()
       });
 
       return {
         id: blockedTime.id,
         title: blockedTime.label,
-        start: buildLocalDate(startDT),
-        end: buildLocalDate(endDT),
+        start: startDT.toJSDate(), // DIRECT conversion - no buildLocalDate
+        end: endDT.toJSDate(), // DIRECT conversion - no buildLocalDate
         source: 'blocked_time',
         type: 'blocked_time',
         resource: blockedTime
       };
     });
 
-    console.log('[CalendarSimple] Blocked time events generation completed:', {
+    console.log('[CalendarSimple] Blocked time events generation completed with DIRECT conversion:', {
       eventsCount: events.length,
       events: events.map(e => ({
         id: e.id,
@@ -734,13 +734,14 @@ const CalendarSimple = React.memo(() => {
             availableCount={availabilityEvents.length}
           />
 
-          {/* React Big Calendar with native navigation */}
+          {/* React Big Calendar with timezone support and forced overlapping */}
           <ReactBigCalendar
             events={allEvents}
             onSelectSlot={handleSelectSlot}
             onSelectEvent={handleSelectEvent}
             date={currentDate}
             onNavigate={handleCalendarNavigate}
+            userTimeZone={userTimeZone}
           />
 
           {/* Calendar-specific Appointment Dialog */}
