@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -391,13 +390,9 @@ const MyPortal: React.FC<MyPortalProps> = ({
       </Card>
 
       <AppointmentBookingDialog 
-        open={isBookingOpen} 
-        onOpenChange={setIsBookingOpen} 
-        clinicianId={clientData?.client_assigned_therapist || null} 
-        clinicianName={clinicianName} 
-        clientId={clientData?.id || null} 
-        onAppointmentBooked={handleBookingComplete}
-        userTimeZone={clientTimeZone}
+        isOpen={isBookingOpen} 
+        onClose={() => setIsBookingOpen(false)}
+        clinicianId={clientData?.client_assigned_therapist || ''} 
       />
 
       {showPHQ9 && (
