@@ -1,17 +1,8 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Appointment } from '@/types/appointment';
-import { BLOCKED_TIME_CLIENT_ID, isBlockedTimeAppointment, validateBlockedTimeConfig } from '@/utils/blockedTimeUtils';
 
 export const fetchClinicianAppointments = async (clinicianId: string): Promise<Appointment[]> => {
   try {
-    // Validate blocked time configuration before proceeding
-    const configValidation = validateBlockedTimeConfig();
-    if (!configValidation.isValid) {
-      console.error('[fetchClinicianAppointments] Blocked time configuration error:', configValidation.error);
-      // Continue with fallback filtering, but log the issue
-    }
-    
     console.log('[fetchClinicianAppointments] Fetching appointments for clinician:', clinicianId);
     
     const { data, error } = await supabase
@@ -34,7 +25,6 @@ export const fetchClinicianAppointments = async (clinicianId: string): Promise<A
         )
       `)
       .eq('clinician_id', clinicianId)
-      .neq('client_id', BLOCKED_TIME_CLIENT_ID) // Database-level filtering
       .order('start_at', { ascending: true });
 
     if (error) {
@@ -42,18 +32,9 @@ export const fetchClinicianAppointments = async (clinicianId: string): Promise<A
       throw error;
     }
 
-    console.log(`[fetchClinicianAppointments] Found ${data?.length || 0} appointments (excluding blocked time at DB level)`);
+    console.log(`[fetchClinicianAppointments] Found ${data?.length || 0} appointments`);
 
-    // Process appointments with defense-in-depth filtering
     const processedAppointments: Appointment[] = (data || [])
-      .filter(appointment => {
-        // Double-check for blocked time (defense in depth)
-        const isBlocked = isBlockedTimeAppointment(appointment);
-        if (isBlocked) {
-          console.warn('[fetchClinicianAppointments] Found blocked time appointment that passed DB filter:', appointment.id);
-        }
-        return !isBlocked;
-      })
       .map(appointment => ({
         ...appointment,
         client: appointment.client ? {
@@ -75,7 +56,7 @@ export const fetchClinicianAppointments = async (clinicianId: string): Promise<A
           : 'Unknown Client'
       }));
 
-    console.log(`[fetchClinicianAppointments] Returning ${processedAppointments.length} real appointments`);
+    console.log(`[fetchClinicianAppointments] Returning ${processedAppointments.length} appointments`);
     return processedAppointments;
   } catch (error) {
     console.error('[fetchClinicianAppointments] Error fetching appointments:', error);

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
@@ -6,7 +5,6 @@ import { Search, Filter, RotateCcw, MoreHorizontal } from 'lucide-react';
 import { supabase, getCurrentUser, getClinicianIdByName } from '@/integrations/supabase/client';
 import { useToast } from "@/hooks/use-toast";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
-import { BLOCKED_TIME_CLIENT_ID } from '@/utils/blockedTimeUtils';
 
 interface Client {
   id: string;
@@ -89,7 +87,6 @@ const MyClients = () => {
         .from('clients')
         .select('id, client_first_name, client_last_name, client_email, client_phone, client_date_of_birth, client_status, client_assigned_therapist')
         .eq('client_assigned_therapist', clinicianId)
-        .neq('id', BLOCKED_TIME_CLIENT_ID) // Filter out blocked time client
         .order('created_at', { ascending: false });
       
       if (error) {

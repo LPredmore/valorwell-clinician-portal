@@ -6,7 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from '@/context/UserContext';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
-import { BLOCKED_TIME_CLIENT_ID } from '@/utils/blockedTimeUtils';
+// CLEANED: Removed BLOCKED_TIME_CLIENT_ID import
 
 interface Client {
   id: string;
@@ -102,7 +102,7 @@ const Clients = () => {
         .from('clients')
         .select('id, client_first_name, client_last_name, client_email, client_phone, client_date_of_birth, client_status, client_assigned_therapist')
         .eq('client_assigned_therapist', clinicianId)
-        .neq('id', BLOCKED_TIME_CLIENT_ID) // Filter out blocked time client
+        // CLEANED: Removed legacy blocked time client filter
         .order('created_at', { ascending: false });
       
       if (error) {
@@ -113,7 +113,6 @@ const Clients = () => {
       setClients(data || []);
     } catch (error) {
       console.error('Error fetching clients:', error);
-      // Get fresh toast instance when needed
       const { toast: toastInstance } = useToast();
       toastInstance({
         title: "Error",

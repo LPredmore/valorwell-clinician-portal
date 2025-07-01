@@ -11,7 +11,6 @@ import { SessionDidNotOccurDialog } from '@/components/dashboard/SessionDidNotOc
 import { Appointment } from '@/types/appointment';
 import { ClientDetails } from '@/types/client';
 import { fetchClinicianAppointments, fetchClinicianProfile } from '@/utils/clinicianDataUtils';
-import { isBlockedTimeAppointment } from '@/utils/blockedTimeUtils';
 
 const ClinicianDashboard = () => {
   const { userRole, userId } = useUser();
@@ -125,8 +124,8 @@ const ClinicianDashboard = () => {
     const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
     const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
 
-    // Filter out blocked time appointments from all categories
-    const realAppointments = appointments.filter(apt => !isBlockedTimeAppointment(apt));
+    // Simplified to use all appointments (blocked time now in separate table)
+    const realAppointments = appointments;
 
     return {
       today: realAppointments.filter(apt => {
