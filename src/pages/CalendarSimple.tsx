@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "../components/layout/Layout";
@@ -7,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import CalendarErrorBoundary from "../components/calendar/CalendarErrorBoundary";
 import ReactBigCalendar from "@/components/calendar/ReactBigCalendar";
 import AppointmentDialog from "@/components/calendar/AppointmentDialog";
+import BlockTimeDialog from "@/components/calendar/BlockTimeDialog";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Plus, Clock } from "lucide-react";
@@ -36,6 +36,7 @@ const CalendarSimple = React.memo(() => {
   const [userTimeZone, setUserTimeZone] = useState<string>(TimeZoneService.DEFAULT_TIMEZONE);
   const [isMounted, setIsMounted] = useState(true);
   const [showAppointmentDialog, setShowAppointmentDialog] = useState(false);
+  const [showBlockTimeDialog, setShowBlockTimeDialog] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<any>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<any>(null);
@@ -185,6 +186,15 @@ const CalendarSimple = React.memo(() => {
     // Add internal appointments with FIXED timezone-aware conversion
     if (appointments) {
       events.push(...appointments.map(apt => {
+        // Handle blocked time appointments with custom title
+        let title = apt.clientName || 'Internal Appointment';
+        if (apt.type === 'blocked_time') {
+          // Extract label from notes or use default
+          const notesText = apt.notes || '';
+          const labelMatch = notesText.match(/^Blocked time: (.+)$/);
+          title = labelMatch ? labelMatch[1] : 'Blocked Time';
+        }
+
         // CRITICAL FIX: Parse ISO string explicitly as UTC, then convert to clinician's zone
         // This prevents Luxon from treating the timestamp as local time
         const apptDTStart = DateTime.fromISO(apt.start_at, { zone: 'UTC' })
@@ -213,9 +223,9 @@ const CalendarSimple = React.memo(() => {
         return {
           ...apt,
           source: 'internal',
-          type: 'appointment',
+          type: apt.type === 'blocked_time' ? 'blocked_time' : 'appointment',
           id: apt.id,
-          title: apt.clientName || 'Internal Appointment',
+          title: title,
           start: buildLocalDate(apptDTStart),
           end: buildLocalDate(apptDTEnd),
           resource: apt
@@ -338,14 +348,22 @@ const CalendarSimple = React.memo(() => {
   const handleSelectEvent = useCallback((event: any) => {
     console.log('[CalendarSimple] Event selected:', event);
     if (event.source === 'internal') {
-      // Open appointment edit dialog for internal appointments
-      setEditingAppointment(event.resource || event);
-      setSelectedSlot({
-        start: event.start || new Date(event.start_at),
-        end: event.end || new Date(event.end_at)
-      });
-      setIsEditMode(true);
-      setShowAppointmentDialog(true);
+      if (event.type === 'blocked_time') {
+        // Show toast for blocked time - can be enhanced later for editing
+        toast({
+          title: "Blocked Time",
+          description: `${event.title} - Click to edit or delete (coming soon)`,
+        });
+      } else {
+        // Open appointment edit dialog for regular appointments
+        setEditingAppointment(event.resource || event);
+        setSelectedSlot({
+          start: event.start || new Date(event.start_at),
+          end: event.end || new Date(event.end_at)
+        });
+        setIsEditMode(true);
+        setShowAppointmentDialog(true);
+      }
     } else if (event.source === 'nylas') {
       // Show toast for external events
       toast({
@@ -367,6 +385,11 @@ const CalendarSimple = React.memo(() => {
     setEditingAppointment(null);
     setIsEditMode(false);
     setShowAppointmentDialog(true);
+  }, []);
+
+  // Handle block time button
+  const handleBlockTime = useCallback(() => {
+    setShowBlockTimeDialog(true);
   }, []);
 
   // Stabilized access control handler with circuit breaker
@@ -532,6 +555,12 @@ const CalendarSimple = React.memo(() => {
                 New Appointment
               </Button>
 
+              {/* Block Time Button */}
+              <Button variant="outline" onClick={handleBlockTime}>
+                <Clock className="h-4 w-4 mr-2" />
+                Block Time
+              </Button>
+
               {/* Availability Sheet */}
               <Sheet>
                 <SheetTrigger asChild>
@@ -601,6 +630,16 @@ const CalendarSimple = React.memo(() => {
               isEdit={isEditMode}
               fixedClientId={editingAppointment?.client_id}
               appointmentId={editingAppointment?.id}
+            />
+          )}
+
+          {/* Block Time Dialog */}
+          {showBlockTimeDialog && (
+            <BlockTimeDialog
+              isOpen={showBlockTimeDialog}
+              onClose={() => setShowBlockTimeDialog(false)}
+              selectedClinicianId={userId}
+              onBlockCreated={triggerRefresh}
             />
           )}
         </div>

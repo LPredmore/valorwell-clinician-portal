@@ -144,7 +144,7 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
       const startAtUTC = convertLocalToUTC(dateString, startTime, clinicianTimeZone);
       const endAtUTC = convertLocalToUTC(dateString, endTime, clinicianTimeZone);
 
-      console.log('[BlockTimeDialog] Creating INTERNAL_BLOCKED_TIME appointment:', {
+      console.log('[BlockTimeDialog] Creating visible blocked time appointment:', {
         dateString,
         startTime,
         endTime,
@@ -153,7 +153,7 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
         endAtUTC: endAtUTC.toISO()
       });
 
-      // Create blocked time using pure INTERNAL_BLOCKED_TIME approach
+      // Create visible blocked time appointment
       const { data, error } = await supabase
         .from('appointments')
         .insert({
@@ -161,8 +161,8 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
           client_id: '00000000-0000-0000-0000-000000000001', // Placeholder for compatibility
           start_at: startAtUTC.toJSDate().toISOString(),
           end_at: endAtUTC.toJSDate().toISOString(),
-          type: 'INTERNAL_BLOCKED_TIME', // Pure stealth type
-          status: 'hidden', // Stealth status
+          type: 'blocked_time', // NEW: Visible type instead of INTERNAL_BLOCKED_TIME
+          status: 'blocked', // NEW: Use existing 'blocked' status
           notes: notes || `Blocked time: ${blockLabel}`,
           appointment_timezone: clinicianTimeZone
         })
@@ -172,11 +172,11 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
         throw error;
       }
 
-      console.log('✅ INTERNAL_BLOCKED_TIME appointment created successfully:', data);
+      console.log('✅ Visible blocked time appointment created successfully:', data);
 
       toast({
         title: "Success",
-        description: "Time block created successfully using pure stealth method.",
+        description: "Time blocked successfully and will appear on your calendar.",
       });
 
       onBlockCreated();
@@ -213,7 +213,7 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Block Time (Pure Stealth)</DialogTitle>
+          <DialogTitle>Block Time</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -303,7 +303,7 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
               Cancel
             </Button>
             <Button onClick={handleSubmit} disabled={isLoading}>
-              {isLoading ? 'Creating...' : 'Block Time (Stealth)'}
+              {isLoading ? 'Creating...' : 'Block Time'}
             </Button>
           </div>
         </div>
