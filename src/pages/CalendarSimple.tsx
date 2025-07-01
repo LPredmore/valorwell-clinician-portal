@@ -349,10 +349,21 @@ const CalendarSimple = React.memo(() => {
     console.log('[CalendarSimple] Event selected:', event);
     if (event.source === 'internal') {
       if (event.type === 'blocked_time') {
-        // Show toast for blocked time - can be enhanced later for editing
+        // Enhanced feedback for blocked time with more options
+        const blockLabel = event.title || 'Blocked Time';
         toast({
-          title: "Blocked Time",
-          description: `${event.title} - Click to edit or delete (coming soon)`,
+          title: "🚫 Blocked Time",
+          description: `${blockLabel} - This time slot is blocked and unavailable for appointments`,
+          duration: 4000,
+        });
+        
+        // TODO: Future enhancement - could open BlockTimeEditDialog here
+        console.log('[CalendarSimple] Blocked time clicked:', {
+          id: event.id,
+          title: event.title,
+          start: event.start,
+          end: event.end,
+          notes: event.notes
         });
       } else {
         // Open appointment edit dialog for regular appointments
@@ -367,14 +378,16 @@ const CalendarSimple = React.memo(() => {
     } else if (event.source === 'nylas') {
       // Show toast for external events
       toast({
-        title: "External Event",
-        description: `${event.title} - Synced from ${event.connection_provider}`,
+        title: "📅 External Event",
+        description: `${event.title} - Synced from ${event.connection_provider || 'external calendar'}`,
+        duration: 3000,
       });
     } else if (event.source === 'availability') {
-      // Show toast for availability events
+      // Enhanced availability feedback
       toast({
-        title: "Availability Block",
-        description: `Available time: ${event.resource.startTime} - ${event.resource.endTime}`,
+        title: "✅ Available Time",
+        description: `Available slot: ${event.resource.startTime} - ${event.resource.endTime}. Click 'New Appointment' to book this time.`,
+        duration: 3000,
       });
     }
   }, [toast]);
@@ -597,7 +610,12 @@ const CalendarSimple = React.memo(() => {
                 Showing {allEvents.length} events | 
                 Internal: {appointments?.length || 0} | 
                 External: {nylasEvents?.length || 0} | 
-                Availability: {availabilityEvents.length}
+                Available: {availabilityEvents.length}
+                {allEvents.filter(e => e.type === 'blocked_time').length > 0 && (
+                  <span className="text-gray-500">
+                    {' '}| Blocked: {allEvents.filter(e => e.type === 'blocked_time').length}
+                  </span>
+                )}
               </p>
               <p>Timezone: {userTimeZone}</p>
             </div>
