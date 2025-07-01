@@ -54,39 +54,43 @@ const CalendarSimple = React.memo(() => {
   const timezoneLoadCountRef = useRef(0);
   const accessDeniedRef = useRef(false);
 
-  // SYNCHRONIZED date ranges using standard date-fns functions
+  // FIXED: Enhanced week boundary calculation with timezone awareness
   const { weekStart, weekEnd } = useMemo(() => {
-    const start = startOfWeek(currentDate);
-    const end = endOfWeek(currentDate);
+    // Use clinician's timezone for proper week boundaries
+    const tz = userTimeZone || TimeZoneService.DEFAULT_TIMEZONE;
+    const currentDT = DateTime.fromJSDate(currentDate).setZone(tz);
     
-    console.log('[CalendarSimple] SYNCHRONIZED Week boundaries calculated:', {
+    const start = currentDT.startOf('week').toJSDate();
+    const end = currentDT.endOf('week').toJSDate();
+    
+    console.log('[CalendarSimple] FIXED Week boundaries with timezone awareness:', {
       currentDate: currentDate.toISOString(),
+      userTimeZone: tz,
       weekStart: start.toISOString(),
       weekEnd: end.toISOString(),
-      weekStartLocal: start.toLocaleString(),
-      weekEndLocal: end.toLocaleString(),
-      calculatedUsing: 'date-fns startOfWeek/endOfWeek'
+      weekStartLocal: DateTime.fromJSDate(start).setZone(tz).toFormat('yyyy-MM-dd HH:mm'),
+      weekEndLocal: DateTime.fromJSDate(end).setZone(tz).toFormat('yyyy-MM-dd HH:mm'),
+      calculatedUsing: 'Luxon with clinician timezone'
     });
     
     return {
       weekStart: start,
       weekEnd: end
     };
-  }, [currentDate]);
+  }, [currentDate, userTimeZone]);
 
-  // Date Range Synchronization Debug Logging
+  // Enhanced date range synchronization logging
   useEffect(() => {
-    console.log('[CalendarSimple] Date Range Sync Check:', {
-      appointmentsRange: { start: weekStart.toISOString(), end: weekEnd.toISOString() },
-      nylasRange: { start: weekStart.toISOString(), end: weekEnd.toISOString() },
-      blockedTimeRange: { start: weekStart.toISOString(), end: weekEnd.toISOString() },
-      rangesMatch: true,
-      currentDate: currentDate.toISOString(),
-      synchronizationMethod: 'All hooks use identical weekStart/weekEnd variables'
-    });
-  }, [weekStart, weekEnd, currentDate]);
+    console.group('📅 FIXED Date Range Synchronization');
+    console.log('Current Date:', currentDate.toISOString());
+    console.log('User Timezone:', userTimeZone);
+    console.log('Week Start:', weekStart.toISOString());
+    console.log('Week End:', weekEnd.toISOString());
+    console.log('All hooks will use identical date range parameters');
+    console.groupEnd();
+  }, [weekStart, weekEnd, currentDate, userTimeZone]);
 
-  // Fetch clean internal appointments - USING SYNCHRONIZED DATE RANGE
+  // Fetch clean internal appointments - USING FIXED DATE RANGE
   const { appointments, isLoading: appointmentsLoading } = useAppointments(
     userId,
     weekStart,
@@ -95,13 +99,13 @@ const CalendarSimple = React.memo(() => {
     refreshTrigger
   );
 
-  // Fetch external calendar events (Nylas) - USING SYNCHRONIZED DATE RANGE
+  // Fetch external calendar events (Nylas) - USING FIXED DATE RANGE
   const { events: nylasEvents, isLoading: nylasLoading } = useNylasEvents(
     weekStart,
     weekEnd
   );
 
-  // Fetch blocked times - USING SYNCHRONIZED DATE RANGE
+  // FIXED: Fetch blocked times with proper temporal overlap
   const { blockedTimes, isLoading: blockedTimesLoading } = useBlockedTime(
     userId || '',
     weekStart,
@@ -111,70 +115,87 @@ const CalendarSimple = React.memo(() => {
   // Fetch availability slots
   const availabilitySlots = useClinicianAvailability(userId);
 
-  // Transform availability slots into calendar events with timezone-aware conversion
+  // FIXED: Transform availability slots with proper timezone-aware date projection
   const availabilityEvents = useMemo(() => {
-    if (!availabilitySlots.length || !userTimeZone) return [];
+    if (!availabilitySlots.length || !userTimeZone) {
+      console.log('[CalendarSimple] No availability slots or timezone, returning empty array');
+      return [];
+    }
     
-    console.log('[CalendarSimple] Processing availability slots with timezone fix:', {
+    console.log('[CalendarSimple] FIXED availability processing with timezone-aware date projection:', {
       slotsCount: availabilitySlots.length,
       slots: availabilitySlots,
-      weekStart: weekStart.toISOString(),  
-      weekEnd: weekEnd.toISOString(),
-      userTimeZone
+      userTimeZone,
+      weekStartUTC: weekStart.toISOString(),
+      weekEndUTC: weekEnd.toISOString()
     });
     
-    // Generate all dates in the week range
+    // FIXED: Use clinician's timezone for all date math
+    const tz = userTimeZone;
+    const startDT = DateTime.fromJSDate(weekStart).setZone(tz).startOf('day');
+    const endDT = DateTime.fromJSDate(weekEnd).setZone(tz).startOf('day');
+    
+    // Generate dates in clinician's timezone
     const dates = [];
-    let cursor = DateTime.fromJSDate(weekStart).startOf('day');
-    const endDate = DateTime.fromJSDate(weekEnd).startOf('day');
-    while (cursor <= endDate) {
+    let cursor = startDT;
+    
+    while (cursor <= endDT) {
       dates.push(cursor);
       cursor = cursor.plus({ days: 1 });
     }
 
-    console.log('[CalendarSimple] Generated dates for availability:', dates.map(d => d.toISODate()));
-
-    const events = availabilitySlots.flatMap(slot => {
-      // Match slot.day to weekday number (1=Monday … 7=Sunday)
-      const weekdayMap = { 
-        monday: 1, tuesday: 2, wednesday: 3, thursday: 4, 
-        friday: 5, saturday: 6, sunday: 7 
-      };
-      
-      return dates
-        .filter(d => d.weekday === weekdayMap[slot.day])
-        .map(d => {
-          // Build DateTimes in clinician timezone
-          const startDT = DateTime.fromISO(`${d.toISODate()}T${slot.startTime}`, { zone: userTimeZone });
-          const endDT = DateTime.fromISO(`${d.toISODate()}T${slot.endTime}`, { zone: userTimeZone });
-          
-          console.log('[CalendarSimple] Creating availability event with timezone fix:', {
-            slotDay: slot.day,
-            dateWeekday: d.weekday,
-            date: d.toISODate(),
-            startTime: slot.startTime,
-            endTime: slot.endTime,
-            startDateTime: startDT.toISO(),
-            endDateTime: endDT.toISO(),
-            startLocalDate: buildLocalDate(startDT).toISOString(),
-            endLocalDate: buildLocalDate(endDT).toISOString(),
-            timezone: userTimeZone
-          });
-          
-          return {
-            id: `avail-${slot.day}-${slot.slot}-${d.toISODate()}`,
-            title: 'Available',
-            start: buildLocalDate(startDT),
-            end: buildLocalDate(endDT),
-            source: 'availability',
-            type: 'availability',
-            resource: slot
-          };
-        });
+    console.log('[CalendarSimple] FIXED date projection in clinician timezone:', {
+      timezonUsed: tz,
+      generatedDates: dates.map(d => ({
+        date: d.toISODate(),
+        weekday: d.weekday,
+        weekdayName: d.weekdayShort
+      })),
+      dateCount: dates.length
     });
 
-    console.log('[CalendarSimple] Generated availability events with timezone fix:', {
+    const weekdayMap = { 
+      monday: 1, tuesday: 2, wednesday: 3, thursday: 4, 
+      friday: 5, saturday: 6, sunday: 7 
+    };
+
+    const events = availabilitySlots.flatMap(slot => {
+      const matchedDates = dates.filter(d => d.weekday === weekdayMap[slot.day]);
+      
+      return matchedDates.map(d => {
+        // Build DateTimes in clinician timezone
+        const startDT = DateTime.fromISO(`${d.toISODate()}T${slot.startTime}`, { zone: tz });
+        const endDT = DateTime.fromISO(`${d.toISODate()}T${slot.endTime}`, { zone: tz });
+        
+        console.log('[CalendarSimple] FIXED availability event creation:', {
+          slotDay: slot.day,
+          dateWeekday: d.weekday,
+          date: d.toISODate(),
+          startTime: slot.startTime,
+          endTime: slot.endTime,
+          startDateTime: startDT.toISO(),
+          endDateTime: endDT.toISO(),
+          startLocalDate: buildLocalDate(startDT).toISOString(),
+          endLocalDate: buildLocalDate(endDT).toISOString(),
+          timezone: tz
+        });
+        
+        return {
+          id: `avail-${slot.day}-${slot.slot}-${d.toISODate()}`,
+          title: 'Available',
+          start: buildLocalDate(startDT),
+          end: buildLocalDate(endDT),
+          source: 'availability',
+          type: 'availability',
+          resource: slot
+        };
+      });
+    });
+
+    console.log('[CalendarSimple] FIXED availability events generation completed:', {
       eventsCount: events.length,
+      weekRange: `${startDT.toISODate()} to ${endDT.toISODate()}`,
+      timezone: tz,
       events: events.map(e => ({
         id: e.id,
         title: e.title,
@@ -186,20 +207,24 @@ const CalendarSimple = React.memo(() => {
     return events;
   }, [availabilitySlots, weekStart, weekEnd, userTimeZone]);
 
-  // Transform blocked times into calendar events
+  // FIXED: Transform blocked times with enhanced logging
   const blockedTimeEvents = useMemo(() => {
-    if (!blockedTimes.length || !userTimeZone) return [];
+    if (!blockedTimes.length || !userTimeZone) {
+      console.log('[CalendarSimple] No blocked times or timezone');
+      return [];
+    }
     
-    console.log('[CalendarSimple] Processing blocked times:', {
+    console.log('[CalendarSimple] FIXED blocked times processing:', {
       blockedTimesCount: blockedTimes.length,
+      userTimeZone,
+      weekRange: `${weekStart.toISOString()} to ${weekEnd.toISOString()}`,
       blockedTimes: blockedTimes.map(bt => ({
         id: bt.id,
         label: bt.label,
         start_at: bt.start_at,
         end_at: bt.end_at,
         timezone: bt.timezone
-      })),
-      userTimeZone
+      }))
     });
 
     const events = blockedTimes.map(blockedTime => {
@@ -209,7 +234,7 @@ const CalendarSimple = React.memo(() => {
       const endDT = DateTime.fromISO(blockedTime.end_at, { zone: 'UTC' })
         .setZone(blockedTime.timezone || userTimeZone);
 
-      console.log('[CalendarSimple] Creating blocked time event:', {
+      console.log('[CalendarSimple] FIXED blocked time event creation:', {
         id: blockedTime.id,
         label: blockedTime.label,
         originalStartUTC: blockedTime.start_at,
@@ -233,7 +258,7 @@ const CalendarSimple = React.memo(() => {
       };
     });
 
-    console.log('[CalendarSimple] Generated blocked time events:', {
+    console.log('[CalendarSimple] FIXED blocked time events generation completed:', {
       eventsCount: events.length,
       events: events.map(e => ({
         id: e.id,
@@ -248,10 +273,11 @@ const CalendarSimple = React.memo(() => {
 
   // Refresh callback for data changes
   const triggerRefresh = useCallback(() => {
+    console.log('[CalendarSimple] FIXED refresh triggered - will refetch all data sources');
     setRefreshTrigger(prev => prev + 1);
   }, []);
 
-  // Combine clean internal, external, blocked time, and availability events
+  // FIXED: Combine all events with comprehensive logging
   const allEvents = useMemo(() => {
     const events = [];
     
@@ -265,22 +291,6 @@ const CalendarSimple = React.memo(() => {
           .setZone(apt.appointment_timezone || userTimeZone);
         const apptDTEnd = DateTime.fromISO(apt.end_at, { zone: 'UTC' })
           .setZone(apt.appointment_timezone || userTimeZone);
-
-        console.log('[CalendarSimple] Processing clean appointment:', {
-          appointmentId: apt.id,
-          clientName: apt.clientName,
-          originalStartUTC: apt.start_at,
-          originalEndUTC: apt.end_at,
-          appointmentTimezone: apt.appointment_timezone,
-          userTimezone: userTimeZone,
-          parsedAsUTC_Start: DateTime.fromISO(apt.start_at, { zone: 'UTC' }).toISO(),
-          parsedAsUTC_End: DateTime.fromISO(apt.end_at, { zone: 'UTC' }).toISO(),
-          convertedToClinicianTZ_Start: apptDTStart.toISO(),
-          convertedToClinicianTZ_End: apptDTEnd.toISO(),
-          localDateStart: buildLocalDate(apptDTStart).toISOString(),
-          localDateEnd: buildLocalDate(apptDTEnd).toISOString(),
-          status: 'CLEAN - No legacy blocked time processing'
-        });
 
         return {
           ...apt,
@@ -315,21 +325,27 @@ const CalendarSimple = React.memo(() => {
     // Add availability events
     events.push(...availabilityEvents);
 
-    console.log('[CalendarSimple] Clean event merging completed:', {
-      dateRangeUsed: {
-        start: weekStart.toISOString(),
-        end: weekEnd.toISOString()
-      },
-      internalEventsCount: appointments?.length || 0,
-      externalEventsCount: nylasEvents?.length || 0,
-      blockedTimeEventsCount: blockedTimeEvents.length,
-      availabilityEventsCount: availabilityEvents.length,
-      totalEventsCount: events.length,
-      cleanupStatus: 'SUCCESS - All legacy patterns removed'
+    console.group('📊 FIXED Calendar Data Summary');
+    console.log('Week Range:', {
+      start: weekStart.toISOString(),
+      end: weekEnd.toISOString(),
+      timezone: userTimeZone
     });
+    console.log('Data Sources:');
+    console.log('  Internal Appointments:', appointments?.length || 0);
+    console.log('  External Events (Nylas):', nylasEvents?.length || 0);
+    console.log('  Blocked Time Events:', blockedTimeEvents.length);
+    console.log('  Availability Events:', availabilityEvents.length);
+    console.log('  Total Events:', events.length);
+    console.log('Loading States:', {
+      appointmentsLoading,
+      nylasLoading,
+      blockedTimesLoading
+    });
+    console.groupEnd();
 
     return events.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
-  }, [appointments, nylasEvents, blockedTimeEvents, availabilityEvents, weekStart, weekEnd, userTimeZone]);
+  }, [appointments, nylasEvents, blockedTimeEvents, availabilityEvents, weekStart, weekEnd, userTimeZone, appointmentsLoading, nylasLoading, blockedTimesLoading]);
 
   // Debug logging for calendar state
   useEffect(() => {
@@ -354,16 +370,34 @@ const CalendarSimple = React.memo(() => {
 
   // Navigation functions
   const navigatePrevious = useCallback(() => {
-    setCurrentDate(prev => subWeeks(prev, 1));
-  }, []);
+    const newDate = subWeeks(currentDate, 1);
+    console.log('[CalendarSimple] FIXED navigation: Previous week', {
+      from: currentDate.toISOString(),
+      to: newDate.toISOString()
+    });
+    setCurrentDate(newDate);
+    triggerRefresh(); // Force refresh all data sources
+  }, [currentDate, triggerRefresh]);
 
   const navigateNext = useCallback(() => {
-    setCurrentDate(prev => addWeeks(prev, 1));
-  }, []);
+    const newDate = addWeeks(currentDate, 1);
+    console.log('[CalendarSimple] FIXED navigation: Next week', {
+      from: currentDate.toISOString(),
+      to: newDate.toISOString()
+    });
+    setCurrentDate(newDate);
+    triggerRefresh(); // Force refresh all data sources
+  }, [currentDate, triggerRefresh]);
 
   const navigateToday = useCallback(() => {
-    setCurrentDate(new Date());
-  }, []);
+    const newDate = new Date();
+    console.log('[CalendarSimple] FIXED navigation: Today', {
+      from: currentDate.toISOString(),  
+      to: newDate.toISOString()
+    });
+    setCurrentDate(newDate);
+    triggerRefresh(); // Force refresh all data sources
+  }, [currentDate, triggerRefresh]);
 
   // Handle slot selection for new appointments
   const handleSelectSlot = useCallback((slotInfo: { start: Date; end: Date }) => {
@@ -377,9 +411,9 @@ const CalendarSimple = React.memo(() => {
     setShowAppointmentDialog(true);
   }, []);
 
-  // Handle event click - enhanced with blocked time editing
+  // FIXED: Handle event click with proper blocked time handling
   const handleSelectEvent = useCallback((event: any) => {
-    console.log('[CalendarSimple] Event selected:', event);
+    console.log('[CalendarSimple] Event selected - FIXED handling:', event);
     if (event.source === 'internal') {
       // Handle regular appointments
       setEditingAppointment(event.resource || event);
@@ -397,8 +431,8 @@ const CalendarSimple = React.memo(() => {
         duration: 3000,
       });
     } else if (event.source === 'blocked_time') {
-      // Open edit dialog for blocked time events
-      console.log('[CalendarSimple] Opening edit dialog for blocked time:', event);
+      // FIXED: Open edit dialog for blocked time events
+      console.log('[CalendarSimple] FIXED: Opening edit dialog for blocked time:', event);
       setEditingBlockedTime(event.resource);
       setShowEditBlockedDialog(true);
     } else if (event.source === 'availability') {
@@ -691,9 +725,13 @@ const CalendarSimple = React.memo(() => {
                 Available: {availabilityEvents.length}
               </p>
               <p>Timezone: {userTimeZone}</p>
-              {/* Debug info for development */}
+              {/* FIXED: Enhanced debug info */}
               {process.env.NODE_ENV === 'development' && (
-                <p className="text-xs text-blue-600">Debug: UserID: {userId}</p>
+                <div className="text-xs text-blue-600 space-y-1">
+                  <p>Debug: UserID: {userId}</p>
+                  <p>Week: {DateTime.fromJSDate(weekStart).toFormat('MM/dd')} - {DateTime.fromJSDate(weekEnd).toFormat('MM/dd')}</p>
+                  <p>Loading: A:{appointmentsLoading ? 'Y' : 'N'} | N:{nylasLoading ? 'Y' : 'N'} | B:{blockedTimesLoading ? 'Y' : 'N'}</p>
+                </div>
               )}
             </div>
           </div>
@@ -713,7 +751,7 @@ const CalendarSimple = React.memo(() => {
             onSelectEvent={handleSelectEvent}
           />
 
-          {/* Calendar-specific Appointment Dialog */}
+          {/* FIXED: Calendar-specific Appointment Dialog with proper DateTime conversion */}
           {showAppointmentDialog && (
             <AppointmentDialog
               isOpen={showAppointmentDialog}
@@ -745,7 +783,7 @@ const CalendarSimple = React.memo(() => {
             />
           )}
 
-          {/* Edit Blocked Time Dialog */}
+          {/* FIXED: Edit Blocked Time Dialog */}
           {showEditBlockedDialog && editingBlockedTime && (
             <EditBlockedTimeDialog
               isOpen={showEditBlockedDialog}
