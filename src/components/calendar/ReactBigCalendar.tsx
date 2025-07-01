@@ -21,12 +21,16 @@ interface ReactBigCalendarProps {
   events: CalendarEvent[];
   onSelectSlot: (slotInfo: { start: Date; end: Date }) => void;
   onSelectEvent: (event: CalendarEvent) => void;
+  date: Date;
+  onNavigate: (date: Date) => void;
 }
 
 const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
   events,
   onSelectSlot,
   onSelectEvent,
+  date,
+  onNavigate,
 }) => {
   // Clean event style getter - only handles new blocked_time table events
   const eventPropGetter = useCallback((event: CalendarEvent) => {
@@ -136,10 +140,23 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
     },
   }), []);
 
-  // Memoized calendar configuration
+  // Handle navigation events from React Big Calendar
+  const handleNavigate = useCallback((newDate: Date, view?: string, action?: string) => {
+    console.log('[ReactBigCalendar] Navigation triggered:', {
+      newDate: newDate.toISOString(),
+      view,
+      action,
+      previousDate: date.toISOString()
+    });
+    onNavigate(newDate);
+  }, [onNavigate, date]);
+
+  // Memoized calendar configuration with controlled date and navigation
   const calendarConfig = useMemo(() => ({
     localizer,
     events,
+    date, // Controlled date
+    onNavigate: handleNavigate, // Handle navigation
     startAccessor: 'start',
     endAccessor: 'end',
     style: { height: 600 },
@@ -159,10 +176,12 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
     popup: true,
     showMultiDayTimes: true,
     dayLayoutAlgorithm: 'no-overlap',
-  }), [events, eventPropGetter, components, onSelectSlot, onSelectEvent]);
+    toolbar: true, // Enable native toolbar
+  }), [events, eventPropGetter, components, onSelectSlot, onSelectEvent, date, handleNavigate]);
 
-  console.log('[ReactBigCalendar] Rendering clean calendar with events:', {
+  console.log('[ReactBigCalendar] Rendering calendar with native navigation:', {
     totalEvents: events.length,
+    currentDate: date.toISOString(),
     eventsBySource: {
       internal: events.filter(e => e.source === 'internal').length,
       blocked_time: events.filter(e => e.source === 'blocked_time').length,
