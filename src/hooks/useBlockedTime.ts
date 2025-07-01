@@ -105,6 +105,43 @@ export const useBlockedTime = (clinicianId: string, startDate?: Date, endDate?: 
     }
   };
 
+  const updateBlockedTime = async (
+    id: string,
+    updates: {
+      start_at?: string;
+      end_at?: string;
+      label?: string;
+      notes?: string;
+      timezone?: string;
+    }
+  ): Promise<boolean> => {
+    try {
+      const { error } = await supabase
+        .from('blocked_time')
+        .update(updates)
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Blocked time updated successfully",
+      });
+
+      // Refresh the data
+      await fetchBlockedTimes();
+      return true;
+    } catch (error) {
+      console.error('[useBlockedTime] Error updating blocked time:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update blocked time",
+        variant: "destructive"
+      });
+      return false;
+    }
+  };
+
   const deleteBlockedTime = async (id: string): Promise<boolean> => {
     try {
       const { error } = await supabase
@@ -142,6 +179,7 @@ export const useBlockedTime = (clinicianId: string, startDate?: Date, endDate?: 
     isLoading,
     error,
     createBlockedTime,
+    updateBlockedTime,
     deleteBlockedTime,
     refetch: fetchBlockedTimes
   };

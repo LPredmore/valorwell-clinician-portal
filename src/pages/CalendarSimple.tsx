@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "../components/layout/Layout";
@@ -8,6 +7,7 @@ import CalendarErrorBoundary from "../components/calendar/CalendarErrorBoundary"
 import ReactBigCalendar from "@/components/calendar/ReactBigCalendar";
 import AppointmentDialog from "@/components/calendar/AppointmentDialog";
 import BlockTimeDialog from "@/components/calendar/BlockTimeDialog";
+import EditBlockedTimeDialog from "@/components/calendar/EditBlockedTimeDialog";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Plus, Clock } from "lucide-react";
@@ -40,9 +40,11 @@ const CalendarSimple = React.memo(() => {
   const [isMounted, setIsMounted] = useState(true);
   const [showAppointmentDialog, setShowAppointmentDialog] = useState(false);
   const [showBlockTimeDialog, setShowBlockTimeDialog] = useState(false);
+  const [showEditBlockedDialog, setShowEditBlockedDialog] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<any>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<any>(null);
+  const [editingBlockedTime, setEditingBlockedTime] = useState<any>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -375,7 +377,7 @@ const CalendarSimple = React.memo(() => {
     setShowAppointmentDialog(true);
   }, []);
 
-  // Handle event click - clean implementation
+  // Handle event click - enhanced with blocked time editing
   const handleSelectEvent = useCallback((event: any) => {
     console.log('[CalendarSimple] Event selected:', event);
     if (event.source === 'internal') {
@@ -395,22 +397,10 @@ const CalendarSimple = React.memo(() => {
         duration: 3000,
       });
     } else if (event.source === 'blocked_time') {
-      // Handle clicks on blocked time events from dedicated table
-      const blockLabel = event.title || 'Blocked Time';
-      toast({
-        title: "🚫 Blocked Time",
-        description: `${blockLabel} - This time slot is blocked and unavailable for appointments`,
-        duration: 4000,
-      });
-      
-      console.log('[CalendarSimple] Blocked time clicked:', {
-        id: event.id,
-        title: event.title,
-        start: event.start,
-        end: event.end,
-        source: event.source,
-        resource: event.resource
-      });
+      // Open edit dialog for blocked time events
+      console.log('[CalendarSimple] Opening edit dialog for blocked time:', event);
+      setEditingBlockedTime(event.resource);
+      setShowEditBlockedDialog(true);
     } else if (event.source === 'availability') {
       // Enhanced availability feedback
       toast({
@@ -452,7 +442,7 @@ const CalendarSimple = React.memo(() => {
       });
       return;
     }
-
+    
     if (typeof userId !== 'string') {
       console.error(`[CalendarSimple] ${timestamp} Invalid userId type:`, {
         userId,
@@ -465,7 +455,7 @@ const CalendarSimple = React.memo(() => {
       });
       return;
     }
-
+    
     if (userId.trim() === '') {
       console.error(`[CalendarSimple] ${timestamp} userId is empty string`);
       toast({
@@ -475,7 +465,7 @@ const CalendarSimple = React.memo(() => {
       });
       return;
     }
-
+    
     // UUID format validation
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!uuidRegex.test(userId)) {
@@ -487,7 +477,7 @@ const CalendarSimple = React.memo(() => {
       });
       return;
     }
-
+    
     console.log(`[CalendarSimple] ${timestamp} Opening clean BlockTimeDialog with valid userId:`, userId);
     setShowBlockTimeDialog(true);
   }, [userId, isReady, authInitialized, userRole, toast]);
@@ -752,6 +742,28 @@ const CalendarSimple = React.memo(() => {
               onClose={() => setShowBlockTimeDialog(false)}
               selectedClinicianId={userId}
               onBlockCreated={triggerRefresh}
+            />
+          )}
+
+          {/* Edit Blocked Time Dialog */}
+          {showEditBlockedDialog && editingBlockedTime && (
+            <EditBlockedTimeDialog
+              isOpen={showEditBlockedDialog}
+              onClose={() => {
+                setShowEditBlockedDialog(false);
+                setEditingBlockedTime(null);
+              }}
+              blockedTime={editingBlockedTime}
+              onDeleted={() => {
+                triggerRefresh();
+                setShowEditBlockedDialog(false);
+                setEditingBlockedTime(null);
+              }}
+              onUpdated={() => {
+                triggerRefresh();
+                setShowEditBlockedDialog(false);
+                setEditingBlockedTime(null);
+              }}
             />
           )}
         </div>
