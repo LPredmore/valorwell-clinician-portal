@@ -7,6 +7,7 @@
   position: relative !important;
   overflow: hidden !important;
   box-shadow: 0 2px 4px rgba(0,0,0,0.2), inset 0 1px 2px rgba(255,255,255,0.1) !important;
+  z-index: 15 !important;
 }
 
 .rbc-event.blocked-time-event::before {
@@ -45,6 +46,8 @@
   border: 1px dashed #22c55e !important;
   border-radius: 4px !important;
   color: #15803d !important;
+  position: relative !important;
+  z-index: 1 !important;
 }
 
 .rbc-event.availability-event:hover {
@@ -57,6 +60,8 @@
   background: linear-gradient(135deg, #f57c00 0%, #e65100 100%) !important;
   border: 1px solid #d84315 !important;
   box-shadow: 0 1px 3px rgba(0,0,0,0.2) !important;
+  position: relative !important;
+  z-index: 12 !important;
 }
 
 /* Internal appointment styling */
@@ -64,6 +69,8 @@
   background: linear-gradient(135deg, #3174ad 0%, #1e40af 100%) !important;
   border: 1px solid #1e3a8a !important;
   box-shadow: 0 1px 3px rgba(0,0,0,0.2) !important;
+  position: relative !important;
+  z-index: 10 !important;
 }
 
 /* Calendar tooltip enhancements */

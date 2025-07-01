@@ -301,7 +301,8 @@ const CalendarSimple = React.memo(() => {
           title: title,
           start: buildLocalDate(apptDTStart),
           end: buildLocalDate(apptDTEnd),
-          resource: apt
+          resource: apt,
+          priority: 1
         };
       }));
     }
@@ -316,15 +317,22 @@ const CalendarSimple = React.memo(() => {
         start_time: evt.when?.start_time,
         end_time: evt.when?.end_time,
         start: evt.when?.start_time,
-        end: evt.when?.end_time
+        end: evt.when?.end_time,
+        priority: 1
       })));
     }
 
     // Add blocked time events (from dedicated blocked_time table)
-    events.push(...blockedTimeEvents);
+    events.push(...blockedTimeEvents.map(evt => ({
+      ...evt,
+      priority: 2
+    })));
 
     // Add availability events
-    events.push(...availabilityEvents);
+    events.push(...availabilityEvents.map(evt => ({
+      ...evt,
+      priority: 0
+    })));
 
     console.group('📊 Calendar Data Summary');
     console.log('Week Range:', {
@@ -345,7 +353,14 @@ const CalendarSimple = React.memo(() => {
     });
     console.groupEnd();
 
-    return events.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+    // Sort by priority first (availability=0, appointments=1, blocked=2), then by time
+    return events
+      .sort((a, b) => {
+        if (a.priority !== b.priority) {
+          return a.priority - b.priority;
+        }
+        return new Date(a.start).getTime() - new Date(b.start).getTime();
+      });
   }, [appointments, nylasEvents, blockedTimeEvents, availabilityEvents, weekStart, weekEnd, userTimeZone, appointmentsLoading, nylasLoading, blockedTimesLoading]);
 
   // Debug logging for calendar state
