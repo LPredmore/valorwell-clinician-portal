@@ -1,5 +1,5 @@
 
-/* CRITICAL: Enhanced event styling with proper z-index but NO positioning overrides */
+/* CRITICAL: Clean event styling with z-index but NO positioning overrides */
 
 /* CRITICAL: Availability events - LOWEST z-index (background layer) */
 .rbc-event.availability-event {
@@ -75,12 +75,11 @@
   transition: all 0.2s ease-in-out !important;
 }
 
-/* CRITICAL: FIXED - Let React Big Calendar handle positioning - NATIVE layout restored */
+/* CRITICAL: NATIVE RBC layout - position: relative only, NO width/positioning overrides */
 .rbc-event {
-  /* CRITICAL: REMOVED ALL positioning overrides to restore native RBC behavior */
-  transition: all 0.2s ease-in-out !important;
-  /* position: relative ensures z-index works without breaking RBC layout */
   position: relative !important;
+  transition: all 0.2s ease-in-out !important;
+  /* REMOVED: All width, left, top overrides to restore native RBC positioning */
 }
 
 .rbc-event:hover {
@@ -88,9 +87,10 @@
   box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important;
 }
 
-/* CRITICAL: FIXED - Allow React Big Calendar to control event container positioning */
-.rbc-calendar .rbc-event-container {
+/* CRITICAL: Allow React Big Calendar to control event container positioning */
+.rbc-event-container {
   position: relative !important;
+  /* REMOVED: All positioning overrides - let RBC handle layout */
 }
 
 /* Calendar tooltip enhancements */
@@ -105,7 +105,7 @@
   z-index: 1000 !important;
 }
 
-/* Legend indicators */
+/* ... keep existing code (legend styles) the same ... */
 .calendar-legend {
   display: flex;
   gap: 16px;

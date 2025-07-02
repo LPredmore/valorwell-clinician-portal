@@ -18,7 +18,7 @@ import { useAppointments } from "@/hooks/useAppointments";
 import { useNylasEvents } from "@/hooks/useNylasEvents";
 import { useClinicianAvailability } from "@/hooks/useClinicianAvailability";
 import { useBlockedTime } from "@/hooks/useBlockedTime";
-import { toLocalJSDate } from "@/utils/dateUtils";
+import { toEventDate } from "@/utils/dateUtils";
 import {
   Sheet,
   SheetTrigger,
@@ -92,14 +92,14 @@ const CalendarSimple = React.memo(() => {
   // CRITICAL: Fixed availability hook with proper dependencies
   const availabilitySlots = useClinicianAvailability(userId, refreshTrigger);
 
-  // CRITICAL: Transform availability slots with FIXED single conversion path (NO double conversion)
+  // CRITICAL: Transform availability slots with FIXED single conversion (no double conversion)
   const availabilityEvents = useMemo(() => {
     if (!availabilitySlots.length || !userTimeZone) {
       console.log('[CalendarSimple] No availability slots or timezone, returning empty array');
       return [];
     }
     
-    console.log('[CalendarSimple] CRITICAL: Processing availability with FIXED single conversion path:', {
+    console.log('[CalendarSimple] CRITICAL: Processing availability with FIXED toEventDate conversion:', {
       slotsCount: availabilitySlots.length,
       userTimeZone,
       weekStartUTC: weekStart.toISOString(),
@@ -127,27 +127,27 @@ const CalendarSimple = React.memo(() => {
       const matchedDates = dates.filter(d => d.weekday === weekdayMap[slot.day]);
       
       return matchedDates.map(d => {
-        // CRITICAL: FIXED - Direct ISO string construction without UTC conversion
-        const startISOLocal = `${d.toISODate()}T${slot.startTime}`;
-        const endISOLocal = `${d.toISODate()}T${slot.endTime}`;
+        // CRITICAL: FIXED - Create local ISO strings and use single toEventDate conversion
+        const startISOLocal = `${d.toISODate()}T${slot.startTime}:00`;
+        const endISOLocal = `${d.toISODate()}T${slot.endTime}:00`;
         
-        console.log('[CalendarSimple] CRITICAL: Availability FIXED conversion (no double conversion):', {
+        console.log('[CalendarSimple] CRITICAL: Availability FIXED toEventDate conversion:', {
           slotDay: slot.day,
           startTime: slot.startTime,
           endTime: slot.endTime,
           startISOLocal,
           endISOLocal,
-          finalStartJS: toLocalJSDate(startISOLocal, tz).toISOString(),
-          finalStartHours: toLocalJSDate(startISOLocal, tz).getHours(),
+          finalStartJS: toEventDate(startISOLocal, tz).toISOString(),
+          finalStartHours: toEventDate(startISOLocal, tz).getHours(),
           timezone: tz,
-          conversionType: 'DIRECT - No UTC roundtrip'
+          conversionType: 'SINGLE toEventDate - No double conversion'
         });
         
         return {
           id: `avail-${slot.day}-${slot.slot}-${d.toISODate()}`,
           title: 'Available',
-          start: toLocalJSDate(startISOLocal, tz), // CRITICAL: Fixed single conversion path
-          end: toLocalJSDate(endISOLocal, tz), // CRITICAL: Fixed single conversion path
+          start: toEventDate(startISOLocal, tz), // CRITICAL: Single conversion path
+          end: toEventDate(endISOLocal, tz),     // CRITICAL: Single conversion path
           source: 'availability',
           type: 'availability',
           className: 'availability-event',
@@ -156,10 +156,10 @@ const CalendarSimple = React.memo(() => {
       });
     });
 
-    console.log('[CalendarSimple] CRITICAL: Availability events FIXED conversion verification:', {
+    console.log('[CalendarSimple] CRITICAL: Availability events FIXED toEventDate verification:', {
       eventsCount: events.length,
       timezone: tz,
-      conversionMethod: 'DIRECT toLocalJSDate - No double conversion',
+      conversionMethod: 'SINGLE toEventDate - No double conversion',
       sampleTimes: events.slice(0, 2).map(e => ({
         id: e.id,
         start: e.start.toISOString(),
@@ -172,33 +172,33 @@ const CalendarSimple = React.memo(() => {
     return events;
   }, [availabilitySlots, weekStart, weekEnd, userTimeZone, refreshTrigger]);
 
-  // CRITICAL: Transform blocked times with STANDARDIZED toLocalJSDate conversion
+  // CRITICAL: Transform blocked times with STANDARDIZED toEventDate conversion
   const blockedTimeEvents = useMemo(() => {
     if (!blockedTimes.length || !userTimeZone) {
       console.log('[CalendarSimple] No blocked times or timezone');
       return [];
     }
     
-    console.log('[CalendarSimple] CRITICAL: Processing blocked times with STANDARDIZED toLocalJSDate:', {
+    console.log('[CalendarSimple] CRITICAL: Processing blocked times with STANDARDIZED toEventDate:', {
       blockedTimesCount: blockedTimes.length,
       userTimeZone
     });
 
     const events = blockedTimes.map(blockedTime => {
-      // CRITICAL: Use toLocalJSDate directly with stored UTC timestamps
-      console.log('[CalendarSimple] CRITICAL: Blocked time toLocalJSDate conversion:', {
+      // CRITICAL: Use toEventDate directly with stored UTC timestamps
+      console.log('[CalendarSimple] CRITICAL: Blocked time toEventDate conversion:', {
         id: blockedTime.id,
         originalStartUTC: blockedTime.start_at,
         originalEndUTC: blockedTime.end_at,
-        toLocalJSDateStart: toLocalJSDate(blockedTime.start_at, blockedTime.timezone || userTimeZone).toISOString(),
-        toLocalJSDateEnd: toLocalJSDate(blockedTime.end_at, blockedTime.timezone || userTimeZone).toISOString()
+        toEventDateStart: toEventDate(blockedTime.start_at, blockedTime.timezone || userTimeZone).toISOString(),
+        toEventDateEnd: toEventDate(blockedTime.end_at, blockedTime.timezone || userTimeZone).toISOString()
       });
 
       return {
         id: blockedTime.id,
         title: blockedTime.label,
-        start: toLocalJSDate(blockedTime.start_at, blockedTime.timezone || userTimeZone), // CRITICAL: Use toLocalJSDate
-        end: toLocalJSDate(blockedTime.end_at, blockedTime.timezone || userTimeZone), // CRITICAL: Use toLocalJSDate
+        start: toEventDate(blockedTime.start_at, blockedTime.timezone || userTimeZone), // CRITICAL: Use toEventDate
+        end: toEventDate(blockedTime.end_at, blockedTime.timezone || userTimeZone),     // CRITICAL: Use toEventDate
         source: 'blocked_time',
         type: 'blocked_time',
         className: 'blocked-time-event',
@@ -225,26 +225,26 @@ const CalendarSimple = React.memo(() => {
     triggerRefresh();
   }, [currentDate, triggerRefresh]);
 
-  // CRITICAL: Combine all events with STANDARDIZED toLocalJSDate conversion for appointments
+  // CRITICAL: Combine all events with STANDARDIZED toEventDate conversion for appointments
   const allEvents = useMemo(() => {
     const events = [];
     
-    // CRITICAL: Add appointments with STANDARDIZED toLocalJSDate conversion
+    // CRITICAL: Add appointments with STANDARDIZED toEventDate conversion
     if (appointments) {
       events.push(...appointments.map(apt => {
         const title = apt.clientName || 'Internal Appointment';
 
-        // CRITICAL: Use toLocalJSDate directly with stored UTC timestamps
-        console.log('[CalendarSimple] CRITICAL: Appointment toLocalJSDate conversion:', {
+        // CRITICAL: Use toEventDate directly with stored UTC timestamps
+        console.log('[CalendarSimple] CRITICAL: Appointment toEventDate conversion:', {
           id: apt.id,
           clientName: apt.clientName,
           originalStartUTC: apt.start_at,
           originalEndUTC: apt.end_at,
           appointmentTimezone: apt.appointment_timezone,
           userTimezone: userTimeZone,
-          toLocalJSDateStart: toLocalJSDate(apt.start_at, apt.appointment_timezone || userTimeZone).toISOString(),
-          toLocalJSDateEnd: toLocalJSDate(apt.end_at, apt.appointment_timezone || userTimeZone).toISOString(),
-          finalHours: `${toLocalJSDate(apt.start_at, apt.appointment_timezone || userTimeZone).getHours()}:${toLocalJSDate(apt.start_at, apt.appointment_timezone || userTimeZone).getMinutes().toString().padStart(2, '0')}`
+          toEventDateStart: toEventDate(apt.start_at, apt.appointment_timezone || userTimeZone).toISOString(),
+          toEventDateEnd: toEventDate(apt.end_at, apt.appointment_timezone || userTimeZone).toISOString(),
+          finalHours: `${toEventDate(apt.start_at, apt.appointment_timezone || userTimeZone).getHours()}:${toEventDate(apt.start_at, apt.appointment_timezone || userTimeZone).getMinutes().toString().padStart(2, '0')}`
         });
 
         return {
@@ -254,8 +254,8 @@ const CalendarSimple = React.memo(() => {
           className: 'internal-event',
           id: apt.id,
           title: title,
-          start: toLocalJSDate(apt.start_at, apt.appointment_timezone || userTimeZone), // CRITICAL: Use toLocalJSDate
-          end: toLocalJSDate(apt.end_at, apt.appointment_timezone || userTimeZone), // CRITICAL: Use toLocalJSDate
+          start: toEventDate(apt.start_at, apt.appointment_timezone || userTimeZone), // CRITICAL: Use toEventDate
+          end: toEventDate(apt.end_at, apt.appointment_timezone || userTimeZone),     // CRITICAL: Use toEventDate
           resource: apt,
           priority: 1
         };
@@ -290,7 +290,7 @@ const CalendarSimple = React.memo(() => {
       priority: 0
     })));
 
-    console.group('📊 CRITICAL: Calendar Data with FIXED toLocalJSDate');
+    console.group('📊 CRITICAL: Calendar Data with FIXED toEventDate');
     console.log('Week Range:', {
       start: weekStart.toISOString(),
       end: weekEnd.toISOString(),
@@ -681,7 +681,7 @@ const CalendarSimple = React.memo(() => {
                   <p>Debug: UserID: {userId}</p>
                   <p>Week: {DateTime.fromJSDate(weekStart).toFormat('MM/dd')} - {DateTime.fromJSDate(weekEnd).toFormat('MM/dd')}</p>
                   <p>Loading: A:{appointmentsLoading ? 'Y' : 'N'} | N:{nylasLoading ? 'Y' : 'N'} | B:{blockedTimesLoading ? 'Y' : 'N'}</p>
-                  <p>CRITICAL: All events use FIXED toLocalJSDate() with Luxon localizer</p>
+                  <p>CRITICAL: All events use FIXED toEventDate() with bound Luxon localizer</p>
                 </div>
               )}
             </div>

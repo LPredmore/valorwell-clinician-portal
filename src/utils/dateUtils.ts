@@ -159,37 +159,16 @@ export const formatDateForDB = (date: Date | string | null | undefined): string 
 };
 
 /**
- * Convert a Luxon DateTime (in any zone) into a JS Date whose
- * fields (Y/M/D h:m:s) match the DateTime values, ignoring timezone.
- * This ensures React Big Calendar displays times correctly in the clinician's timezone.
+ * CRITICAL: Single, correct event date converter for React Big Calendar
+ * Given a UTC ISO timestamp or local slot string with known zone,
+ * produce a JS Date representing the correct absolute instant.
+ * This REPLACES all previous conversion methods.
  */
-export function buildLocalDate(dt: DateTime): Date {
-  return new Date(
-    dt.year,
-    dt.month - 1,
-    dt.day,
-    dt.hour,
-    dt.minute,
-    dt.second,
-    dt.millisecond
-  );
-}
-
-/**
- * CRITICAL: Single-path date conversion for React Big Calendar with Luxon localizer
- * Parse UTC, shift into clinician zone, then preserve the clock hour
- * This replaces all other conversion methods for calendar events
- */
-export function toLocalJSDate(isoString: string, timeZone: string): Date {
-  // Parse UTC, shift into clinician zone, then preserve the clock hour
-  const dt = DateTime.fromISO(isoString, { zone: 'UTC' }).setZone(timeZone);
-  return new Date(
-    dt.year,
-    dt.month - 1,
-    dt.day,
-    dt.hour,
-    dt.minute,
-    dt.second,
-    dt.millisecond
-  );
+export function toEventDate(iso: string, zone: string): Date {
+  // Parse either UTC ISO (with Z/offset) or local ISO (no offset) in specified zone
+  const dt = iso.endsWith('Z') || iso.includes('+') || iso.includes('-') 
+    ? DateTime.fromISO(iso).setZone(zone)  // UTC ISO → convert to zone
+    : DateTime.fromISO(iso, { zone });     // Local ISO → parse in zone
+  
+  return dt.toJSDate();  // Absolute instant for React Big Calendar
 }

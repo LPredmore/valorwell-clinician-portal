@@ -15,16 +15,16 @@ const getUserTimeZone = () => {
   }
 };
 
-// Set global timezone for Luxon BEFORE any calendar components are created
+// CRITICAL: Set global timezone for Luxon BEFORE any calendar components are created
 const userTimeZone = getUserTimeZone();
-console.log('[main] CRITICAL: Set global Luxon timezone BEFORE React mount:', userTimeZone);
+console.log('[main] CRITICAL: Setting global Luxon default zone BEFORE React mount:', userTimeZone);
 
-// CRITICAL: Tell Luxon the clinician's IANA timezone once using the correct API
-Settings.defaultZone = userTimeZone;
+// CRITICAL: Use Settings.defaultZoneName (not defaultZone) to bind Luxon globally
+Settings.defaultZoneName = userTimeZone;
 
-// CRITICAL: Create the localizer using that default zone
+// CRITICAL: Create the localizer with the globally bound zone
 export const globalLocalizer = luxonLocalizer(DateTime);
-console.log('[main] CRITICAL: Created timezone-aware global Luxon localizer with default zone:', userTimeZone);
+console.log('[main] CRITICAL: Created timezone-aware global Luxon localizer with bound zone:', userTimeZone);
 
 const rootElement = document.getElementById("root");
 
