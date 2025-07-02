@@ -1,5 +1,5 @@
-/* FIXED: Import react-big-calendar styles first, then override with higher specificity */
-@import 'react-big-calendar/lib/css/react-big-calendar.css';
+
+/* FIXED: Removed duplicate react-big-calendar import - now handled in index.css */
 
 /* FIXED: Enhanced blocked time styling with HIGHEST z-index for overlapping */
 .rbc-event.blocked-time-event {

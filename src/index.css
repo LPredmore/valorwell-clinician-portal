@@ -3,7 +3,8 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Import calendar-specific styles */
+/* FIXED: Import react-big-calendar styles FIRST, then our custom calendar styles */
+@import 'react-big-calendar/lib/css/react-big-calendar.css';
 @import './styles/calendar.css';
 
 /* ... keep existing code the same ... */

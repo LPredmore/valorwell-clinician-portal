@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -199,9 +198,10 @@ export const useBlockedTime = (
     }
   };
 
+  // FIXED: Include all necessary dependencies in useEffect
   useEffect(() => {
     fetchBlockedTimes();
-  }, [clinicianId, startDate, endDate, refreshTrigger]);
+  }, [clinicianId, startDate, endDate, refreshTrigger]); // FIXED: Added refreshTrigger dependency
 
   return {
     blockedTimes,

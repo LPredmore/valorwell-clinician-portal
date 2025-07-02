@@ -104,14 +104,14 @@ const CalendarSimple = React.memo(() => {
   // Fetch availability slots
   const availabilitySlots = useClinicianAvailability(userId);
 
-  // Transform availability slots with CONSISTENT timezone handling
+  // Transform availability slots with STANDARDIZED buildLocalDate conversion
   const availabilityEvents = useMemo(() => {
     if (!availabilitySlots.length || !userTimeZone) {
       console.log('[CalendarSimple] No availability slots or timezone, returning empty array');
       return [];
     }
     
-    console.log('[CalendarSimple] Processing availability with CONSISTENT timezone conversion:', {
+    console.log('[CalendarSimple] FIXED: Processing availability with STANDARDIZED buildLocalDate conversion:', {
       slotsCount: availabilitySlots.length,
       userTimeZone,
       weekStartUTC: weekStart.toISOString(),
@@ -141,26 +141,26 @@ const CalendarSimple = React.memo(() => {
       const matchedDates = dates.filter(d => d.weekday === weekdayMap[slot.day]);
       
       return matchedDates.map(d => {
-        // FIXED: Build DateTimes in clinician timezone and convert directly
+        // FIXED: Build DateTimes in clinician timezone and use buildLocalDate()
         const startDT = DateTime.fromISO(`${d.toISODate()}T${slot.startTime}`, { zone: tz });
         const endDT = DateTime.fromISO(`${d.toISODate()}T${slot.endTime}`, { zone: tz });
         
-        console.log('[CalendarSimple] Availability event FIXED conversion:', {
+        console.log('[CalendarSimple] FIXED: Availability event buildLocalDate conversion:', {
           slotDay: slot.day,
           startTime: slot.startTime,
           endTime: slot.endTime,
           startDateTime: startDT.toISO(),
           endDateTime: endDT.toISO(),
-          startJSDate: startDT.toJSDate().toISOString(),
-          endJSDate: endDT.toJSDate().toISOString(),
+          startJSDate: buildLocalDate(startDT).toISOString(),
+          endJSDate: buildLocalDate(endDT).toISOString(),
           timezone: tz
         });
         
         return {
           id: `avail-${slot.day}-${slot.slot}-${d.toISODate()}`,
           title: 'Available',
-          start: startDT.toJSDate(), // CONSISTENT: timezone-aware conversion
-          end: endDT.toJSDate(), // CONSISTENT: timezone-aware conversion
+          start: buildLocalDate(startDT), // FIXED: Use buildLocalDate instead of toJSDate
+          end: buildLocalDate(endDT), // FIXED: Use buildLocalDate instead of toJSDate
           source: 'availability',
           type: 'availability',
           resource: slot
@@ -168,7 +168,7 @@ const CalendarSimple = React.memo(() => {
       });
     });
 
-    console.log('[CalendarSimple] Availability events FIXED generation:', {
+    console.log('[CalendarSimple] FIXED: Availability events with buildLocalDate:', {
       eventsCount: events.length,
       timezone: tz,
       sampleEvents: events.slice(0, 2).map(e => ({
@@ -182,40 +182,40 @@ const CalendarSimple = React.memo(() => {
     return events;
   }, [availabilitySlots, weekStart, weekEnd, userTimeZone]);
 
-  // Transform blocked times with CONSISTENT timezone handling
+  // Transform blocked times with STANDARDIZED buildLocalDate conversion
   const blockedTimeEvents = useMemo(() => {
     if (!blockedTimes.length || !userTimeZone) {
       console.log('[CalendarSimple] No blocked times or timezone');
       return [];
     }
     
-    console.log('[CalendarSimple] Processing blocked times with CONSISTENT timezone conversion:', {
+    console.log('[CalendarSimple] FIXED: Processing blocked times with STANDARDIZED buildLocalDate conversion:', {
       blockedTimesCount: blockedTimes.length,
       userTimeZone
     });
 
     const events = blockedTimes.map(blockedTime => {
-      // FIXED: Parse UTC timestamps and convert to clinician's timezone consistently
+      // FIXED: Parse UTC timestamps and convert to clinician's timezone, then use buildLocalDate
       const startDT = DateTime.fromISO(blockedTime.start_at, { zone: 'UTC' })
         .setZone(blockedTime.timezone || userTimeZone);
       const endDT = DateTime.fromISO(blockedTime.end_at, { zone: 'UTC' })
         .setZone(blockedTime.timezone || userTimeZone);
 
-      console.log('[CalendarSimple] Blocked time FIXED conversion:', {
+      console.log('[CalendarSimple] FIXED: Blocked time buildLocalDate conversion:', {
         id: blockedTime.id,
         originalStartUTC: blockedTime.start_at,
         originalEndUTC: blockedTime.end_at,
         convertedStart: startDT.toISO(),
         convertedEnd: endDT.toISO(),
-        startJSDate: startDT.toJSDate().toISOString(),
-        endJSDate: endDT.toJSDate().toISOString()
+        startJSDate: buildLocalDate(startDT).toISOString(),
+        endJSDate: buildLocalDate(endDT).toISOString()
       });
 
       return {
         id: blockedTime.id,
         title: blockedTime.label,
-        start: startDT.toJSDate(), // CONSISTENT: timezone-aware conversion
-        end: endDT.toJSDate(), // CONSISTENT: timezone-aware conversion
+        start: buildLocalDate(startDT), // FIXED: Use buildLocalDate instead of toJSDate
+        end: buildLocalDate(endDT), // FIXED: Use buildLocalDate instead of toJSDate
         source: 'blocked_time',
         type: 'blocked_time',
         resource: blockedTime
@@ -242,22 +242,22 @@ const CalendarSimple = React.memo(() => {
     triggerRefresh();
   }, [currentDate, triggerRefresh]);
 
-  // Combine all events with CONSISTENT timezone handling for appointments
+  // Combine all events with STANDARDIZED buildLocalDate conversion for appointments
   const allEvents = useMemo(() => {
     const events = [];
     
-    // FIXED: Add appointments with CONSISTENT timezone-aware conversion
+    // FIXED: Add appointments with STANDARDIZED buildLocalDate conversion
     if (appointments) {
       events.push(...appointments.map(apt => {
         const title = apt.clientName || 'Internal Appointment';
 
-        // FIXED: Parse ISO string as UTC, then convert to clinician's zone with toJSDate()
+        // FIXED: Parse ISO string as UTC, then convert to clinician's zone with buildLocalDate()
         const apptDTStart = DateTime.fromISO(apt.start_at, { zone: 'UTC' })
           .setZone(apt.appointment_timezone || userTimeZone);
         const apptDTEnd = DateTime.fromISO(apt.end_at, { zone: 'UTC' })
           .setZone(apt.appointment_timezone || userTimeZone);
 
-        console.log('[CalendarSimple] Appointment FIXED conversion:', {
+        console.log('[CalendarSimple] FIXED: Appointment buildLocalDate conversion:', {
           id: apt.id,
           clientName: apt.clientName,
           originalStartUTC: apt.start_at,
@@ -266,8 +266,8 @@ const CalendarSimple = React.memo(() => {
           userTimezone: userTimeZone,
           convertedStart: apptDTStart.toISO(),
           convertedEnd: apptDTEnd.toISO(),
-          startJSDate: apptDTStart.toJSDate().toISOString(),
-          endJSDate: apptDTEnd.toJSDate().toISOString()
+          startJSDate: buildLocalDate(apptDTStart).toISOString(),
+          endJSDate: buildLocalDate(apptDTEnd).toISOString()
         });
 
         return {
@@ -277,8 +277,8 @@ const CalendarSimple = React.memo(() => {
           className: 'internal-event',
           id: apt.id,
           title: title,
-          start: apptDTStart.toJSDate(), // FIXED: Consistent timezone-aware conversion
-          end: apptDTEnd.toJSDate(), // FIXED: Consistent timezone-aware conversion
+          start: buildLocalDate(apptDTStart), // FIXED: Use buildLocalDate instead of toJSDate
+          end: buildLocalDate(apptDTEnd), // FIXED: Use buildLocalDate instead of toJSDate
           resource: apt,
           priority: 1
         };
@@ -315,7 +315,7 @@ const CalendarSimple = React.memo(() => {
       priority: 0
     })));
 
-    console.group('📊 FIXED Calendar Data with Consistent Timezone Handling');
+    console.group('📊 FIXED: Calendar Data with STANDARDIZED buildLocalDate Conversion');
     console.log('Week Range:', {
       start: weekStart.toISOString(),
       end: weekEnd.toISOString(),
@@ -327,7 +327,7 @@ const CalendarSimple = React.memo(() => {
     console.log('  Blocked Time Events:', blockedTimeEvents.length);
     console.log('  Availability Events:', availabilityEvents.length);
     console.log('  Total Events:', events.length);
-    console.log('Sample Event Times (should be consistent):', events.slice(0, 3).map(e => ({
+    console.log('Sample Event Times (should be STANDARDIZED with buildLocalDate):', events.slice(0, 3).map(e => ({
       id: e.id,
       title: e.title,
       source: e.source,

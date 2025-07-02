@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -10,7 +9,7 @@ export interface AvailabilitySlot {
   endTime: string;       // "17:00"
 }
 
-export function useClinicianAvailability(clinicianId: string | null) {
+export function useClinicianAvailability(clinicianId: string | null, refreshTrigger = 0) {
   const [slots, setSlots] = useState<AvailabilitySlot[]>([]);
   const { toast } = useToast();
 
@@ -70,7 +69,10 @@ export function useClinicianAvailability(clinicianId: string | null) {
           }
         });
         
-        console.log('[useClinicianAvailability] Loaded availability slots:', availabilitySlots);
+        console.log('[useClinicianAvailability] FIXED: Loaded availability slots with refresh trigger:', {
+          availabilitySlots,
+          refreshTrigger
+        });
         setSlots(availabilitySlots);
       } catch (err) {
         console.error('[useClinicianAvailability] Error loading availability:', err);
@@ -83,7 +85,7 @@ export function useClinicianAvailability(clinicianId: string | null) {
     };
 
     loadAvailability();
-  }, [clinicianId, toast]);
+  }, [clinicianId, toast, refreshTrigger]); // FIXED: Added refreshTrigger dependency
 
   return slots;
 }
