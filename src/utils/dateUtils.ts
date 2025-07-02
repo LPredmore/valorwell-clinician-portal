@@ -169,13 +169,15 @@ export function toEventDate(iso: string, zone: string): Date {
     ? DateTime.fromISO(iso).setZone(zone)  // UTC ISO → convert to zone
     : DateTime.fromISO(iso, { zone });     // Local ISO → parse in zone
   
-  console.log('[toEventDate] CRITICAL: Single conversion path:', {
-    input: iso,
-    zone,
-    parsedDateTime: dt.toISO(),
-    finalJSDate: dt.toJSDate().toISOString(),
-    finalHours: dt.toJSDate().getHours()
-  });
+  if (dt.isValid) {
+    console.log('[toEventDate] CRITICAL: Single conversion path:', {
+      input: iso,
+      zone,
+      parsedDateTime: dt.toISO()
+    });
+  } else {
+    console.warn('[toEventDate] Invalid date created:', { input: iso, zone });
+  }
   
   return dt.toJSDate();  // Absolute instant for React Big Calendar
 }

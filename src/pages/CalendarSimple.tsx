@@ -131,14 +131,19 @@ const CalendarSimple = React.memo(() => {
         const startISOLocal = `${d.toISODate()}T${slot.startTime}:00`;
         const endISOLocal = `${d.toISODate()}T${slot.endTime}:00`;
         
+        // Validate ISO format before conversion
+        if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(startISOLocal) || 
+            !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(endISOLocal)) {
+          console.warn('Skipping malformed availability ISO:', { startISOLocal, endISOLocal });
+          return null;
+        }
+        
         console.log('[CalendarSimple] CRITICAL: Availability SINGLE toEventDate conversion:', {
           slotDay: slot.day,
           startTime: slot.startTime,
           endTime: slot.endTime,
           startISOLocal,
           endISOLocal,
-          finalStartJS: toEventDate(startISOLocal, tz).toISOString(),
-          finalStartHours: toEventDate(startISOLocal, tz).getHours(),
           timezone: tz,
           conversionType: 'SINGLE toEventDate - No double conversion'
         });
@@ -153,20 +158,13 @@ const CalendarSimple = React.memo(() => {
           className: 'availability-event',
           resource: slot
         };
-      });
+      }).filter(Boolean); // Remove null entries from invalid ISOs
     });
 
     console.log('[CalendarSimple] CRITICAL: Availability events SINGLE toEventDate verification:', {
       eventsCount: events.length,
       timezone: tz,
-      conversionMethod: 'SINGLE toEventDate - No double conversion',
-      sampleTimes: events.slice(0, 2).map(e => ({
-        id: e.id,
-        start: e.start.toISOString(),
-        startHours: e.start.getHours(),
-        end: e.end.toISOString(),
-        endHours: e.end.getHours()
-      }))
+      conversionMethod: 'SINGLE toEventDate - No double conversion'
     });
 
     return events;
@@ -189,9 +187,7 @@ const CalendarSimple = React.memo(() => {
       console.log('[CalendarSimple] CRITICAL: Blocked time toEventDate conversion:', {
         id: blockedTime.id,
         originalStartUTC: blockedTime.start_at,
-        originalEndUTC: blockedTime.end_at,
-        toEventDateStart: toEventDate(blockedTime.start_at, blockedTime.timezone || userTimeZone).toISOString(),
-        toEventDateEnd: toEventDate(blockedTime.end_at, blockedTime.timezone || userTimeZone).toISOString()
+        originalEndUTC: blockedTime.end_at
       });
 
       return {
@@ -241,10 +237,7 @@ const CalendarSimple = React.memo(() => {
           originalStartUTC: apt.start_at,
           originalEndUTC: apt.end_at,
           appointmentTimezone: apt.appointment_timezone,
-          userTimezone: userTimeZone,
-          toEventDateStart: toEventDate(apt.start_at, apt.appointment_timezone || userTimeZone).toISOString(),
-          toEventDateEnd: toEventDate(apt.end_at, apt.appointment_timezone || userTimeZone).toISOString(),
-          finalHours: `${toEventDate(apt.start_at, apt.appointment_timezone || userTimeZone).getHours()}:${toEventDate(apt.start_at, apt.appointment_timezone || userTimeZone).getMinutes().toString().padStart(2, '0')}`
+          userTimezone: userTimeZone
         });
 
         return {
@@ -302,16 +295,7 @@ const CalendarSimple = React.memo(() => {
     console.log('  Blocked Time Events:', blockedTimeEvents.length);
     console.log('  Availability Events:', availabilityEvents.length);
     console.log('  Total Events:', events.length);
-    console.log('CRITICAL - Sample Event Final Times:', events.slice(0, 3).map(e => ({
-      id: e.id,
-      title: e.title,
-      source: e.source,
-      className: e.className,
-      start: e.start?.toISOString(),
-      startHours: e.start?.getHours(),
-      end: e.end?.toISOString(),
-      endHours: e.end?.getHours()
-    })));
+    console.log('CRITICAL - Event Processing Complete with Single toEventDate Conversion');
     console.groupEnd();
 
     return events.sort((a, b) => {
