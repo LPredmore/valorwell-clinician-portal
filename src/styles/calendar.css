@@ -75,11 +75,11 @@
   transition: all 0.2s ease-in-out !important;
 }
 
-/* CRITICAL: Let React Big Calendar handle positioning - NO absolute positioning or width overrides */
+/* CRITICAL: Let React Big Calendar handle positioning - REMOVED absolute positioning and width overrides */
 .rbc-event {
+  /* REMOVED: position: absolute and width: 100% to fix layout issues */
   position: relative !important;
   transition: all 0.2s ease-in-out !important;
-  /* REMOVED: position: absolute and width: 100% to fix layout issues */
 }
 
 .rbc-event:hover {
@@ -87,16 +87,10 @@
   box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important;
 }
 
-/* CRITICAL: Remove conflicting positioning rules that break React Big Calendar layout */
+/* CRITICAL: Allow React Big Calendar to control event container positioning */
 .rbc-calendar .rbc-event-container {
   position: relative !important;
 }
-
-/* REMOVED: Conflicting absolute positioning and width rules */
-/* .rbc-calendar .rbc-event {
-  position: absolute !important;
-  width: 100% !important;
-} */
 
 /* Calendar tooltip enhancements */
 .rbc-tooltip {

@@ -1,4 +1,3 @@
-
 import React, { useCallback, useMemo } from 'react';
 import { Calendar, Views } from 'react-big-calendar';
 import { globalLocalizer } from '@/main';
@@ -34,11 +33,11 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
   userTimeZone = 'America/New_York',
 }) => {
   // CRITICAL: Use global localizer instance instead of creating new ones
-  console.log('[ReactBigCalendar] CRITICAL: Using global Luxon localizer instance with timezone:', userTimeZone);
+  console.log('[ReactBigCalendar] CRITICAL: Using timezone-aware global Luxon localizer instance with timezone:', userTimeZone);
 
-  // Enhanced event style getter with proper className handling
+  // Enhanced event style getter with NO positioning overrides (let RBC handle layout)
   const eventPropGetter = useCallback((event: CalendarEvent) => {
-    console.log('[ReactBigCalendar] Styling event:', {
+    console.log('[ReactBigCalendar] Styling event (NO positioning overrides):', {
       id: event.id,
       title: event.title,
       source: event.source,
@@ -49,9 +48,8 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
 
     return {
       className: event.className || `${event.source}-event`,
-      style: {
-        cursor: 'pointer',
-      }
+      // REMOVED: style overrides that break RBC layout
+      // Let React Big Calendar handle positioning and sizing
     };
   }, []);
 

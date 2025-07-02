@@ -92,14 +92,14 @@ const CalendarSimple = React.memo(() => {
   // CRITICAL: Fixed availability hook with proper dependencies
   const availabilitySlots = useClinicianAvailability(userId, refreshTrigger);
 
-  // CRITICAL: Transform availability slots with STANDARDIZED toLocalJSDate conversion
+  // CRITICAL: Transform availability slots with SINGLE conversion path (no double conversion)
   const availabilityEvents = useMemo(() => {
     if (!availabilitySlots.length || !userTimeZone) {
       console.log('[CalendarSimple] No availability slots or timezone, returning empty array');
       return [];
     }
     
-    console.log('[CalendarSimple] CRITICAL: Processing availability with STANDARDIZED toLocalJSDate:', {
+    console.log('[CalendarSimple] CRITICAL: Processing availability with SINGLE conversion path:', {
       slotsCount: availabilitySlots.length,
       userTimeZone,
       weekStartUTC: weekStart.toISOString(),
@@ -127,30 +127,32 @@ const CalendarSimple = React.memo(() => {
       const matchedDates = dates.filter(d => d.weekday === weekdayMap[slot.day]);
       
       return matchedDates.map(d => {
-        // CRITICAL: Build ISO strings and use toLocalJSDate() for consistency
-        const startISO = `${d.toISODate()}T${slot.startTime}`;
-        const endISO = `${d.toISODate()}T${slot.endTime}`;
+        // CRITICAL: SINGLE conversion path - build UTC ISO strings and use toLocalJSDate() once
+        const startISOLocal = `${d.toISODate()}T${slot.startTime}`;
+        const endISOLocal = `${d.toISODate()}T${slot.endTime}`;
         
-        // Convert to UTC first, then use toLocalJSDate
-        const startDT = DateTime.fromISO(startISO, { zone: tz }).toUTC();
-        const endDT = DateTime.fromISO(endISO, { zone: tz }).toUTC();
+        // Convert local time to UTC, then use toLocalJSDate for consistency
+        const startUTC = DateTime.fromISO(startISOLocal, { zone: tz }).toUTC().toISO();
+        const endUTC = DateTime.fromISO(endISOLocal, { zone: tz }).toUTC().toISO();
         
-        console.log('[CalendarSimple] CRITICAL: Availability toLocalJSDate conversion:', {
+        console.log('[CalendarSimple] CRITICAL: Availability SINGLE conversion:', {
           slotDay: slot.day,
           startTime: slot.startTime,
           endTime: slot.endTime,
-          startISO,
-          endISO,
-          toLocalJSDateStart: toLocalJSDate(startDT.toISO()!, tz).toISOString(),
-          toLocalJSDateEnd: toLocalJSDate(endDT.toISO()!, tz).toISOString(),
+          startISOLocal,
+          endISOLocal,
+          startUTC,
+          endUTC,
+          finalStartJS: toLocalJSDate(startUTC!, tz).toISOString(),
+          finalStartHours: toLocalJSDate(startUTC!, tz).getHours(),
           timezone: tz
         });
         
         return {
           id: `avail-${slot.day}-${slot.slot}-${d.toISODate()}`,
           title: 'Available',
-          start: toLocalJSDate(startDT.toISO()!, tz), // CRITICAL: Use toLocalJSDate
-          end: toLocalJSDate(endDT.toISO()!, tz), // CRITICAL: Use toLocalJSDate
+          start: toLocalJSDate(startUTC!, tz), // CRITICAL: Single conversion path
+          end: toLocalJSDate(endUTC!, tz), // CRITICAL: Single conversion path
           source: 'availability',
           type: 'availability',
           className: 'availability-event',
@@ -159,7 +161,7 @@ const CalendarSimple = React.memo(() => {
       });
     });
 
-    console.log('[CalendarSimple] CRITICAL: Availability events final check:', {
+    console.log('[CalendarSimple] CRITICAL: Availability events SINGLE conversion check:', {
       eventsCount: events.length,
       timezone: tz,
       sampleTimes: events.slice(0, 2).map(e => ({

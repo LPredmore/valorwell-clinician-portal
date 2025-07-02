@@ -17,11 +17,13 @@ const getUserTimeZone = () => {
 
 // Set global timezone for Luxon BEFORE any calendar components are created
 const userTimeZone = getUserTimeZone();
-console.log('[main] FIXED: Set global Luxon timezone BEFORE React mount:', userTimeZone);
+console.log('[main] CRITICAL: Set global Luxon timezone BEFORE React mount:', userTimeZone);
 
-// CRITICAL: Create single global localizer instance
+// CRITICAL: Create timezone-aware global localizer instance
+// Set Luxon's default zone to ensure consistency
+DateTime.Settings.defaultZone = userTimeZone;
 export const globalLocalizer = luxonLocalizer(DateTime);
-console.log('[main] CRITICAL: Created single global Luxon localizer instance');
+console.log('[main] CRITICAL: Created timezone-aware global Luxon localizer instance with zone:', userTimeZone);
 
 const rootElement = document.getElementById("root");
 
