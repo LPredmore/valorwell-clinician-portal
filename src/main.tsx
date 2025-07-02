@@ -19,8 +19,8 @@ const getUserTimeZone = () => {
 const userTimeZone = getUserTimeZone();
 console.log('[main] CRITICAL: Setting global Luxon default zone BEFORE React mount:', userTimeZone);
 
-// CRITICAL: Use Settings.defaultZoneName (not defaultZone) to bind Luxon globally
-Settings.defaultZoneName = userTimeZone;
+// CRITICAL: Use Settings.defaultZone (not defaultZoneName) to bind Luxon globally
+Settings.defaultZone = userTimeZone;
 
 // CRITICAL: Create the localizer with the globally bound zone
 export const globalLocalizer = luxonLocalizer(DateTime);

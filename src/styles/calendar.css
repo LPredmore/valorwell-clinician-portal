@@ -79,7 +79,7 @@
 .rbc-event {
   position: relative !important;
   transition: all 0.2s ease-in-out !important;
-  /* REMOVED: All width, left, top overrides to restore native RBC positioning */
+  /* CRITICAL: All width, left, top overrides REMOVED to restore native RBC positioning */
 }
 
 .rbc-event:hover {
@@ -90,7 +90,7 @@
 /* CRITICAL: Allow React Big Calendar to control event container positioning */
 .rbc-event-container {
   position: relative !important;
-  /* REMOVED: All positioning overrides - let RBC handle layout */
+  /* CRITICAL: All positioning overrides REMOVED - let RBC handle layout */
 }
 
 /* Calendar tooltip enhancements */

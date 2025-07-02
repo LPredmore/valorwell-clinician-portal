@@ -159,16 +159,23 @@ export const formatDateForDB = (date: Date | string | null | undefined): string 
 };
 
 /**
- * CRITICAL: Single, correct event date converter for React Big Calendar
- * Given a UTC ISO timestamp or local slot string with known zone,
- * produce a JS Date representing the correct absolute instant.
- * This REPLACES all previous conversion methods.
+ * CRITICAL: Single conversion path for all React Big Calendar events
+ * Parse any ISO (with or without offset) as UTC if offset present, else in zone; then toJSDate
+ * This REPLACES all previous conversion methods and eliminates double-conversion issues.
  */
 export function toEventDate(iso: string, zone: string): Date {
   // Parse either UTC ISO (with Z/offset) or local ISO (no offset) in specified zone
-  const dt = iso.endsWith('Z') || iso.includes('+') || iso.includes('-') 
+  const dt = iso.includes('Z') || iso.includes('+') || iso.includes('-') 
     ? DateTime.fromISO(iso).setZone(zone)  // UTC ISO → convert to zone
     : DateTime.fromISO(iso, { zone });     // Local ISO → parse in zone
+  
+  console.log('[toEventDate] CRITICAL: Single conversion path:', {
+    input: iso,
+    zone,
+    parsedDateTime: dt.toISO(),
+    finalJSDate: dt.toJSDate().toISOString(),
+    finalHours: dt.toJSDate().getHours()
+  });
   
   return dt.toJSDate();  // Absolute instant for React Big Calendar
 }

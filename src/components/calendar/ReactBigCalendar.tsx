@@ -1,3 +1,4 @@
+
 import React, { useCallback, useMemo } from 'react';
 import { Calendar, Views } from 'react-big-calendar';
 import { globalLocalizer } from '@/main';
@@ -86,7 +87,7 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
     onNavigate(newDate);
   }, [onNavigate, userTimeZone]);
 
-  // CRITICAL: NATIVE Calendar configuration with ENFORCED overlap layout
+  // CRITICAL: NATIVE Calendar configuration with NATIVE overlap layout
   const calendarConfig = useMemo(() => ({
     localizer: globalLocalizer, // CRITICAL: Use globally bound localizer
     events,

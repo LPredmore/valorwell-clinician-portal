@@ -92,14 +92,14 @@ const CalendarSimple = React.memo(() => {
   // CRITICAL: Fixed availability hook with proper dependencies
   const availabilitySlots = useClinicianAvailability(userId, refreshTrigger);
 
-  // CRITICAL: Transform availability slots with FIXED single conversion (no double conversion)
+  // CRITICAL: Transform availability using SINGLE toEventDate conversion (NO double conversion)
   const availabilityEvents = useMemo(() => {
     if (!availabilitySlots.length || !userTimeZone) {
       console.log('[CalendarSimple] No availability slots or timezone, returning empty array');
       return [];
     }
     
-    console.log('[CalendarSimple] CRITICAL: Processing availability with FIXED toEventDate conversion:', {
+    console.log('[CalendarSimple] CRITICAL: Processing availability with SINGLE toEventDate conversion:', {
       slotsCount: availabilitySlots.length,
       userTimeZone,
       weekStartUTC: weekStart.toISOString(),
@@ -127,11 +127,11 @@ const CalendarSimple = React.memo(() => {
       const matchedDates = dates.filter(d => d.weekday === weekdayMap[slot.day]);
       
       return matchedDates.map(d => {
-        // CRITICAL: FIXED - Create local ISO strings and use single toEventDate conversion
+        // CRITICAL: Create local ISO strings (no offset) and use SINGLE toEventDate conversion
         const startISOLocal = `${d.toISODate()}T${slot.startTime}:00`;
         const endISOLocal = `${d.toISODate()}T${slot.endTime}:00`;
         
-        console.log('[CalendarSimple] CRITICAL: Availability FIXED toEventDate conversion:', {
+        console.log('[CalendarSimple] CRITICAL: Availability SINGLE toEventDate conversion:', {
           slotDay: slot.day,
           startTime: slot.startTime,
           endTime: slot.endTime,
@@ -156,7 +156,7 @@ const CalendarSimple = React.memo(() => {
       });
     });
 
-    console.log('[CalendarSimple] CRITICAL: Availability events FIXED toEventDate verification:', {
+    console.log('[CalendarSimple] CRITICAL: Availability events SINGLE toEventDate verification:', {
       eventsCount: events.length,
       timezone: tz,
       conversionMethod: 'SINGLE toEventDate - No double conversion',
@@ -172,14 +172,14 @@ const CalendarSimple = React.memo(() => {
     return events;
   }, [availabilitySlots, weekStart, weekEnd, userTimeZone, refreshTrigger]);
 
-  // CRITICAL: Transform blocked times with STANDARDIZED toEventDate conversion
+  // CRITICAL: Transform blocked times with SINGLE toEventDate conversion
   const blockedTimeEvents = useMemo(() => {
     if (!blockedTimes.length || !userTimeZone) {
       console.log('[CalendarSimple] No blocked times or timezone');
       return [];
     }
     
-    console.log('[CalendarSimple] CRITICAL: Processing blocked times with STANDARDIZED toEventDate:', {
+    console.log('[CalendarSimple] CRITICAL: Processing blocked times with SINGLE toEventDate:', {
       blockedTimesCount: blockedTimes.length,
       userTimeZone
     });
@@ -225,11 +225,11 @@ const CalendarSimple = React.memo(() => {
     triggerRefresh();
   }, [currentDate, triggerRefresh]);
 
-  // CRITICAL: Combine all events with STANDARDIZED toEventDate conversion for appointments
+  // CRITICAL: Combine all events with SINGLE toEventDate conversion for appointments
   const allEvents = useMemo(() => {
     const events = [];
     
-    // CRITICAL: Add appointments with STANDARDIZED toEventDate conversion
+    // CRITICAL: Add appointments with SINGLE toEventDate conversion
     if (appointments) {
       events.push(...appointments.map(apt => {
         const title = apt.clientName || 'Internal Appointment';
@@ -290,7 +290,7 @@ const CalendarSimple = React.memo(() => {
       priority: 0
     })));
 
-    console.group('📊 CRITICAL: Calendar Data with FIXED toEventDate');
+    console.group('📊 CRITICAL: Calendar Data with SINGLE toEventDate');
     console.log('Week Range:', {
       start: weekStart.toISOString(),
       end: weekEnd.toISOString(),
@@ -681,7 +681,7 @@ const CalendarSimple = React.memo(() => {
                   <p>Debug: UserID: {userId}</p>
                   <p>Week: {DateTime.fromJSDate(weekStart).toFormat('MM/dd')} - {DateTime.fromJSDate(weekEnd).toFormat('MM/dd')}</p>
                   <p>Loading: A:{appointmentsLoading ? 'Y' : 'N'} | N:{nylasLoading ? 'Y' : 'N'} | B:{blockedTimesLoading ? 'Y' : 'N'}</p>
-                  <p>CRITICAL: All events use FIXED toEventDate() with bound Luxon localizer</p>
+                  <p>CRITICAL: All events use SINGLE toEventDate() with bound Luxon localizer</p>
                 </div>
               )}
             </div>
