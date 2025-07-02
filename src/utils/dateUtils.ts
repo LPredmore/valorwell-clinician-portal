@@ -180,10 +180,7 @@ export function buildLocalDate(dt: DateTime): Date {
  * Parse UTC, shift into clinician zone, then preserve the clock hour
  * This replaces all other conversion methods for calendar events
  */
-export function toLocalJSDate(
-  isoString: string,
-  timeZone: string
-): Date {
+export function toLocalJSDate(isoString: string, timeZone: string): Date {
   // Parse UTC, shift into clinician zone, then preserve the clock hour
   const dt = DateTime.fromISO(isoString, { zone: 'UTC' }).setZone(timeZone);
   return new Date(

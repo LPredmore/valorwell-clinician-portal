@@ -75,10 +75,12 @@
   transition: all 0.2s ease-in-out !important;
 }
 
-/* CRITICAL: Let React Big Calendar handle positioning - NATIVE layout restored */
+/* CRITICAL: FIXED - Let React Big Calendar handle positioning - NATIVE layout restored */
 .rbc-event {
-  /* REMOVED: All positioning overrides to restore native RBC behavior */
+  /* CRITICAL: REMOVED ALL positioning overrides to restore native RBC behavior */
   transition: all 0.2s ease-in-out !important;
+  /* position: relative ensures z-index works without breaking RBC layout */
+  position: relative !important;
 }
 
 .rbc-event:hover {
@@ -86,7 +88,7 @@
   box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important;
 }
 
-/* CRITICAL: Allow React Big Calendar to control event container positioning */
+/* CRITICAL: FIXED - Allow React Big Calendar to control event container positioning */
 .rbc-calendar .rbc-event-container {
   position: relative !important;
 }

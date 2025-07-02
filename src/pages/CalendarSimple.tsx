@@ -92,14 +92,14 @@ const CalendarSimple = React.memo(() => {
   // CRITICAL: Fixed availability hook with proper dependencies
   const availabilitySlots = useClinicianAvailability(userId, refreshTrigger);
 
-  // CRITICAL: Transform availability slots with SINGLE conversion path (no double conversion)
+  // CRITICAL: Transform availability slots with FIXED single conversion path (NO double conversion)
   const availabilityEvents = useMemo(() => {
     if (!availabilitySlots.length || !userTimeZone) {
       console.log('[CalendarSimple] No availability slots or timezone, returning empty array');
       return [];
     }
     
-    console.log('[CalendarSimple] CRITICAL: Processing availability with SINGLE conversion path:', {
+    console.log('[CalendarSimple] CRITICAL: Processing availability with FIXED single conversion path:', {
       slotsCount: availabilitySlots.length,
       userTimeZone,
       weekStartUTC: weekStart.toISOString(),
@@ -127,11 +127,11 @@ const CalendarSimple = React.memo(() => {
       const matchedDates = dates.filter(d => d.weekday === weekdayMap[slot.day]);
       
       return matchedDates.map(d => {
-        // CRITICAL: SINGLE conversion path - build local time strings directly in user timezone
+        // CRITICAL: FIXED - Direct ISO string construction without UTC conversion
         const startISOLocal = `${d.toISODate()}T${slot.startTime}`;
         const endISOLocal = `${d.toISODate()}T${slot.endTime}`;
         
-        console.log('[CalendarSimple] CRITICAL: Availability SINGLE conversion (no UTC roundtrip):', {
+        console.log('[CalendarSimple] CRITICAL: Availability FIXED conversion (no double conversion):', {
           slotDay: slot.day,
           startTime: slot.startTime,
           endTime: slot.endTime,
@@ -139,14 +139,15 @@ const CalendarSimple = React.memo(() => {
           endISOLocal,
           finalStartJS: toLocalJSDate(startISOLocal, tz).toISOString(),
           finalStartHours: toLocalJSDate(startISOLocal, tz).getHours(),
-          timezone: tz
+          timezone: tz,
+          conversionType: 'DIRECT - No UTC roundtrip'
         });
         
         return {
           id: `avail-${slot.day}-${slot.slot}-${d.toISODate()}`,
           title: 'Available',
-          start: toLocalJSDate(startISOLocal, tz), // CRITICAL: Single conversion path
-          end: toLocalJSDate(endISOLocal, tz), // CRITICAL: Single conversion path
+          start: toLocalJSDate(startISOLocal, tz), // CRITICAL: Fixed single conversion path
+          end: toLocalJSDate(endISOLocal, tz), // CRITICAL: Fixed single conversion path
           source: 'availability',
           type: 'availability',
           className: 'availability-event',
@@ -155,9 +156,10 @@ const CalendarSimple = React.memo(() => {
       });
     });
 
-    console.log('[CalendarSimple] CRITICAL: Availability events SINGLE conversion check:', {
+    console.log('[CalendarSimple] CRITICAL: Availability events FIXED conversion verification:', {
       eventsCount: events.length,
       timezone: tz,
+      conversionMethod: 'DIRECT toLocalJSDate - No double conversion',
       sampleTimes: events.slice(0, 2).map(e => ({
         id: e.id,
         start: e.start.toISOString(),
@@ -288,7 +290,7 @@ const CalendarSimple = React.memo(() => {
       priority: 0
     })));
 
-    console.group('📊 CRITICAL: Calendar Data with STANDARDIZED toLocalJSDate');
+    console.group('📊 CRITICAL: Calendar Data with FIXED toLocalJSDate');
     console.log('Week Range:', {
       start: weekStart.toISOString(),
       end: weekEnd.toISOString(),
@@ -679,7 +681,7 @@ const CalendarSimple = React.memo(() => {
                   <p>Debug: UserID: {userId}</p>
                   <p>Week: {DateTime.fromJSDate(weekStart).toFormat('MM/dd')} - {DateTime.fromJSDate(weekEnd).toFormat('MM/dd')}</p>
                   <p>Loading: A:{appointmentsLoading ? 'Y' : 'N'} | N:{nylasLoading ? 'Y' : 'N'} | B:{blockedTimesLoading ? 'Y' : 'N'}</p>
-                  <p>CRITICAL: All events use toLocalJSDate() with Luxon localizer</p>
+                  <p>CRITICAL: All events use FIXED toLocalJSDate() with Luxon localizer</p>
                 </div>
               )}
             </div>

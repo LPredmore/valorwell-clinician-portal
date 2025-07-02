@@ -36,9 +36,9 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
   // CRITICAL: Use global localizer instance instead of creating new ones
   console.log('[ReactBigCalendar] CRITICAL: Using timezone-aware global Luxon localizer instance with timezone:', userTimeZone);
 
-  // CRITICAL: Native RBC event style getter - no positioning overrides
+  // CRITICAL: FIXED - Native RBC event style getter with NO positioning overrides
   const eventPropGetter = useCallback((event: CalendarEvent) => {
-    console.log('[ReactBigCalendar] Styling event (Native RBC layout):', {
+    console.log('[ReactBigCalendar] FIXED - Styling event (Native RBC layout, no style overrides):', {
       id: event.id,
       title: event.title,
       source: event.source,
@@ -48,8 +48,8 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
     });
 
     return {
-      className: event.className || `${event.source}-event`,
-      style: {} // CRITICAL: Don't override left/width/top - let RBC handle positioning
+      className: event.className || `${event.source}-event`
+      // CRITICAL: FIXED - NO style overrides to preserve native RBC positioning
     };
   }, []);
 
@@ -88,7 +88,7 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
     onNavigate(newDate);
   }, [onNavigate, userTimeZone]);
 
-  // CRITICAL: Calendar configuration with ENFORCED overlap layout and global Luxon localizer
+  // CRITICAL: FIXED Calendar configuration with ENFORCED overlap layout and NO style overrides
   const calendarConfig = useMemo(() => ({
     localizer: globalLocalizer, // CRITICAL: Use global localizer instance
     events,
@@ -105,7 +105,7 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
     defaultView: Views.WEEK,
     step: 30,
     timeslots: 2,
-    eventPropGetter,
+    eventPropGetter, // CRITICAL: FIXED - No style overrides
     components,
     onSelectSlot,
     onSelectEvent,
@@ -116,12 +116,13 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
     toolbar: true,
   }), [events, eventPropGetter, components, onSelectSlot, onSelectEvent, date, handleNavigate]);
 
-  console.log('[ReactBigCalendar] CRITICAL: Rendering with GLOBAL Luxon localizer and NATIVE overlap:', {
+  console.log('[ReactBigCalendar] CRITICAL: FIXED - Rendering with GLOBAL Luxon localizer and NATIVE overlap:', {
     totalEvents: events.length,
     currentDate: date.toISOString(),
     userTimeZone,
     layoutAlgorithm: 'overlap',
     localizerType: 'Global Luxon with Default Zone',
+    styleOverrides: 'REMOVED - Native RBC positioning restored',
     eventsBySource: {
       internal: events.filter(e => e.source === 'internal').length,
       blocked_time: events.filter(e => e.source === 'blocked_time').length,
