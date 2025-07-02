@@ -64,11 +64,13 @@
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
   body {
     @apply bg-background text-foreground;
+  }
+  
+  /* Apply borders only to specific UI components, not universally */
+  .card, .input, .button, [data-radix-collection-item] {
+    @apply border-border;
   }
 }
 
