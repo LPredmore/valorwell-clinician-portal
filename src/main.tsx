@@ -3,7 +3,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
-import { DateTime } from 'luxon';
+import { DateTime, Settings } from 'luxon';
 import { luxonLocalizer } from 'react-big-calendar';
 
 // CRITICAL: Get user timezone and set globally before ANY React components mount
@@ -20,7 +20,7 @@ const userTimeZone = getUserTimeZone();
 console.log('[main] CRITICAL: Set global Luxon timezone BEFORE React mount:', userTimeZone);
 
 // CRITICAL: Tell Luxon the clinician's IANA timezone once using the correct API
-DateTime.defaultZone = userTimeZone;
+Settings.defaultZone = userTimeZone;
 
 // CRITICAL: Create the localizer using that default zone
 export const globalLocalizer = luxonLocalizer(DateTime);
