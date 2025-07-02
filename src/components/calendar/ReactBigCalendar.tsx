@@ -1,4 +1,3 @@
-
 import React, { useCallback, useMemo } from 'react';
 import { Calendar, Views } from 'react-big-calendar';
 import { globalLocalizer } from '@/main';
