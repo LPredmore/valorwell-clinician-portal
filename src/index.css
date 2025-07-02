@@ -1,12 +1,11 @@
 
+/* CRITICAL: Import react-big-calendar styles FIRST, then our custom styles */
+@import 'react-big-calendar/lib/css/react-big-calendar.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* CRITICAL: Import react-big-calendar styles FIRST, then our custom styles */
-@import 'react-big-calendar/lib/css/react-big-calendar.css';
-
-/* ... keep existing code (CSS variables and other styles) the same ... */
 @layer base {
   :root {
     --background: 0 0% 100%;
