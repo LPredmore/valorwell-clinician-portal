@@ -16,6 +16,7 @@ interface CalendarProps {
   appointments: any[];
   isLoading: boolean;
   error: any;
+  onRefresh?: () => void;
 }
 
 const CalendarView = ({ 
@@ -24,7 +25,8 @@ const CalendarView = ({
   userTimeZone,
   refreshTrigger = 0,
   isLoading = false,
-  error = null
+  error = null,
+  onRefresh
 }: CalendarProps) => {
   console.log('[CalendarView] Rendering traditional weekly calendar with:', {
     clinicianId,
@@ -77,6 +79,8 @@ const CalendarView = ({
           <AvailabilityManagementSidebar
             clinicianId={clinicianId}
             userTimeZone={userTimeZone}
+            refreshTrigger={refreshTrigger}
+            onRefresh={onRefresh || (() => {})}
           />
         </div>
       </div>
