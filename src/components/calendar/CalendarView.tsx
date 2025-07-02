@@ -1,90 +1,106 @@
 
-import React from 'react';
-import { addWeeks, subWeeks } from 'date-fns';
-import CalendarErrorBoundary from './CalendarErrorBoundary';
-import WeeklyCalendarGrid from './WeeklyCalendarGrid';
-import AvailabilityManagementSidebar from './AvailabilityManagementSidebar';
+import React, { useState, useCallback, useMemo } from 'react';
+import { Calendar, Views } from 'react-big-calendar';
+import { globalLocalizer } from '@/main';
+import 'react-big-calendar/lib/css/react-big-calendar.css';
 
-interface CalendarProps {
-  view: 'week' | 'month';
-  showAvailability: boolean;
-  clinicianId: string | null;
-  currentDate: Date;
-  userTimeZone: string;
-  clinicianTimeZone: string;
-  refreshTrigger: number;
-  appointments: any[];
-  isLoading: boolean;
-  error: any;
-  onRefresh?: () => void;
+interface CalendarEvent {
+  id: string;
+  title: string;
+  start: Date;
+  end: Date;
+  source?: 'internal' | 'nylas' | 'availability' | 'blocked_time';
+  type?: string;
+  className?: string;
+  resource?: any;
 }
 
-const CalendarView = ({ 
-  clinicianId, 
-  currentDate, 
-  userTimeZone,
-  refreshTrigger = 0,
-  isLoading = false,
-  error = null,
-  onRefresh
-}: CalendarProps) => {
-  console.log('[CalendarView] Rendering traditional weekly calendar with:', {
-    clinicianId,
-    currentDate,
-    userTimeZone,
-    refreshTrigger,
-    isLoading,
-    hasError: !!error
-  });
+interface CalendarViewProps {
+  events: CalendarEvent[];
+  onSelectSlot: (slotInfo: { start: Date; end: Date }) => void;
+  onSelectEvent: (event: CalendarEvent) => void;
+  date: Date;
+  onNavigate: (date: Date) => void;
+  userTimeZone?: string;
+}
 
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-          <p>Loading calendar...</p>
-        </div>
-      </div>
-    );
-  }
+const CalendarView: React.FC<CalendarViewProps> = ({
+  events,
+  onSelectSlot,
+  onSelectEvent,
+  date,
+  onNavigate,
+  userTimeZone = 'America/New_York',
+}) => {
+  // Pure RBC event styling - NO style overrides
+  const eventPropGetter = useCallback((event: CalendarEvent) => {
+    return {
+      className: event.className || `${event.source}-event`,
+      style: {} // Pure RBC - no style overrides
+    };
+  }, []);
 
-  if (error) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="text-center text-red-600">
-          <p>Error loading calendar: {error?.message || 'Unknown error'}</p>
+  // Enhanced component getter with visual indicators
+  const components = useMemo(() => ({
+    event: ({ event }: { event: CalendarEvent }) => {
+      const isBlockedTime = event.source === 'blocked_time';
+      const isAvailability = event.source === 'availability';
+      const isExternal = event.source === 'nylas';
+      
+      return (
+        <div className="rbc-event-content">
+          {isBlockedTime && (
+            <span style={{ marginRight: '4px', fontSize: '12px' }}>🚫</span>
+          )}
+          {isExternal && (
+            <span style={{ marginRight: '4px', fontSize: '12px' }}>📅</span>
+          )}
+          {isAvailability && (
+            <span style={{ marginRight: '4px', fontSize: '12px' }}>✅</span>
+          )}
+          <span>{event.title}</span>
         </div>
-      </div>
-    );
-  }
+      );
+    },
+  }), []);
+
+  // Handle navigation events from React Big Calendar
+  const handleNavigate = useCallback((newDate: Date, view?: string, action?: string) => {
+    onNavigate(newDate);
+  }, [onNavigate]);
+
+  // Pure Calendar configuration with native overlap layout
+  const calendarConfig = useMemo(() => ({
+    localizer: globalLocalizer, // Global Luxon localizer
+    events,
+    date,
+    onNavigate: handleNavigate,
+    startAccessor: 'start',
+    endAccessor: 'end',
+    style: { height: 600 },
+    views: {
+      month: true,
+      week: true,
+      day: true,
+    },
+    defaultView: Views.WEEK,
+    step: 30,
+    timeslots: 2,
+    eventPropGetter, // Pure RBC styling
+    components,
+    onSelectSlot,
+    onSelectEvent,
+    selectable: true,
+    popup: true,
+    showMultiDayTimes: true,
+    dayLayoutAlgorithm: 'overlap', // Native overlap layout
+    toolbar: true, // Use RBC's built-in toolbar
+  }), [events, eventPropGetter, components, onSelectSlot, onSelectEvent, date, handleNavigate]);
 
   return (
-    <CalendarErrorBoundary>
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Main Weekly Calendar Display */}
-        <div className="lg:col-span-3">
-          <WeeklyCalendarGrid
-            currentDate={currentDate}
-            clinicianId={clinicianId}
-            userTimeZone={userTimeZone}
-            onAvailabilityClick={(date, startTime, endTime) => {
-              console.log('Availability clicked:', { date, startTime, endTime });
-              // TODO: Implement availability editing
-            }}
-          />
-        </div>
-        
-        {/* Availability Management Sidebar */}
-        <div className="lg:col-span-1">
-          <AvailabilityManagementSidebar
-            clinicianId={clinicianId}
-            userTimeZone={userTimeZone}
-            refreshTrigger={refreshTrigger}
-            onRefresh={onRefresh || (() => {})}
-          />
-        </div>
-      </div>
-    </CalendarErrorBoundary>
+    <div className="calendar-container">
+      <Calendar {...calendarConfig} />
+    </div>
   );
 };
 
