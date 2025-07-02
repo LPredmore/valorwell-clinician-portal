@@ -13,6 +13,8 @@ import { Clock, Save, Trash2 } from 'lucide-react';
 interface AvailabilityManagementSidebarProps {
   clinicianId: string | null;
   userTimeZone: string;
+  refreshTrigger: number;
+  onRefresh: () => void;
 }
 
 interface AvailabilitySlot {
@@ -24,7 +26,9 @@ interface AvailabilitySlot {
 
 const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps> = ({
   clinicianId,
-  userTimeZone
+  userTimeZone,
+  refreshTrigger,
+  onRefresh
 }) => {
   const [selectedDay, setSelectedDay] = useState<string>('monday');
   const [selectedSlot, setSelectedSlot] = useState<number>(1);
@@ -192,8 +196,9 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
         description: 'Availability saved successfully'
       });
 
-      // Reload availability to reflect changes
+      // Reload availability to reflect changes and trigger parent refresh
       await loadCurrentAvailability();
+      onRefresh();
     } catch (error) {
       console.error('Error saving availability:', error);
       toast({
@@ -236,6 +241,7 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
       setStartTime('');
       setEndTime('');
       await loadCurrentAvailability();
+      onRefresh();
     } catch (error) {
       console.error('Error deleting availability:', error);
       toast({
