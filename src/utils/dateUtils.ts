@@ -174,3 +174,26 @@ export function buildLocalDate(dt: DateTime): Date {
     dt.millisecond
   );
 }
+
+/**
+ * CRITICAL: New standardized date conversion for Luxon localizer
+ * Convert a UTC ISO string into a JS Date whose hour/minute fields
+ * match the target time zone's local clock.
+ * This replaces buildLocalDate for use with Luxon localizer.
+ */
+export function toLocalJSDate(
+  isoString: string,
+  timeZone: string
+): Date {
+  const dt = DateTime.fromISO(isoString, { zone: 'UTC' })
+    .setZone(timeZone);
+  return new Date(
+    dt.year,
+    dt.month - 1,
+    dt.day,
+    dt.hour,
+    dt.minute,
+    dt.second,
+    dt.millisecond
+  );
+}

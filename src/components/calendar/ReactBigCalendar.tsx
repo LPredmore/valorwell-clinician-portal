@@ -1,7 +1,7 @@
 
 import React, { useCallback, useMemo } from 'react';
-import { Calendar, momentLocalizer, Views } from 'react-big-calendar';
-import moment from 'moment';
+import { Calendar, luxonLocalizer, Views } from 'react-big-calendar';
+import { DateTime } from 'luxon';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import '@/styles/calendar.css';
 
@@ -33,11 +33,11 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
   onNavigate,
   userTimeZone = 'America/New_York',
 }) => {
-  // CRITICAL: Use simple localizer - timezone is already set globally
+  // CRITICAL: Use Luxon localizer instead of Moment
   const localizer = useMemo(() => {
-    console.log('[ReactBigCalendar] FIXED: Using global moment timezone configuration');
-    return momentLocalizer(moment);
-  }, []);
+    console.log('[ReactBigCalendar] FIXED: Using Luxon localizer with timezone:', userTimeZone);
+    return luxonLocalizer(DateTime);
+  }, [userTimeZone]);
 
   // Enhanced event style getter with proper className handling
   const eventPropGetter = useCallback((event: CalendarEvent) => {
@@ -93,7 +93,7 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
     onNavigate(newDate);
   }, [onNavigate, userTimeZone]);
 
-  // CRITICAL: Calendar configuration with ENFORCED overlap layout
+  // CRITICAL: Calendar configuration with ENFORCED overlap layout and Luxon localizer
   const calendarConfig = useMemo(() => ({
     localizer,
     events,
@@ -121,12 +121,12 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
     toolbar: true,
   }), [events, eventPropGetter, components, onSelectSlot, onSelectEvent, date, handleNavigate, localizer]);
 
-  console.log('[ReactBigCalendar] FIXED: Rendering with ENFORCED overlap and global timezone:', {
+  console.log('[ReactBigCalendar] FIXED: Rendering with Luxon localizer and ENFORCED overlap:', {
     totalEvents: events.length,
     currentDate: date.toISOString(),
     userTimeZone,
     layoutAlgorithm: 'overlap',
-    globalMomentTimezone: moment.tz.guess(),
+    localizerType: 'Luxon',
     eventsBySource: {
       internal: events.filter(e => e.source === 'internal').length,
       blocked_time: events.filter(e => e.source === 'blocked_time').length,

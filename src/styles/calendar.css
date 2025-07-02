@@ -1,5 +1,5 @@
 
-/* CRITICAL: Enhanced event styling with ENFORCED z-index and positioning */
+/* CRITICAL: Enhanced event styling with proper z-index but NO positioning conflicts */
 
 /* CRITICAL: Availability events - LOWEST z-index (background layer) */
 .rbc-event.availability-event {
@@ -75,10 +75,11 @@
   transition: all 0.2s ease-in-out !important;
 }
 
-/* CRITICAL: Ensure all events have proper stacking context */
+/* CRITICAL: Let React Big Calendar handle positioning - NO absolute positioning or width overrides */
 .rbc-event {
   position: relative !important;
   transition: all 0.2s ease-in-out !important;
+  /* REMOVED: position: absolute and width: 100% to fix layout issues */
 }
 
 .rbc-event:hover {
@@ -86,21 +87,16 @@
   box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important;
 }
 
-/* CRITICAL: Force overlapping layout with absolute positioning */
+/* CRITICAL: Remove conflicting positioning rules that break React Big Calendar layout */
 .rbc-calendar .rbc-event-container {
   position: relative !important;
 }
 
-.rbc-calendar .rbc-event {
+/* REMOVED: Conflicting absolute positioning and width rules */
+/* .rbc-calendar .rbc-event {
   position: absolute !important;
   width: 100% !important;
-  transition: all 0.2s ease-in-out !important;
-}
-
-.rbc-calendar .rbc-event:hover {
-  transform: translateY(-1px) !important;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important;
-}
+} */
 
 /* Calendar tooltip enhancements */
 .rbc-tooltip {

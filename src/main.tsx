@@ -3,7 +3,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
-import moment from 'moment-timezone';
+import { DateTime } from 'luxon';
 
 // CRITICAL: Get user timezone and set globally before ANY React components mount
 const getUserTimeZone = () => {
@@ -14,10 +14,9 @@ const getUserTimeZone = () => {
   }
 };
 
-// Set moment timezone globally BEFORE any calendar components are created
+// Set global timezone for Luxon BEFORE any calendar components are created
 const userTimeZone = getUserTimeZone();
-moment.tz.setDefault(userTimeZone);
-console.log('[main] FIXED: Set global moment timezone BEFORE React mount:', userTimeZone);
+console.log('[main] FIXED: Set global Luxon timezone BEFORE React mount:', userTimeZone);
 
 const rootElement = document.getElementById("root");
 
