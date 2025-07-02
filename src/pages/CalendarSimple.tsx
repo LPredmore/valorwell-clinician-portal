@@ -1,44 +1,22 @@
-import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
+
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "../components/layout/Layout";
 import { useUser } from "@/context/UserContext";
 import { useToast } from "@/hooks/use-toast";
 import CalendarErrorBoundary from "../components/calendar/CalendarErrorBoundary";
 import ReactBigCalendar from "@/components/calendar/ReactBigCalendar";
-import AppointmentDialog from "@/components/calendar/AppointmentDialog";
-import BlockTimeDialog from "@/components/calendar/BlockTimeDialog";
-import EditBlockedTimeDialog from "@/components/calendar/EditBlockedTimeDialog";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Plus, Clock } from "lucide-react";
-import { TimeZoneService } from "@/utils/timeZoneService";
-import { getClinicianTimeZone } from "@/hooks/useClinicianData";
 import { DateTime } from "luxon";
 import { useAppointments } from "@/hooks/useAppointments";
 import { useNylasEvents } from "@/hooks/useNylasEvents";
 import { useClinicianAvailability } from "@/hooks/useClinicianAvailability";
 import { useBlockedTime } from "@/hooks/useBlockedTime";
-import { toEventDate } from "@/utils/dateUtils";
-import {
-  Sheet,
-  SheetTrigger,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import AvailabilityManagementSidebar from "@/components/calendar/AvailabilityManagementSidebar";
-import CalendarConnectionsPanel from "@/components/calendar/CalendarConnectionsPanel";
-import CalendarLegend from "../components/calendar/CalendarLegend";
-import { getWeekRange, logWeekNavigation } from "@/utils/dateRangeUtils";
-
-// CRITICAL: Time normalization helper to fix malformed ISO strings
-const normalizeTime = (time: string) => {
-  return time.length === 5            // "HH:mm"
-    ? `${time}:00`
-    : time.length === 8               // "HH:mm:ss"
-      ? time
-      : time.slice(0,8);              // trim any extras
-};
+import { getWeekRange } from "@/utils/dateRangeUtils";
+import { getClinicianTimeZone } from "@/hooks/useClinicianData";
+import { TimeZoneService } from "@/utils/timeZoneService";
 
 const CalendarSimple = React.memo(() => {
   const { userId, authInitialized, userRole } = useUser();
@@ -46,37 +24,17 @@ const CalendarSimple = React.memo(() => {
   const [isReady, setIsReady] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [userTimeZone, setUserTimeZone] = useState<string>(TimeZoneService.DEFAULT_TIMEZONE);
-  const [isMounted, setIsMounted] = useState(true);
-  const [showAppointmentDialog, setShowAppointmentDialog] = useState(false);
-  const [showBlockTimeDialog, setShowBlockTimeDialog] = useState(false);
-  const [showEditBlockedDialog, setShowEditBlockedDialog] = useState(false);
-  const [selectedSlot, setSelectedSlot] = useState<any>(null);
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [editingAppointment, setEditingAppointment] = useState<any>(null);
-  const [editingBlockedTime, setEditingBlockedTime] = useState<any>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const navigate = useNavigate();
   const { toast } = useToast();
-  
-  // Circuit breakers
-  const authCheckCountRef = useRef(0);
-  const timezoneLoadCountRef = useRef(0);
-  const accessDeniedRef = useRef(false);
 
-  // Enhanced week boundary calculation with timezone awareness
+  // Calculate week boundaries
   const { weekStart, weekEnd } = useMemo(() => {
     const tz = userTimeZone || TimeZoneService.DEFAULT_TIMEZONE;
-    const range = getWeekRange(currentDate, tz);
-    
-    logWeekNavigation(range.start, range.end, tz);
-    
-    return {
-      weekStart: range.start,
-      weekEnd: range.end
-    };
+    return getWeekRange(currentDate, tz);
   }, [currentDate, userTimeZone]);
 
-  // CRITICAL: Fetch data with FIXED hook dependencies
+  // Fetch data
   const { appointments, isLoading: appointmentsLoading } = useAppointments(
     userId,
     weekStart,
@@ -90,7 +48,6 @@ const CalendarSimple = React.memo(() => {
     weekEnd
   );
 
-  // CRITICAL: Fixed blocked times hook with proper dependencies
   const { blockedTimes, isLoading: blockedTimesLoading } = useBlockedTime(
     userId || '',
     weekStart,
@@ -98,7 +55,6 @@ const CalendarSimple = React.memo(() => {
     refreshTrigger
   );
 
-  // CRITICAL: Fixed availability hook with proper date range dependencies
   const availabilitySlots = useClinicianAvailability(
     userId,
     weekStart,
@@ -106,13 +62,8 @@ const CalendarSimple = React.memo(() => {
     refreshTrigger
   );
 
-  // CRITICAL: Transform availability with FIXED ISO construction and consistent timezone handling
+  // Transform availability events
   const availabilityEvents = useMemo(() => {
-    console.log('[CalendarSimple] Processing availability slots:', {
-      slotsCount: availabilitySlots.length,
-      userTimeZone
-    });
-    
     const tz = userTimeZone;
     const startDT = DateTime.fromJSDate(weekStart).setZone(tz).startOf('day');
     const endDT = DateTime.fromJSDate(weekEnd).setZone(tz).startOf('day');
@@ -130,27 +81,13 @@ const CalendarSimple = React.memo(() => {
       friday: 5, saturday: 6, sunday: 7 
     };
 
-    const events = availabilitySlots.flatMap(slot => {
+    return availabilitySlots.flatMap(slot => {
       const matchedDates = dates.filter(d => d.weekday === weekdayMap[slot.day]);
       
       return matchedDates.map(d => {
-        // CRITICAL: Normalize time strings to prevent malformed ISO
-        const tStart = normalizeTime(slot.startTime);
-        const tEnd = normalizeTime(slot.endTime);
-        const startISO = `${d.toISODate()}T${tStart}`;
-        const endISO = `${d.toISODate()}T${tEnd}`;
+        const startISO = `${d.toISODate()}T${slot.startTime}`;
+        const endISO = `${d.toISODate()}T${slot.endTime}`;
         
-        console.log('[CalendarSimple] Creating availability event:', {
-          slotDay: slot.day,
-          originalStart: slot.startTime,
-          originalEnd: slot.endTime,
-          normalizedStart: tStart,
-          normalizedEnd: tEnd,
-          startISO,
-          endISO
-        });
-        
-        // CRITICAL: Parse availability as local time in clinician's timezone
         const startDT = DateTime.fromISO(startISO, { zone: tz });
         const endDT = DateTime.fromISO(endISO, { zone: tz });
         
@@ -166,27 +103,11 @@ const CalendarSimple = React.memo(() => {
         };
       });
     });
+  }, [availabilitySlots, weekStart, weekEnd, userTimeZone]);
 
-    console.log('[CalendarSimple] Created availability events:', events.length);
-    return events;
-  }, [availabilitySlots, weekStart, weekEnd, userTimeZone, refreshTrigger]);
-
-  // CRITICAL: Transform blocked times with consistent timezone handling
+  // Transform blocked time events
   const blockedTimeEvents = useMemo(() => {
-    if (!blockedTimes.length || !userTimeZone) {
-      console.log('[CalendarSimple] No blocked times or timezone');
-      return [];
-    }
-    
-    console.log('[CalendarSimple] Processing blocked times:', blockedTimes.length);
-
-    const events = blockedTimes.map(blockedTime => {
-      console.log('[CalendarSimple] Creating blocked time event:', {
-        id: blockedTime.id,
-        label: blockedTime.label
-      });
-
-      // CRITICAL: Parse blocked time as UTC and convert to clinician's timezone
+    return blockedTimes.map(blockedTime => {
       const startDT = DateTime.fromISO(blockedTime.start_at, { zone: 'utc' }).setZone(userTimeZone);
       const endDT = DateTime.fromISO(blockedTime.end_at, { zone: 'utc' }).setZone(userTimeZone);
 
@@ -201,43 +122,15 @@ const CalendarSimple = React.memo(() => {
         resource: blockedTime
       };
     });
-
-    return events;
   }, [blockedTimes, userTimeZone]);
 
-  // Refresh callback for data changes
-  const triggerRefresh = useCallback(() => {
-    console.log('[CalendarSimple] Refresh triggered - will refetch all data sources');
-    setRefreshTrigger(prev => prev + 1);
-  }, []);
-
-  // Handle navigation from React Big Calendar
-  const handleCalendarNavigate = useCallback((newDate: Date) => {
-    console.log('[CalendarSimple] Navigation handled by React Big Calendar:', {
-      from: currentDate.toISOString(),
-      to: newDate.toISOString()
-    });
-    setCurrentDate(newDate);
-    triggerRefresh();
-  }, [currentDate, triggerRefresh]);
-
-  // CRITICAL: Combine all events with consistent timezone conversion for appointments
+  // Combine all events
   const allEvents = useMemo(() => {
     const events = [];
     
-    // CRITICAL: Add appointments with consistent UTC-to-local conversion
+    // Add appointments
     if (appointments) {
       events.push(...appointments.map(apt => {
-        const title = apt.clientName || 'Internal Appointment';
-
-        console.log('[CalendarSimple] Creating appointment event:', {
-          id: apt.id,
-          clientName: apt.clientName,
-          start_at: apt.start_at,
-          end_at: apt.end_at
-        });
-
-        // CRITICAL: Parse appointment as UTC and convert to clinician's timezone
         const startDT = DateTime.fromISO(apt.start_at, { zone: 'utc' }).setZone(userTimeZone);
         const endDT = DateTime.fromISO(apt.end_at, { zone: 'utc' }).setZone(userTimeZone);
 
@@ -246,8 +139,7 @@ const CalendarSimple = React.memo(() => {
           source: 'internal',
           type: 'appointment',
           className: 'internal-event',
-          id: apt.id,
-          title: title,
+          title: apt.clientName || 'Internal Appointment',
           start: startDT.toJSDate(),
           end: endDT.toJSDate(),
           resource: apt,
@@ -256,16 +148,13 @@ const CalendarSimple = React.memo(() => {
       }));
     }
     
-    // Add Nylas events with proper source tagging
+    // Add Nylas events
     if (nylasEvents) {
       events.push(...nylasEvents.map(evt => ({
         ...evt,
         source: 'nylas',
         type: 'external',
         className: 'external-event',
-        id: evt.id,
-        start_time: evt.when?.start_time,
-        end_time: evt.when?.end_time,
         start: evt.when?.start_time,
         end: evt.when?.end_time,
         priority: 1
@@ -284,66 +173,46 @@ const CalendarSimple = React.memo(() => {
       priority: 0
     })));
 
-    console.log('[CalendarSimple] Final event summary:', {
-      appointments: appointments?.length || 0,
-      nylasEvents: nylasEvents?.length || 0,
-      blockedTimeEvents: blockedTimeEvents.length,
-      availabilityEvents: availabilityEvents.length,
-      totalEvents: events.length
-    });
-
     return events.sort((a, b) => {
       if (a.priority !== b.priority) {
         return a.priority - b.priority;
       }
       return new Date(a.start).getTime() - new Date(b.start).getTime();
     });
-  }, [appointments, nylasEvents, blockedTimeEvents, availabilityEvents, weekStart, weekEnd, userTimeZone]);
+  }, [appointments, nylasEvents, blockedTimeEvents, availabilityEvents]);
 
-  // Debug logging for calendar state
-  useEffect(() => {
-    console.log('[CalendarSimple] Component state:', {
-      userId,
-      appointmentsCount: appointments?.length || 0,
-      nylasEventsCount: nylasEvents?.length || 0,
-      blockedTimesCount: blockedTimes?.length || 0,
-      allEventsCount: allEvents?.length || 0,
-      appointmentsLoading,
-      nylasLoading,
-      blockedTimesLoading,
-      userTimeZone,
-      currentDate: currentDate.toISOString(),
-      synchronizedWeekStart: weekStart.toISOString(),
-      synchronizedWeekEnd: weekEnd.toISOString(),
-      isReady,
-      authInitialized,
-      navigationSystem: 'React Big Calendar Native'
-    });
-  }, [userId, appointments, nylasEvents, blockedTimes, allEvents, appointmentsLoading, nylasLoading, blockedTimesLoading, userTimeZone, currentDate, weekStart, weekEnd, isReady, authInitialized]);
-
-  // Handle slot selection for new appointments
-  const handleSelectSlot = useCallback((slotInfo: { start: Date; end: Date }) => {
-    console.log('[CalendarSimple] Slot selected:', slotInfo);
-    setSelectedSlot({
-      start: slotInfo.start,
-      end: slotInfo.end
-    });
-    setEditingAppointment(null);
-    setIsEditMode(false);
-    setShowAppointmentDialog(true);
+  // Load user timezone
+  const loadUserTimeZone = useCallback(async (clinicianId: string) => {
+    try {
+      const timeZone = await getClinicianTimeZone(clinicianId);
+      setUserTimeZone(TimeZoneService.ensureIANATimeZone(timeZone));
+    } catch (error) {
+      const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      setUserTimeZone(TimeZoneService.ensureIANATimeZone(browserTimezone));
+    }
   }, []);
 
-  // Handle event click with proper blocked time handling
+  // Handle navigation
+  const handleCalendarNavigate = useCallback((newDate: Date) => {
+    setCurrentDate(newDate);
+    setRefreshTrigger(prev => prev + 1);
+  }, []);
+
+  // Handle slot selection
+  const handleSelectSlot = useCallback((slotInfo: { start: Date; end: Date }) => {
+    // Navigate to appointment creation page or open modal
+    navigate('/appointments/new', { 
+      state: { 
+        start: slotInfo.start, 
+        end: slotInfo.end 
+      } 
+    });
+  }, [navigate]);
+
+  // Handle event click
   const handleSelectEvent = useCallback((event: any) => {
-    console.log('[CalendarSimple] Event selected:', event);
     if (event.source === 'internal') {
-      setEditingAppointment(event.resource || event);
-      setSelectedSlot({
-        start: event.start || new Date(event.start_at),
-        end: event.end || new Date(event.end_at)
-      });
-      setIsEditMode(true);
-      setShowAppointmentDialog(true);
+      navigate(`/appointments/${event.id}`);
     } else if (event.source === 'nylas') {
       toast({
         title: "📅 External Event",
@@ -351,234 +220,43 @@ const CalendarSimple = React.memo(() => {
         duration: 3000,
       });
     } else if (event.source === 'blocked_time') {
-      console.log('[CalendarSimple] Opening edit dialog for blocked time:', event);
-      setEditingBlockedTime(event.resource);
-      setShowEditBlockedDialog(true);
+      navigate(`/blocked-time/${event.id}`);
     } else if (event.source === 'availability') {
       toast({
         title: "✅ Available Time",
-        description: `Available slot: ${event.resource.startTime} - ${event.resource.endTime}. Click 'New Appointment' to book this time.`,
+        description: `Available slot: ${event.resource.startTime} - ${event.resource.endTime}`,
         duration: 3000,
       });
     }
-  }, [toast]);
+  }, [toast, navigate]);
 
-  // Handle new appointment button
-  const handleNewAppointment = useCallback(() => {
-    setSelectedSlot(null);
-    setEditingAppointment(null);
-    setIsEditMode(false);
-    setShowAppointmentDialog(true);
-  }, []);
-
-  // Clean block time handler
-  const handleBlockTime = useCallback(() => {
-    const timestamp = new Date().toISOString();
-    console.log(`[CalendarSimple] ${timestamp} handleBlockTime called with userId:`, {
-      userId,
-      type: typeof userId,
-      isNull: userId === null,
-      isUndefined: userId === undefined,
-      isReady,
-      authInitialized,
-      userRole
-    });
-
-    // Validate user ID before opening dialog
-    if (!userId) {
-      console.error(`[CalendarSimple] ${timestamp} Cannot open BlockTimeDialog - userId is null/undefined`);
-      toast({
-        title: "Error",
-        description: "No user ID available. Please refresh the page and try again.",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    if (typeof userId !== 'string') {
-      console.error(`[CalendarSimple] ${timestamp} Invalid userId type:`, {
-        userId,
-        type: typeof userId
-      });
-      toast({
-        title: "Error", 
-        description: "Invalid user ID format. Please refresh the page and try again.",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    if (userId.trim() === '') {
-      console.error(`[CalendarSimple] ${timestamp} userId is empty string`);
-      toast({
-        title: "Error",
-        description: "Empty user ID. Please refresh the page and try again.",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(userId)) {
-      console.error(`[CalendarSimple] ${timestamp} userId is not a valid UUID:`, userId);
-      toast({
-        title: "Error",
-        description: "Invalid user ID format. Please refresh the page and try again.",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    console.log(`[CalendarSimple] ${timestamp} Opening BlockTimeDialog with valid userId:`, userId);
-    setShowBlockTimeDialog(true);
-  }, [userId, isReady, authInitialized, userRole, toast]);
-
-  // Stabilized access control handler with circuit breaker
-  const handleAccessDenied = useCallback((message: string) => {
-    if (!isMounted || accessDeniedRef.current) return;
-    
-    accessDeniedRef.current = true;
-    toast({
-      title: "Access Denied",
-      description: message,
-      variant: "destructive"
-    });
-  }, [toast, isMounted]);
-
-  // Stabilized timezone loading function with circuit breaker
-  const loadUserTimeZone = useCallback(async (clinicianId: string) => {
-    if (!isMounted || timezoneLoadCountRef.current >= 3) return;
-    
-    timezoneLoadCountRef.current++;
-    
-    try {
-      console.log('[CalendarSimple] Loading timezone for:', clinicianId);
-      const timeZone = await getClinicianTimeZone(clinicianId);
-      
-      if (!isMounted) return;
-      
-      setUserTimeZone(TimeZoneService.ensureIANATimeZone(timeZone));
-    } catch (error) {
-      console.error('[CalendarSimple] Error loading user timezone:', error);
-      if (isMounted) {
-        const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        setUserTimeZone(TimeZoneService.ensureIANATimeZone(browserTimezone));
-      }
-    }
-  }, [isMounted]);
-
-  // Component mounting effect
+  // Auth effect
   useEffect(() => {
-    setIsMounted(true);
-    return () => {
-      setIsMounted(false);
-    };
-  }, []);
-
-  // Primary auth effect with circuit breaker
-  useEffect(() => {
-    if (!authInitialized || authCheckCountRef.current >= 3) return;
-    
-    authCheckCountRef.current++;
-    console.log('[CalendarSimple] Auth check #', authCheckCountRef.current, { authInitialized, userId, userRole });
+    if (!authInitialized) return;
     
     if (!userId) {
-      console.log('[CalendarSimple] No user found, redirecting to login');
-      handleAccessDenied("Please log in to access the calendar");
-      setTimeout(() => navigate('/login'), 100);
+      navigate('/login');
       return;
     }
     
     if (userRole === 'client') {
-      console.log('[CalendarSimple] Client user detected, redirecting to portal');
-      handleAccessDenied("This calendar is for clinicians only. Redirecting to client portal.");
-      setTimeout(() => navigate('/portal'), 100);
+      navigate('/portal');
       return;
     }
     
     if (userRole === 'clinician' || userRole === 'admin') {
-      console.log('[CalendarSimple] Authorized user, setting ready');
       setIsReady(true);
     }
-  }, [authInitialized, userId, userRole, navigate, handleAccessDenied]);
+  }, [authInitialized, userId, userRole, navigate]);
 
-  // Timezone loading effect with circuit breaker
+  // Timezone loading effect
   useEffect(() => {
-    if (!isReady || !userId || !isMounted || timezoneLoadCountRef.current >= 3) return;
-    
-    console.log('[CalendarSimple] Loading timezone for ready user:', userId);
+    if (!isReady || !userId) return;
     loadUserTimeZone(userId);
-  }, [isReady, userId, isMounted, loadUserTimeZone]);
-
-  // Memoized display values
-  const currentMonthDisplay = useMemo(() => {
-    return currentDate.toLocaleDateString('en-US', { 
-      month: 'long', 
-      year: 'numeric' 
-    });
-  }, [currentDate]);
-
-  // Debug logging for calendar state
-  useEffect(() => {
-    console.log('[CalendarSimple] Component state:', {
-      userId,
-      appointmentsCount: appointments?.length || 0,
-      nylasEventsCount: nylasEvents?.length || 0,
-      blockedTimesCount: blockedTimes?.length || 0,
-      allEventsCount: allEvents?.length || 0,
-      appointmentsLoading,
-      nylasLoading,
-      blockedTimesLoading,
-      userTimeZone,
-      currentDate: currentDate.toISOString(),
-      synchronizedWeekStart: weekStart.toISOString(),
-      synchronizedWeekEnd: weekEnd.toISOString(),
-      isReady,
-      authInitialized,
-      navigationSystem: 'React Big Calendar Native'
-    });
-  }, [userId, appointments, nylasEvents, blockedTimes, allEvents, appointmentsLoading, nylasLoading, blockedTimesLoading, userTimeZone, currentDate, weekStart, weekEnd, isReady, authInitialized]);
+  }, [isReady, userId, loadUserTimeZone]);
 
   // Early returns for loading states
-  if (!authInitialized) {
-    return (
-      <Layout>
-        <div className="bg-white rounded-lg shadow-sm p-6 animate-fade-in">
-          <div className="flex justify-center items-center h-64">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-              <p>Initializing authentication...</p>
-            </div>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
-
-  if (!userId) {
-    return (
-      <Layout>
-        <div className="bg-white rounded-lg shadow-sm p-6 animate-fade-in">
-          <div className="flex justify-center items-center h-64">
-            <div className="text-center">
-              <div className="text-red-600 mb-4">
-                <p className="text-lg font-medium">Authentication Required</p>
-                <p className="text-sm">Please log in to access the calendar</p>
-              </div>
-              <button 
-                onClick={() => navigate('/login')}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-              >
-                Go to Login
-              </button>
-            </div>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
-
-  if (!isReady) {
+  if (!authInitialized || !userId || !isReady) {
     return (
       <Layout>
         <div className="bg-white rounded-lg shadow-sm p-6 animate-fade-in">
@@ -593,52 +271,27 @@ const CalendarSimple = React.memo(() => {
     );
   }
 
+  const currentMonthDisplay = currentDate.toLocaleDateString('en-US', { 
+    month: 'long', 
+    year: 'numeric' 
+  });
+
   return (
     <Layout>
       <CalendarErrorBoundary>
         <div className="p-6">
-          {/* Header with action buttons only - navigation now handled by React Big Calendar */}
+          {/* Header with action buttons */}
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center space-x-4">
-              {/* New Appointment Button */}
-              <Button onClick={handleNewAppointment}>
+              <Button onClick={() => navigate('/appointments/new')}>
                 <Plus className="h-4 w-4 mr-2" />
                 New Appointment
               </Button>
 
-              {/* Block Time Button */}
-              <Button variant="outline" onClick={handleBlockTime}>
+              <Button variant="outline" onClick={() => navigate('/blocked-time/new')}>
                 <Clock className="h-4 w-4 mr-2" />
                 Block Time
               </Button>
-
-              {/* Availability Sheet */}
-              <Sheet>
-                <SheetTrigger asChild>
-                  <Button variant="outline">
-                    <Clock className="h-4 w-4 mr-2" />
-                    Availability
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="right" className="sm:max-w-md overflow-y-auto">
-                  <SheetHeader>
-                    <SheetTitle>Manage Availability</SheetTitle>
-                  </SheetHeader>
-                  
-                  <div className="mt-6 space-y-6">
-                    {/* Availability Management */}
-                    <AvailabilityManagementSidebar
-                      clinicianId={userId}
-                      userTimeZone={userTimeZone}
-                      refreshTrigger={refreshTrigger}
-                      onRefresh={triggerRefresh}
-                    />
-
-                    {/* Calendar Connections */}
-                    <CalendarConnectionsPanel />
-                  </div>
-                </SheetContent>
-              </Sheet>
             </div>
             
             <h1 className="text-2xl font-bold text-gray-800">
@@ -646,34 +299,11 @@ const CalendarSimple = React.memo(() => {
             </h1>
             
             <div className="text-sm text-gray-600 text-right">
-              <p>
-                Showing {allEvents.length} events | 
-                Internal: {appointments?.length || 0} | 
-                External: {nylasEvents?.length || 0} | 
-                Blocked: {blockedTimeEvents.length} |
-                Available: {availabilityEvents.length}
-              </p>
               <p>Timezone: {userTimeZone}</p>
-              {process.env.NODE_ENV === 'development' && (
-                <div className="text-xs text-blue-600 space-y-1">
-                  <p>Debug: UserID: {userId}</p>
-                  <p>Week: {DateTime.fromJSDate(weekStart).toFormat('MM/dd')} - {DateTime.fromJSDate(weekEnd).toFormat('MM/dd')}</p>
-                  <p>Loading: A:{appointmentsLoading ? 'Y' : 'N'} | N:{nylasLoading ? 'Y' : 'N'} | B:{blockedTimesLoading ? 'Y' : 'N'}</p>
-                  <p>SURGICAL FIX: Availability guard removed, native RBC flow restored</p>
-                </div>
-              )}
             </div>
           </div>
 
-          {/* Calendar Legend */}
-          <CalendarLegend
-            blockedCount={blockedTimeEvents.length}
-            internalCount={appointments?.length || 0}
-            externalCount={nylasEvents?.length || 0}
-            availableCount={availabilityEvents.length}
-          />
-
-          {/* CRITICAL: React Big Calendar with Luxon localizer and properly converted events */}
+          {/* React Big Calendar */}
           <ReactBigCalendar
             events={allEvents}
             onSelectSlot={handleSelectSlot}
@@ -682,51 +312,6 @@ const CalendarSimple = React.memo(() => {
             onNavigate={handleCalendarNavigate}
             userTimeZone={userTimeZone}
           />
-
-          {/* Calendar-specific Appointment Dialog */}
-          {showAppointmentDialog && (
-            <AppointmentDialog
-              isOpen={showAppointmentDialog}
-              onClose={() => {
-                setShowAppointmentDialog(false);
-                setSelectedSlot(null);
-                setEditingAppointment(null);
-                setIsEditMode(false);
-              }}
-              selectedSlot={selectedSlot}
-              clinicianId={userId}
-              userTimeZone={userTimeZone}
-              onAppointmentCreated={triggerRefresh}
-              onAppointmentUpdated={triggerRefresh}
-              isEditMode={isEditMode}
-              editingAppointment={editingAppointment}
-            />
-          )}
-
-          {/* Block Time Dialog */}
-          {showBlockTimeDialog && (
-            <BlockTimeDialog
-              isOpen={showBlockTimeDialog}
-              onClose={() => setShowBlockTimeDialog(false)}
-              clinicianId={userId}
-              userTimeZone={userTimeZone}
-              onBlockedTimeCreated={triggerRefresh}
-            />
-          )}
-
-          {/* Edit Blocked Time Dialog */}
-          {showEditBlockedDialog && (
-            <EditBlockedTimeDialog
-              isOpen={showEditBlockedDialog}
-              onClose={() => {
-                setShowEditBlockedDialog(false);
-                setEditingBlockedTime(null);
-              }}
-              blockedTime={editingBlockedTime}
-              userTimeZone={userTimeZone}
-              onBlockedTimeUpdated={triggerRefresh}
-            />
-          )}
         </div>
       </CalendarErrorBoundary>
     </Layout>

@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -20,6 +19,8 @@ import Settings from "./pages/Settings";
 import ResetPassword from "./pages/ResetPassword";
 import NylasOAuthCallback from "./pages/NylasOAuthCallback";
 import MonitoringPage from "./pages/MonitoringPage";
+import AppointmentCreate from "./pages/AppointmentCreate";
+import BlockedTimeCreate from "./pages/BlockedTimeCreate";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -77,6 +78,22 @@ const App = () => {
                 } 
               />
               <Route 
+                path="/appointments/new" 
+                element={
+                  <ProtectedRoute allowedRoles={['clinician', 'admin']}>
+                    <AppointmentCreate />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/blocked-time/new" 
+                element={
+                  <ProtectedRoute allowedRoles={['clinician', 'admin']}>
+                    <BlockedTimeCreate />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
                 path="/dashboard" 
                 element={
                   <ProtectedRoute allowedRoles={['clinician', 'admin']}>
@@ -84,6 +101,9 @@ const App = () => {
                   </ProtectedRoute>
                 } 
               />
+              
+              
+              
               <Route 
                 path="/clients" 
                 element={
