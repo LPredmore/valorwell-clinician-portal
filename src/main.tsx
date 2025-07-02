@@ -19,8 +19,8 @@ const getUserTimeZone = () => {
 const userTimeZone = getUserTimeZone();
 console.log('[main] CRITICAL: Set global Luxon timezone BEFORE React mount:', userTimeZone);
 
-// CRITICAL: Tell Luxon the clinician's IANA timezone once
-DateTime.Settings.defaultZone = userTimeZone;
+// CRITICAL: Tell Luxon the clinician's IANA timezone once using the correct API
+DateTime.defaultZone = userTimeZone;
 
 // CRITICAL: Create the localizer using that default zone
 export const globalLocalizer = luxonLocalizer(DateTime);
