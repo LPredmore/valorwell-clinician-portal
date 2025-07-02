@@ -1,7 +1,19 @@
 
 import { useMemo } from 'react';
 import { DateTime } from 'luxon';
-import { TimeBlock, AppointmentBlock } from '@/components/calendar/week-view/types';
+
+interface TimeBlock {
+  start: DateTime;
+  end: DateTime;
+  isException?: boolean;
+}
+
+interface AppointmentBlock {
+  id: string;
+  start: DateTime;
+  end: DateTime;
+  clientName?: string;
+}
 
 interface UseTimeRangeProps {
   appointmentBlocks: AppointmentBlock[];

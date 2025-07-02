@@ -1,30 +1,23 @@
 
-import { DateTime } from 'luxon';
 import { Appointment } from '@/types/appointment';
 
-export interface TimeSlotProps {
-  day: Date;
-  timeSlot: Date;
-  isAvailable: boolean;
-  currentBlock?: any;
-  appointment?: any;
-  isStartOfBlock: boolean;
-  isEndOfBlock: boolean;
-  isStartOfAppointment: boolean;
-  isEndOfAppointment?: boolean;
-  handleAvailabilityBlockClick: (day: Date, block: any) => void;
-  onAppointmentClick?: (appointment: any) => void;
-  onAppointmentDragStart?: (appointment: any, event: React.DragEvent) => void;
-  onAppointmentDragOver?: (day: Date, timeSlot: Date, event: React.DragEvent) => void;
-  onAppointmentDrop?: (day: Date, timeSlot: Date, event: React.DragEvent) => void;
-  originalAppointments: any[];
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  start: Date;
+  end: Date;
+  source?: 'internal' | 'nylas' | 'availability' | 'blocked_time';
+  type?: string;
+  className?: string;
+  resource?: any;
+  priority?: number;
 }
 
-export interface EditAppointmentDialogProps {
-  appointment: Appointment;
-  onClose: () => void;
-  onUpdate: (updatedAppointment: Appointment) => void;
-  onDelete: (id: string) => void;
-  isOpen?: boolean;
-  onAppointmentUpdated?: () => void;
+export interface ReactBigCalendarProps {
+  events: CalendarEvent[];
+  onSelectSlot: (slotInfo: { start: Date; end: Date }) => void;
+  onSelectEvent: (event: CalendarEvent) => void;
+  date: Date;
+  onNavigate: (date: Date) => void;
+  userTimeZone?: string;
 }
