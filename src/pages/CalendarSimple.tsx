@@ -106,7 +106,7 @@ const CalendarSimple = React.memo(() => {
     refreshTrigger
   );
 
-  // CRITICAL: Transform availability with FIXED ISO construction and NO early bail-out
+  // CRITICAL: Transform availability with FIXED ISO construction and consistent timezone handling
   const availabilityEvents = useMemo(() => {
     console.log('[CalendarSimple] Processing availability slots:', {
       slotsCount: availabilitySlots.length,
@@ -150,11 +150,15 @@ const CalendarSimple = React.memo(() => {
           endISO
         });
         
+        // CRITICAL: Parse availability as local time in clinician's timezone
+        const startDT = DateTime.fromISO(startISO, { zone: tz });
+        const endDT = DateTime.fromISO(endISO, { zone: tz });
+        
         return {
           id: `avail-${slot.day}-${slot.slot}-${d.toISODate()}`,
           title: 'Available',
-          start: toEventDate(startISO, tz),
-          end: toEventDate(endISO, tz),
+          start: startDT.toJSDate(),
+          end: endDT.toJSDate(),
           source: 'availability',
           type: 'availability',
           className: 'availability-event',
@@ -167,7 +171,7 @@ const CalendarSimple = React.memo(() => {
     return events;
   }, [availabilitySlots, weekStart, weekEnd, userTimeZone, refreshTrigger]);
 
-  // CRITICAL: Transform blocked times with SINGLE toEventDate conversion
+  // CRITICAL: Transform blocked times with consistent timezone handling
   const blockedTimeEvents = useMemo(() => {
     if (!blockedTimes.length || !userTimeZone) {
       console.log('[CalendarSimple] No blocked times or timezone');
@@ -182,11 +186,15 @@ const CalendarSimple = React.memo(() => {
         label: blockedTime.label
       });
 
+      // CRITICAL: Parse blocked time as UTC and convert to clinician's timezone
+      const startDT = DateTime.fromISO(blockedTime.start_at, { zone: 'utc' }).setZone(userTimeZone);
+      const endDT = DateTime.fromISO(blockedTime.end_at, { zone: 'utc' }).setZone(userTimeZone);
+
       return {
         id: blockedTime.id,
         title: blockedTime.label,
-        start: toEventDate(blockedTime.start_at, blockedTime.timezone || userTimeZone),
-        end: toEventDate(blockedTime.end_at, blockedTime.timezone || userTimeZone),
+        start: startDT.toJSDate(),
+        end: endDT.toJSDate(),
         source: 'blocked_time',
         type: 'blocked_time',
         className: 'blocked-time-event',
@@ -213,19 +221,25 @@ const CalendarSimple = React.memo(() => {
     triggerRefresh();
   }, [currentDate, triggerRefresh]);
 
-  // CRITICAL: Combine all events with SINGLE toEventDate conversion for appointments
+  // CRITICAL: Combine all events with consistent timezone conversion for appointments
   const allEvents = useMemo(() => {
     const events = [];
     
-    // CRITICAL: Add appointments with SINGLE toEventDate conversion
+    // CRITICAL: Add appointments with consistent UTC-to-local conversion
     if (appointments) {
       events.push(...appointments.map(apt => {
         const title = apt.clientName || 'Internal Appointment';
 
         console.log('[CalendarSimple] Creating appointment event:', {
           id: apt.id,
-          clientName: apt.clientName
+          clientName: apt.clientName,
+          start_at: apt.start_at,
+          end_at: apt.end_at
         });
+
+        // CRITICAL: Parse appointment as UTC and convert to clinician's timezone
+        const startDT = DateTime.fromISO(apt.start_at, { zone: 'utc' }).setZone(userTimeZone);
+        const endDT = DateTime.fromISO(apt.end_at, { zone: 'utc' }).setZone(userTimeZone);
 
         return {
           ...apt,
@@ -234,8 +248,8 @@ const CalendarSimple = React.memo(() => {
           className: 'internal-event',
           id: apt.id,
           title: title,
-          start: toEventDate(apt.start_at, apt.appointment_timezone || userTimeZone),
-          end: toEventDate(apt.end_at, apt.appointment_timezone || userTimeZone),
+          start: startDT.toJSDate(),
+          end: endDT.toJSDate(),
           resource: apt,
           priority: 1
         };
