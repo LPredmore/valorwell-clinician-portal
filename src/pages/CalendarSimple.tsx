@@ -31,6 +31,15 @@ import CalendarConnectionsPanel from "@/components/calendar/CalendarConnectionsP
 import CalendarLegend from "../components/calendar/CalendarLegend";
 import { getWeekRange, logWeekNavigation } from "@/utils/dateRangeUtils";
 
+// CRITICAL: Time normalization helper to fix malformed ISO strings
+const normalizeTime = (time: string) => {
+  return time.length === 5            // "HH:mm"
+    ? `${time}:00`
+    : time.length === 8               // "HH:mm:ss"
+      ? time
+      : time.slice(0,8);              // trim any extras
+};
+
 const CalendarSimple = React.memo(() => {
   const { userId, authInitialized, userRole } = useUser();
   const { user } = useAuth();
@@ -97,7 +106,7 @@ const CalendarSimple = React.memo(() => {
     refreshTrigger
   );
 
-  // CRITICAL: Transform availability using SINGLE toEventDate conversion (NO double conversion)
+  // CRITICAL: Transform availability with FIXED ISO construction and NO early bail-out
   const availabilityEvents = useMemo(() => {
     console.log('[CalendarSimple] Processing availability slots:', {
       slotsCount: availabilitySlots.length,
@@ -125,36 +134,33 @@ const CalendarSimple = React.memo(() => {
       const matchedDates = dates.filter(d => d.weekday === weekdayMap[slot.day]);
       
       return matchedDates.map(d => {
-        // CRITICAL: Create local ISO strings (no offset) and use SINGLE toEventDate conversion
-        const startISOLocal = `${d.toISODate()}T${slot.startTime}:00`;
-        const endISOLocal = `${d.toISODate()}T${slot.endTime}:00`;
-        
-        // Validate ISO format before conversion
-        if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(startISOLocal) || 
-            !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(endISOLocal)) {
-          console.warn('Skipping malformed availability ISO:', { startISOLocal, endISOLocal });
-          return null;
-        }
+        // CRITICAL: Normalize time strings to prevent malformed ISO
+        const tStart = normalizeTime(slot.startTime);
+        const tEnd = normalizeTime(slot.endTime);
+        const startISO = `${d.toISODate()}T${tStart}`;
+        const endISO = `${d.toISODate()}T${tEnd}`;
         
         console.log('[CalendarSimple] Creating availability event:', {
           slotDay: slot.day,
-          startTime: slot.startTime,
-          endTime: slot.endTime,
-          startISOLocal,
-          endISOLocal
+          originalStart: slot.startTime,
+          originalEnd: slot.endTime,
+          normalizedStart: tStart,
+          normalizedEnd: tEnd,
+          startISO,
+          endISO
         });
         
         return {
           id: `avail-${slot.day}-${slot.slot}-${d.toISODate()}`,
           title: 'Available',
-          start: toEventDate(startISOLocal, tz), // CRITICAL: Single conversion path
-          end: toEventDate(endISOLocal, tz),     // CRITICAL: Single conversion path
+          start: toEventDate(startISO, tz),
+          end: toEventDate(endISO, tz),
           source: 'availability',
           type: 'availability',
           className: 'availability-event',
           resource: slot
         };
-      }).filter(Boolean); // Remove null entries from invalid ISOs
+      });
     });
 
     console.log('[CalendarSimple] Created availability events:', events.length);
@@ -179,8 +185,8 @@ const CalendarSimple = React.memo(() => {
       return {
         id: blockedTime.id,
         title: blockedTime.label,
-        start: toEventDate(blockedTime.start_at, blockedTime.timezone || userTimeZone), // CRITICAL: Use toEventDate
-        end: toEventDate(blockedTime.end_at, blockedTime.timezone || userTimeZone),     // CRITICAL: Use toEventDate
+        start: toEventDate(blockedTime.start_at, blockedTime.timezone || userTimeZone),
+        end: toEventDate(blockedTime.end_at, blockedTime.timezone || userTimeZone),
         source: 'blocked_time',
         type: 'blocked_time',
         className: 'blocked-time-event',
@@ -228,8 +234,8 @@ const CalendarSimple = React.memo(() => {
           className: 'internal-event',
           id: apt.id,
           title: title,
-          start: toEventDate(apt.start_at, apt.appointment_timezone || userTimeZone), // CRITICAL: Use toEventDate
-          end: toEventDate(apt.end_at, apt.appointment_timezone || userTimeZone),     // CRITICAL: Use toEventDate
+          start: toEventDate(apt.start_at, apt.appointment_timezone || userTimeZone),
+          end: toEventDate(apt.end_at, apt.appointment_timezone || userTimeZone),
           resource: apt,
           priority: 1
         };
