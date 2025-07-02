@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -9,7 +10,6 @@ import ProtectedRoute from "@/components/auth/ProtectedRoute";
 
 // Pages
 import Login from "./pages/Login";
-import CalendarContainer from "./components/calendar/CalendarContainer";
 import PatientDashboard from "./pages/PatientDashboard";
 import ClinicianDashboard from "./pages/ClinicianDashboard";
 import Clients from "./pages/Clients";
@@ -19,8 +19,6 @@ import Settings from "./pages/Settings";
 import ResetPassword from "./pages/ResetPassword";
 import NylasOAuthCallback from "./pages/NylasOAuthCallback";
 import MonitoringPage from "./pages/MonitoringPage";
-import AppointmentCreate from "./pages/AppointmentCreate";
-import BlockedTimeCreate from "./pages/BlockedTimeCreate";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -69,31 +67,6 @@ const App = () => {
               <Route path="/api/nylas/callback" element={<NylasOAuthCallback />} />
 
               {/* Protected Routes */}
-              <Route 
-                path="/calendar" 
-                element={
-                  <ProtectedRoute allowedRoles={['clinician', 'admin']}>
-                    <CalendarContainer />
-                  </ProtectedRoute>
-                } 
-              />
-              
-              <Route 
-                path="/appointments/new" 
-                element={
-                  <ProtectedRoute allowedRoles={['clinician', 'admin']}>
-                    <AppointmentCreate />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/blocked-time/new" 
-                element={
-                  <ProtectedRoute allowedRoles={['clinician', 'admin']}>
-                    <BlockedTimeCreate />
-                  </ProtectedRoute>
-                } 
-              />
               <Route 
                 path="/dashboard" 
                 element={

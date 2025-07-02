@@ -1,415 +1,181 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Calendar, Clock, AlertCircle } from 'lucide-react';
-import { useUser } from '@/context/UserContext';
+
+import React, { useState } from 'react';
 import Layout from '@/components/layout/Layout';
-import VideoChat from '@/components/video/VideoChat';
-import { TimeZoneService } from '@/utils/timeZoneService';
-import { AppointmentsList } from '@/components/dashboard/AppointmentsList';
-import SessionNoteTemplate from '@/components/templates/SessionNoteTemplate';
-import { getClinicianTimeZone } from '@/hooks/useClinicianData';
-import { SessionDidNotOccurDialog } from '@/components/dashboard/SessionDidNotOccurDialog';
-import { Appointment } from '@/types/appointment';
-import { ClientDetails } from '@/types/client';
-import { fetchClinicianAppointments, fetchClinicianProfile } from '@/utils/clinicianDataUtils';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Calendar, Users, FileText, Clock, TrendingUp, Bell } from "lucide-react";
+import AppointmentsList from '@/components/dashboard/AppointmentsList';
+import { useAuth } from '@/hooks/useAuth';
 
 const ClinicianDashboard = () => {
-  const { userRole, userId } = useUser();
-  const [clinicianProfile, setClinicianProfile] = useState<any>(null);
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [clinicianTimeZone, setClinicianTimeZone] = useState<string>(TimeZoneService.DEFAULT_TIMEZONE);
-  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
-  const [isLoadingAppointments, setIsLoadingAppointments] = useState(true);
-  const [isLoadingTimeZone, setIsLoadingTimeZone] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-  
-  // Video and session states
-  const [isVideoOpen, setIsVideoOpen] = useState(false);
-  const [currentVideoUrl, setCurrentVideoUrl] = useState<string>('');
-  const [showSessionTemplate, setShowSessionTemplate] = useState(false);
-  const [currentAppointment, setCurrentAppointment] = useState<Appointment | null>(null);
-  const [clientData, setClientData] = useState<any>(null);
-  const [isLoadingClientData, setIsLoadingClientData] = useState(false);
-  
-  // Session did not occur dialog states
-  const [showSessionDidNotOccurDialog, setShowSessionDidNotOccurDialog] = useState(false);
-  const [selectedAppointmentForNoShow, setSelectedAppointmentForNoShow] = useState<Appointment | null>(null);
-  
-  // Circuit breaker to prevent infinite loops
-  const dataFetchCountRef = useRef(0);
+  const { user } = useAuth();
+  const [selectedDate, setSelectedDate] = useState(new Date());
 
-  // Ensure timezone is always a string
-  const safeClinicianTimeZone = Array.isArray(clinicianTimeZone) ? clinicianTimeZone[0] : clinicianTimeZone;
-  const timeZoneDisplay = TimeZoneService.getTimeZoneDisplayName(safeClinicianTimeZone);
-
-  // Fetch clinician profile
-  useEffect(() => {
-    if (!userId) return;
-    
-    const fetchProfile = async () => {
-      setIsLoadingProfile(true);
-      try {
-        const profile = await fetchClinicianProfile(userId);
-        setClinicianProfile(profile);
-      } catch (error) {
-        console.error("Error fetching clinician profile:", error);
-        setError(error as Error);
-      } finally {
-        setIsLoadingProfile(false);
-      }
-    };
-    
-    fetchProfile();
-  }, [userId]);
-
-  // Fetch clinician's timezone
-  useEffect(() => {
-    if (!userId) return;
-    
-    const fetchTimeZone = async () => {
-      setIsLoadingTimeZone(true);
-      try {
-        const timeZone = await getClinicianTimeZone(userId);
-        console.log("[ClinicianDashboard] Fetched clinician timezone:", { timeZone, type: typeof timeZone, isArray: Array.isArray(timeZone) });
-        
-        // Ensure timezone is a string
-        const safeTimeZone = Array.isArray(timeZone) ? timeZone[0] : timeZone;
-        console.log("[ClinicianDashboard] Safe timezone after conversion:", { safeTimeZone, type: typeof safeTimeZone });
-        
-        setClinicianTimeZone(safeTimeZone);
-      } catch (error) {
-        console.error("Error fetching clinician timezone:", error);
-        // Fallback to system timezone
-        setClinicianTimeZone(TimeZoneService.DEFAULT_TIMEZONE);
-      } finally {
-        setIsLoadingTimeZone(false);
-      }
-    };
-    
-    fetchTimeZone();
-  }, [userId]);
-
-  // Fetch clinician's appointments with circuit breaker
-  useEffect(() => {
-    if (!userId) return;
-    
-    // Circuit breaker check INSIDE effect, not on render
-    const currentAttempts = dataFetchCountRef.current++;
-    if (currentAttempts >= 3) {
-      console.error("Max fetch attempts reached");
-      setIsLoadingAppointments(false);
-      return;
+  const stats = [
+    {
+      title: "Today's Appointments",
+      value: "8",
+      description: "2 upcoming",
+      icon: Calendar,
+      color: "text-blue-600"
+    },
+    {
+      title: "Active Clients",
+      value: "24",
+      description: "+2 this week",
+      icon: Users,
+      color: "text-green-600"
+    },
+    {
+      title: "Pending Notes",
+      value: "3",
+      description: "Due today",
+      icon: FileText,
+      color: "text-orange-600"
+    },
+    {
+      title: "This Week",
+      value: "32h",
+      description: "Scheduled time",
+      icon: Clock,
+      color: "text-purple-600"
     }
-    
-    const fetchAppointments = async () => {
-      setIsLoadingAppointments(true);
-      try {
-        const appointmentsData = await fetchClinicianAppointments(userId);
-        setAppointments(appointmentsData);
-        setError(null);
-        dataFetchCountRef.current = 0; // Reset on success
-      } catch (error) {
-        console.error("Error fetching clinician appointments:", error);
-        setError(error as Error);
-      } finally {
-        setIsLoadingAppointments(false);
-      }
-    };
-    
-    fetchAppointments();
-  }, [userId]); // Remove refreshTrigger from dependencies
-
-  // Memoize expensive appointment calculations
-  const appointmentCategories = useMemo(() => {
-    const today = new Date();
-    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
-
-    // Simplified to use all appointments (blocked time now in separate table)
-    const realAppointments = appointments;
-
-    return {
-      today: realAppointments.filter(apt => {
-        const aptDate = new Date(apt.start_at);
-        return aptDate >= todayStart && aptDate < todayEnd && apt.status !== 'cancelled';
-      }),
-      upcoming: realAppointments.filter(apt => {
-        const aptDate = new Date(apt.start_at);
-        return aptDate >= todayEnd && apt.status !== 'cancelled';
-      }),
-      past: realAppointments.filter(apt => {
-        const aptDate = new Date(apt.start_at);
-        return aptDate < todayStart && apt.status === 'completed' && !apt.notes;
-      })
-    };
-  }, [appointments]);
-
-  // Video session handlers
-  const startVideoSession = (appointment: Appointment) => {
-    setCurrentAppointment(appointment);
-    setCurrentVideoUrl(appointment.video_room_url || '');
-    setIsVideoOpen(true);
-  };
-
-  const closeVideoSession = () => {
-    setIsVideoOpen(false);
-    setCurrentVideoUrl('');
-    setCurrentAppointment(null);
-  };
-
-  // Session template handlers
-  const openSessionTemplate = (appointment: Appointment) => {
-    setCurrentAppointment(appointment);
-    setShowSessionTemplate(true);
-    
-    // Set client data from appointment
-    if (appointment.client) {
-      setClientData({
-        client_first_name: appointment.client.client_first_name,
-        client_last_name: appointment.client.client_last_name,
-        client_preferred_name: appointment.client.client_preferred_name
-      });
-    }
-  };
-
-  const closeSessionTemplate = () => {
-    setShowSessionTemplate(false);
-    setCurrentAppointment(null);
-    setClientData(null);
-  };
-
-  const handleSessionDidNotOccur = (appointment: Appointment) => {
-    setSelectedAppointmentForNoShow(appointment);
-    setShowSessionDidNotOccurDialog(true);
-  };
-
-  const closeSessionDidNotOccurDialog = () => {
-    setShowSessionDidNotOccurDialog(false);
-    setSelectedAppointmentForNoShow(null);
-    // Refetch appointments after status update
-    if (userId) {
-      fetchClinicianAppointments(userId).then(setAppointments);
-    }
-  };
-
-  // Create a type adapter function for SessionNoteTemplate
-  const prepareClientDataForTemplate = (): ClientDetails | null => {
-    if (!clientData) return null;
-    
-    return {
-      id: currentAppointment?.client_id || '',
-      client_first_name: clientData.client_first_name || null,
-      client_last_name: clientData.client_last_name || null,
-      client_preferred_name: clientData.client_preferred_name || null,
-      client_email: null,
-      client_phone: null,
-      client_date_of_birth: null,
-      client_age: null,
-      client_gender: null,
-      client_gender_identity: null,
-      client_state: null,
-      client_time_zone: null,
-      client_minor: null,
-      client_status: null,
-      client_assigned_therapist: null,
-      client_referral_source: null,
-      client_self_goal: null,
-      client_diagnosis: null,
-      client_insurance_company_primary: null,
-      client_policy_number_primary: null,
-      client_group_number_primary: null,
-      client_subscriber_name_primary: null,
-      client_insurance_type_primary: null,
-      client_subscriber_dob_primary: null,
-      client_subscriber_relationship_primary: null,
-      client_insurance_company_secondary: null,
-      client_policy_number_secondary: null,
-      client_group_number_secondary: null,
-      client_subscriber_name_secondary: null,
-      client_insurance_type_secondary: null,
-      client_subscriber_dob_secondary: null,
-      client_subscriber_relationship_secondary: null,
-      client_insurance_company_tertiary: null,
-      client_policy_number_tertiary: null,
-      client_group_number_tertiary: null,
-      client_subscriber_name_tertiary: null,
-      client_insurance_type_tertiary: null,
-      client_subscriber_dob_tertiary: null,
-      client_subscriber_relationship_tertiary: null,
-      client_planlength: null,
-      client_treatmentfrequency: null,
-      client_problem: null,
-      client_treatmentgoal: null,
-      client_primaryobjective: null,
-      client_secondaryobjective: null,
-      client_tertiaryobjective: null,
-      client_intervention1: null,
-      client_intervention2: null,
-      client_intervention3: null,
-      client_intervention4: null,
-      client_intervention5: null,
-      client_intervention6: null,
-      client_nexttreatmentplanupdate: null,
-      client_privatenote: null,
-      client_appearance: null,
-      client_attitude: null,
-      client_behavior: null,
-      client_speech: null,
-      client_affect: null,
-      client_thoughtprocess: null,
-      client_perception: null,
-      client_orientation: null,
-      client_memoryconcentration: null,
-      client_insightjudgement: null,
-      client_mood: null,
-      client_substanceabuserisk: null,
-      client_suicidalideation: null,
-      client_homicidalideation: null,
-      client_functioning: null,
-      client_prognosis: null,
-      client_progress: null,
-      client_sessionnarrative: null,
-      client_medications: null,
-      client_personsinattendance: null,
-      client_currentsymptoms: null,
-      client_vacoverage: null,
-      client_champva: null,
-      client_tricare_beneficiary_category: null,
-      client_tricare_sponsor_name: null,
-      client_tricare_sponsor_branch: null,
-      client_tricare_sponsor_id: null,
-      client_tricare_plan: null,
-      client_tricare_region: null,
-      client_tricare_policy_id: null,
-      client_tricare_has_referral: null,
-      client_tricare_referral_number: null,
-      client_recentdischarge: null,
-      client_branchOS: null,
-      client_disabilityrating: null,
-      client_relationship: null,
-      client_is_profile_complete: null,
-      client_treatmentplan_startdate: null,
-      client_temppassword: null,
-      client_primary_payer_id: null,
-      client_secondary_payer_id: null,
-      client_tertiary_payer_id: null,
-      eligibility_status_primary: null,
-      eligibility_last_checked_primary: null,
-      eligibility_claimmd_id_primary: null,
-      eligibility_response_details_primary_json: null,
-      eligibility_copay_primary: null,
-      eligibility_deductible_primary: null,
-      eligibility_coinsurance_primary_percent: null,
-      stripe_customer_id: null,
-      client_city: null,
-      client_zipcode: null,
-      client_address: null,
-      client_zip_code: null
-    };
-  };
-
-  console.log("[ClinicianDashboard] Rendering with stabilized data management:", {
-    clinicianTimeZone,
-    safeClinicianTimeZone,
-    timeZoneDisplay,
-    type: typeof safeClinicianTimeZone,
-    isArray: Array.isArray(clinicianTimeZone),
-    totalAppointments: appointments.length,
-    todayCount: appointmentCategories.today.length,
-    upcomingCount: appointmentCategories.upcoming.length,
-    pastCount: appointmentCategories.past.length
-  });
-
-  if (showSessionTemplate && currentAppointment) {
-    return (
-      <Layout>
-        <SessionNoteTemplate 
-          onClose={closeSessionTemplate}
-          appointment={currentAppointment}
-          clinicianName={userId}
-          clientData={prepareClientDataForTemplate()}
-        />
-      </Layout>
-    );
-  }
+  ];
 
   return (
     <Layout>
-      <div className="container mx-auto">
-        <h1 className="text-2xl font-bold mb-6">Clinician Dashboard</h1>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* Today's Appointments */}
-          <div>
-            <AppointmentsList
-              title="Today's Appointments"
-              icon={<Calendar className="h-5 w-5 mr-2" />}
-              appointments={appointmentCategories.today}
-              isLoading={isLoadingAppointments || isLoadingTimeZone}
-              error={error}
-              emptyMessage="No appointments scheduled for today."
-              timeZoneDisplay={timeZoneDisplay}
-              userTimeZone={safeClinicianTimeZone}
-              showStartButton={true}
-              onStartSession={startVideoSession}
-            />
-          </div>
-          
-          {/* Outstanding Documentation */}
-          <div>
-            <AppointmentsList
-              title="Outstanding Documentation"
-              icon={<AlertCircle className="h-5 w-5 mr-2" />}
-              appointments={appointmentCategories.past}
-              isLoading={isLoadingAppointments || isLoadingTimeZone || isLoadingClientData}
-              error={error}
-              emptyMessage="No outstanding documentation."
-              timeZoneDisplay={timeZoneDisplay}
-              userTimeZone={safeClinicianTimeZone}
-              onDocumentSession={openSessionTemplate}
-              onSessionDidNotOccur={handleSessionDidNotOccur}
-            />
-          </div>
-          
-          {/* Upcoming Appointments */}
-          <div>
-            <AppointmentsList
-              title="Upcoming Appointments"
-              icon={<Calendar className="h-5 w-5 mr-2" />}
-              appointments={appointmentCategories.upcoming}
-              isLoading={isLoadingAppointments || isLoadingTimeZone}
-              error={error}
-              emptyMessage="No upcoming appointments scheduled."
-              timeZoneDisplay={timeZoneDisplay}
-              userTimeZone={safeClinicianTimeZone}
-              showViewAllButton={true}
-            />
-          </div>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">
+            Welcome back, {user?.user_metadata?.first_name || 'Doctor'}
+          </h1>
+          <p className="text-muted-foreground">
+            Here's what's happening with your practice today.
+          </p>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {stats.map((stat, index) => (
+            <Card key={index}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">
+                  {stat.title}
+                </CardTitle>
+                <stat.icon className={`h-4 w-4 ${stat.color}`} />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stat.value}</div>
+                <p className="text-xs text-muted-foreground">
+                  {stat.description}
+                </p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
+          <Card className="col-span-4">
+            <CardHeader>
+              <CardTitle>Recent Appointments</CardTitle>
+              <CardDescription>
+                Your upcoming and recent appointments
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <AppointmentsList />
+            </CardContent>
+          </Card>
+
+          <Card className="col-span-3">
+            <CardHeader>
+              <CardTitle>Quick Actions</CardTitle>
+              <CardDescription>
+                Common tasks and shortcuts
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Button className="w-full justify-start" variant="outline">
+                <Calendar className="mr-2 h-4 w-4" />
+                Schedule Appointment
+              </Button>
+              <Button className="w-full justify-start" variant="outline">
+                <Users className="mr-2 h-4 w-4" />
+                Add New Client
+              </Button>
+              <Button className="w-full justify-start" variant="outline">
+                <FileText className="mr-2 h-4 w-4" />
+                Create Session Note
+              </Button>
+              <Button className="w-full justify-start" variant="outline">
+                <TrendingUp className="mr-2 h-4 w-4" />
+                View Analytics
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Today's Schedule</CardTitle>
+              <CardDescription>
+                Overview of your appointments today
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-3 rounded-lg bg-muted">
+                  <div>
+                    <p className="font-medium">John Smith</p>
+                    <p className="text-sm text-muted-foreground">Individual Therapy</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-medium">9:00 AM</p>
+                    <p className="text-sm text-muted-foreground">60 min</p>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-muted">
+                  <div>
+                    <p className="font-medium">Sarah Johnson</p>
+                    <p className="text-sm text-muted-foreground">Follow-up Session</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-medium">11:00 AM</p>
+                    <p className="text-sm text-muted-foreground">45 min</p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Notifications</CardTitle>
+              <CardDescription>
+                Recent updates and reminders
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex items-start space-x-3">
+                  <Bell className="h-5 w-5 text-blue-600 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium">Session note due</p>
+                    <p className="text-xs text-muted-foreground">John Smith - Yesterday's session</p>
+                  </div>
+                </div>
+                <div className="flex items-start space-x-3">
+                  <Calendar className="h-5 w-5 text-green-600 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium">Appointment confirmed</p>
+                    <p className="text-xs text-muted-foreground">Sarah Johnson - Tomorrow 2:00 PM</p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
-      
-      {/* Video Chat Component */}
-      {isVideoOpen && (
-        <VideoChat
-          roomUrl={currentVideoUrl}
-          isOpen={isVideoOpen}
-          onClose={closeVideoSession}
-        />
-      )}
-
-      {/* Session Did Not Occur Dialog */}
-      {showSessionDidNotOccurDialog && selectedAppointmentForNoShow && (
-        <SessionDidNotOccurDialog
-          isOpen={showSessionDidNotOccurDialog}
-          onClose={closeSessionDidNotOccurDialog}
-          appointmentId={selectedAppointmentForNoShow.id}
-          onStatusUpdate={() => {
-            // Refetch appointments after status update
-            if (userId) {
-              fetchClinicianAppointments(userId).then(setAppointments);
-            }
-          }}
-        />
-      )}
     </Layout>
   );
 };
