@@ -20,9 +20,12 @@ const userTimeZone = getUserTimeZone();
 console.log('[main] CRITICAL: Set global Luxon timezone BEFORE React mount:', userTimeZone);
 
 // CRITICAL: Create timezone-aware global localizer instance
-// Set Luxon's default zone to ensure consistency
-DateTime.Settings.defaultZone = userTimeZone;
-export const globalLocalizer = luxonLocalizer(DateTime);
+// Create a DateTime instance in the user's timezone for the localizer
+const timeZoneAwareDateTime = DateTime.local().setZone(userTimeZone);
+export const globalLocalizer = luxonLocalizer(DateTime, {
+  // Set the timezone for all DateTime operations
+  zone: userTimeZone
+});
 console.log('[main] CRITICAL: Created timezone-aware global Luxon localizer instance with zone:', userTimeZone);
 
 const rootElement = document.getElementById("root");
