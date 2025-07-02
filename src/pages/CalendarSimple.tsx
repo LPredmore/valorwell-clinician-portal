@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "../components/layout/Layout";
@@ -198,9 +197,8 @@ const CalendarSimple = React.memo(() => {
     setRefreshTrigger(prev => prev + 1);
   }, []);
 
-  // Handle slot selection
+  // Handle slot selection - navigate to route instead of opening dialog
   const handleSelectSlot = useCallback((slotInfo: { start: Date; end: Date }) => {
-    // Navigate to appointment creation page or open modal
     navigate('/appointments/new', { 
       state: { 
         start: slotInfo.start, 
@@ -209,7 +207,7 @@ const CalendarSimple = React.memo(() => {
     });
   }, [navigate]);
 
-  // Handle event click
+  // Handle event click - navigate to routes instead of opening dialogs
   const handleSelectEvent = useCallback((event: any) => {
     if (event.source === 'internal') {
       navigate(`/appointments/${event.id}`);

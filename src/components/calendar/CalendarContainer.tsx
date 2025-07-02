@@ -197,7 +197,7 @@ const CalendarContainer: React.FC = () => {
     setRefreshTrigger(prev => prev + 1);
   }, []);
 
-  // Handle slot selection
+  // Handle slot selection - navigate to route instead of opening dialog
   const handleSelectSlot = useCallback((slotInfo: { start: Date; end: Date }) => {
     navigate('/appointments/new', { 
       state: { 
@@ -207,7 +207,7 @@ const CalendarContainer: React.FC = () => {
     });
   }, [navigate]);
 
-  // Handle event click
+  // Handle event click - navigate to routes instead of opening dialogs
   const handleSelectEvent = useCallback((event: any) => {
     if (event.source === 'internal') {
       navigate(`/appointments/${event.id}`);
