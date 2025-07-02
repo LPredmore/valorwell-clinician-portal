@@ -1,3 +1,4 @@
+
 import React, { useCallback, useMemo } from 'react';
 import { Calendar, Views } from 'react-big-calendar';
 import { globalLocalizer } from '@/main';
@@ -35,9 +36,9 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
   // CRITICAL: Use global localizer instance instead of creating new ones
   console.log('[ReactBigCalendar] CRITICAL: Using timezone-aware global Luxon localizer instance with timezone:', userTimeZone);
 
-  // Enhanced event style getter with NO positioning overrides (let RBC handle layout)
+  // CRITICAL: Native RBC event style getter - no positioning overrides
   const eventPropGetter = useCallback((event: CalendarEvent) => {
-    console.log('[ReactBigCalendar] Styling event (NO positioning overrides):', {
+    console.log('[ReactBigCalendar] Styling event (Native RBC layout):', {
       id: event.id,
       title: event.title,
       source: event.source,
@@ -48,8 +49,7 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
 
     return {
       className: event.className || `${event.source}-event`,
-      // REMOVED: style overrides that break RBC layout
-      // Let React Big Calendar handle positioning and sizing
+      style: {} // CRITICAL: Don't override left/width/top - let RBC handle positioning
     };
   }, []);
 
@@ -112,16 +112,16 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
     selectable: true,
     popup: true,
     showMultiDayTimes: true,
-    dayLayoutAlgorithm: 'overlap', // CRITICAL: ENFORCED overlap layout
+    dayLayoutAlgorithm: 'overlap', // CRITICAL: ENFORCED native overlap layout
     toolbar: true,
   }), [events, eventPropGetter, components, onSelectSlot, onSelectEvent, date, handleNavigate]);
 
-  console.log('[ReactBigCalendar] CRITICAL: Rendering with GLOBAL Luxon localizer and ENFORCED overlap:', {
+  console.log('[ReactBigCalendar] CRITICAL: Rendering with GLOBAL Luxon localizer and NATIVE overlap:', {
     totalEvents: events.length,
     currentDate: date.toISOString(),
     userTimeZone,
     layoutAlgorithm: 'overlap',
-    localizerType: 'Global Luxon',
+    localizerType: 'Global Luxon with Default Zone',
     eventsBySource: {
       internal: events.filter(e => e.source === 'internal').length,
       blocked_time: events.filter(e => e.source === 'blocked_time').length,

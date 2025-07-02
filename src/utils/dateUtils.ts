@@ -176,17 +176,16 @@ export function buildLocalDate(dt: DateTime): Date {
 }
 
 /**
- * CRITICAL: New standardized date conversion for Luxon localizer
- * Convert a UTC ISO string into a JS Date whose hour/minute fields
- * match the target time zone's local clock.
- * This replaces buildLocalDate for use with Luxon localizer.
+ * CRITICAL: Single-path date conversion for React Big Calendar with Luxon localizer
+ * Parse UTC, shift into clinician zone, then preserve the clock hour
+ * This replaces all other conversion methods for calendar events
  */
 export function toLocalJSDate(
   isoString: string,
   timeZone: string
 ): Date {
-  const dt = DateTime.fromISO(isoString, { zone: 'UTC' })
-    .setZone(timeZone);
+  // Parse UTC, shift into clinician zone, then preserve the clock hour
+  const dt = DateTime.fromISO(isoString, { zone: 'UTC' }).setZone(timeZone);
   return new Date(
     dt.year,
     dt.month - 1,

@@ -127,32 +127,26 @@ const CalendarSimple = React.memo(() => {
       const matchedDates = dates.filter(d => d.weekday === weekdayMap[slot.day]);
       
       return matchedDates.map(d => {
-        // CRITICAL: SINGLE conversion path - build UTC ISO strings and use toLocalJSDate() once
+        // CRITICAL: SINGLE conversion path - build local time strings directly in user timezone
         const startISOLocal = `${d.toISODate()}T${slot.startTime}`;
         const endISOLocal = `${d.toISODate()}T${slot.endTime}`;
         
-        // Convert local time to UTC, then use toLocalJSDate for consistency
-        const startUTC = DateTime.fromISO(startISOLocal, { zone: tz }).toUTC().toISO();
-        const endUTC = DateTime.fromISO(endISOLocal, { zone: tz }).toUTC().toISO();
-        
-        console.log('[CalendarSimple] CRITICAL: Availability SINGLE conversion:', {
+        console.log('[CalendarSimple] CRITICAL: Availability SINGLE conversion (no UTC roundtrip):', {
           slotDay: slot.day,
           startTime: slot.startTime,
           endTime: slot.endTime,
           startISOLocal,
           endISOLocal,
-          startUTC,
-          endUTC,
-          finalStartJS: toLocalJSDate(startUTC!, tz).toISOString(),
-          finalStartHours: toLocalJSDate(startUTC!, tz).getHours(),
+          finalStartJS: toLocalJSDate(startISOLocal, tz).toISOString(),
+          finalStartHours: toLocalJSDate(startISOLocal, tz).getHours(),
           timezone: tz
         });
         
         return {
           id: `avail-${slot.day}-${slot.slot}-${d.toISODate()}`,
           title: 'Available',
-          start: toLocalJSDate(startUTC!, tz), // CRITICAL: Single conversion path
-          end: toLocalJSDate(endUTC!, tz), // CRITICAL: Single conversion path
+          start: toLocalJSDate(startISOLocal, tz), // CRITICAL: Single conversion path
+          end: toLocalJSDate(endISOLocal, tz), // CRITICAL: Single conversion path
           source: 'availability',
           type: 'availability',
           className: 'availability-event',

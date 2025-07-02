@@ -1,5 +1,5 @@
 
-/* CRITICAL: Enhanced event styling with proper z-index but NO positioning conflicts */
+/* CRITICAL: Enhanced event styling with proper z-index but NO positioning overrides */
 
 /* CRITICAL: Availability events - LOWEST z-index (background layer) */
 .rbc-event.availability-event {
@@ -75,10 +75,9 @@
   transition: all 0.2s ease-in-out !important;
 }
 
-/* CRITICAL: Let React Big Calendar handle positioning - REMOVED absolute positioning and width overrides */
+/* CRITICAL: Let React Big Calendar handle positioning - NATIVE layout restored */
 .rbc-event {
-  /* REMOVED: position: absolute and width: 100% to fix layout issues */
-  position: relative !important;
+  /* REMOVED: All positioning overrides to restore native RBC behavior */
   transition: all 0.2s ease-in-out !important;
 }
 

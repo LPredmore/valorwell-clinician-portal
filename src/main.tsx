@@ -19,14 +19,12 @@ const getUserTimeZone = () => {
 const userTimeZone = getUserTimeZone();
 console.log('[main] CRITICAL: Set global Luxon timezone BEFORE React mount:', userTimeZone);
 
-// CRITICAL: Create timezone-aware global localizer instance
-// Create a DateTime instance in the user's timezone for the localizer
-const timeZoneAwareDateTime = DateTime.local().setZone(userTimeZone);
-export const globalLocalizer = luxonLocalizer(DateTime, {
-  // Set the timezone for all DateTime operations
-  zone: userTimeZone
-});
-console.log('[main] CRITICAL: Created timezone-aware global Luxon localizer instance with zone:', userTimeZone);
+// CRITICAL: Tell Luxon the clinician's IANA timezone once
+DateTime.Settings.defaultZone = userTimeZone;
+
+// CRITICAL: Create the localizer using that default zone
+export const globalLocalizer = luxonLocalizer(DateTime);
+console.log('[main] CRITICAL: Created timezone-aware global Luxon localizer with default zone:', userTimeZone);
 
 const rootElement = document.getElementById("root");
 
