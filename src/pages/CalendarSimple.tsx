@@ -29,7 +29,7 @@ const CalendarSimple = React.memo(() => {
   const { toast } = useToast();
 
   // Calculate week boundaries
-  const { weekStart, weekEnd } = useMemo(() => {
+  const { start: weekStart, end: weekEnd } = useMemo(() => {
     const tz = userTimeZone || TimeZoneService.DEFAULT_TIMEZONE;
     return getWeekRange(currentDate, tz);
   }, [currentDate, userTimeZone]);
