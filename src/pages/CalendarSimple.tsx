@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import Layout from "../components/layout/Layout";
 import { useUser } from "@/context/UserContext";
 import { useToast } from "@/hooks/use-toast";
-import CalendarErrorBoundary from "../components/calendar/CalendarErrorBoundary";
 import ReactBigCalendar from "@/components/calendar/ReactBigCalendar";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -271,38 +270,36 @@ const CalendarSimple = React.memo(() => {
 
   return (
     <Layout>
-      <CalendarErrorBoundary>
-        <div className="p-6">
-          {/* Simple header with action buttons */}
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center space-x-4">
-              <Button onClick={() => navigate('/appointments/new')}>
-                <Plus className="h-4 w-4 mr-2" />
-                New Appointment
-              </Button>
+      <div className="p-6">
+        {/* Simple header with action buttons */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center space-x-4">
+            <Button onClick={() => navigate('/appointments/new')}>
+              <Plus className="h-4 w-4 mr-2" />
+              New Appointment
+            </Button>
 
-              <Button variant="outline" onClick={() => navigate('/blocked-time/new')}>
-                <Clock className="h-4 w-4 mr-2" />
-                Block Time
-              </Button>
-            </div>
-            
-            <div className="text-sm text-gray-600 text-right">
-              <p>Timezone: {userTimeZone}</p>
-            </div>
+            <Button variant="outline" onClick={() => navigate('/blocked-time/new')}>
+              <Clock className="h-4 w-4 mr-2" />
+              Block Time
+            </Button>
           </div>
-
-          {/* React Big Calendar with native toolbar */}
-          <ReactBigCalendar
-            events={allEvents}
-            onSelectSlot={handleSelectSlot}
-            onSelectEvent={handleSelectEvent}
-            date={currentDate}
-            onNavigate={handleCalendarNavigate}
-            userTimeZone={userTimeZone}
-          />
+          
+          <div className="text-sm text-gray-600 text-right">
+            <p>Timezone: {userTimeZone}</p>
+          </div>
         </div>
-      </CalendarErrorBoundary>
+
+        {/* React Big Calendar with native toolbar */}
+        <ReactBigCalendar
+          events={allEvents}
+          onSelectSlot={handleSelectSlot}
+          onSelectEvent={handleSelectEvent}
+          date={currentDate}
+          onNavigate={handleCalendarNavigate}
+          userTimeZone={userTimeZone}
+        />
+      </div>
     </Layout>
   );
 });
