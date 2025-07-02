@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "../layout/Layout";
@@ -121,7 +122,7 @@ const CalendarContainer: React.FC = () => {
     });
   }, [blockedTimes, userTimeZone]);
 
-  // Combine all events
+  // Combine all events - clean data preparation
   const allEvents = useMemo(() => {
     const events = [];
     
@@ -195,7 +196,7 @@ const CalendarContainer: React.FC = () => {
     setRefreshTrigger(prev => prev + 1);
   }, []);
 
-  // Handle slot selection - navigate to route instead of opening dialog
+  // Handle slot selection
   const handleSelectSlot = useCallback((slotInfo: { start: Date; end: Date }) => {
     navigate('/appointments/new', { 
       state: { 
@@ -205,7 +206,7 @@ const CalendarContainer: React.FC = () => {
     });
   }, [navigate]);
 
-  // Handle event click - navigate to routes instead of opening dialogs
+  // Handle event click
   const handleSelectEvent = useCallback((event: any) => {
     if (event.source === 'internal') {
       navigate(`/appointments/${event.id}`);
@@ -260,11 +261,6 @@ const CalendarContainer: React.FC = () => {
     );
   }
 
-  const currentMonthDisplay = currentDate.toLocaleDateString('en-US', { 
-    month: 'long', 
-    year: 'numeric' 
-  });
-
   return (
     <Layout>
       <div className="p-6">
@@ -287,7 +283,7 @@ const CalendarContainer: React.FC = () => {
           </div>
         </div>
 
-        {/* React Big Calendar with native toolbar */}
+        {/* React Big Calendar - clean component with prepared data */}
         <ReactBigCalendar
           events={allEvents}
           onSelectSlot={handleSelectSlot}
