@@ -53,8 +53,8 @@ interface EditBlockedTimeDialogProps {
   isOpen: boolean;
   onClose: () => void;
   blockedTime: BlockedTime;
-  onDeleted: () => void;
-  onUpdated: () => void;
+  userTimeZone: string; // Added to match CalendarSimple
+  onBlockedTimeUpdated: () => void; // Changed from onDeleted/onUpdated to match CalendarSimple
 }
 
 // Helper function to generate time options for dropdown
@@ -79,8 +79,8 @@ const EditBlockedTimeDialog: React.FC<EditBlockedTimeDialogProps> = ({
   isOpen,
   onClose,
   blockedTime,
-  onDeleted,
-  onUpdated
+  userTimeZone, // Added prop
+  onBlockedTimeUpdated // Changed from separate onDeleted/onUpdated
 }) => {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const [startTime, setStartTime] = useState('');
@@ -151,7 +151,7 @@ const EditBlockedTimeDialog: React.FC<EditBlockedTimeDialogProps> = ({
       const success = await updateBlockedTime(blockedTime.id, updates);
 
       if (success) {
-        onUpdated();
+        onBlockedTimeUpdated();
         onClose();
       }
     } catch (error: any) {
@@ -175,7 +175,7 @@ const EditBlockedTimeDialog: React.FC<EditBlockedTimeDialogProps> = ({
       const success = await deleteBlockedTime(blockedTime.id);
 
       if (success) {
-        onDeleted();
+        onBlockedTimeUpdated();
         onClose();
       }
     } catch (error: any) {

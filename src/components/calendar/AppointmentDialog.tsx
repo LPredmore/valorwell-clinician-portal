@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -32,31 +31,24 @@ interface AppointmentDialogProps {
   isOpen: boolean;
   onClose: () => void;
   clinicianId: string;
-  clinicianTimeZone: string;
+  userTimeZone: string; // Changed from clinicianTimeZone to match CalendarSimple
   onAppointmentCreated?: () => void;
   onAppointmentUpdated?: () => void;
-  initialData?: {
-    start?: Date;
-    end?: Date;
-    start_at?: string;
-    end_at?: string;
-    title?: string;
-    clientName?: string;
-    notes?: string;
-    appointment_timezone?: string;
-    id?: string;
-    client_id?: string;
-  } | null;
+  selectedSlot?: any; // Added missing prop
+  isEditMode?: boolean; // Added missing prop
+  editingAppointment?: any; // Added missing prop
 }
 
 const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
   isOpen,
   onClose,
   clinicianId,
-  clinicianTimeZone,
+  userTimeZone, // Changed from clinicianTimeZone
   onAppointmentCreated,
   onAppointmentUpdated,
-  initialData
+  selectedSlot, // Added prop
+  isEditMode = false, // Added prop with default
+  editingAppointment // Added prop
 }) => {
   const [clients, setClients] = useState<Client[]>([]);
   const [selectedClientId, setSelectedClientId] = useState<string>('');
@@ -70,8 +62,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
   const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
 
-  const isEdit = Boolean(initialData?.id);
-  const appointmentId = initialData?.id;
+  const appointmentId = editingAppointment?.id;
 
   // Load clients when dialog opens
   useEffect(() => {
@@ -84,33 +75,38 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
   useEffect(() => {
     if (isOpen && !isInitialized) {
       console.log('[AppointmentDialog] Initializing form state', {
-        isEdit,
+        isEdit: isEditMode,
         appointmentId,
-        initialData
+        editingAppointment,
+        selectedSlot
       });
 
-      if (initialData) {
-        // Handle existing appointment data
-        if (initialData.client_id) {
-          setSelectedClientId(initialData.client_id);
+      if (editingAppointment) {
+        if (editingAppointment.client_id) {
+          setSelectedClientId(editingAppointment.client_id);
         }
         
-        setNotes(initialData.notes || '');
+        setNotes(editingAppointment.notes || '');
         
-        // Handle date/time from various possible sources
         let startDateTime: DateTime | null = null;
         
-        if (initialData.start_at) {
-          // From database - ISO string in UTC
-          startDateTime = DateTime.fromISO(initialData.start_at, { zone: 'UTC' })
-            .setZone(initialData.appointment_timezone || clinicianTimeZone);
-        } else if (initialData.start) {
-          // From slot selection - Date object
-          startDateTime = DateTime.fromJSDate(initialData.start)
-            .setZone(clinicianTimeZone);
+        if (editingAppointment.start_at) {
+          startDateTime = DateTime.fromISO(editingAppointment.start_at, { zone: 'UTC' })
+            .setZone(editingAppointment.appointment_timezone || userTimeZone);
+        } else if (editingAppointment.start) {
+          startDateTime = DateTime.fromJSDate(editingAppointment.start)
+            .setZone(userTimeZone);
         }
         
         if (startDateTime) {
+          setDate(startDateTime.toFormat('yyyy-MM-dd'));
+          setStartTime(startDateTime.toFormat('HH:mm'));
+        }
+      } else if (selectedSlot) {
+        // Handle slot selection for new appointments
+        if (selectedSlot.start) {
+          const startDateTime = DateTime.fromJSDate(selectedSlot.start)
+            .setZone(userTimeZone);
           setDate(startDateTime.toFormat('yyyy-MM-dd'));
           setStartTime(startDateTime.toFormat('HH:mm'));
         }
@@ -128,7 +124,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
       setIsInitialized(false);
       resetForm();
     }
-  }, [isOpen, initialData, isInitialized, clinicianTimeZone]);
+  }, [isOpen, editingAppointment, selectedSlot, isInitialized, userTimeZone, isEditMode]);
 
   const resetForm = () => {
     setSelectedClientId('');
@@ -176,29 +172,28 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
     try {
       setIsLoading(true);
 
-      // Validate timezone
-      if (!clinicianTimeZone) {
-        throw new Error('Clinician timezone not found - cannot create appointment');
+      // Validate timezone - use userTimeZone instead of clinicianTimeZone
+      if (!userTimeZone) {
+        throw new Error('User timezone not found - cannot create appointment');
       }
 
-      // Convert local date/time to UTC for storage
       const localDateTimeStart = `${date}T${startTime}`;
       
       console.log('[AppointmentDialog] Converting times:', {
         localDateTimeStart,
-        clinicianTimeZone,
-        isEdit
+        userTimeZone,
+        isEdit: isEditMode
       });
 
-      const startAtUTC = TimeZoneService.convertLocalToUTC(localDateTimeStart, clinicianTimeZone);
-      const endAtUTC = startAtUTC.plus({ hours: 1 }); // Add 1 hour for appointment duration
+      const startAtUTC = TimeZoneService.convertLocalToUTC(localDateTimeStart, userTimeZone);
+      const endAtUTC = startAtUTC.plus({ hours: 1 });
 
       const appointmentData = {
         client_id: selectedClientId,
         clinician_id: clinicianId,
         start_at: startAtUTC.toISO(),
         end_at: endAtUTC.toISO(),
-        appointment_timezone: clinicianTimeZone,
+        appointment_timezone: userTimeZone,
         type: 'therapy_session',
         status: 'scheduled',
         notes: notes || null
@@ -207,15 +202,13 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
       console.log('[AppointmentDialog] Appointment data:', appointmentData);
 
       let error;
-      if (isEdit && appointmentId) {
-        // Update existing appointment
+      if (isEditMode && appointmentId) {
         const result = await supabase
           .from('appointments')
           .update(appointmentData)
           .eq('id', appointmentId);
         error = result.error;
       } else {
-        // Create new appointment
         const result = await supabase
           .from('appointments')
           .insert(appointmentData);
@@ -226,13 +219,12 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
 
       toast({
         title: 'Success',
-        description: isEdit ? 'Appointment updated successfully' : 'Appointment created successfully'
+        description: isEditMode ? 'Appointment updated successfully' : 'Appointment created successfully'
       });
 
-      // Reset form
       resetForm();
       
-      if (isEdit) {
+      if (isEditMode) {
         onAppointmentUpdated?.();
       } else {
         onAppointmentCreated?.();
@@ -293,16 +285,14 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>{isEdit ? 'Edit Appointment' : 'Create New Appointment'}</DialogTitle>
+            <DialogTitle>{isEditMode ? 'Edit Appointment' : 'Create New Appointment'}</DialogTitle>
           </DialogHeader>
           
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-4 gap-4">
-              {/* Title (read-only) */}
               <Label className="text-right">Title</Label>
               <div className="col-span-3 py-2 text-sm">Therapy Session</div>
               
-              {/* Client */}
               <Label htmlFor="client" className="text-right">Client *</Label>
               <Select
                 value={selectedClientId}
@@ -321,7 +311,6 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
                 </SelectContent>
               </Select>
 
-              {/* Date */}
               <Label htmlFor="date" className="text-right">Date *</Label>
               <Input
                 id="date"
@@ -332,7 +321,6 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
                 className="col-span-3"
               />
 
-              {/* Start Time */}
               <Label htmlFor="startTime" className="text-right">Start Time *</Label>
               <Input
                 id="startTime"
@@ -343,7 +331,6 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
                 className="col-span-3"
               />
 
-              {/* Notes */}
               <Label htmlFor="notes" className="text-right">Notes</Label>
               <Textarea
                 id="notes"
@@ -354,16 +341,16 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
                 className="col-span-4 w-full"
               />
 
-              {clinicianTimeZone && (
+              {userTimeZone && (
                 <div className="col-span-4 text-sm text-gray-500 text-center">
-                  Times will be saved in timezone: {clinicianTimeZone} | Duration: 1 hour
+                  Times will be saved in timezone: {userTimeZone} | Duration: 1 hour
                 </div>
               )}
             </div>
 
             <div className="flex justify-between pt-4">
               <div>
-                {isEdit && (
+                {isEditMode && (
                   <Button 
                     type="button" 
                     variant="destructive"
@@ -380,7 +367,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
                   Cancel
                 </Button>
                 <Button type="submit" disabled={isLoading}>
-                  {isLoading ? (isEdit ? 'Updating...' : 'Creating...') : (isEdit ? 'Update Appointment' : 'Create Appointment')}
+                  {isLoading ? (isEditMode ? 'Updating...' : 'Creating...') : (isEditMode ? 'Update Appointment' : 'Create Appointment')}
                 </Button>
               </div>
             </div>
