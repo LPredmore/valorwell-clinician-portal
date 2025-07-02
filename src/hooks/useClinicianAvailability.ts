@@ -24,12 +24,7 @@ export function useClinicianAvailability(
     
     const loadAvailability = async () => {
       try {
-        console.log('[useClinicianAvailability] Loading with date range:', {
-          clinicianId,
-          weekStart: weekStart.toISOString(),
-          weekEnd: weekEnd.toISOString(),
-          refreshTrigger
-        });
+        console.log('[useClinicianAvailability] Loading availability for clinician:', clinicianId);
 
         const { data, error } = await supabase
           .from('clinicians')
@@ -82,7 +77,7 @@ export function useClinicianAvailability(
           }
         });
         
-        console.log('[useClinicianAvailability] Loaded availability slots:', availabilitySlots);
+        console.log('[useClinicianAvailability] Loaded availability slots:', availabilitySlots.length);
         setSlots(availabilitySlots);
       } catch (err) {
         console.error('[useClinicianAvailability] Error loading availability:', err);

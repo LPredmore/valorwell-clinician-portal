@@ -99,11 +99,9 @@ const CalendarSimple = React.memo(() => {
 
   // CRITICAL: Transform availability using SINGLE toEventDate conversion (NO double conversion)
   const availabilityEvents = useMemo(() => {
-    console.log('[CalendarSimple] CRITICAL: Processing availability with SINGLE toEventDate conversion:', {
+    console.log('[CalendarSimple] Processing availability slots:', {
       slotsCount: availabilitySlots.length,
-      userTimeZone,
-      weekStartUTC: weekStart.toISOString(),
-      weekEndUTC: weekEnd.toISOString()
+      userTimeZone
     });
     
     const tz = userTimeZone;
@@ -138,14 +136,12 @@ const CalendarSimple = React.memo(() => {
           return null;
         }
         
-        console.log('[CalendarSimple] CRITICAL: Availability SINGLE toEventDate conversion:', {
+        console.log('[CalendarSimple] Creating availability event:', {
           slotDay: slot.day,
           startTime: slot.startTime,
           endTime: slot.endTime,
           startISOLocal,
-          endISOLocal,
-          timezone: tz,
-          conversionType: 'SINGLE toEventDate - No double conversion'
+          endISOLocal
         });
         
         return {
@@ -161,12 +157,7 @@ const CalendarSimple = React.memo(() => {
       }).filter(Boolean); // Remove null entries from invalid ISOs
     });
 
-    console.log('[CalendarSimple] CRITICAL: Availability events SINGLE toEventDate verification:', {
-      eventsCount: events.length,
-      timezone: tz,
-      conversionMethod: 'SINGLE toEventDate - No double conversion'
-    });
-
+    console.log('[CalendarSimple] Created availability events:', events.length);
     return events;
   }, [availabilitySlots, weekStart, weekEnd, userTimeZone, refreshTrigger]);
 
@@ -177,17 +168,12 @@ const CalendarSimple = React.memo(() => {
       return [];
     }
     
-    console.log('[CalendarSimple] CRITICAL: Processing blocked times with SINGLE toEventDate:', {
-      blockedTimesCount: blockedTimes.length,
-      userTimeZone
-    });
+    console.log('[CalendarSimple] Processing blocked times:', blockedTimes.length);
 
     const events = blockedTimes.map(blockedTime => {
-      // CRITICAL: Use toEventDate directly with stored UTC timestamps
-      console.log('[CalendarSimple] CRITICAL: Blocked time toEventDate conversion:', {
+      console.log('[CalendarSimple] Creating blocked time event:', {
         id: blockedTime.id,
-        originalStartUTC: blockedTime.start_at,
-        originalEndUTC: blockedTime.end_at
+        label: blockedTime.label
       });
 
       return {
@@ -230,14 +216,9 @@ const CalendarSimple = React.memo(() => {
       events.push(...appointments.map(apt => {
         const title = apt.clientName || 'Internal Appointment';
 
-        // CRITICAL: Use toEventDate directly with stored UTC timestamps
-        console.log('[CalendarSimple] CRITICAL: Appointment toEventDate conversion:', {
+        console.log('[CalendarSimple] Creating appointment event:', {
           id: apt.id,
-          clientName: apt.clientName,
-          originalStartUTC: apt.start_at,
-          originalEndUTC: apt.end_at,
-          appointmentTimezone: apt.appointment_timezone,
-          userTimezone: userTimeZone
+          clientName: apt.clientName
         });
 
         return {
@@ -283,20 +264,13 @@ const CalendarSimple = React.memo(() => {
       priority: 0
     })));
 
-    console.group('📊 CRITICAL: Calendar Data with SINGLE toEventDate');
-    console.log('Week Range:', {
-      start: weekStart.toISOString(),
-      end: weekEnd.toISOString(),
-      timezone: userTimeZone
+    console.log('[CalendarSimple] Final event summary:', {
+      appointments: appointments?.length || 0,
+      nylasEvents: nylasEvents?.length || 0,
+      blockedTimeEvents: blockedTimeEvents.length,
+      availabilityEvents: availabilityEvents.length,
+      totalEvents: events.length
     });
-    console.log('Data Sources:');
-    console.log('  Internal Appointments:', appointments?.length || 0);
-    console.log('  External Events (Nylas):', nylasEvents?.length || 0);
-    console.log('  Blocked Time Events:', blockedTimeEvents.length);
-    console.log('  Availability Events:', availabilityEvents.length);
-    console.log('  Total Events:', events.length);
-    console.log('CRITICAL - Event Processing Complete with Single toEventDate Conversion');
-    console.groupEnd();
 
     return events.sort((a, b) => {
       if (a.priority !== b.priority) {
@@ -665,7 +639,7 @@ const CalendarSimple = React.memo(() => {
                   <p>Debug: UserID: {userId}</p>
                   <p>Week: {DateTime.fromJSDate(weekStart).toFormat('MM/dd')} - {DateTime.fromJSDate(weekEnd).toFormat('MM/dd')}</p>
                   <p>Loading: A:{appointmentsLoading ? 'Y' : 'N'} | N:{nylasLoading ? 'Y' : 'N'} | B:{blockedTimesLoading ? 'Y' : 'N'}</p>
-                  <p>CRITICAL: All events use SINGLE toEventDate() with bound Luxon localizer</p>
+                  <p>SURGICAL FIX: Availability guard removed, native RBC flow restored</p>
                 </div>
               )}
             </div>
