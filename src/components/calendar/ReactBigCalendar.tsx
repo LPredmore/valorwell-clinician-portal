@@ -1,7 +1,7 @@
 
 import React, { useCallback, useMemo } from 'react';
-import { Calendar, luxonLocalizer, Views } from 'react-big-calendar';
-import { DateTime } from 'luxon';
+import { Calendar, Views } from 'react-big-calendar';
+import { globalLocalizer } from '@/main';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import '@/styles/calendar.css';
 
@@ -33,11 +33,8 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
   onNavigate,
   userTimeZone = 'America/New_York',
 }) => {
-  // CRITICAL: Use Luxon localizer instead of Moment
-  const localizer = useMemo(() => {
-    console.log('[ReactBigCalendar] FIXED: Using Luxon localizer with timezone:', userTimeZone);
-    return luxonLocalizer(DateTime);
-  }, [userTimeZone]);
+  // CRITICAL: Use global localizer instance instead of creating new ones
+  console.log('[ReactBigCalendar] CRITICAL: Using global Luxon localizer instance with timezone:', userTimeZone);
 
   // Enhanced event style getter with proper className handling
   const eventPropGetter = useCallback((event: CalendarEvent) => {
@@ -93,9 +90,9 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
     onNavigate(newDate);
   }, [onNavigate, userTimeZone]);
 
-  // CRITICAL: Calendar configuration with ENFORCED overlap layout and Luxon localizer
+  // CRITICAL: Calendar configuration with ENFORCED overlap layout and global Luxon localizer
   const calendarConfig = useMemo(() => ({
-    localizer,
+    localizer: globalLocalizer, // CRITICAL: Use global localizer instance
     events,
     date,
     onNavigate: handleNavigate,
@@ -119,14 +116,14 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
     showMultiDayTimes: true,
     dayLayoutAlgorithm: 'overlap', // CRITICAL: ENFORCED overlap layout
     toolbar: true,
-  }), [events, eventPropGetter, components, onSelectSlot, onSelectEvent, date, handleNavigate, localizer]);
+  }), [events, eventPropGetter, components, onSelectSlot, onSelectEvent, date, handleNavigate]);
 
-  console.log('[ReactBigCalendar] FIXED: Rendering with Luxon localizer and ENFORCED overlap:', {
+  console.log('[ReactBigCalendar] CRITICAL: Rendering with GLOBAL Luxon localizer and ENFORCED overlap:', {
     totalEvents: events.length,
     currentDate: date.toISOString(),
     userTimeZone,
     layoutAlgorithm: 'overlap',
-    localizerType: 'Luxon',
+    localizerType: 'Global Luxon',
     eventsBySource: {
       internal: events.filter(e => e.source === 'internal').length,
       blocked_time: events.filter(e => e.source === 'blocked_time').length,
