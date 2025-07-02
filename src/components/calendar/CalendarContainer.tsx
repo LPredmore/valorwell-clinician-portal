@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "../layout/Layout";
@@ -271,7 +270,7 @@ const CalendarContainer: React.FC = () => {
     <Layout>
       <CalendarErrorBoundary>
         <div className="p-6">
-          {/* Header with action buttons */}
+          {/* Simple header with action buttons */}
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center space-x-4">
               <Button onClick={() => navigate('/appointments/new')}>
@@ -285,16 +284,12 @@ const CalendarContainer: React.FC = () => {
               </Button>
             </div>
             
-            <h1 className="text-2xl font-bold text-gray-800">
-              {currentMonthDisplay}
-            </h1>
-            
             <div className="text-sm text-gray-600 text-right">
               <p>Timezone: {userTimeZone}</p>
             </div>
           </div>
 
-          {/* React Big Calendar */}
+          {/* React Big Calendar with native toolbar */}
           <ReactBigCalendar
             events={allEvents}
             onSelectSlot={handleSelectSlot}
