@@ -7,7 +7,6 @@
   border: 1px dashed #22c55e !important;
   border-radius: 4px !important;
   color: #15803d !important;
-  position: relative !important;
   z-index: 1 !important;
 }
 
@@ -21,7 +20,6 @@
   background: linear-gradient(135deg, #f57c00 0%, #e65100 100%) !important;
   border: 1px solid #d84315 !important;
   box-shadow: 0 1px 3px rgba(0,0,0,0.2) !important;
-  position: relative !important;
   z-index: 10 !important;
 }
 
@@ -30,7 +28,6 @@
   background: linear-gradient(135deg, #3174ad 0%, #1e40af 100%) !important;
   border: 1px solid #1e3a8a !important;
   box-shadow: 0 1px 3px rgba(0,0,0,0.2) !important;
-  position: relative !important;
   z-index: 15 !important;
 }
 
@@ -39,7 +36,6 @@
   background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%) !important;
   border: 2px solid #374151 !important;
   border-radius: 6px !important;
-  position: relative !important;
   overflow: hidden !important;
   box-shadow: 0 2px 4px rgba(0,0,0,0.2), inset 0 1px 2px rgba(255,255,255,0.1) !important;
   z-index: 20 !important;
@@ -75,37 +71,13 @@
   transition: all 0.2s ease-in-out !important;
 }
 
-/* CRITICAL: NATIVE RBC layout - position: relative only, NO width/positioning overrides */
-.rbc-event {
-  position: relative !important;
-  transition: all 0.2s ease-in-out !important;
-  /* CRITICAL: All width, left, top overrides REMOVED to restore native RBC positioning */
-}
-
+/* CRITICAL: Minimal hover effects only - NO positioning overrides */
 .rbc-event:hover {
   transform: translateY(-1px) !important;
   box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important;
 }
 
-/* CRITICAL: Allow React Big Calendar to control event container positioning */
-.rbc-event-container {
-  position: relative !important;
-  /* CRITICAL: All positioning overrides REMOVED - let RBC handle layout */
-}
-
-/* Calendar tooltip enhancements */
-.rbc-tooltip {
-  background: rgba(0, 0, 0, 0.9) !important;
-  color: white !important;
-  border-radius: 6px !important;
-  padding: 8px 12px !important;
-  font-size: 12px !important;
-  max-width: 200px !important;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
-  z-index: 1000 !important;
-}
-
-/* ... keep existing code (legend styles) the same ... */
+/* Calendar legend styles */
 .calendar-legend {
   display: flex;
   gap: 16px;
