@@ -1,7 +1,40 @@
 
-/* FIXED: Removed duplicate react-big-calendar import - now handled in index.css */
+/* CRITICAL: Enhanced event styling with ENFORCED z-index and positioning */
 
-/* FIXED: Enhanced blocked time styling with HIGHEST z-index for overlapping */
+/* CRITICAL: Availability events - LOWEST z-index (background layer) */
+.rbc-event.availability-event {
+  background: rgba(34, 197, 94, 0.1) !important;
+  border: 1px dashed #22c55e !important;
+  border-radius: 4px !important;
+  color: #15803d !important;
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+.rbc-event.availability-event:hover {
+  background: rgba(34, 197, 94, 0.2) !important;
+  border-color: #16a34a !important;
+}
+
+/* CRITICAL: External event styling - MEDIUM z-index */
+.rbc-event.external-event {
+  background: linear-gradient(135deg, #f57c00 0%, #e65100 100%) !important;
+  border: 1px solid #d84315 !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2) !important;
+  position: relative !important;
+  z-index: 10 !important;
+}
+
+/* CRITICAL: Internal appointment styling - HIGH z-index */
+.rbc-event.internal-event {
+  background: linear-gradient(135deg, #3174ad 0%, #1e40af 100%) !important;
+  border: 1px solid #1e3a8a !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2) !important;
+  position: relative !important;
+  z-index: 15 !important;
+}
+
+/* CRITICAL: Blocked time styling - HIGHEST z-index (always on top) */
 .rbc-event.blocked-time-event {
   background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%) !important;
   border: 2px solid #374151 !important;
@@ -9,7 +42,7 @@
   position: relative !important;
   overflow: hidden !important;
   box-shadow: 0 2px 4px rgba(0,0,0,0.2), inset 0 1px 2px rgba(255,255,255,0.1) !important;
-  z-index: 100 !important; /* HIGHEST priority - always on top */
+  z-index: 20 !important;
 }
 
 .rbc-event.blocked-time-event::before {
@@ -42,40 +75,7 @@
   transition: all 0.2s ease-in-out !important;
 }
 
-/* FIXED: Availability events - LOWEST z-index (background layer) */
-.rbc-event.availability-event {
-  background: rgba(34, 197, 94, 0.1) !important;
-  border: 1px dashed #22c55e !important;
-  border-radius: 4px !important;
-  color: #15803d !important;
-  position: relative !important;
-  z-index: 1 !important; /* LOWEST priority - background layer */
-}
-
-.rbc-event.availability-event:hover {
-  background: rgba(34, 197, 94, 0.2) !important;
-  border-color: #16a34a !important;
-}
-
-/* FIXED: External event styling - MEDIUM-HIGH z-index */
-.rbc-event.external-event {
-  background: linear-gradient(135deg, #f57c00 0%, #e65100 100%) !important;
-  border: 1px solid #d84315 !important;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.2) !important;
-  position: relative !important;
-  z-index: 50 !important; /* MEDIUM-HIGH priority */
-}
-
-/* FIXED: Internal appointment styling - HIGH z-index (above availability, below blocked time) */
-.rbc-event.internal-event {
-  background: linear-gradient(135deg, #3174ad 0%, #1e40af 100%) !important;
-  border: 1px solid #1e3a8a !important;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.2) !important;
-  position: relative !important;
-  z-index: 75 !important; /* HIGH priority - above availability and external */
-}
-
-/* Ensure all events have proper stacking context and allow overlapping */
+/* CRITICAL: Ensure all events have proper stacking context */
 .rbc-event {
   position: relative !important;
   transition: all 0.2s ease-in-out !important;
@@ -86,7 +86,7 @@
   box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important;
 }
 
-/* FIXED: Force overlapping layout by overriding React Big Calendar's positioning */
+/* CRITICAL: Force overlapping layout with absolute positioning */
 .rbc-calendar .rbc-event-container {
   position: relative !important;
 }
@@ -111,7 +111,7 @@
   font-size: 12px !important;
   max-width: 200px !important;
   box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
-  z-index: 1000 !important; /* Ensure tooltips appear above everything */
+  z-index: 1000 !important;
 }
 
 /* Legend indicators */
@@ -171,25 +171,4 @@
 .legend-dot.available {
   background: rgba(34, 197, 94, 0.2);
   border: 1px dashed #22c55e;
-}
-
-/* FIXED: Ensure proper stacking with specific z-index values */
-.rbc-calendar .rbc-event {
-  position: relative !important;
-}
-
-.rbc-calendar .rbc-event.availability-event {
-  z-index: 1 !important;
-}
-
-.rbc-calendar .rbc-event.external-event {
-  z-index: 50 !important;
-}
-
-.rbc-calendar .rbc-event.internal-event {
-  z-index: 75 !important;
-}
-
-.rbc-calendar .rbc-event.blocked-time-event {
-  z-index: 100 !important;
 }

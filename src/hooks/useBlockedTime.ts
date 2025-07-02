@@ -33,12 +33,11 @@ export const useBlockedTime = (
       setIsLoading(true);
       setError(null);
 
-      console.log('[useBlockedTime] Fetching blocked times with FIXED temporal overlap query:', {
+      console.log('[useBlockedTime] CRITICAL: Fetching with FIXED dependencies:', {
         clinicianId,
         startDate: startDate?.toISOString(),
         endDate: endDate?.toISOString(),
-        refreshTrigger,
-        queryType: 'temporal_overlap'
+        refreshTrigger
       });
 
       let query = supabase
@@ -47,13 +46,11 @@ export const useBlockedTime = (
         .eq('clinician_id', clinicianId)
         .order('start_at');
 
-      // FIXED: Use proper temporal overlap instead of just checking start_at
       if (startDate && endDate) {
         query = temporalOverlapQuery(query, startDate, endDate);
         console.log('[useBlockedTime] Applied temporal overlap filter:', {
           rangeStart: startDate.toISOString(),
-          rangeEnd: endDate.toISOString(),
-          logic: 'blocked_start <= range_end AND blocked_end >= range_start'
+          rangeEnd: endDate.toISOString()
         });
       }
 
@@ -61,22 +58,14 @@ export const useBlockedTime = (
 
       if (error) throw error;
 
-      console.log('[useBlockedTime] FIXED fetch results:', {
+      console.log('[useBlockedTime] CRITICAL: Fetch results with dependencies:', {
         clinicianId,
         count: data?.length || 0,
         refreshTrigger,
         dateRange: { 
           startDate: startDate?.toISOString(), 
           endDate: endDate?.toISOString() 
-        },
-        retrievedBlocks: data?.map(bt => ({
-          id: bt.id,
-          label: bt.label,
-          start_at: bt.start_at,
-          end_at: bt.end_at,
-          spans_range: startDate && endDate ? 
-            (new Date(bt.start_at) <= endDate && new Date(bt.end_at) >= startDate) : 'N/A'
-        }))
+        }
       });
 
       setBlockedTimes(data || []);
@@ -119,7 +108,6 @@ export const useBlockedTime = (
         description: "Time blocked successfully",
       });
 
-      // Refresh the data
       await fetchBlockedTimes();
       return true;
     } catch (error: any) {
@@ -156,7 +144,6 @@ export const useBlockedTime = (
         description: "Blocked time updated successfully",
       });
 
-      // Refresh the data
       await fetchBlockedTimes();
       return true;
     } catch (error: any) {
@@ -184,7 +171,6 @@ export const useBlockedTime = (
         description: "Blocked time removed successfully",
       });
 
-      // Refresh the data
       await fetchBlockedTimes();
       return true;
     } catch (error: any) {
@@ -198,10 +184,10 @@ export const useBlockedTime = (
     }
   };
 
-  // FIXED: Include all necessary dependencies in useEffect
+  // CRITICAL: Include ALL necessary dependencies
   useEffect(() => {
     fetchBlockedTimes();
-  }, [clinicianId, startDate, endDate, refreshTrigger]); // FIXED: Added refreshTrigger dependency
+  }, [clinicianId, startDate, endDate, refreshTrigger]);
 
   return {
     blockedTimes,

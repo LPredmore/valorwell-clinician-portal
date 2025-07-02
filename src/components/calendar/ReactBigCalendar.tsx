@@ -33,13 +33,13 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
   onNavigate,
   userTimeZone = 'America/New_York',
 }) => {
-  // FIXED: Use simple localizer without conflicting timezone configuration
+  // CRITICAL: Use simple localizer - timezone is already set globally
   const localizer = useMemo(() => {
-    console.log('[ReactBigCalendar] FIXED: Using simple moment localizer with global timezone configuration');
+    console.log('[ReactBigCalendar] FIXED: Using global moment timezone configuration');
     return momentLocalizer(moment);
   }, []);
 
-  // FIXED: Enhanced event style getter with proper className handling
+  // Enhanced event style getter with proper className handling
   const eventPropGetter = useCallback((event: CalendarEvent) => {
     console.log('[ReactBigCalendar] Styling event:', {
       id: event.id,
@@ -50,12 +50,10 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
       end: event.end?.toISOString()
     });
 
-    // Return both className and style for proper layering
     return {
       className: event.className || `${event.source}-event`,
       style: {
         cursor: 'pointer',
-        // Let CSS z-index handle layering
       }
     };
   }, []);
@@ -95,7 +93,7 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
     onNavigate(newDate);
   }, [onNavigate, userTimeZone]);
 
-  // FIXED: Calendar configuration with GUARANTEED overlap layout algorithm
+  // CRITICAL: Calendar configuration with ENFORCED overlap layout
   const calendarConfig = useMemo(() => ({
     localizer,
     events,
@@ -119,15 +117,16 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
     selectable: true,
     popup: true,
     showMultiDayTimes: true,
-    dayLayoutAlgorithm: 'overlap', // GUARANTEED: Enable overlapping layout
+    dayLayoutAlgorithm: 'overlap', // CRITICAL: ENFORCED overlap layout
     toolbar: true,
   }), [events, eventPropGetter, components, onSelectSlot, onSelectEvent, date, handleNavigate, localizer]);
 
-  console.log('[ReactBigCalendar] FIXED: Rendering with GUARANTEED overlap layout and simplified timezone handling:', {
+  console.log('[ReactBigCalendar] FIXED: Rendering with ENFORCED overlap and global timezone:', {
     totalEvents: events.length,
     currentDate: date.toISOString(),
     userTimeZone,
     layoutAlgorithm: 'overlap',
+    globalMomentTimezone: moment.tz.guess(),
     eventsBySource: {
       internal: events.filter(e => e.source === 'internal').length,
       blocked_time: events.filter(e => e.source === 'blocked_time').length,

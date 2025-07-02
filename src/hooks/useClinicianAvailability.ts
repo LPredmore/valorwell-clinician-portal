@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -18,6 +19,11 @@ export function useClinicianAvailability(clinicianId: string | null, refreshTrig
     
     const loadAvailability = async () => {
       try {
+        console.log('[useClinicianAvailability] CRITICAL: Loading with FIXED dependencies:', {
+          clinicianId,
+          refreshTrigger
+        });
+
         const { data, error } = await supabase
           .from('clinicians')
           .select(`
@@ -69,7 +75,7 @@ export function useClinicianAvailability(clinicianId: string | null, refreshTrig
           }
         });
         
-        console.log('[useClinicianAvailability] FIXED: Loaded availability slots with refresh trigger:', {
+        console.log('[useClinicianAvailability] CRITICAL: Loaded with FIXED dependencies:', {
           availabilitySlots,
           refreshTrigger
         });
@@ -85,7 +91,7 @@ export function useClinicianAvailability(clinicianId: string | null, refreshTrig
     };
 
     loadAvailability();
-  }, [clinicianId, toast, refreshTrigger]); // FIXED: Added refreshTrigger dependency
+  }, [clinicianId, toast, refreshTrigger]); // CRITICAL: ALL dependencies included
 
   return slots;
 }

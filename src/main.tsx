@@ -5,10 +5,19 @@ import App from './App.tsx';
 import './index.css';
 import moment from 'moment-timezone';
 
-// FIXED: Initialize moment timezone globally with a default that will be updated per user
-// This provides a stable base configuration that individual components can then customize
-moment.tz.setDefault('America/New_York');
-console.log('[main] FIXED: Initialized global moment timezone with default:', moment.tz.guess());
+// CRITICAL: Get user timezone and set globally before ANY React components mount
+const getUserTimeZone = () => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch {
+    return 'America/New_York';
+  }
+};
+
+// Set moment timezone globally BEFORE any calendar components are created
+const userTimeZone = getUserTimeZone();
+moment.tz.setDefault(userTimeZone);
+console.log('[main] FIXED: Set global moment timezone BEFORE React mount:', userTimeZone);
 
 const rootElement = document.getElementById("root");
 
