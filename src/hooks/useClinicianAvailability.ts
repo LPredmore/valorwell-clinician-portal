@@ -10,7 +10,12 @@ export interface AvailabilitySlot {
   endTime: string;       // "17:00"
 }
 
-export function useClinicianAvailability(clinicianId: string | null, refreshTrigger = 0) {
+export function useClinicianAvailability(
+  clinicianId: string | null, 
+  weekStart: Date,
+  weekEnd: Date,
+  refreshTrigger = 0
+) {
   const [slots, setSlots] = useState<AvailabilitySlot[]>([]);
   const { toast } = useToast();
 
@@ -19,8 +24,10 @@ export function useClinicianAvailability(clinicianId: string | null, refreshTrig
     
     const loadAvailability = async () => {
       try {
-        console.log('[useClinicianAvailability] CRITICAL: Loading with FIXED dependencies:', {
+        console.log('[useClinicianAvailability] Loading with date range:', {
           clinicianId,
+          weekStart: weekStart.toISOString(),
+          weekEnd: weekEnd.toISOString(),
           refreshTrigger
         });
 
@@ -75,10 +82,7 @@ export function useClinicianAvailability(clinicianId: string | null, refreshTrig
           }
         });
         
-        console.log('[useClinicianAvailability] CRITICAL: Loaded with FIXED dependencies:', {
-          availabilitySlots,
-          refreshTrigger
-        });
+        console.log('[useClinicianAvailability] Loaded availability slots:', availabilitySlots);
         setSlots(availabilitySlots);
       } catch (err) {
         console.error('[useClinicianAvailability] Error loading availability:', err);
@@ -91,7 +95,7 @@ export function useClinicianAvailability(clinicianId: string | null, refreshTrig
     };
 
     loadAvailability();
-  }, [clinicianId, toast, refreshTrigger]); // CRITICAL: ALL dependencies included
+  }, [clinicianId, weekStart, weekEnd, toast, refreshTrigger]);
 
   return slots;
 }

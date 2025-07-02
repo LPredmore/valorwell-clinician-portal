@@ -89,16 +89,16 @@ const CalendarSimple = React.memo(() => {
     refreshTrigger
   );
 
-  // CRITICAL: Fixed availability hook with proper dependencies
-  const availabilitySlots = useClinicianAvailability(userId, refreshTrigger);
+  // CRITICAL: Fixed availability hook with proper date range dependencies
+  const availabilitySlots = useClinicianAvailability(
+    userId,
+    weekStart,
+    weekEnd,
+    refreshTrigger
+  );
 
   // CRITICAL: Transform availability using SINGLE toEventDate conversion (NO double conversion)
   const availabilityEvents = useMemo(() => {
-    if (!availabilitySlots.length || !userTimeZone) {
-      console.log('[CalendarSimple] No availability slots or timezone, returning empty array');
-      return [];
-    }
-    
     console.log('[CalendarSimple] CRITICAL: Processing availability with SINGLE toEventDate conversion:', {
       slotsCount: availabilitySlots.length,
       userTimeZone,
