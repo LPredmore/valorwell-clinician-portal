@@ -1,6 +1,7 @@
+
 import React, { useCallback, useMemo } from 'react';
 import { Calendar, momentLocalizer, Views } from 'react-big-calendar';
-import moment from 'moment-timezone';
+import moment from 'moment';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import '@/styles/calendar.css';
 
@@ -32,13 +33,11 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
   onNavigate,
   userTimeZone = 'America/New_York',
 }) => {
-  // FIXED: Properly configure moment with clinician's timezone and create localizer
+  // FIXED: Use simple localizer without conflicting timezone configuration
   const localizer = useMemo(() => {
-    // Set the timezone for moment before creating localizer
-    moment.tz.setDefault(userTimeZone);
-    console.log('[ReactBigCalendar] FIXED: Configured moment timezone:', userTimeZone);
+    console.log('[ReactBigCalendar] FIXED: Using simple moment localizer with global timezone configuration');
     return momentLocalizer(moment);
-  }, [userTimeZone]);
+  }, []);
 
   // FIXED: Enhanced event style getter with proper className handling
   const eventPropGetter = useCallback((event: CalendarEvent) => {
@@ -124,12 +123,11 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
     toolbar: true,
   }), [events, eventPropGetter, components, onSelectSlot, onSelectEvent, date, handleNavigate, localizer]);
 
-  console.log('[ReactBigCalendar] FIXED: Rendering with GUARANTEED overlap layout:', {
+  console.log('[ReactBigCalendar] FIXED: Rendering with GUARANTEED overlap layout and simplified timezone handling:', {
     totalEvents: events.length,
     currentDate: date.toISOString(),
     userTimeZone,
     layoutAlgorithm: 'overlap',
-    momentDefaultTimezone: moment.tz.guess(),
     eventsBySource: {
       internal: events.filter(e => e.source === 'internal').length,
       blocked_time: events.filter(e => e.source === 'blocked_time').length,

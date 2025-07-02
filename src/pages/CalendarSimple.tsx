@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "../components/layout/Layout";
@@ -30,6 +31,7 @@ import AvailabilityManagementSidebar from "@/components/calendar/AvailabilityMan
 import CalendarConnectionsPanel from "@/components/calendar/CalendarConnectionsPanel";
 import CalendarLegend from "../components/calendar/CalendarLegend";
 import { getWeekRange, logWeekNavigation } from "@/utils/dateRangeUtils";
+import moment from 'moment-timezone';
 
 const CalendarSimple = React.memo(() => {
   const { userId, authInitialized, userRole } = useUser();
@@ -67,6 +69,14 @@ const CalendarSimple = React.memo(() => {
     };
   }, [currentDate, userTimeZone]);
 
+  // FIXED: Update global moment timezone when userTimeZone changes
+  useEffect(() => {
+    if (userTimeZone) {
+      console.log('[CalendarSimple] FIXED: Setting global moment timezone:', userTimeZone);
+      moment.tz.setDefault(userTimeZone);
+    }
+  }, [userTimeZone]);
+
   // Enhanced date range synchronization logging
   useEffect(() => {
     console.group('📅 Date Range Synchronization');
@@ -102,9 +112,9 @@ const CalendarSimple = React.memo(() => {
   );
 
   // Fetch availability slots
-  const availabilitySlots = useClinicianAvailability(userId);
+  const availabilitySlots = useClinicianAvailability(userId, refreshTrigger);
 
-  // Transform availability slots with STANDARDIZED buildLocalDate conversion
+  // FIXED: Transform availability slots with STANDARDIZED buildLocalDate conversion
   const availabilityEvents = useMemo(() => {
     if (!availabilitySlots.length || !userTimeZone) {
       console.log('[CalendarSimple] No availability slots or timezone, returning empty array');
@@ -180,9 +190,9 @@ const CalendarSimple = React.memo(() => {
     });
 
     return events;
-  }, [availabilitySlots, weekStart, weekEnd, userTimeZone]);
+  }, [availabilitySlots, weekStart, weekEnd, userTimeZone, refreshTrigger]);
 
-  // Transform blocked times with STANDARDIZED buildLocalDate conversion
+  // FIXED: Transform blocked times with STANDARDIZED buildLocalDate conversion
   const blockedTimeEvents = useMemo(() => {
     if (!blockedTimes.length || !userTimeZone) {
       console.log('[CalendarSimple] No blocked times or timezone');
@@ -242,7 +252,7 @@ const CalendarSimple = React.memo(() => {
     triggerRefresh();
   }, [currentDate, triggerRefresh]);
 
-  // Combine all events with STANDARDIZED buildLocalDate conversion for appointments
+  // FIXED: Combine all events with STANDARDIZED buildLocalDate conversion for appointments
   const allEvents = useMemo(() => {
     const events = [];
     
@@ -570,6 +580,27 @@ const CalendarSimple = React.memo(() => {
     });
   }, [currentDate]);
 
+  // Debug logging for calendar state
+  useEffect(() => {
+    console.log('[CalendarSimple] Component state:', {
+      userId,
+      appointmentsCount: appointments?.length || 0,
+      nylasEventsCount: nylasEvents?.length || 0,
+      blockedTimesCount: blockedTimes?.length || 0,
+      allEventsCount: allEvents?.length || 0,
+      appointmentsLoading,
+      nylasLoading,
+      blockedTimesLoading,
+      userTimeZone,
+      currentDate: currentDate.toISOString(),
+      synchronizedWeekStart: weekStart.toISOString(),
+      synchronizedWeekEnd: weekEnd.toISOString(),
+      isReady,
+      authInitialized,
+      navigationSystem: 'React Big Calendar Native'
+    });
+  }, [userId, appointments, nylasEvents, blockedTimes, allEvents, appointmentsLoading, nylasLoading, blockedTimesLoading, userTimeZone, currentDate, weekStart, weekEnd, isReady, authInitialized]);
+
   // Early returns for loading states
   if (!authInitialized) {
     return (
@@ -661,6 +692,8 @@ const CalendarSimple = React.memo(() => {
                     <AvailabilityManagementSidebar
                       clinicianId={userId}
                       userTimeZone={userTimeZone}
+                      refreshTrigger={refreshTrigger}
+                      onRefresh={triggerRefresh}
                     />
 
                     {/* Calendar Connections */}

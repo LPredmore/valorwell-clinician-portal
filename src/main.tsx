@@ -5,9 +5,10 @@ import App from './App.tsx';
 import './index.css';
 import moment from 'moment-timezone';
 
-// Initialize moment timezone globally - this will be set dynamically per user
-// For now, we set a default that will be overridden when user timezone is known
+// FIXED: Initialize moment timezone globally with a default that will be updated per user
+// This provides a stable base configuration that individual components can then customize
 moment.tz.setDefault('America/New_York');
+console.log('[main] FIXED: Initialized global moment timezone with default:', moment.tz.guess());
 
 const rootElement = document.getElementById("root");
 
