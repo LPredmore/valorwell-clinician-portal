@@ -1,10 +1,9 @@
-
 import React, { useState } from 'react';
 import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Calendar, Users, FileText, Clock, TrendingUp, Bell } from "lucide-react";
-import AppointmentsList from '@/components/dashboard/AppointmentsList';
+import { AppointmentsList } from '@/components/dashboard/AppointmentsList';
 import { useAuth } from '@/hooks/useAuth';
 
 const ClinicianDashboard = () => {
@@ -47,7 +46,7 @@ const ClinicianDashboard = () => {
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">
-            Welcome back, {user?.user_metadata?.first_name || 'Doctor'}
+            Welcome back, Doctor
           </h1>
           <p className="text-muted-foreground">
             Here's what's happening with your practice today.
@@ -82,7 +81,16 @@ const ClinicianDashboard = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <AppointmentsList />
+              <AppointmentsList
+                title="Appointments"
+                icon={<Calendar className="h-5 w-5 mr-2" />}
+                appointments={[]}
+                isLoading={false}
+                error={null}
+                emptyMessage="No appointments scheduled"
+                timeZoneDisplay="EST"
+                userTimeZone="America/New_York"
+              />
             </CardContent>
           </Card>
 

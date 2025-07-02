@@ -68,7 +68,12 @@
     @apply bg-background text-foreground;
   }
   
-  /* Apply borders only to specific UI components, not universally */
+  /* Scope border application to exclude RBC calendar components */
+  :where(.app) *:not([class*="rbc"]) {
+    @apply border-border;
+  }
+  
+  /* Apply borders only to specific UI components as fallback */
   .card, .input, .button, [data-radix-collection-item] {
     @apply border-border;
   }
