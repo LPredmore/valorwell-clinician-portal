@@ -56,6 +56,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
   const [date, setDate] = useState<string>('');
   const [startHour, setStartHour] = useState<string>('09');
   const [startMinute, setStartMinute] = useState<string>('00');
+  const [startAMPM, setStartAMPM] = useState<string>('AM');
   const [notes, setNotes] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingClients, setIsLoadingClients] = useState(false);
@@ -66,10 +67,10 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
 
   const appointmentId = editingAppointment?.id;
 
-  // Generate hour options (0-23)
-  const hourOptions = Array.from({ length: 24 }, (_, i) => ({
-    value: i.toString().padStart(2, '0'),
-    label: i.toString().padStart(2, '0')
+  // Generate hour options (1-12 for AM/PM format)
+  const hourOptions = Array.from({ length: 12 }, (_, i) => ({
+    value: (i + 1).toString().padStart(2, '0'),
+    label: (i + 1).toString().padStart(2, '0')
   }));
 
   // Generate minute options (only 00, 15, 30, 45)
@@ -78,6 +79,12 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
     { value: '15', label: '15' },
     { value: '30', label: '30' },
     { value: '45', label: '45' }
+  ];
+
+  // AM/PM options
+  const ampmOptions = [
+    { value: 'AM', label: 'AM' },
+    { value: 'PM', label: 'PM' }
   ];
 
   // Load clients when dialog opens
@@ -116,8 +123,12 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
         
         if (startDateTime) {
           setDate(startDateTime.toFormat('yyyy-MM-dd'));
-          setStartHour(startDateTime.toFormat('HH'));
+          const hour24 = startDateTime.hour;
+          const hour12 = hour24 === 0 ? 12 : hour24 > 12 ? hour24 - 12 : hour24;
+          const ampm = hour24 >= 12 ? 'PM' : 'AM';
+          setStartHour(hour12.toString().padStart(2, '0'));
           setStartMinute(startDateTime.toFormat('mm'));
+          setStartAMPM(ampm);
         }
       } else if (selectedSlot) {
         // Handle slot selection for new appointments
@@ -125,8 +136,12 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
           const startDateTime = DateTime.fromJSDate(selectedSlot.start)
             .setZone(userTimeZone);
           setDate(startDateTime.toFormat('yyyy-MM-dd'));
-          setStartHour(startDateTime.toFormat('HH'));
+          const hour24 = startDateTime.hour;
+          const hour12 = hour24 === 0 ? 12 : hour24 > 12 ? hour24 - 12 : hour24;
+          const ampm = hour24 >= 12 ? 'PM' : 'AM';
+          setStartHour(hour12.toString().padStart(2, '0'));
           setStartMinute(startDateTime.toFormat('mm'));
+          setStartAMPM(ampm);
         }
       } else {
         // Reset form for new appointments
@@ -134,6 +149,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
         setDate('');
         setStartHour('09');
         setStartMinute('00');
+        setStartAMPM('AM');
         setNotes('');
       }
       
@@ -150,6 +166,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
     setDate('');
     setStartHour('09');
     setStartMinute('00');
+    setStartAMPM('AM');
     setNotes('');
     setShowDeleteConfirm(false);
   };
@@ -197,7 +214,15 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
         throw new Error('User timezone not found - cannot create appointment');
       }
 
-      const localDateTimeStart = `${date}T${startHour}:${startMinute}`;
+      // Convert 12-hour format to 24-hour format
+      let hour24 = parseInt(startHour);
+      if (startAMPM === 'PM' && hour24 !== 12) {
+        hour24 += 12;
+      } else if (startAMPM === 'AM' && hour24 === 12) {
+        hour24 = 0;
+      }
+
+      const localDateTimeStart = `${date}T${hour24.toString().padStart(2, '0')}:${startMinute}`;
       
       console.log('[AppointmentDialog] Converting times:', {
         localDateTimeStart,
@@ -364,6 +389,18 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
                     {minuteOptions.map((minute) => (
                       <SelectItem key={minute.value} value={minute.value}>
                         {minute.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={startAMPM} onValueChange={setStartAMPM}>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="AM/PM" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ampmOptions.map((ampm) => (
+                      <SelectItem key={ampm.value} value={ampm.value}>
+                        {ampm.label}
                       </SelectItem>
                     ))}
                   </SelectContent>

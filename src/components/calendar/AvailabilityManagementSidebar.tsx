@@ -33,8 +33,10 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
   const [selectedSlot, setSelectedSlot] = useState<number>(1);
   const [startHour, setStartHour] = useState<string>('09');
   const [startMinute, setStartMinute] = useState<string>('00');
-  const [endHour, setEndHour] = useState<string>('17');
+  const [startAMPM, setStartAMPM] = useState<string>('AM');
+  const [endHour, setEndHour] = useState<string>('05');
   const [endMinute, setEndMinute] = useState<string>('00');
+  const [endAMPM, setEndAMPM] = useState<string>('PM');
   const [currentAvailability, setCurrentAvailability] = useState<AvailabilitySlot[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -50,10 +52,10 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
     { value: 'sunday', label: 'Sunday' }
   ];
 
-  // Generate hour options (0-23)
-  const hourOptions = Array.from({ length: 24 }, (_, i) => ({
-    value: i.toString().padStart(2, '0'),
-    label: i.toString().padStart(2, '0')
+  // Generate hour options (1-12 for AM/PM format)
+  const hourOptions = Array.from({ length: 12 }, (_, i) => ({
+    value: (i + 1).toString().padStart(2, '0'),
+    label: (i + 1).toString().padStart(2, '0')
   }));
 
   // Generate minute options (only 00, 15, 30, 45)
@@ -62,6 +64,12 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
     { value: '15', label: '15' },
     { value: '30', label: '30' },
     { value: '45', label: '45' }
+  ];
+
+  // AM/PM options
+  const ampmOptions = [
+    { value: 'AM', label: 'AM' },
+    { value: 'PM', label: 'PM' }
   ];
 
   // Load current availability when component mounts or clinician changes
@@ -144,23 +152,50 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
     }
   };
 
+  const convertTimeToAMPM = (time24: string) => {
+    const [hour, minute] = time24.split(':');
+    const hour24 = parseInt(hour);
+    const hour12 = hour24 === 0 ? 12 : hour24 > 12 ? hour24 - 12 : hour24;
+    const ampm = hour24 >= 12 ? 'PM' : 'AM';
+    return {
+      hour: hour12.toString().padStart(2, '0'),
+      minute,
+      ampm
+    };
+  };
+
+  const convertTimeFrom12To24 = (hour12: string, minute: string, ampm: string) => {
+    let hour24 = parseInt(hour12);
+    if (ampm === 'PM' && hour24 !== 12) {
+      hour24 += 12;
+    } else if (ampm === 'AM' && hour24 === 12) {
+      hour24 = 0;
+    }
+    return `${hour24.toString().padStart(2, '0')}:${minute}`;
+  };
+
   const loadSelectedSlot = () => {
     const slot = currentAvailability.find(
       a => a.day === selectedDay && a.slot === selectedSlot
     );
     
     if (slot) {
-      const [startH, startM] = slot.startTime.split(':');
-      const [endH, endM] = slot.endTime.split(':');
-      setStartHour(startH);
-      setStartMinute(startM);
-      setEndHour(endH);
-      setEndMinute(endM);
+      const startTime = convertTimeToAMPM(slot.startTime);
+      const endTime = convertTimeToAMPM(slot.endTime);
+      
+      setStartHour(startTime.hour);
+      setStartMinute(startTime.minute);
+      setStartAMPM(startTime.ampm);
+      setEndHour(endTime.hour);
+      setEndMinute(endTime.minute);
+      setEndAMPM(endTime.ampm);
     } else {
       setStartHour('09');
       setStartMinute('00');
-      setEndHour('17');
+      setStartAMPM('AM');
+      setEndHour('05');
       setEndMinute('00');
+      setEndAMPM('PM');
     }
   };
 
@@ -174,8 +209,8 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
       return;
     }
 
-    const startTime = `${startHour}:${startMinute}`;
-    const endTime = `${endHour}:${endMinute}`;
+    const startTime = convertTimeFrom12To24(startHour, startMinute, startAMPM);
+    const endTime = convertTimeFrom12To24(endHour, endMinute, endAMPM);
 
     if (!startTime || !endTime) {
       toast({
@@ -264,8 +299,10 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
       // Clear form and reload
       setStartHour('09');
       setStartMinute('00');
-      setEndHour('17');
+      setStartAMPM('AM');
+      setEndHour('05');
       setEndMinute('00');
+      setEndAMPM('PM');
       await loadCurrentAvailability();
       onRefresh();
     } catch (error) {
@@ -278,6 +315,11 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const formatTimeForDisplay = (time: string) => {
+    const { hour, minute, ampm } = convertTimeToAMPM(time);
+    return `${hour}:${minute} ${ampm}`;
   };
 
   return (
@@ -355,6 +397,18 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
                   ))}
                 </SelectContent>
               </Select>
+              <Select value={startAMPM} onValueChange={setStartAMPM}>
+                <SelectTrigger className="flex-1">
+                  <SelectValue placeholder="AM/PM" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ampmOptions.map((ampm) => (
+                    <SelectItem key={ampm.value} value={ampm.value}>
+                      {ampm.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           
@@ -386,6 +440,18 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
                   ))}
                 </SelectContent>
               </Select>
+              <Select value={endAMPM} onValueChange={setEndAMPM}>
+                <SelectTrigger className="flex-1">
+                  <SelectValue placeholder="AM/PM" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ampmOptions.map((ampm) => (
+                    <SelectItem key={ampm.value} value={ampm.value}>
+                      {ampm.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </div>
@@ -406,15 +472,13 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
             {isSaving ? 'Saving...' : 'Save'}
           </Button>
           
-          {(startHour !== '09' || startMinute !== '00' || endHour !== '17' || endMinute !== '00') && (
-            <Button
-              onClick={deleteAvailability}
-              disabled={isSaving || isLoading}
-              variant="outline"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          )}
+          <Button
+            onClick={deleteAvailability}
+            disabled={isSaving || isLoading}
+            variant="outline"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
         </div>
 
         {/* Current Availability Summary */}
@@ -435,7 +499,7 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
                     <div className="font-medium">{day.label}</div>
                     {daySlots.map(slot => (
                       <div key={slot.slot} className="ml-2 text-gray-600">
-                        Slot {slot.slot}: {slot.startTime} - {slot.endTime}
+                        Slot {slot.slot}: {formatTimeForDisplay(slot.startTime)} - {formatTimeForDisplay(slot.endTime)}
                       </div>
                     ))}
                   </div>
