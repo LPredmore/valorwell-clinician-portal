@@ -28,7 +28,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { SyncStatusIndicator } from './SyncStatusIndicator';
-import { CalendarConnectionsButton } from "@/components/CalendarConnectionsButton";
+import CalendarConnectionsButton from "@/components/calendar/CalendarConnectionsButton";
 
 const CalendarContainer: React.FC = () => {
   const { userId, authInitialized, userRole } = useUser();

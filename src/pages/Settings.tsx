@@ -8,8 +8,10 @@ import BillingTab from '@/components/settings/BillingTab';
 import TemplatesTab from '@/components/settings/TemplatesTab';
 import SecurityTab from '@/components/settings/SecurityTab';
 import LicensesTab from '@/components/settings/LicensesTab';
-import CalendarConnectionsPanel from '@/components/calendar/CalendarConnectionsPanel';
+import CalendarTab from '@/components/settings/CalendarTab';
 import { AddUserDialog } from '@/components/AddUserDialog';
+import { useLocation } from 'react-router-dom';
+import { useEffect } from 'react';
 
 const SettingsTabs = {
   PRACTICE: 'practice',
@@ -23,8 +25,16 @@ const SettingsTabs = {
 };
 
 const Settings = () => {
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState(SettingsTabs.PRACTICE);
   const [isAddUserDialogOpen, setIsAddUserDialogOpen] = useState(false);
+  
+  // Handle navigation state for direct tab access
+  useEffect(() => {
+    if (location.state?.activeTab) {
+      setActiveTab(location.state.activeTab);
+    }
+  }, [location.state]);
   
   return (
     <Layout>
@@ -88,7 +98,7 @@ const Settings = () => {
           {activeTab === SettingsTabs.TEMPLATES && <TemplatesTab />}
           {activeTab === SettingsTabs.SECURITY && <SecurityTab />}
           {activeTab === SettingsTabs.LICENSES && <LicensesTab />}
-          {activeTab === SettingsTabs.CALENDAR && <CalendarConnectionsPanel />}
+          {activeTab === SettingsTabs.CALENDAR && <CalendarTab />}
         </div>
       </div>
       
