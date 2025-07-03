@@ -50,7 +50,7 @@ export const useNylasEvents = (startDate?: Date, endDate?: Date) => {
       setIsLoading(true);
       setError(null);
 
-      console.log('[useNylasEvents] Fetching events with Nylas SDK:', {
+      console.log('[useNylasEvents] Fetching events with Nylas SDK v7:', {
         startDateISO,
         endDateISO,
         connectionCount: connections.length
@@ -62,9 +62,12 @@ export const useNylasEvents = (startDate?: Date, endDate?: Date) => {
         try {
           console.log(`[useNylasEvents] Processing connection: ${connection.id} (${connection.email})`);
           
+          // Use grant_id as identifier for v7 SDK
+          const grantId = connection.grant_id || connection.id;
+          
           // First get calendars for this connection
           const calendarsResponse = await nylasClient.calendars.list({
-            grantId: connection.grant_id || connection.id
+            identifier: grantId
           });
 
           const calendars = calendarsResponse.data || [];
@@ -77,7 +80,7 @@ export const useNylasEvents = (startDate?: Date, endDate?: Date) => {
             console.log(`[useNylasEvents] Fetching events for calendar: ${calendar.id} (${calendar.name})`);
             
             const eventsResponse = await nylasClient.events.list({
-              grantId: connection.grant_id || connection.id,
+              identifier: grantId,
               queryParams: {
                 calendar_id: calendar.id,
                 starts_after: Math.floor(startDate.getTime() / 1000),

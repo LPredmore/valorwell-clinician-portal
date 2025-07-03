@@ -9,10 +9,12 @@ export function useNylasClient() {
   return useMemo(() => {
     if (!isAuthenticated) return null;
     
-    // Use the Nylas credentials from your custom instructions
-    return Nylas.with({
-      clientId: '51e0429b-2859-4aed-9a8d-d9612d529853',
-      clientSecret: 'nyk_v0_S9OozobUDThXIF9vKpAliyo1ojSNANr3Tq00uvwYjPbuCWNWoILXRSGvxUvB8DSG'
+    // v7 SDK initialization with API key
+    const nylas = new Nylas({
+      apiKey: 'nyk_v0_S9OozobUDThXIF9vKpAliyo1ojSNANr3Tq00uvwYjPbuCWNWoILXRSGvxUvB8DSG',
+      apiUri: 'https://api.us.nylas.com'
     });
+    
+    return nylas;
   }, [isAuthenticated]);
 }

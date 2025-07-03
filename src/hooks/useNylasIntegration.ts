@@ -66,7 +66,7 @@ export const useNylasIntegration = () => {
     return () => window.removeEventListener('message', handleMessage);
   }, []);
 
-  // Fetch calendars directly with Nylas SDK
+  // Fetch calendars directly with Nylas SDK v7
   const fetchCalendars = async () => {
     if (!nylasClient || !connections.length) {
       setCalendars([]);
@@ -74,13 +74,14 @@ export const useNylasIntegration = () => {
     }
 
     try {
-      console.log('[useNylasIntegration] Fetching calendars with Nylas SDK');
+      console.log('[useNylasIntegration] Fetching calendars with Nylas SDK v7');
       const allCalendars: NylasCalendar[] = [];
 
       for (const connection of connections) {
         try {
+          const grantId = connection.grant_id || connection.id;
           const calendarsResponse = await nylasClient.calendars.list({
-            grantId: connection.grant_id || connection.id
+            identifier: grantId
           });
 
           const connectionCalendars = (calendarsResponse.data || []).map(cal => ({
