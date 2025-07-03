@@ -58,11 +58,11 @@ const CalendarContainer: React.FC = () => {
     refreshTrigger
   );
 
-  // Pure RBC event transformations with proper typing
-  const allEvents = useMemo((): CalendarEvent[] => {
+  // Separate real events from background availability
+  const realEvents = useMemo((): CalendarEvent[] => {
     const events: CalendarEvent[] = [];
     
-    // Transform appointments to RBC format with proper typing
+    // Transform appointments to RBC format
     if (appointments) {
       events.push(...appointments.map(apt => {
         const startDT = DateTime.fromISO(apt.start_at, { zone: 'utc' }).setZone(userTimeZone);
@@ -79,7 +79,7 @@ const CalendarContainer: React.FC = () => {
       }));
     }
     
-    // Transform Nylas events to RBC format with proper typing
+    // Transform Nylas events to RBC format
     if (nylasEvents) {
       events.push(...nylasEvents.map(evt => ({
         id: evt.id,
@@ -91,7 +91,7 @@ const CalendarContainer: React.FC = () => {
       })));
     }
 
-    // Transform blocked time to RBC format with proper typing
+    // Transform blocked time to RBC format
     events.push(...blockedTimes.map(blockedTime => {
       const startDT = DateTime.fromISO(blockedTime.start_at, { zone: 'utc' }).setZone(userTimeZone);
       const endDT = DateTime.fromISO(blockedTime.end_at, { zone: 'utc' }).setZone(userTimeZone);
@@ -106,7 +106,11 @@ const CalendarContainer: React.FC = () => {
       };
     }));
 
-    // Transform availability slots to RBC format with proper typing
+    return events;
+  }, [appointments, nylasEvents, blockedTimes, userTimeZone]);
+
+  // Transform availability slots to background events
+  const backgroundEvents = useMemo(() => {
     const tz = userTimeZone;
     const startDT = DateTime.fromJSDate(weekStart).setZone(tz).startOf('day');
     const endDT = DateTime.fromJSDate(weekEnd).setZone(tz).startOf('day');
@@ -124,7 +128,7 @@ const CalendarContainer: React.FC = () => {
       friday: 5, saturday: 6, sunday: 7 
     };
 
-    const availabilityEvents = availabilitySlots.flatMap(slot => {
+    return availabilitySlots.flatMap(slot => {
       const matchedDates = dates.filter(d => d.weekday === weekdayMap[slot.day]);
       
       return matchedDates.map(d => {
@@ -135,21 +139,13 @@ const CalendarContainer: React.FC = () => {
         const endDT = DateTime.fromISO(endISO, { zone: tz });
         
         return {
-          id: `avail-${slot.day}-${slot.slot}-${d.toISODate()}`,
-          title: 'Available',
           start: startDT.toJSDate(),
           end: endDT.toJSDate(),
-          source: 'availability' as const,
           resource: slot
         };
       });
     });
-
-    events.push(...availabilityEvents);
-
-    // Let RBC handle all sorting and display natively
-    return events;
-  }, [appointments, nylasEvents, blockedTimes, availabilitySlots, weekStart, weekEnd, userTimeZone]);
+  }, [availabilitySlots, weekStart, weekEnd, userTimeZone]);
 
   // Load user timezone
   const loadUserTimeZone = useCallback(async (clinicianId: string) => {
@@ -188,12 +184,6 @@ const CalendarContainer: React.FC = () => {
       });
     } else if (event.source === 'blocked_time') {
       navigate(`/blocked-time/${event.id}`);
-    } else if (event.source === 'availability') {
-      toast({
-        title: "Available Time",
-        description: `Available slot: ${event.resource.startTime} - ${event.resource.endTime}`,
-        duration: 3000,
-      });
     }
   }, [toast, navigate]);
 
@@ -253,7 +243,9 @@ const CalendarContainer: React.FC = () => {
         </div>
 
         <ReactBigCalendar
-          events={allEvents}
+          events={realEvents}
+          backgroundEvents={backgroundEvents}
+          availabilitySlots={availabilitySlots}
           onSelectSlot={handleSelectSlot}
           onSelectEvent={handleSelectEvent}
           date={currentDate}

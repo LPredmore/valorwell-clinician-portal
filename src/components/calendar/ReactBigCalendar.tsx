@@ -4,25 +4,39 @@ import { Calendar, Views } from 'react-big-calendar';
 import { globalLocalizer } from '@/main';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import { CalendarEvent, ReactBigCalendarProps } from './types';
+import { DateTime } from 'luxon';
 
-const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
+interface ExtendedReactBigCalendarProps extends ReactBigCalendarProps {
+  backgroundEvents?: Array<{
+    start: Date;
+    end: Date;
+    resource?: any;
+  }>;
+  availabilitySlots?: Array<{
+    day: string;
+    slot: number;
+    startTime: string;
+    endTime: string;
+  }>;
+}
+
+const ReactBigCalendar: React.FC<ExtendedReactBigCalendarProps> = ({
   events,
+  backgroundEvents = [],
+  availabilitySlots = [],
   onSelectSlot,
   onSelectEvent,
   date,
   onNavigate,
   userTimeZone = 'America/New_York',
 }) => {
-  // Pure RBC event styling - minimal differentiation
+  // Pure RBC event styling - minimal differentiation for real events only
   const eventPropGetter = useCallback((event: CalendarEvent) => {
     let backgroundColor = '#3174ad';
     
     switch (event.source) {
       case 'blocked_time':
         backgroundColor = '#dc3545';
-        break;
-      case 'availability':
-        backgroundColor = '#28a745';
         break;
       case 'nylas':
         backgroundColor = '#6f42c1';
@@ -40,15 +54,53 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
     };
   }, []);
 
+  // Background event styling for availability
+  const backgroundEventPropGetter = useCallback(() => ({
+    style: {
+      backgroundColor: '#e0f7fa', // light teal for availability
+      opacity: 0.4,
+      border: 'none'
+    }
+  }), []);
+
+  // Slot prop getter for Day/Week view time slot coloring
+  const slotPropGetter = useCallback((date: Date) => {
+    // Check if this time slot falls within any availability interval
+    const isAvailable = backgroundEvents.some(slot => 
+      date >= slot.start && date < slot.end
+    );
+    
+    return {
+      style: {
+        backgroundColor: isAvailable ? '#e8f5e9' : undefined // light green for available slots
+      }
+    };
+  }, [backgroundEvents]);
+
+  // Day prop getter for Month view day coloring
+  const dayPropGetter = useCallback((date: Date) => {
+    // Check if this day has any availability
+    const hasAvailability = backgroundEvents.some(slot => 
+      slot.start.toDateString() === date.toDateString()
+    );
+    
+    return {
+      style: {
+        backgroundColor: hasAvailability ? '#f1f8e9' : undefined // very light green for days with availability
+      }
+    };
+  }, [backgroundEvents]);
+
   // RBC navigation handler
   const handleNavigate = useCallback((newDate: Date) => {
     onNavigate(newDate);
   }, [onNavigate]);
 
-  // Pure RBC configuration
+  // Pure RBC configuration with native availability features
   const calendarConfig = useMemo(() => ({
     localizer: globalLocalizer,
     events,
+    backgroundEvents, // RBC native background events
     date,
     onNavigate: handleNavigate,
     startAccessor: 'start',
@@ -61,15 +113,29 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
     },
     defaultView: Views.WEEK,
     step: 30,
-    timeslots: 2,
+    timeslots: 1, // Use 1 timeslot per step for cleaner availability display
     eventPropGetter,
+    backgroundEventPropGetter, // Style background events (availability)
+    slotPropGetter, // Color time slots in Day/Week views
+    dayPropGetter, // Color days in Month view
     onSelectSlot,
     onSelectEvent,
     selectable: true,
     popup: true,
     showMultiDayTimes: true,
     toolbar: true,
-  }), [events, eventPropGetter, onSelectSlot, onSelectEvent, date, handleNavigate]);
+  }), [
+    events,
+    backgroundEvents,
+    eventPropGetter,
+    backgroundEventPropGetter,
+    slotPropGetter,
+    dayPropGetter,
+    onSelectSlot,
+    onSelectEvent,
+    date,
+    handleNavigate
+  ]);
 
   return (
     <div className="rbc-calendar-container">
