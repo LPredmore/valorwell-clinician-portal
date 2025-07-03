@@ -38,6 +38,35 @@ const AppointmentBookingDialog: React.FC<AppointmentBookingDialogProps> = ({
     }));
   };
 
+  const createVideoRoom = async (appointmentId: string): Promise<string | null> => {
+    try {
+      console.log('[AppointmentBookingDialog] Creating video room for appointment:', appointmentId);
+      
+      const { data, error } = await supabase.functions.invoke('create-daily-room', {
+        body: {
+          appointmentId: appointmentId,
+          forceNew: false
+        }
+      });
+
+      if (error) {
+        console.error('[AppointmentBookingDialog] Video room creation error:', error);
+        throw error;
+      }
+
+      if (data && data.url) {
+        console.log('[AppointmentBookingDialog] Video room created successfully:', data.url);
+        return data.url;
+      } else {
+        console.error('[AppointmentBookingDialog] No video URL in response:', data);
+        return null;
+      }
+    } catch (error) {
+      console.error('[AppointmentBookingDialog] Failed to create video room:', error);
+      return null;
+    }
+  };
+
   const handleBooking = async () => {
     if (!formData.startTime || !userId) {
       toast({
@@ -59,7 +88,7 @@ const AppointmentBookingDialog: React.FC<AppointmentBookingDialogProps> = ({
       const startUtc = startDT.toUTC().toISO();
       const endUtc = endDT.toUTC().toISO();
 
-      console.log('[AppointmentBookingDialog] Creating appointment (video room will be auto-created by trigger):', {
+      console.log('[AppointmentBookingDialog] Creating appointment:', {
         client_id: userId,
         clinician_id: clinicianId,
         start_at: startUtc,
@@ -69,8 +98,8 @@ const AppointmentBookingDialog: React.FC<AppointmentBookingDialogProps> = ({
         notes: formData.notes
       });
 
-      // Create appointment - video room URL will be automatically created by database trigger
-      const { error } = await supabase
+      // Create appointment first
+      const { data: appointment, error: appointmentError } = await supabase
         .from('appointments')
         .insert({
           client_id: userId,
@@ -81,9 +110,33 @@ const AppointmentBookingDialog: React.FC<AppointmentBookingDialogProps> = ({
           status: 'scheduled',
           notes: formData.notes || null,
           appointment_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
-        });
+        })
+        .select()
+        .single();
 
-      if (error) throw error;
+      if (appointmentError) throw appointmentError;
+
+      console.log('[AppointmentBookingDialog] Appointment created successfully:', appointment.id);
+
+      // Create video room for therapy sessions
+      if (appointment.type === 'therapy_session') {
+        const videoRoomUrl = await createVideoRoom(appointment.id);
+        
+        if (videoRoomUrl) {
+          // Update appointment with video room URL
+          const { error: updateError } = await supabase
+            .from('appointments')
+            .update({ video_room_url: videoRoomUrl })
+            .eq('id', appointment.id);
+
+          if (updateError) {
+            console.error('[AppointmentBookingDialog] Failed to update video room URL:', updateError);
+            // Don't fail the entire operation for this
+          } else {
+            console.log('[AppointmentBookingDialog] Video room URL updated successfully');
+          }
+        }
+      }
 
       toast({
         title: 'Success',
