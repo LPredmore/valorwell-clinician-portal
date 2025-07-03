@@ -19,11 +19,15 @@ export function useClinicianAvailability(
   const [slots, setSlots] = useState<AvailabilitySlot[]>([]);
   const { toast } = useToast();
   
+  // Convert Date objects to stable string representations to prevent infinite loops
+  const weekStartISO = useMemo(() => weekStart.toISOString(), [weekStart.getTime()]);
+  const weekEndISO = useMemo(() => weekEnd.toISOString(), [weekEnd.getTime()]);
+  
   // Create stable cache key for memoization using primitive values
   const cacheKey = useMemo(() => {
     if (!clinicianId) return null;
-    return `${clinicianId}-${weekStart.getTime()}-${weekEnd.getTime()}-${refreshTrigger}`;
-  }, [clinicianId, weekStart.getTime(), weekEnd.getTime(), refreshTrigger]);
+    return `${clinicianId}-${weekStartISO}-${weekEndISO}-${refreshTrigger}`;
+  }, [clinicianId, weekStartISO, weekEndISO, refreshTrigger]);
 
   const loadedCacheKey = useRef<string | null>(null);
 
@@ -38,11 +42,14 @@ export function useClinicianAvailability(
       try {
         console.log('[useClinicianAvailability] Loading availability for clinician:', {
           clinicianId,
-          weekStart: weekStart.toISOString(),
-          weekEnd: weekEnd.toISOString(),
+          weekStartISO,
+          weekEndISO,
           cacheKey,
           previousCacheKey: loadedCacheKey.current
         });
+
+        // Mark this cache key as loaded BEFORE making the query to prevent race conditions
+        loadedCacheKey.current = cacheKey;
 
         const { data, error } = await supabase
           .from('clinicians')
@@ -96,13 +103,12 @@ export function useClinicianAvailability(
         });
         
         console.log('[useClinicianAvailability] Loaded availability slots:', availabilitySlots.length);
-        
-        // Mark this cache key as loaded BEFORE setting state to prevent race conditions
-        loadedCacheKey.current = cacheKey;
         setSlots(availabilitySlots);
+        
       } catch (err) {
         console.error('[useClinicianAvailability] Error loading availability:', err);
-        loadedCacheKey.current = cacheKey; // Mark as attempted even on error
+        // Reset cache key on error to allow retry
+        loadedCacheKey.current = null;
         toast({ 
           title: 'Error', 
           description: 'Unable to load availability', 

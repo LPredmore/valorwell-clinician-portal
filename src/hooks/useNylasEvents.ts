@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -29,32 +29,34 @@ export const useNylasEvents = (startDate?: Date, endDate?: Date) => {
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
+  // Convert Date objects to stable string representations to prevent infinite loops
+  const startDateISO = useMemo(() => startDate?.toISOString(), [startDate?.getTime()]);
+  const endDateISO = useMemo(() => endDate?.toISOString(), [endDate?.getTime()]);
+
   const fetchEvents = async () => {
     try {
       setIsLoading(true);
       setError(null);
 
-      console.log('[useNylasEvents] SYNCHRONIZED date range fetch with parameters:', {
-        startDate: startDate?.toISOString(),
-        endDate: endDate?.toISOString(),
-        startDateLocal: startDate?.toLocaleString(),
-        endDateLocal: endDate?.toLocaleString(),
-        synchronizationStatus: 'Using SAME date range as useAppointments'
+      console.log('[useNylasEvents] ENHANCED: Fetching events with stabilized parameters:', {
+        startDateISO,
+        endDateISO,
+        stabilized: true
       });
 
       const requestBody = {
         action: 'fetch_events',
-        startDate: startDate?.toISOString(),
-        endDate: endDate?.toISOString()
+        startDate: startDateISO,
+        endDate: endDateISO
       };
 
-      console.log('[useNylasEvents] SYNCHRONIZED request body to nylas-events function:', requestBody);
+      console.log('[useNylasEvents] ENHANCED: Request body to nylas-events function:', requestBody);
 
       const { data, error } = await supabase.functions.invoke('nylas-events', {
         body: requestBody
       });
 
-      console.log('[useNylasEvents] Function response for SYNCHRONIZED date range:', { data, error });
+      console.log('[useNylasEvents] ENHANCED: Function response:', { data, error });
 
       if (error) {
         console.error('[useNylasEvents] Function error:', error);
@@ -64,41 +66,22 @@ export const useNylasEvents = (startDate?: Date, endDate?: Date) => {
       const fetchedEvents = data?.events || [];
       const fetchedConnections = data?.connections || [];
 
-      // Add detailed logging for event data verification
-      console.log('[useNylasEvents] Nylas events date range verification:', {
-        startDate: startDate?.toISOString(),
-        endDate: endDate?.toISOString(),
+      // Enhanced logging for event data verification
+      console.log('[useNylasEvents] ENHANCED: Events fetched with date range verification:', {
+        startDateISO,
+        endDateISO,
         totalEvents: fetchedEvents.length,
-        eventDates: fetchedEvents.map((e: any) => ({
+        eventSample: fetchedEvents.slice(0, 3).map((e: any) => ({
           title: e.title,
-          when: e.when,
           start_time: e.when?.start_time,
-          date: e.when?.date,
-          object_type: e.when?.object
+          connection_email: e.connection_email
         }))
-      });
-
-      console.log('[useNylasEvents] SYNCHRONIZED response processed:', {
-        eventsCount: fetchedEvents.length,
-        connectionsCount: fetchedConnections.length,
-        dateRangeUsed: {
-          start: startDate?.toISOString(),
-          end: endDate?.toISOString()
-        },
-        events: fetchedEvents,
-        connections: fetchedConnections.map((conn: any) => ({
-          id: conn.id,
-          grant_id: conn.grant_id,
-          email: conn.email,
-          provider: conn.provider
-        })),
-        synchronizationNote: 'This hook now uses IDENTICAL date ranges as useAppointments'
       });
 
       setEvents(fetchedEvents);
       setConnections(fetchedConnections);
     } catch (error) {
-      console.error('[useNylasEvents] Error fetching Nylas events with SYNCHRONIZED dates:', error);
+      console.error('[useNylasEvents] ENHANCED: Error fetching Nylas events:', error);
       setError(error.message || 'Failed to fetch calendar events');
       toast({
         title: "Error",
@@ -110,35 +93,33 @@ export const useNylasEvents = (startDate?: Date, endDate?: Date) => {
     }
   };
 
+  // Use stabilized string dependencies instead of Date objects
   useEffect(() => {
-    console.log('[useNylasEvents] Effect triggered with SYNCHRONIZED dates:', {
-      startDate: startDate?.toISOString(),
-      endDate: endDate?.toISOString(),
-      synchronizationStatus: 'MATCHED with useAppointments date range'
+    console.log('[useNylasEvents] ENHANCED: Effect triggered with stabilized dates:', {
+      startDateISO,
+      endDateISO,
+      stabilized: true
     });
     fetchEvents();
-  }, [startDate, endDate]);
+  }, [startDateISO, endDateISO]);
 
   useEffect(() => {
-    console.log('[useNylasEvents] State updated with SYNCHRONIZED data:', {
+    console.log('[useNylasEvents] ENHANCED: State updated with stabilized data:', {
       eventsCount: events.length,
       connectionsCount: connections.length,
       isLoading,
       error,
       dateRangeUsed: {
-        start: startDate?.toISOString(),
-        end: endDate?.toISOString()
+        startDateISO,
+        endDateISO
       },
-      events: events.map(e => ({
+      eventsSample: events.slice(0, 3).map(e => ({
         id: e.id,
         title: e.title,
-        start_time: e.when?.start_time,
-        connection_email: e.connection_email,
-        connection_provider: e.connection_provider
-      })),
-      synchronizationStatus: 'SUCCESS - Using same date boundaries as internal appointments'
+        start_time: e.when?.start_time
+      }))
     });
-  }, [events, connections, isLoading, error, startDate, endDate]);
+  }, [events, connections, isLoading, error, startDateISO, endDateISO]);
 
   return {
     events,

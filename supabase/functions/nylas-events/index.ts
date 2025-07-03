@@ -34,18 +34,19 @@ serve(async (req) => {
       throw new Error('Authentication failed')
     }
 
-    const { action, startDate, endDate } = await req.json()
+    const { action, startDate, endDate, calendarId } = await req.json()
 
     const nylasApiKey = Deno.env.get('NYLAS_API_KEY')
     if (!nylasApiKey) {
       throw new Error('Nylas configuration missing - NYLAS_API_KEY not found')
     }
 
-    console.log('[nylas-events] Processing request:', {
+    console.log('[nylas-events] ENHANCED: Processing request:', {
       action,
       userId: user.id,
       startDate,
-      endDate
+      endDate,
+      calendarId
     })
 
     switch (action) {
@@ -74,80 +75,126 @@ serve(async (req) => {
           )
         }
 
-        console.log(`[nylas-events] Found ${connections.length} active connections`)
+        console.log(`[nylas-events] ENHANCED: Found ${connections.length} active connections`)
 
         const allEvents = []
 
         for (const connection of connections) {
           try {
-            console.log(`[nylas-events] Fetching events for connection: ${connection.id}`)
+            console.log(`[nylas-events] ENHANCED: Processing connection: ${connection.id}`)
             
             // Use grant_id for API calls
             const grantId = connection.grant_id || connection.id
-            const eventsUrl = new URL(`https://api.us.nylas.com/v3/grants/${grantId}/events`)
             
-            // Add date filters if provided
-            if (startDate) {
-              const startTimestamp = Math.floor(new Date(startDate).getTime() / 1000)
-              eventsUrl.searchParams.set('start', startTimestamp.toString())
-            }
-            if (endDate) {
-              const endTimestamp = Math.floor(new Date(endDate).getTime() / 1000)
-              eventsUrl.searchParams.set('end', endTimestamp.toString())
-            }
-            
-            // Limit to avoid too many events
-            eventsUrl.searchParams.set('limit', '100')
+            // First, get available calendars for this connection
+            const calendarsUrl = `https://api.us.nylas.com/v3/grants/${grantId}/calendars`
+            console.log(`[nylas-events] ENHANCED: Fetching calendars from: ${calendarsUrl}`)
 
-            console.log(`[nylas-events] Fetching from URL: ${eventsUrl.toString()}`)
-
-            const eventsResponse = await fetch(eventsUrl.toString(), {
+            const calendarsResponse = await fetch(calendarsUrl, {
               headers: {
                 'Authorization': `Bearer ${nylasApiKey}`,
                 'Content-Type': 'application/json',
               },
             })
 
-            if (eventsResponse.ok) {
-              const eventsData = await eventsResponse.json()
-              console.log(`[nylas-events] Fetched ${eventsData.data?.length || 0} events from connection ${connection.id}`)
-
-              // Transform events to include connection info
-              const transformedEvents = (eventsData.data || []).map(event => ({
-                id: event.id,
-                title: event.title || 'Untitled Event',
-                description: event.description || '',
-                when: event.when,
-                connection_id: connection.id,
-                connection_email: connection.email,
-                connection_provider: connection.provider,
-                calendar_id: event.calendar_id || 'primary',
-                calendar_name: event.calendar_name || 'Calendar',
-                status: event.status,
-                location: event.location,
-                participants: event.participants || []
-              }))
-
-              allEvents.push(...transformedEvents)
-            } else {
-              const errorText = await eventsResponse.text()
-              console.error(`[nylas-events] Failed to fetch events for connection ${connection.id}:`, {
-                status: eventsResponse.status,
-                statusText: eventsResponse.statusText,
+            if (!calendarsResponse.ok) {
+              const errorText = await calendarsResponse.text()
+              console.error(`[nylas-events] ENHANCED: Failed to fetch calendars for connection ${connection.id}:`, {
+                status: calendarsResponse.status,
                 error: errorText
               })
-              
-              // Continue with other connections even if one fails
               continue
             }
+
+            const calendarsData = await calendarsResponse.json()
+            const availableCalendars = calendarsData.data || []
+            console.log(`[nylas-events] ENHANCED: Found ${availableCalendars.length} calendars for connection ${connection.id}`)
+
+            // If a specific calendar ID was requested, filter to that calendar
+            const calendarsToFetch = calendarId 
+              ? availableCalendars.filter(cal => cal.id === calendarId)
+              : availableCalendars.filter(cal => cal.is_primary) // Default to primary calendar only
+
+            if (calendarsToFetch.length === 0) {
+              console.log(`[nylas-events] ENHANCED: No matching calendars found for connection ${connection.id}`)
+              continue
+            }
+
+            // Fetch events for each calendar
+            for (const calendar of calendarsToFetch) {
+              console.log(`[nylas-events] ENHANCED: Fetching events for calendar: ${calendar.id} (${calendar.name})`)
+              
+              const eventsUrl = new URL(`https://api.us.nylas.com/v3/grants/${grantId}/events`)
+              
+              // Add calendar filter
+              eventsUrl.searchParams.set('calendar_id', calendar.id)
+              
+              // Add date filters if provided (enhanced with proper formatting)
+              if (startDate) {
+                const startTimestamp = Math.floor(new Date(startDate).getTime() / 1000)
+                eventsUrl.searchParams.set('starts_after', startTimestamp.toString())
+              }
+              if (endDate) {
+                const endTimestamp = Math.floor(new Date(endDate).getTime() / 1000)
+                eventsUrl.searchParams.set('ends_before', endTimestamp.toString())
+              }
+              
+              // Limit to avoid too many events and exclude all-day events for "busy" sync
+              eventsUrl.searchParams.set('limit', '50')
+              eventsUrl.searchParams.set('expand_recurring', 'false')
+
+              console.log(`[nylas-events] ENHANCED: Fetching from URL: ${eventsUrl.toString()}`)
+
+              const eventsResponse = await fetch(eventsUrl.toString(), {
+                headers: {
+                  'Authorization': `Bearer ${nylasApiKey}`,
+                  'Content-Type': 'application/json',
+                },
+              })
+
+              if (eventsResponse.ok) {
+                const eventsData = await eventsResponse.json()
+                console.log(`[nylas-events] ENHANCED: Fetched ${eventsData.data?.length || 0} events from calendar ${calendar.id}`)
+
+                // Transform events and filter out all-day events (for busy sync)
+                const transformedEvents = (eventsData.data || [])
+                  .filter(event => {
+                    // Filter out all-day events - we only want "busy" events
+                    return event.when && event.when.object === 'timespan' && 
+                           event.when.start_time && event.when.end_time
+                  })
+                  .map(event => ({
+                    id: event.id,
+                    title: event.title || 'Busy',
+                    description: event.description || '',
+                    when: event.when,
+                    connection_id: connection.id,
+                    connection_email: connection.email,
+                    connection_provider: connection.provider,
+                    calendar_id: calendar.id,
+                    calendar_name: calendar.name,
+                    status: event.status,
+                    location: event.location,
+                    participants: event.participants || []
+                  }))
+
+                allEvents.push(...transformedEvents)
+              } else {
+                const errorText = await eventsResponse.text()
+                console.error(`[nylas-events] ENHANCED: Failed to fetch events for calendar ${calendar.id}:`, {
+                  status: eventsResponse.status,
+                  statusText: eventsResponse.statusText,
+                  error: errorText
+                })
+              }
+            }
           } catch (error) {
-            console.error(`[nylas-events] Error processing connection ${connection.id}:`, error)
-            // Continue with other connections even if one fails
+            console.error(`[nylas-events] ENHANCED: Error processing connection ${connection.id}:`, error)
             continue
           }
         }
 
-        console.log(`[nylas-events] Total events fetched: ${allEvents.length}`)
+        console.log(`[nylas-events] ENHANCED: Total events fetched (filtered for busy sync): ${allEvents.length}`)
 
         return new Response(
           JSON.stringify({ 
@@ -159,7 +206,9 @@ serve(async (req) => {
               provider: conn.provider,
               is_active: conn.is_active
             })),
-            total_events: allEvents.length
+            total_events: allEvents.length,
+            date_range: { startDate, endDate },
+            filtered_for_busy: true
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
@@ -170,7 +219,7 @@ serve(async (req) => {
     }
 
   } catch (error) {
-    console.error('[nylas-events] Error:', error)
+    console.error('[nylas-events] ENHANCED: Error:', error)
     return new Response(
       JSON.stringify({ 
         error: error.message,

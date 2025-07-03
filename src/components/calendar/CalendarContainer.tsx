@@ -15,7 +15,7 @@ import { useAppointments } from "@/hooks/useAppointments";
 import { useNylasEvents } from "@/hooks/useNylasEvents";
 import { useClinicianAvailability } from "@/hooks/useClinicianAvailability";
 import { useBlockedTime } from "@/hooks/useBlockedTime";
-import { getWeekRange } from "@/utils/dateRangeUtils";
+import { getStableWeekRange } from "@/utils/dateRangeUtils";
 import { getClinicianTimeZone } from "@/hooks/useClinicianData";
 import { TimeZoneService } from "@/utils/timeZoneService";
 import { CalendarEvent } from "./types";
@@ -66,18 +66,18 @@ const CalendarContainer: React.FC = () => {
   // Calculate week boundaries using stable primitive values to prevent infinite loops
   const { start: weekStart, end: weekEnd } = useMemo(() => {
     const tz = userTimeZone || TimeZoneService.DEFAULT_TIMEZONE;
-    console.log('[CalendarContainer] Calculating week range for:', {
+    console.log('[CalendarContainer] Calculating stable week range for:', {
       currentDate: currentDate.toISOString(),
       currentDateTime: currentDate.getTime(),
       timezone: tz
     });
-    return getWeekRange(currentDate, tz);
+    return getStableWeekRange(currentDate, tz);
   }, [
-    currentDate.getTime(), // Use primitive timestamp instead of Date object reference
+    currentDate.getTime(), // Use primitive timestamp to prevent infinite loops
     userTimeZone
   ]);
 
-  // Fetch data with simplified parameters
+  // Fetch data with stabilized parameters
   const { appointments } = useAppointments(
     userId,
     weekStart,
@@ -167,7 +167,7 @@ const CalendarContainer: React.FC = () => {
     return events;
   }, [appointments, nylasEvents, blockedTimes, userTimeZone, getSyncStatusForAppointment]);
 
-  // Transform availability slots to background events
+  // Transform availability slots to background events using stable calculations
   const backgroundEvents = useMemo(() => {
     const tz = userTimeZone;
     const startDT = DateTime.fromJSDate(weekStart).setZone(tz).startOf('day');
