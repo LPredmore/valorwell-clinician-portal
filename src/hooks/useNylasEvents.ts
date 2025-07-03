@@ -87,8 +87,8 @@ export const useNylasEvents = (startDate?: Date, endDate?: Date) => {
               identifier: grantId,
               queryParams: {
                 calendarId: calendar.id,
-                start: startUnix,
-                end: endUnix,
+                start: startUnix.toString(),
+                end: endUnix.toString(),
                 limit: 50,
                 expandRecurring: false
               }
