@@ -14,31 +14,29 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
 }) => {
   return (
     <div className="calendar-container">
-      <div className="rbc-reset">
-        <Calendar
-          localizer={globalLocalizer}
-          events={events}
-          date={date}
-          onNavigate={onNavigate}
-          startAccessor="start"
-          endAccessor="end"
-          style={{ height: 600 }}
-          views={{
-            month: true,
-            week: true,
-            day: true,
-          }}
-          defaultView={Views.WEEK}
-          step={30}
-          timeslots={2}
-          onSelectSlot={onSelectSlot}
-          onSelectEvent={onSelectEvent}
-          selectable={true}
-          popup={true}
-          showMultiDayTimes={true}
-          toolbar={true}
-        />
-      </div>
+      <Calendar
+        localizer={globalLocalizer}
+        events={events}
+        date={date}
+        onNavigate={onNavigate}
+        startAccessor="start"
+        endAccessor="end"
+        style={{ height: 600 }}
+        views={{
+          month: true,
+          week: true,
+          day: true,
+        }}
+        defaultView={Views.WEEK}
+        step={30}
+        timeslots={2}
+        onSelectSlot={onSelectSlot}
+        onSelectEvent={onSelectEvent}
+        selectable={true}
+        popup={true}
+        showMultiDayTimes={true}
+        toolbar={true}
+      />
     </div>
   );
 };
