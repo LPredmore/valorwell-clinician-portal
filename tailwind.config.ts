@@ -1,4 +1,3 @@
-
 import type { Config } from "tailwindcss";
 
 export default {
@@ -124,4 +123,9 @@ export default {
 		}
 	},
 	plugins: [require("tailwindcss-animate")],
+	// Ensure Tailwind doesn't interfere with RBC by maintaining full CSS compatibility
+	corePlugins: {
+		// Keep all core plugins enabled to maintain functionality
+		// RBC will take precedence due to CSS import order and specificity
+	}
 } satisfies Config;

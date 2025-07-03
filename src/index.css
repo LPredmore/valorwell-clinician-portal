@@ -1,12 +1,12 @@
 
+/* CRITICAL: Import react-big-calendar styles FIRST for proper cascade precedence */
+@import 'react-big-calendar/lib/css/react-big-calendar.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* CRITICAL: Import react-big-calendar styles FIRST, then our custom styles */
-@import 'react-big-calendar/lib/css/react-big-calendar.css';
-
-/* ... keep existing code (CSS variables and other styles) the same ... */
+/* CSS Layer management for proper specificity control */
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -65,15 +65,17 @@
 }
 
 @layer base {
-  * {
+  /* Scope border override to exclude RBC elements - this is critical for pure RBC styling */
+  *:not([class*="rbc"]):not(.rbc-calendar):not(.rbc-event):not(.rbc-slot):not(.rbc-header):not(.rbc-toolbar):not(.rbc-month-view):not(.rbc-week-view):not(.rbc-day-view):not(.rbc-agenda-view) {
     @apply border-border;
   }
+  
   body {
     @apply bg-background text-foreground;
   }
 }
 
-/* Animation classes */
+/* Animation classes for non-calendar components only */
 .animate-fade-in {
   animation: fadeIn 0.3s ease-in-out;
 }
@@ -88,3 +90,6 @@
     transform: translateY(0);
   }
 }
+
+/* Remove any custom calendar container overrides - let RBC handle sizing natively */
+/* This ensures pure RBC responsive behavior */

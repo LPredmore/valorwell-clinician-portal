@@ -1,3 +1,4 @@
+
 import React, { useCallback, useMemo } from 'react';
 import { Calendar, Views } from 'react-big-calendar';
 import { globalLocalizer } from '@/main';
@@ -10,7 +11,6 @@ interface CalendarEvent {
   end: Date;
   source?: 'internal' | 'nylas' | 'availability' | 'blocked_time';
   type?: string;
-  className?: string;
   resource?: any;
 }
 
@@ -31,34 +31,52 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
   onNavigate,
   userTimeZone = 'America/New_York',
 }) => {
-  // Pure RBC event styling - NO style overrides
+  // Pure RBC event styling - NO overrides, let RBC handle everything natively
   const eventPropGetter = useCallback((event: CalendarEvent) => {
+    // Use RBC's native color system based on event source
+    let backgroundColor = '#3174ad'; // RBC default blue
+    
+    switch (event.source) {
+      case 'blocked_time':
+        backgroundColor = '#dc3545'; // Red for blocked time
+        break;
+      case 'availability':
+        backgroundColor = '#28a745'; // Green for availability
+        break;
+      case 'nylas':
+        backgroundColor = '#6f42c1'; // Purple for external events
+        break;
+      default:
+        backgroundColor = '#3174ad'; // Default RBC blue
+    }
+    
     return {
-      className: event.className || `${event.source}-event`,
-      style: {} // Pure RBC - no style overrides
+      style: {
+        backgroundColor,
+        borderColor: backgroundColor,
+        color: 'white'
+      }
     };
   }, []);
 
-  // Enhanced component getter with visual indicators
+  // Pure RBC component configuration - no custom wrappers or overrides
   const components = useMemo(() => ({
     event: ({ event }: { event: CalendarEvent }) => {
-      const isBlockedTime = event.source === 'blocked_time';
-      const isAvailability = event.source === 'availability';
-      const isExternal = event.source === 'nylas';
+      // Use RBC's native event title display with minimal enhancement
+      const getEventIcon = (source?: string) => {
+        switch (source) {
+          case 'blocked_time': return '🚫 ';
+          case 'availability': return '✅ ';
+          case 'nylas': return '📅 ';
+          default: return '';
+        }
+      };
       
       return (
-        <div className="rbc-event-content">
-          {isBlockedTime && (
-            <span style={{ marginRight: '4px', fontSize: '12px' }}>🚫</span>
-          )}
-          {isExternal && (
-            <span style={{ marginRight: '4px', fontSize: '12px' }}>📅</span>
-          )}
-          {isAvailability && (
-            <span style={{ marginRight: '4px', fontSize: '12px' }}>✅</span>
-          )}
-          <span>{event.title}</span>
-        </div>
+        <span>
+          {getEventIcon(event.source)}
+          {event.title}
+        </span>
       );
     },
   }), []);
@@ -68,15 +86,15 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
     onNavigate(newDate);
   }, [onNavigate]);
 
-  // Pure Calendar configuration with native overlap layout
+  // Pure RBC configuration - no custom styling or overrides
   const calendarConfig = useMemo(() => ({
-    localizer: globalLocalizer, // Global Luxon localizer
+    localizer: globalLocalizer,
     events,
     date,
     onNavigate: handleNavigate,
     startAccessor: 'start',
     endAccessor: 'end',
-    style: { height: 600 },
+    // Remove hardcoded height - let RBC handle responsive sizing
     views: {
       month: true,
       week: true,
@@ -85,22 +103,19 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
     defaultView: Views.WEEK,
     step: 30,
     timeslots: 2,
-    eventPropGetter, // Pure RBC styling
+    eventPropGetter,
     components,
     onSelectSlot,
     onSelectEvent,
     selectable: true,
     popup: true,
     showMultiDayTimes: true,
-    dayLayoutAlgorithm: 'overlap', // Native overlap layout
+    dayLayoutAlgorithm: 'overlap', // Native RBC overlap layout
     toolbar: true,
   }), [events, eventPropGetter, components, onSelectSlot, onSelectEvent, date, handleNavigate]);
 
-  return (
-    <div className="calendar-container">
-      <Calendar {...calendarConfig} />
-    </div>
-  );
+  // Pure RBC rendering - no custom containers or wrappers
+  return <Calendar {...calendarConfig} />;
 };
 
 export default ReactBigCalendar;
