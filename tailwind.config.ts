@@ -1,4 +1,3 @@
-
 import type { Config } from "tailwindcss";
 
 export default {
@@ -10,6 +9,9 @@ export default {
 		"./src/**/*.{ts,tsx}",
 	],
 	prefix: "",
+	corePlugins: {
+		preflight: false
+	},
 	theme: {
 		container: {
 			center: true,
