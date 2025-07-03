@@ -19,6 +19,7 @@ import { getWeekRange } from "@/utils/dateRangeUtils";
 import { getClinicianTimeZone } from "@/hooks/useClinicianData";
 import { TimeZoneService } from "@/utils/timeZoneService";
 import { CalendarEvent } from "./types";
+import { useNylasSync } from "@/hooks/useNylasSync";
 import {
   Sheet,
   SheetContent,
@@ -43,6 +44,9 @@ const CalendarContainer: React.FC = () => {
   const [editingBlockedTime, setEditingBlockedTime] = useState<any>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  // Initialize Nylas sync hook
+  const { getSyncStatusForAppointment, loadSyncMappings } = useNylasSync();
 
   // Calculate week boundaries using RBC-native approach
   const { start: weekStart, end: weekEnd } = useMemo(() => {
@@ -75,6 +79,14 @@ const CalendarContainer: React.FC = () => {
     refreshTrigger
   );
 
+  // Load sync mappings when appointments change
+  useEffect(() => {
+    if (appointments && appointments.length > 0) {
+      const appointmentIds = appointments.map(apt => apt.id);
+      loadSyncMappings(appointmentIds);
+    }
+  }, [appointments, loadSyncMappings]);
+
   // Separate real events from background availability
   const realEvents = useMemo((): CalendarEvent[] => {
     const events: CalendarEvent[] = [];
@@ -86,7 +98,7 @@ const CalendarContainer: React.FC = () => {
         const endDT = DateTime.fromISO(apt.end_at, { zone: 'utc' }).setZone(userTimeZone);
 
         // Get sync status for this appointment
-        const syncStatus = getSyncStatusForAppointment ? getSyncStatusForAppointment(apt.id) : null;
+        const syncStatus = getSyncStatusForAppointment(apt.id);
 
         return {
           id: apt.id,

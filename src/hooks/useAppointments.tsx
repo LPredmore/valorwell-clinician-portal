@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase, getOrCreateVideoRoom } from "@/integrations/supabase/client";
@@ -278,6 +279,9 @@ export const useAppointments = (
     retry: false,
   });
 
+  // Properly type and handle fetchedAppointments array
+  const appointments = fetchedAppointments || [];
+
   // Load sync mappings when appointments change
   useEffect(() => {
     if (appointments && appointments.length > 0) {
@@ -303,9 +307,6 @@ export const useAppointments = (
       });
     }
   }, [error, toast]);
-
-  // Properly type and handle fetchedAppointments array
-  const appointments = fetchedAppointments || [];
 
   // Log query results
   useEffect(() => {

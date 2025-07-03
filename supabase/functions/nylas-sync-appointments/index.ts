@@ -142,6 +142,71 @@ serve(async (req) => {
         )
       }
 
+      case 'delete': {
+        if (!appointmentId) {
+          throw new Error('Appointment ID required')
+        }
+
+        // Get existing mapping
+        const { data: mapping, error: mappingError } = await supabaseClient
+          .from('external_calendar_mappings')
+          .select('*')
+          .eq('appointment_id', appointmentId)
+          .single()
+
+        if (mappingError || !mapping) {
+          // No mapping exists, nothing to delete
+          return new Response(
+            JSON.stringify({ 
+              success: true,
+              message: 'No external calendar mapping found'
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+
+        // Get connection details
+        const { data: connection, error: connectionError } = await supabaseClient
+          .from('nylas_connections')
+          .select('*')
+          .eq('id', mapping.connection_id)
+          .single()
+
+        if (connection && !connectionError) {
+          // Delete the external calendar event
+          try {
+            const deleteResponse = await fetch(`https://api.nylas.com/v3/grants/${connection.id}/events/${mapping.external_event_id}`, {
+              method: 'DELETE',
+              headers: {
+                'Authorization': `Bearer ${connection.access_token}`,
+              },
+            })
+
+            if (!deleteResponse.ok) {
+              console.error('Failed to delete external calendar event:', await deleteResponse.text())
+              // Continue with mapping deletion even if external delete fails
+            }
+          } catch (error) {
+            console.error('Error deleting external calendar event:', error)
+            // Continue with mapping deletion even if external delete fails
+          }
+        }
+
+        // Delete the mapping
+        await supabaseClient
+          .from('external_calendar_mappings')
+          .delete()
+          .eq('id', mapping.id)
+
+        return new Response(
+          JSON.stringify({ 
+            success: true,
+            message: 'External calendar mapping deleted'
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
       case 'sync_calendar_to_appointments': {
         if (!clinicianId) {
           throw new Error('Clinician ID required')
