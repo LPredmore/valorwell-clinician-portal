@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,19 +8,7 @@ import MyProfile from './MyProfile';
 import MyDocuments from './MyDocuments';
 import MyInsurance from './MyInsurance';
 
-interface MyPortalProps {
-  upcomingAppointments?: any[];
-  clientData?: any;
-  clinicianName?: string | null;
-  loading?: boolean;
-}
-
-const MyPortal: React.FC<MyPortalProps> = ({
-  upcomingAppointments = [],
-  clientData = null,
-  clinicianName = null,
-  loading = false
-}) => {
+const MyPortal = () => {
   const [activeTab, setActiveTab] = useState('appointments');
 
   const renderContent = () => {
@@ -27,35 +16,11 @@ const MyPortal: React.FC<MyPortalProps> = ({
       case 'appointments':
         return <MyAppointments />;
       case 'profile':
-        return <MyProfile 
-          clientData={clientData}
-          loading={loading}
-          isEditing={false}
-          setIsEditing={() => {}}
-          form={{}}
-          isSaving={false}
-          handleSaveProfile={async () => {}}
-          handleCancelEdit={() => {}}
-          genderOptions={[]}
-          genderIdentityOptions={[]}
-          stateOptions={[]}
-          timeZoneOptions={[]}
-        />;
+        return <MyProfile />;
       case 'documents':
         return <MyDocuments />;
       case 'insurance':
-        return <MyInsurance 
-          clientData={clientData}
-          loading={loading}
-          isEditing={false}
-          setIsEditing={() => {}}
-          form={{}}
-          isSaving={false}
-          handleSaveProfile={async () => {}}
-          handleCancelEdit={() => {}}
-          insuranceTypes={[]}
-          relationshipTypes={[]}
-        />;
+        return <MyInsurance />;
       default:
         return <MyAppointments />;
     }
