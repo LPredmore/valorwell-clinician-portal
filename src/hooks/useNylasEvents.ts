@@ -85,11 +85,13 @@ export const useNylasEvents = (startDate?: Date, endDate?: Date) => {
             
             const eventsResponse = await nylasClient.events.list({
               identifier: grantId,
-              calendarId: calendar.id,
-              start: startUnix, // Use 'start' instead of 'startsAfter'
-              end: endUnix, // Use 'end' instead of 'endsBefore'
-              limit: 50,
-              expandRecurring: false
+              queryParams: {
+                calendarId: calendar.id,
+                start: startUnix,
+                end: endUnix,
+                limit: 50,
+                expandRecurring: false
+              }
             });
 
             const fetchedEvents = eventsResponse.data || [];
