@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -18,13 +18,31 @@ export function useClinicianAvailability(
 ) {
   const [slots, setSlots] = useState<AvailabilitySlot[]>([]);
   const { toast } = useToast();
+  
+  // Create stable cache key for memoization using primitive values
+  const cacheKey = useMemo(() => {
+    if (!clinicianId) return null;
+    return `${clinicianId}-${weekStart.getTime()}-${weekEnd.getTime()}-${refreshTrigger}`;
+  }, [clinicianId, weekStart.getTime(), weekEnd.getTime(), refreshTrigger]);
+
+  const loadedCacheKey = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!clinicianId) return;
+    // Prevent redundant calls with same parameters
+    if (!cacheKey || cacheKey === loadedCacheKey.current) {
+      console.log('[useClinicianAvailability] Skipping redundant call, cache key unchanged:', cacheKey);
+      return;
+    }
     
     const loadAvailability = async () => {
       try {
-        console.log('[useClinicianAvailability] Loading availability for clinician:', clinicianId);
+        console.log('[useClinicianAvailability] Loading availability for clinician:', {
+          clinicianId,
+          weekStart: weekStart.toISOString(),
+          weekEnd: weekEnd.toISOString(),
+          cacheKey,
+          previousCacheKey: loadedCacheKey.current
+        });
 
         const { data, error } = await supabase
           .from('clinicians')
@@ -78,9 +96,13 @@ export function useClinicianAvailability(
         });
         
         console.log('[useClinicianAvailability] Loaded availability slots:', availabilitySlots.length);
+        
+        // Mark this cache key as loaded BEFORE setting state to prevent race conditions
+        loadedCacheKey.current = cacheKey;
         setSlots(availabilitySlots);
       } catch (err) {
         console.error('[useClinicianAvailability] Error loading availability:', err);
+        loadedCacheKey.current = cacheKey; // Mark as attempted even on error
         toast({ 
           title: 'Error', 
           description: 'Unable to load availability', 
@@ -90,7 +112,7 @@ export function useClinicianAvailability(
     };
 
     loadAvailability();
-  }, [clinicianId, weekStart, weekEnd, toast, refreshTrigger]);
+  }, [cacheKey, clinicianId, toast]);
 
   return slots;
 }

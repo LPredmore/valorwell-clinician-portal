@@ -63,11 +63,19 @@ const CalendarContainer: React.FC = () => {
     disconnectCalendar
   } = useNylasIntegration();
 
-  // Calculate week boundaries using RBC-native approach
+  // Calculate week boundaries using stable primitive values to prevent infinite loops
   const { start: weekStart, end: weekEnd } = useMemo(() => {
     const tz = userTimeZone || TimeZoneService.DEFAULT_TIMEZONE;
+    console.log('[CalendarContainer] Calculating week range for:', {
+      currentDate: currentDate.toISOString(),
+      currentDateTime: currentDate.getTime(),
+      timezone: tz
+    });
     return getWeekRange(currentDate, tz);
-  }, [currentDate, userTimeZone]);
+  }, [
+    currentDate.getTime(), // Use primitive timestamp instead of Date object reference
+    userTimeZone
+  ]);
 
   // Fetch data with simplified parameters
   const { appointments } = useAppointments(
@@ -195,7 +203,7 @@ const CalendarContainer: React.FC = () => {
         };
       });
     });
-  }, [availabilitySlots, weekStart, weekEnd, userTimeZone]);
+  }, [availabilitySlots, weekStart.getTime(), weekEnd.getTime(), userTimeZone]); // Use .getTime() for stable primitive comparison
 
   // Load user timezone
   const loadUserTimeZone = useCallback(async (clinicianId: string) => {
@@ -210,6 +218,7 @@ const CalendarContainer: React.FC = () => {
 
   // Pure RBC event handlers - native only
   const handleCalendarNavigate = useCallback((newDate: Date) => {
+    console.log('[CalendarContainer] Navigating to new date:', newDate.toISOString());
     setCurrentDate(newDate);
     setRefreshTrigger(prev => prev + 1);
   }, []);
