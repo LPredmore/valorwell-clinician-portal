@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "../layout/Layout";
@@ -60,7 +59,7 @@ const CalendarContainer: React.FC = () => {
     refreshTrigger
   );
 
-  // Transform availability events
+  // Transform availability events - pure RBC format
   const availabilityEvents = useMemo(() => {
     const tz = userTimeZone;
     const startDT = DateTime.fromJSDate(weekStart).setZone(tz).startOf('day');
@@ -96,14 +95,13 @@ const CalendarContainer: React.FC = () => {
           end: endDT.toJSDate(),
           source: 'availability',
           type: 'availability',
-          className: 'availability-event',
           resource: slot
         };
       });
     });
   }, [availabilitySlots, weekStart, weekEnd, userTimeZone]);
 
-  // Transform blocked time events
+  // Transform blocked time events - pure RBC format
   const blockedTimeEvents = useMemo(() => {
     return blockedTimes.map(blockedTime => {
       const startDT = DateTime.fromISO(blockedTime.start_at, { zone: 'utc' }).setZone(userTimeZone);
@@ -116,67 +114,52 @@ const CalendarContainer: React.FC = () => {
         end: endDT.toJSDate(),
         source: 'blocked_time',
         type: 'blocked_time',
-        className: 'blocked-time-event',
         resource: blockedTime
       };
     });
   }, [blockedTimes, userTimeZone]);
 
-  // Combine all events - clean data preparation
+  // Combine all events - pure RBC data structure
   const allEvents = useMemo(() => {
     const events = [];
     
-    // Add appointments
+    // Add appointments - pure RBC format
     if (appointments) {
       events.push(...appointments.map(apt => {
         const startDT = DateTime.fromISO(apt.start_at, { zone: 'utc' }).setZone(userTimeZone);
         const endDT = DateTime.fromISO(apt.end_at, { zone: 'utc' }).setZone(userTimeZone);
 
         return {
-          ...apt,
-          source: 'internal',
-          type: 'appointment',
-          className: 'internal-event',
+          id: apt.id,
           title: apt.clientName || 'Internal Appointment',
           start: startDT.toJSDate(),
           end: endDT.toJSDate(),
-          resource: apt,
-          priority: 1
+          source: 'internal',
+          type: 'appointment',
+          resource: apt
         };
       }));
     }
     
-    // Add Nylas events
+    // Add Nylas events - pure RBC format
     if (nylasEvents) {
       events.push(...nylasEvents.map(evt => ({
-        ...evt,
-        source: 'nylas',
-        type: 'external',
-        className: 'external-event',
+        id: evt.id,
+        title: evt.title,
         start: evt.when?.start_time,
         end: evt.when?.end_time,
-        priority: 1
+        source: 'nylas',
+        type: 'external',
+        resource: evt
       })));
     }
 
-    // Add blocked time events
-    events.push(...blockedTimeEvents.map(evt => ({
-      ...evt,
-      priority: 2
-    })));
+    // Add blocked time and availability events
+    events.push(...blockedTimeEvents);
+    events.push(...availabilityEvents);
 
-    // Add availability events
-    events.push(...availabilityEvents.map(evt => ({
-      ...evt,
-      priority: 0
-    })));
-
-    return events.sort((a, b) => {
-      if (a.priority !== b.priority) {
-        return a.priority - b.priority;
-      }
-      return new Date(a.start).getTime() - new Date(b.start).getTime();
-    });
+    // Let RBC handle all sorting and display logic natively
+    return events;
   }, [appointments, nylasEvents, blockedTimeEvents, availabilityEvents]);
 
   // Load user timezone
@@ -190,13 +173,13 @@ const CalendarContainer: React.FC = () => {
     }
   }, []);
 
-  // Handle navigation
+  // Handle navigation - pure RBC
   const handleCalendarNavigate = useCallback((newDate: Date) => {
     setCurrentDate(newDate);
     setRefreshTrigger(prev => prev + 1);
   }, []);
 
-  // Handle slot selection
+  // Handle slot selection - pure RBC
   const handleSelectSlot = useCallback((slotInfo: { start: Date; end: Date }) => {
     navigate('/appointments/new', { 
       state: { 
@@ -206,14 +189,14 @@ const CalendarContainer: React.FC = () => {
     });
   }, [navigate]);
 
-  // Handle event click
+  // Handle event click - pure RBC
   const handleSelectEvent = useCallback((event: any) => {
     if (event.source === 'internal') {
       navigate(`/appointments/${event.id}`);
     } else if (event.source === 'nylas') {
       toast({
         title: "📅 External Event",
-        description: `${event.title} - Synced from ${event.connection_provider || 'external calendar'}`,
+        description: `${event.title} - Synced from external calendar`,
         duration: 3000,
       });
     } else if (event.source === 'blocked_time') {
@@ -283,7 +266,7 @@ const CalendarContainer: React.FC = () => {
           </div>
         </div>
 
-        {/* React Big Calendar - clean component with prepared data */}
+        {/* Pure React Big Calendar - no custom containers or wrappers */}
         <ReactBigCalendar
           events={allEvents}
           onSelectSlot={handleSelectSlot}

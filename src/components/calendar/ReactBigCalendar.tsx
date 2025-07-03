@@ -31,23 +31,22 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
   onNavigate,
   userTimeZone = 'America/New_York',
 }) => {
-  // Pure RBC event styling - NO overrides, let RBC handle everything natively
+  // Pure RBC event styling - only basic color differentiation
   const eventPropGetter = useCallback((event: CalendarEvent) => {
-    // Use RBC's native color system based on event source
     let backgroundColor = '#3174ad'; // RBC default blue
     
     switch (event.source) {
       case 'blocked_time':
-        backgroundColor = '#dc3545'; // Red for blocked time
+        backgroundColor = '#dc3545';
         break;
       case 'availability':
-        backgroundColor = '#28a745'; // Green for availability
+        backgroundColor = '#28a745';
         break;
       case 'nylas':
-        backgroundColor = '#6f42c1'; // Purple for external events
+        backgroundColor = '#6f42c1';
         break;
       default:
-        backgroundColor = '#3174ad'; // Default RBC blue
+        backgroundColor = '#3174ad';
     }
     
     return {
@@ -59,34 +58,12 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
     };
   }, []);
 
-  // Pure RBC component configuration - no custom wrappers or overrides
-  const components = useMemo(() => ({
-    event: ({ event }: { event: CalendarEvent }) => {
-      // Use RBC's native event title display with minimal enhancement
-      const getEventIcon = (source?: string) => {
-        switch (source) {
-          case 'blocked_time': return '🚫 ';
-          case 'availability': return '✅ ';
-          case 'nylas': return '📅 ';
-          default: return '';
-        }
-      };
-      
-      return (
-        <span>
-          {getEventIcon(event.source)}
-          {event.title}
-        </span>
-      );
-    },
-  }), []);
-
   // Handle navigation events from React Big Calendar
   const handleNavigate = useCallback((newDate: Date, view?: string, action?: string) => {
     onNavigate(newDate);
   }, [onNavigate]);
 
-  // Pure RBC configuration - no custom styling or overrides
+  // Pure RBC configuration - completely native
   const calendarConfig = useMemo(() => ({
     localizer: globalLocalizer,
     events,
@@ -94,7 +71,7 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
     onNavigate: handleNavigate,
     startAccessor: 'start',
     endAccessor: 'end',
-    // Remove hardcoded height - let RBC handle responsive sizing
+    titleAccessor: 'title',
     views: {
       month: true,
       week: true,
@@ -104,18 +81,21 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
     step: 30,
     timeslots: 2,
     eventPropGetter,
-    components,
     onSelectSlot,
     onSelectEvent,
     selectable: true,
     popup: true,
     showMultiDayTimes: true,
-    dayLayoutAlgorithm: 'overlap', // Native RBC overlap layout
+    dayLayoutAlgorithm: 'overlap',
     toolbar: true,
-  }), [events, eventPropGetter, components, onSelectSlot, onSelectEvent, date, handleNavigate]);
+  }), [events, eventPropGetter, onSelectSlot, onSelectEvent, date, handleNavigate]);
 
-  // Pure RBC rendering - no custom containers or wrappers
-  return <Calendar {...calendarConfig} />;
+  // Pure RBC rendering - no custom containers or styling
+  return (
+    <div className="rbc-calendar-container">
+      <Calendar {...calendarConfig} />
+    </div>
+  );
 };
 
 export default ReactBigCalendar;

@@ -8,9 +8,7 @@ export interface CalendarEvent {
   end: Date;
   source?: 'internal' | 'nylas' | 'availability' | 'blocked_time';
   type?: string;
-  // Remove custom properties that override RBC behavior
-  // className and priority are not native RBC properties
-  resource?: any; // This is RBC native for additional event data
+  resource?: any; // RBC native property for additional event data
 }
 
 export interface ReactBigCalendarProps {
