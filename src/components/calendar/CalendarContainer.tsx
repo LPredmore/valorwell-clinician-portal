@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import ReactBigCalendar from "./ReactBigCalendar";
 import AvailabilityManagementSidebar from "./AvailabilityManagementSidebar";
 import AppointmentDialog from "./AppointmentDialog";
+import EditBlockedTimeDialog from "./EditBlockedTimeDialog";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Plus, Clock, Calendar as CalendarIcon } from "lucide-react";
@@ -34,9 +35,11 @@ const CalendarContainer: React.FC = () => {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [isAvailabilityOpen, setIsAvailabilityOpen] = useState(false);
   const [isAppointmentDialogOpen, setIsAppointmentDialogOpen] = useState(false);
+  const [isBlockedTimeDialogOpen, setIsBlockedTimeDialogOpen] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<any>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<any>(null);
+  const [editingBlockedTime, setEditingBlockedTime] = useState<any>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -198,9 +201,11 @@ const CalendarContainer: React.FC = () => {
         duration: 3000,
       });
     } else if (event.source === 'blocked_time') {
-      navigate(`/blocked-time/${event.id}`);
+      // Open edit dialog for blocked time
+      setEditingBlockedTime(event.resource);
+      setIsBlockedTimeDialogOpen(true);
     }
-  }, [toast, navigate]);
+  }, [toast]);
 
   const handleAvailabilityRefresh = useCallback(() => {
     setRefreshTrigger(prev => prev + 1);
@@ -221,6 +226,17 @@ const CalendarContainer: React.FC = () => {
     setSelectedSlot(null);
     setEditingAppointment(null);
     setIsEditMode(false);
+  }, []);
+
+  const handleBlockedTimeUpdated = useCallback(() => {
+    setRefreshTrigger(prev => prev + 1);
+    setIsBlockedTimeDialogOpen(false);
+    setEditingBlockedTime(null);
+  }, []);
+
+  const handleCloseBlockedTimeDialog = useCallback(() => {
+    setIsBlockedTimeDialogOpen(false);
+    setEditingBlockedTime(null);
   }, []);
 
   // Auth effect
@@ -329,6 +345,16 @@ const CalendarContainer: React.FC = () => {
           isEditMode={isEditMode}
           editingAppointment={editingAppointment}
         />
+
+        {editingBlockedTime && (
+          <EditBlockedTimeDialog
+            isOpen={isBlockedTimeDialogOpen}
+            onClose={handleCloseBlockedTimeDialog}
+            blockedTime={editingBlockedTime}
+            userTimeZone={userTimeZone}
+            onBlockedTimeUpdated={handleBlockedTimeUpdated}
+          />
+        )}
       </div>
     </Layout>
   );

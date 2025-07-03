@@ -193,6 +193,13 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
     }
   };
 
+  // Get the client name for the selected client (for edit mode display)
+  const getSelectedClientName = () => {
+    if (!selectedClientId || !clients.length) return '';
+    const selectedClient = clients.find(client => client.id === selectedClientId);
+    return selectedClient ? formatClientName(selectedClient) : '';
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -338,22 +345,28 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
               <div className="col-span-3 py-2 text-sm">Therapy Session</div>
               
               <Label htmlFor="client" className="text-right">Client *</Label>
-              <Select
-                value={selectedClientId}
-                onValueChange={setSelectedClientId}
-                disabled={isLoadingClients}
-              >
-                <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder={isLoadingClients ? "Loading clients..." : "Select client..."} />
-                </SelectTrigger>
-                <SelectContent>
-                  {clients.map((client) => (
-                    <SelectItem key={client.id} value={client.id}>
-                      {formatClientName(client)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="col-span-3">
+                {isEditMode && selectedClientId ? (
+                  <div className="py-2 text-sm font-medium">{getSelectedClientName()}</div>
+                ) : (
+                  <Select
+                    value={selectedClientId}
+                    onValueChange={setSelectedClientId}
+                    disabled={isLoadingClients}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={isLoadingClients ? "Loading clients..." : "Select client..."} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {clients.map((client) => (
+                        <SelectItem key={client.id} value={client.id}>
+                          {formatClientName(client)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
 
               <Label htmlFor="date" className="text-right">Date *</Label>
               <Input
@@ -406,7 +419,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
                 </Select>
               </div>
 
-              <Label htmlFor="notes" className="text-right">Notes</Label>
+              <Label htmlFor="notes" className="text-right col-span-1">Notes</Label>
               <Textarea
                 id="notes"
                 value={notes}
@@ -442,7 +455,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
                   Cancel
                 </Button>
                 <Button type="submit" disabled={isLoading}>
-                  {isLoading ? (isEditMode ? 'Updating...' : 'Creating...') : (isEditMode ? 'Update Appointment' : 'Create Appointment')}
+                  {isLoading ? (isEditMode ? 'Updating...' : 'Creating...') : (isEditMode ? 'Save Changes' : 'Create Appointment')}
                 </Button>
               </div>
             </div>
