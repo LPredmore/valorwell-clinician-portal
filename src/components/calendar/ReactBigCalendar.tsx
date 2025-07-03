@@ -54,28 +54,14 @@ const ReactBigCalendar: React.FC<ExtendedReactBigCalendarProps> = ({
     };
   }, []);
 
-  // Background event styling for availability
+  // Background event styling for availability - changed to light green
   const backgroundEventPropGetter = useCallback(() => ({
     style: {
-      backgroundColor: '#e0f7fa', // light teal for availability
+      backgroundColor: '#e8f5e9', // light green for availability
       opacity: 0.4,
       border: 'none'
     }
   }), []);
-
-  // Slot prop getter for Day/Week view time slot coloring
-  const slotPropGetter = useCallback((date: Date) => {
-    // Check if this time slot falls within any availability interval
-    const isAvailable = backgroundEvents.some(slot => 
-      date >= slot.start && date < slot.end
-    );
-    
-    return {
-      style: {
-        backgroundColor: isAvailable ? '#e8f5e9' : undefined // light green for available slots
-      }
-    };
-  }, [backgroundEvents]);
 
   // Day prop getter for Month view day coloring
   const dayPropGetter = useCallback((date: Date) => {
@@ -116,7 +102,6 @@ const ReactBigCalendar: React.FC<ExtendedReactBigCalendarProps> = ({
     timeslots: 1, // Use 1 timeslot per step for cleaner availability display
     eventPropGetter,
     backgroundEventPropGetter, // Style background events (availability)
-    slotPropGetter, // Color time slots in Day/Week views
     dayPropGetter, // Color days in Month view
     onSelectSlot,
     onSelectEvent,
@@ -129,7 +114,6 @@ const ReactBigCalendar: React.FC<ExtendedReactBigCalendarProps> = ({
     backgroundEvents,
     eventPropGetter,
     backgroundEventPropGetter,
-    slotPropGetter,
     dayPropGetter,
     onSelectSlot,
     onSelectEvent,
