@@ -5,6 +5,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Cross-Origin-Opener-Policy': 'same-origin',
+  'Cross-Origin-Embedder-Policy': 'unsafe-none'
 }
 
 // Use US regional endpoint
@@ -28,8 +30,8 @@ serve(async (req) => {
 
     // Verify JWT and get user - this is critical for RLS policies
     const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      throw new Error('No authorization header')
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      throw new Error('Missing or invalid auth header')
     }
 
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser()

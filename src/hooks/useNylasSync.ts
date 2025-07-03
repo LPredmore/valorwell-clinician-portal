@@ -29,8 +29,10 @@ export const useNylasSync = () => {
   });
 
   const syncAppointment = useCallback(async (
-    action: 'sync_appointment_to_calendar' | 'sync_calendar_to_appointments' | 'delete',
     appointmentId: string,
+    action: 'create' | 'update' | 'delete',
+    nylasCalendarId?: string,
+    eventId?: string,
     retryCount = 3
   ) => {
     setSyncStatus(prev => ({ ...prev, isSyncing: true, lastSyncError: null }));
@@ -40,10 +42,25 @@ export const useNylasSync = () => {
       try {
         console.log(`[useNylasSync] Syncing appointment ${appointmentId} with action: ${action}, attempt: ${attempt + 1}`);
         
+        // Get current session for auth header
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError || !session) {
+          throw new Error('Authentication required');
+        }
+
+        const payload = {
+          appointmentId,
+          action,
+          nylasCalendarId: nylasCalendarId || 'primary',
+          eventId
+        };
+
+        console.log('[useNylasSync] Sending payload:', payload);
+
         const { data, error } = await supabase.functions.invoke('nylas-sync-appointments', {
-          body: {
-            action,
-            appointmentId
+          body: payload,
+          headers: {
+            Authorization: `Bearer ${session.access_token}`
           }
         });
 
@@ -97,6 +114,74 @@ export const useNylasSync = () => {
     }
   }, [toast]);
 
+  const syncBusyEvent = useCallback(async (
+    event: { start: string; end: string; title: string },
+    rbcCalendarId: string = 'primary'
+  ) => {
+    setSyncStatus(prev => ({ ...prev, isSyncing: true, lastSyncError: null }));
+
+    try {
+      console.log('[useNylasSync] Syncing busy event to RBC:', event);
+
+      // Get current session for auth header
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session) {
+        throw new Error('Authentication required');
+      }
+
+      const payload = {
+        action: 'create' as const,
+        nylasCalendarId: rbcCalendarId,
+        event
+      };
+
+      console.log('[useNylasSync] Sending busy event payload:', payload);
+
+      const { data, error } = await supabase.functions.invoke('nylas-sync-appointments', {
+        body: payload,
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        }
+      });
+
+      if (error) {
+        throw new Error(error.message || 'Busy event sync failed');
+      }
+
+      console.log('[useNylasSync] Busy event sync successful:', data);
+      
+      setSyncStatus(prev => ({
+        ...prev,
+        isSyncing: false,
+        lastSyncError: null
+      }));
+
+      toast({
+        title: 'Busy Event Synced',
+        description: data?.message || 'External event has been added to your RBC calendar'
+      });
+
+      return data;
+    } catch (error) {
+      console.error('[useNylasSync] Busy event sync failed:', error);
+      
+      const errorMessage = error instanceof Error ? error.message : 'Unknown sync error';
+      setSyncStatus(prev => ({
+        ...prev,
+        isSyncing: false,
+        lastSyncError: errorMessage
+      }));
+
+      toast({
+        title: 'Busy Event Sync Failed',
+        description: errorMessage,
+        variant: 'destructive'
+      });
+      
+      throw error;
+    }
+  }, [toast]);
+
   const loadSyncMappings = useCallback(async (appointmentIds?: string[]) => {
     try {
       let query = supabase
@@ -147,7 +232,13 @@ export const useNylasSync = () => {
     try {
       console.log(`[useNylasSync] Deleting sync mapping for appointment: ${appointmentId}`);
       
-      await syncAppointment('delete', appointmentId);
+      const mapping = syncStatus.syncMappings[appointmentId];
+      if (!mapping) {
+        console.log('[useNylasSync] No mapping found to delete');
+        return;
+      }
+
+      await syncAppointment(appointmentId, 'delete', undefined, mapping.external_event_id);
       
       // Remove from local state
       setSyncStatus(prev => ({
@@ -165,11 +256,12 @@ export const useNylasSync = () => {
       console.error('[useNylasSync] Failed to delete sync mapping:', error);
       throw error;
     }
-  }, [syncAppointment, toast]);
+  }, [syncAppointment, syncStatus.syncMappings, toast]);
 
   return {
     syncStatus,
     syncAppointment,
+    syncBusyEvent,
     loadSyncMappings,
     getSyncStatusForAppointment,
     deleteSyncMapping
