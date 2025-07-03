@@ -63,20 +63,6 @@ const ReactBigCalendar: React.FC<ExtendedReactBigCalendarProps> = ({
     }
   }), []);
 
-  // Day prop getter for Month view day coloring
-  const dayPropGetter = useCallback((date: Date) => {
-    // Check if this day has any availability
-    const hasAvailability = backgroundEvents.some(slot => 
-      slot.start.toDateString() === date.toDateString()
-    );
-    
-    return {
-      style: {
-        backgroundColor: hasAvailability ? '#f1f8e9' : undefined // very light green for days with availability
-      }
-    };
-  }, [backgroundEvents]);
-
   // RBC navigation handler
   const handleNavigate = useCallback((newDate: Date) => {
     onNavigate(newDate);
@@ -102,7 +88,6 @@ const ReactBigCalendar: React.FC<ExtendedReactBigCalendarProps> = ({
     timeslots: 1, // Use 1 timeslot per step for cleaner availability display
     eventPropGetter,
     backgroundEventPropGetter, // Style background events (availability)
-    dayPropGetter, // Color days in Month view
     onSelectSlot,
     onSelectEvent,
     selectable: true,
@@ -114,7 +99,6 @@ const ReactBigCalendar: React.FC<ExtendedReactBigCalendarProps> = ({
     backgroundEvents,
     eventPropGetter,
     backgroundEventPropGetter,
-    dayPropGetter,
     onSelectSlot,
     onSelectEvent,
     date,
