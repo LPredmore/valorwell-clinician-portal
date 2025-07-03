@@ -82,11 +82,11 @@ export const useNylasEvents = (startDate?: Date, endDate?: Date) => {
             const eventsResponse = await nylasClient.events.list({
               identifier: grantId,
               queryParams: {
-                calendar_id: calendar.id,
-                starts_after: Math.floor(startDate.getTime() / 1000),
-                ends_before: Math.floor(endDate.getTime() / 1000),
+                calendarId: calendar.id, // Fixed: Use camelCase calendarId
+                startsAfter: Math.floor(startDate.getTime() / 1000),
+                endsBefore: Math.floor(endDate.getTime() / 1000),
                 limit: 50,
-                expand_recurring: false
+                expandRecurring: false
               }
             });
 
@@ -98,29 +98,51 @@ export const useNylasEvents = (startDate?: Date, endDate?: Date) => {
               .filter(event => {
                 // Only include non-all-day events for busy sync
                 return event.when && 
-                       event.when.object === 'timespan' && 
-                       event.when.startTime && 
-                       event.when.endTime;
+                       event.when.object === 'timespan'; // Check for timespan events
               })
-              .map(event => ({
-                id: event.id,
-                title: event.title || 'Busy',
-                description: event.description || '',
-                when: {
-                  start_time: new Date(event.when.startTime * 1000).toISOString(),
-                  end_time: new Date(event.when.endTime * 1000).toISOString(),
-                  start_timezone: event.when.startTimezone || 'America/New_York',
-                  end_timezone: event.when.endTimezone || 'America/New_York'
-                },
-                connection_id: connection.id,
-                connection_email: connection.email,
-                connection_provider: connection.provider,
-                calendar_id: calendar.id,
-                calendar_name: calendar.name || 'Calendar',
-                status: event.status,
-                location: event.location,
-                participants: event.participants || []
-              }));
+              .map(event => {
+                // Handle timespan events properly
+                let startTime: string;
+                let endTime: string;
+                let startTimezone = 'America/New_York';
+                let endTimezone = 'America/New_York';
+
+                if (event.when.object === 'timespan') {
+                  // For timed events
+                  startTime = new Date(event.when.startTime * 1000).toISOString();
+                  endTime = new Date(event.when.endTime * 1000).toISOString();
+                  startTimezone = event.when.startTimezone || 'America/New_York';
+                  endTimezone = event.when.endTimezone || 'America/New_York';
+                } else if (event.when.object === 'datespan') {
+                  // For all-day events (if needed in future)
+                  startTime = new Date(event.when.startDate).toISOString();
+                  endTime = new Date(event.when.endDate).toISOString();
+                } else {
+                  // Fallback for other event types
+                  startTime = new Date().toISOString();
+                  endTime = new Date().toISOString();
+                }
+
+                return {
+                  id: event.id,
+                  title: event.title || 'Busy',
+                  description: event.description || '',
+                  when: {
+                    start_time: startTime,
+                    end_time: endTime,
+                    start_timezone: startTimezone,
+                    end_timezone: endTimezone
+                  },
+                  connection_id: connection.id,
+                  connection_email: connection.email,
+                  connection_provider: connection.provider,
+                  calendar_id: calendar.id,
+                  calendar_name: calendar.name || 'Calendar',
+                  status: event.status,
+                  location: event.location,
+                  participants: event.participants || []
+                };
+              });
 
             allEvents.push(...transformedEvents);
           }
