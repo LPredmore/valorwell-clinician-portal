@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -20,6 +19,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { TimeZoneService } from '@/utils/timeZoneService';
 import { DateTime } from 'luxon';
+import { useNylasSync } from '@/hooks/useNylasSync';
 
 interface Client {
   id: string;
@@ -51,6 +51,8 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
   isEditMode = false,
   editingAppointment
 }) => {
+  const { syncAppointment, getSyncStatusForAppointment, deleteSyncMapping } = useNylasSync();
+
   const [clients, setClients] = useState<Client[]>([]);
   const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [date, setDate] = useState<string>('');
@@ -253,18 +255,25 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
 
       console.log('[AppointmentDialog] Appointment data:', appointmentData);
 
+      let savedAppointment;
       let error;
       if (isEditMode && appointmentId) {
         const result = await supabase
           .from('appointments')
           .update(appointmentData)
-          .eq('id', appointmentId);
+          .eq('id', appointmentId)
+          .select()
+          .single();
         error = result.error;
+        savedAppointment = result.data;
       } else {
         const result = await supabase
           .from('appointments')
-          .insert(appointmentData);
+          .insert(appointmentData)
+          .select()
+          .single();
         error = result.error;
+        savedAppointment = result.data;
       }
 
       if (error) throw error;
@@ -273,6 +282,16 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
         title: 'Success',
         description: isEditMode ? 'Appointment updated successfully' : 'Appointment created successfully'
       });
+
+      // Sync to external calendar
+      if (savedAppointment) {
+        try {
+          await syncAppointment('sync_appointment_to_calendar', savedAppointment.id);
+        } catch (syncError) {
+          console.warn('[AppointmentDialog] Calendar sync failed:', syncError);
+          // Don't block the main flow if sync fails
+        }
+      }
 
       resetForm();
       
@@ -299,6 +318,15 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
     
     try {
       setIsDeleting(true);
+      
+      // Delete sync mapping first
+      try {
+        await deleteSyncMapping(appointmentId);
+      } catch (syncError) {
+        console.warn('[AppointmentDialog] Failed to delete sync mapping:', syncError);
+        // Continue with appointment deletion even if sync cleanup fails
+      }
+      
       const { error } = await supabase
         .from('appointments')
         .delete()

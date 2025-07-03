@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase, getOrCreateVideoRoom } from "@/integrations/supabase/client";
@@ -7,6 +6,7 @@ import { TimeZoneService } from "@/utils/timeZoneService";
 import { DateTime } from "luxon";
 import { Appointment } from "@/types/appointment";
 import { formatClientName } from "@/utils/appointmentUtils";
+import { useNylasSync } from '@/hooks/useNylasSync';
 
 // Interface for the raw Supabase response - simplified for debugging
 interface RawSupabaseAppointment {
@@ -53,6 +53,7 @@ export const useAppointments = (
   refreshTrigger: number = 0
 ) => {
   const { toast } = useToast();
+  const { loadSyncMappings, getSyncStatusForAppointment } = useNylasSync();
   const [currentAppointment, setCurrentAppointment] =
     useState<Appointment | null>(null);
   const [isVideoOpen, setIsVideoOpen] = useState(false);
@@ -277,6 +278,14 @@ export const useAppointments = (
     retry: false,
   });
 
+  // Load sync mappings when appointments change
+  useEffect(() => {
+    if (appointments && appointments.length > 0) {
+      const appointmentIds = appointments.map(apt => apt.id);
+      loadSyncMappings(appointmentIds);
+    }
+  }, [appointments, loadSyncMappings]);
+
   // Handle errors with separate useEffect
   useEffect(() => {
     if (error) {
@@ -495,5 +504,6 @@ export const useAppointments = (
     clientData: sessionClientData,
     isLoadingClientData: isLoadingSessionClientData,
     addDisplayFormattingToAppointment,
+    getSyncStatusForAppointment,
   };
 };

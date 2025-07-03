@@ -26,6 +26,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { SyncStatusIndicator } from './SyncStatusIndicator';
 
 const CalendarContainer: React.FC = () => {
   const { userId, authInitialized, userRole } = useUser();
@@ -84,13 +85,19 @@ const CalendarContainer: React.FC = () => {
         const startDT = DateTime.fromISO(apt.start_at, { zone: 'utc' }).setZone(userTimeZone);
         const endDT = DateTime.fromISO(apt.end_at, { zone: 'utc' }).setZone(userTimeZone);
 
+        // Get sync status for this appointment
+        const syncStatus = getSyncStatusForAppointment ? getSyncStatusForAppointment(apt.id) : null;
+
         return {
           id: apt.id,
           title: apt.clientName || 'Internal Appointment',
           start: startDT.toJSDate(),
           end: endDT.toJSDate(),
           source: 'internal' as const,
-          resource: apt
+          resource: { 
+            ...apt,
+            syncStatus // Add sync status to resource
+          }
         };
       }));
     }
@@ -123,7 +130,7 @@ const CalendarContainer: React.FC = () => {
     }));
 
     return events;
-  }, [appointments, nylasEvents, blockedTimes, userTimeZone]);
+  }, [appointments, nylasEvents, blockedTimes, userTimeZone, getSyncStatusForAppointment]);
 
   // Transform availability slots to background events
   const backgroundEvents = useMemo(() => {
