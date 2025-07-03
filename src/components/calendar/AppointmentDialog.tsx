@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -32,24 +31,24 @@ interface AppointmentDialogProps {
   isOpen: boolean;
   onClose: () => void;
   clinicianId: string;
-  userTimeZone: string; // Changed from clinicianTimeZone to match CalendarSimple
+  userTimeZone: string;
   onAppointmentCreated?: () => void;
   onAppointmentUpdated?: () => void;
-  selectedSlot?: any; // Added missing prop
-  isEditMode?: boolean; // Added missing prop
-  editingAppointment?: any; // Added missing prop
+  selectedSlot?: any;
+  isEditMode?: boolean;
+  editingAppointment?: any;
 }
 
 const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
   isOpen,
   onClose,
   clinicianId,
-  userTimeZone, // Changed from clinicianTimeZone
+  userTimeZone,
   onAppointmentCreated,
   onAppointmentUpdated,
-  selectedSlot, // Added prop
-  isEditMode = false, // Added prop with default
-  editingAppointment // Added prop
+  selectedSlot,
+  isEditMode = false,
+  editingAppointment
 }) => {
   const [clients, setClients] = useState<Client[]>([]);
   const [selectedClientId, setSelectedClientId] = useState<string>('');

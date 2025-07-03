@@ -5,6 +5,7 @@ import { useUser } from "@/context/UserContext";
 import { useToast } from "@/hooks/use-toast";
 import ReactBigCalendar from "./ReactBigCalendar";
 import AvailabilityManagementSidebar from "./AvailabilityManagementSidebar";
+import AppointmentDialog from "./AppointmentDialog";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Plus, Clock, Calendar as CalendarIcon } from "lucide-react";
@@ -32,6 +33,10 @@ const CalendarContainer: React.FC = () => {
   const [userTimeZone, setUserTimeZone] = useState<string>(TimeZoneService.DEFAULT_TIMEZONE);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [isAvailabilityOpen, setIsAvailabilityOpen] = useState(false);
+  const [isAppointmentDialogOpen, setIsAppointmentDialogOpen] = useState(false);
+  const [selectedSlot, setSelectedSlot] = useState<any>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingAppointment, setEditingAppointment] = useState<any>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -173,17 +178,19 @@ const CalendarContainer: React.FC = () => {
   }, []);
 
   const handleSelectSlot = useCallback((slotInfo: { start: Date; end: Date }) => {
-    navigate('/appointments/new', { 
-      state: { 
-        start: slotInfo.start, 
-        end: slotInfo.end 
-      } 
-    });
-  }, [navigate]);
+    setSelectedSlot(slotInfo);
+    setIsEditMode(false);
+    setEditingAppointment(null);
+    setIsAppointmentDialogOpen(true);
+  }, []);
 
   const handleSelectEvent = useCallback((event: CalendarEvent) => {
     if (event.source === 'internal') {
-      navigate(`/appointments/${event.id}`);
+      // Open edit dialog for internal appointments
+      setEditingAppointment(event.resource);
+      setSelectedSlot(null);
+      setIsEditMode(true);
+      setIsAppointmentDialogOpen(true);
     } else if (event.source === 'nylas') {
       toast({
         title: "External Event",
@@ -197,6 +204,23 @@ const CalendarContainer: React.FC = () => {
 
   const handleAvailabilityRefresh = useCallback(() => {
     setRefreshTrigger(prev => prev + 1);
+  }, []);
+
+  const handleAppointmentCreated = useCallback(() => {
+    setRefreshTrigger(prev => prev + 1);
+    setIsAppointmentDialogOpen(false);
+  }, []);
+
+  const handleAppointmentUpdated = useCallback(() => {
+    setRefreshTrigger(prev => prev + 1);
+    setIsAppointmentDialogOpen(false);
+  }, []);
+
+  const handleCloseAppointmentDialog = useCallback(() => {
+    setIsAppointmentDialogOpen(false);
+    setSelectedSlot(null);
+    setEditingAppointment(null);
+    setIsEditMode(false);
   }, []);
 
   // Auth effect
@@ -238,7 +262,12 @@ const CalendarContainer: React.FC = () => {
       <div className="p-6">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-4">
-            <Button onClick={() => navigate('/appointments/new')}>
+            <Button onClick={() => {
+              setSelectedSlot({ start: new Date(), end: new Date() });
+              setIsEditMode(false);
+              setEditingAppointment(null);
+              setIsAppointmentDialogOpen(true);
+            }}>
               <Plus className="h-4 w-4 mr-2" />
               New Appointment
             </Button>
@@ -288,6 +317,18 @@ const CalendarContainer: React.FC = () => {
             </div>
           </SheetContent>
         </Sheet>
+
+        <AppointmentDialog
+          isOpen={isAppointmentDialogOpen}
+          onClose={handleCloseAppointmentDialog}
+          clinicianId={userId}
+          userTimeZone={userTimeZone}
+          onAppointmentCreated={handleAppointmentCreated}
+          onAppointmentUpdated={handleAppointmentUpdated}
+          selectedSlot={selectedSlot}
+          isEditMode={isEditMode}
+          editingAppointment={editingAppointment}
+        />
       </div>
     </Layout>
   );
