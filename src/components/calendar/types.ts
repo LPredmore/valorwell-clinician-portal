@@ -1,4 +1,6 @@
 
+import { Appointment } from '@/types/appointment';
+
 export interface CalendarEvent {
   id: string;
   title: string;
