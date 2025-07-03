@@ -3,25 +3,7 @@ import React, { useCallback, useMemo } from 'react';
 import { Calendar, Views } from 'react-big-calendar';
 import { globalLocalizer } from '@/main';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
-
-interface CalendarEvent {
-  id: string;
-  title: string;
-  start: Date;
-  end: Date;
-  source?: 'internal' | 'nylas' | 'availability' | 'blocked_time';
-  type?: string;
-  resource?: any;
-}
-
-interface ReactBigCalendarProps {
-  events: CalendarEvent[];
-  onSelectSlot: (slotInfo: { start: Date; end: Date }) => void;
-  onSelectEvent: (event: CalendarEvent) => void;
-  date: Date;
-  onNavigate: (date: Date) => void;
-  userTimeZone?: string;
-}
+import { CalendarEvent, ReactBigCalendarProps } from './types';
 
 const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
   events,
@@ -31,9 +13,9 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
   onNavigate,
   userTimeZone = 'America/New_York',
 }) => {
-  // Pure RBC event styling - only basic color differentiation
+  // Pure RBC event styling - minimal differentiation
   const eventPropGetter = useCallback((event: CalendarEvent) => {
-    let backgroundColor = '#3174ad'; // RBC default blue
+    let backgroundColor = '#3174ad';
     
     switch (event.source) {
       case 'blocked_time':
@@ -58,12 +40,12 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
     };
   }, []);
 
-  // Handle navigation events from React Big Calendar
-  const handleNavigate = useCallback((newDate: Date, view?: string, action?: string) => {
+  // RBC navigation handler
+  const handleNavigate = useCallback((newDate: Date) => {
     onNavigate(newDate);
   }, [onNavigate]);
 
-  // Pure RBC configuration - completely native
+  // Pure RBC configuration
   const calendarConfig = useMemo(() => ({
     localizer: globalLocalizer,
     events,
@@ -86,11 +68,9 @@ const ReactBigCalendar: React.FC<ReactBigCalendarProps> = ({
     selectable: true,
     popup: true,
     showMultiDayTimes: true,
-    dayLayoutAlgorithm: 'overlap',
     toolbar: true,
   }), [events, eventPropGetter, onSelectSlot, onSelectEvent, date, handleNavigate]);
 
-  // Pure RBC rendering - no custom containers or styling
   return (
     <div className="rbc-calendar-container">
       <Calendar {...calendarConfig} />

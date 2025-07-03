@@ -1,14 +1,11 @@
 
-import { Appointment } from '@/types/appointment';
-
 export interface CalendarEvent {
   id: string;
   title: string;
   start: Date;
   end: Date;
   source?: 'internal' | 'nylas' | 'availability' | 'blocked_time';
-  type?: string;
-  resource?: any; // RBC native property for additional event data
+  resource?: any;
 }
 
 export interface ReactBigCalendarProps {

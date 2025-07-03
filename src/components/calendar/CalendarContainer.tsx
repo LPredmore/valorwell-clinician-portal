@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "../layout/Layout";
@@ -15,6 +16,7 @@ import { useBlockedTime } from "@/hooks/useBlockedTime";
 import { getWeekRange } from "@/utils/dateRangeUtils";
 import { getClinicianTimeZone } from "@/hooks/useClinicianData";
 import { TimeZoneService } from "@/utils/timeZoneService";
+import { CalendarEvent } from "./types";
 
 const CalendarContainer: React.FC = () => {
   const { userId, authInitialized, userRole } = useUser();
@@ -25,13 +27,13 @@ const CalendarContainer: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Calculate week boundaries
+  // Calculate week boundaries using RBC-native approach
   const { start: weekStart, end: weekEnd } = useMemo(() => {
     const tz = userTimeZone || TimeZoneService.DEFAULT_TIMEZONE;
     return getWeekRange(currentDate, tz);
   }, [currentDate, userTimeZone]);
 
-  // Fetch data
+  // Fetch data with simplified parameters
   const { appointments } = useAppointments(
     userId,
     weekStart,
@@ -40,10 +42,7 @@ const CalendarContainer: React.FC = () => {
     refreshTrigger
   );
 
-  const { events: nylasEvents } = useNylasEvents(
-    weekStart,
-    weekEnd
-  );
+  const { events: nylasEvents } = useNylasEvents(weekStart, weekEnd);
 
   const { blockedTimes } = useBlockedTime(
     userId || '',
@@ -59,8 +58,55 @@ const CalendarContainer: React.FC = () => {
     refreshTrigger
   );
 
-  // Transform availability events - pure RBC format
-  const availabilityEvents = useMemo(() => {
+  // Simplified event transformations for pure RBC compatibility
+  const allEvents = useMemo((): CalendarEvent[] => {
+    const events: CalendarEvent[] = [];
+    
+    // Transform appointments to RBC format
+    if (appointments) {
+      events.push(...appointments.map(apt => {
+        const startDT = DateTime.fromISO(apt.start_at, { zone: 'utc' }).setZone(userTimeZone);
+        const endDT = DateTime.fromISO(apt.end_at, { zone: 'utc' }).setZone(userTimeZone);
+
+        return {
+          id: apt.id,
+          title: apt.clientName || 'Internal Appointment',
+          start: startDT.toJSDate(),
+          end: endDT.toJSDate(),
+          source: 'internal',
+          resource: apt
+        };
+      }));
+    }
+    
+    // Transform Nylas events to RBC format
+    if (nylasEvents) {
+      events.push(...nylasEvents.map(evt => ({
+        id: evt.id,
+        title: evt.title,
+        start: evt.when?.start_time,
+        end: evt.when?.end_time,
+        source: 'nylas',
+        resource: evt
+      })));
+    }
+
+    // Transform blocked time to RBC format
+    events.push(...blockedTimes.map(blockedTime => {
+      const startDT = DateTime.fromISO(blockedTime.start_at, { zone: 'utc' }).setZone(userTimeZone);
+      const endDT = DateTime.fromISO(blockedTime.end_at, { zone: 'utc' }).setZone(userTimeZone);
+
+      return {
+        id: blockedTime.id,
+        title: blockedTime.label,
+        start: startDT.toJSDate(),
+        end: endDT.toJSDate(),
+        source: 'blocked_time',
+        resource: blockedTime
+      };
+    }));
+
+    // Transform availability slots to RBC format
     const tz = userTimeZone;
     const startDT = DateTime.fromJSDate(weekStart).setZone(tz).startOf('day');
     const endDT = DateTime.fromJSDate(weekEnd).setZone(tz).startOf('day');
@@ -78,7 +124,7 @@ const CalendarContainer: React.FC = () => {
       friday: 5, saturday: 6, sunday: 7 
     };
 
-    return availabilitySlots.flatMap(slot => {
+    const availabilityEvents = availabilitySlots.flatMap(slot => {
       const matchedDates = dates.filter(d => d.weekday === weekdayMap[slot.day]);
       
       return matchedDates.map(d => {
@@ -94,73 +140,16 @@ const CalendarContainer: React.FC = () => {
           start: startDT.toJSDate(),
           end: endDT.toJSDate(),
           source: 'availability',
-          type: 'availability',
           resource: slot
         };
       });
     });
-  }, [availabilitySlots, weekStart, weekEnd, userTimeZone]);
 
-  // Transform blocked time events - pure RBC format
-  const blockedTimeEvents = useMemo(() => {
-    return blockedTimes.map(blockedTime => {
-      const startDT = DateTime.fromISO(blockedTime.start_at, { zone: 'utc' }).setZone(userTimeZone);
-      const endDT = DateTime.fromISO(blockedTime.end_at, { zone: 'utc' }).setZone(userTimeZone);
-
-      return {
-        id: blockedTime.id,
-        title: blockedTime.label,
-        start: startDT.toJSDate(),
-        end: endDT.toJSDate(),
-        source: 'blocked_time',
-        type: 'blocked_time',
-        resource: blockedTime
-      };
-    });
-  }, [blockedTimes, userTimeZone]);
-
-  // Combine all events - pure RBC data structure
-  const allEvents = useMemo(() => {
-    const events = [];
-    
-    // Add appointments - pure RBC format
-    if (appointments) {
-      events.push(...appointments.map(apt => {
-        const startDT = DateTime.fromISO(apt.start_at, { zone: 'utc' }).setZone(userTimeZone);
-        const endDT = DateTime.fromISO(apt.end_at, { zone: 'utc' }).setZone(userTimeZone);
-
-        return {
-          id: apt.id,
-          title: apt.clientName || 'Internal Appointment',
-          start: startDT.toJSDate(),
-          end: endDT.toJSDate(),
-          source: 'internal',
-          type: 'appointment',
-          resource: apt
-        };
-      }));
-    }
-    
-    // Add Nylas events - pure RBC format
-    if (nylasEvents) {
-      events.push(...nylasEvents.map(evt => ({
-        id: evt.id,
-        title: evt.title,
-        start: evt.when?.start_time,
-        end: evt.when?.end_time,
-        source: 'nylas',
-        type: 'external',
-        resource: evt
-      })));
-    }
-
-    // Add blocked time and availability events
-    events.push(...blockedTimeEvents);
     events.push(...availabilityEvents);
 
-    // Let RBC handle all sorting and display logic natively
+    // Let RBC handle all sorting and display natively
     return events;
-  }, [appointments, nylasEvents, blockedTimeEvents, availabilityEvents]);
+  }, [appointments, nylasEvents, blockedTimes, availabilitySlots, weekStart, weekEnd, userTimeZone]);
 
   // Load user timezone
   const loadUserTimeZone = useCallback(async (clinicianId: string) => {
@@ -173,13 +162,12 @@ const CalendarContainer: React.FC = () => {
     }
   }, []);
 
-  // Handle navigation - pure RBC
+  // Pure RBC event handlers
   const handleCalendarNavigate = useCallback((newDate: Date) => {
     setCurrentDate(newDate);
     setRefreshTrigger(prev => prev + 1);
   }, []);
 
-  // Handle slot selection - pure RBC
   const handleSelectSlot = useCallback((slotInfo: { start: Date; end: Date }) => {
     navigate('/appointments/new', { 
       state: { 
@@ -189,8 +177,7 @@ const CalendarContainer: React.FC = () => {
     });
   }, [navigate]);
 
-  // Handle event click - pure RBC
-  const handleSelectEvent = useCallback((event: any) => {
+  const handleSelectEvent = useCallback((event: CalendarEvent) => {
     if (event.source === 'internal') {
       navigate(`/appointments/${event.id}`);
     } else if (event.source === 'nylas') {
@@ -247,7 +234,6 @@ const CalendarContainer: React.FC = () => {
   return (
     <Layout>
       <div className="p-6">
-        {/* Simple header with action buttons */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-4">
             <Button onClick={() => navigate('/appointments/new')}>
@@ -266,7 +252,6 @@ const CalendarContainer: React.FC = () => {
           </div>
         </div>
 
-        {/* Pure React Big Calendar - no custom containers or wrappers */}
         <ReactBigCalendar
           events={allEvents}
           onSelectSlot={handleSelectSlot}
