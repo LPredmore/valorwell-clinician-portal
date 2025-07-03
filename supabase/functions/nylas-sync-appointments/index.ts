@@ -43,16 +43,26 @@ serve(async (req) => {
       syncDirection = 'both' 
     } = await req.json()
 
-    const nylasClientSecret = Deno.env.get('NYLAS_CLIENT_SECRET')
-    if (!nylasClientSecret) {
-      throw new Error('Nylas configuration missing')
+    const nylasApiKey = Deno.env.get('NYLAS_API_KEY')
+    if (!nylasApiKey) {
+      throw new Error('Nylas configuration missing - NYLAS_API_KEY not found')
     }
+
+    console.log(`[nylas-sync-appointments] Processing action: ${action}`, {
+      appointmentId,
+      clinicianId,
+      startDate,
+      endDate,
+      syncDirection
+    })
 
     switch (action) {
       case 'sync_appointment_to_calendar': {
         if (!appointmentId) {
           throw new Error('Appointment ID required')
         }
+
+        console.log(`[nylas-sync-appointments] Syncing appointment ${appointmentId} to calendar`)
 
         // Get appointment details
         const { data: appointment, error: appointmentError } = await supabaseClient
@@ -66,10 +76,18 @@ serve(async (req) => {
           .single()
 
         if (appointmentError || !appointment) {
+          console.error('[nylas-sync-appointments] Appointment not found:', appointmentError)
           throw new Error('Appointment not found')
         }
 
-        // Get clinician's connection
+        console.log('[nylas-sync-appointments] Found appointment:', {
+          id: appointment.id,
+          clinician_id: appointment.clinician_id,
+          start_at: appointment.start_at,
+          end_at: appointment.end_at
+        })
+
+        // Get clinician's active connection
         const { data: connections, error: connectionsError } = await supabaseClient
           .from('nylas_connections')
           .select('*')
@@ -78,15 +96,22 @@ serve(async (req) => {
           .limit(1)
 
         if (connectionsError || !connections || connections.length === 0) {
-          throw new Error('No active calendar connection found')
+          console.error('[nylas-sync-appointments] No active connection found:', connectionsError)
+          throw new Error('No active calendar connection found for this clinician')
         }
 
         const connection = connections[0]
+        console.log('[nylas-sync-appointments] Using connection:', {
+          id: connection.id,
+          grant_id: connection.grant_id,
+          email: connection.email,
+          provider: connection.provider
+        })
 
-        // Create calendar event
+        // Create calendar event data
         const eventData = {
-          title: `Appointment with ${appointment.clients?.client_first_name} ${appointment.clients?.client_last_name}`,
-          description: `Type: ${appointment.type}\nStatus: ${appointment.status}`,
+          title: `Appointment with ${appointment.clients?.client_first_name || 'Client'} ${appointment.clients?.client_last_name || ''}`.trim(),
+          description: `Type: ${appointment.type}\nStatus: ${appointment.status}${appointment.notes ? `\nNotes: ${appointment.notes}` : ''}`,
           when: {
             start_time: Math.floor(new Date(appointment.start_at).getTime() / 1000),
             end_time: Math.floor(new Date(appointment.end_at).getTime() / 1000),
@@ -97,9 +122,10 @@ serve(async (req) => {
               status: 'yes',
             },
           ],
-          calendar_id: connection.calendar_ids?.[0] || 'primary',
+          calendar_id: 'primary',
         }
 
+        // Add client email if available
         if (appointment.clients?.client_email) {
           eventData.participants.push({
             email: appointment.clients.client_email,
@@ -107,36 +133,52 @@ serve(async (req) => {
           })
         }
 
-        const eventResponse = await fetch(`https://api.nylas.com/v3/grants/${connection.id}/events`, {
+        console.log('[nylas-sync-appointments] Creating event with data:', eventData)
+
+        // Use grant_id for the API call (this is the connection identifier Nylas expects)
+        const grantId = connection.grant_id || connection.id
+        const eventResponse = await fetch(`https://api.us.nylas.com/v3/grants/${grantId}/events`, {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${connection.access_token}`,
+            'Authorization': `Bearer ${nylasApiKey}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(eventData),
         })
 
         if (!eventResponse.ok) {
-          const error = await eventResponse.text()
-          throw new Error(`Failed to create calendar event: ${error}`)
+          const errorText = await eventResponse.text()
+          console.error('[nylas-sync-appointments] Failed to create calendar event:', {
+            status: eventResponse.status,
+            statusText: eventResponse.statusText,
+            error: errorText
+          })
+          throw new Error(`Failed to create calendar event: ${eventResponse.status} ${errorText}`)
         }
 
         const eventResult = await eventResponse.json()
+        console.log('[nylas-sync-appointments] Calendar event created:', eventResult)
 
-        // Store external event mapping
-        await supabaseClient
+        // Store external event mapping with correct connection_id
+        const { error: mappingError } = await supabaseClient
           .from('external_calendar_mappings')
           .insert({
             appointment_id: appointmentId,
             external_event_id: eventResult.data.id,
-            connection_id: connection.id,
+            connection_id: connection.id, // Use the database connection ID, not grant_id
             sync_direction: 'outbound',
           })
+
+        if (mappingError) {
+          console.error('[nylas-sync-appointments] Failed to store mapping:', mappingError)
+          // Don't fail the whole operation if mapping storage fails
+        }
 
         return new Response(
           JSON.stringify({ 
             success: true,
-            external_event_id: eventResult.data.id 
+            external_event_id: eventResult.data.id,
+            message: 'Appointment synced to calendar successfully'
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
@@ -147,6 +189,8 @@ serve(async (req) => {
           throw new Error('Appointment ID required')
         }
 
+        console.log(`[nylas-sync-appointments] Deleting sync for appointment ${appointmentId}`)
+
         // Get existing mapping
         const { data: mapping, error: mappingError } = await supabaseClient
           .from('external_calendar_mappings')
@@ -155,7 +199,7 @@ serve(async (req) => {
           .single()
 
         if (mappingError || !mapping) {
-          // No mapping exists, nothing to delete
+          console.log('[nylas-sync-appointments] No mapping found for appointment:', appointmentId)
           return new Response(
             JSON.stringify({ 
               success: true,
@@ -175,28 +219,37 @@ serve(async (req) => {
         if (connection && !connectionError) {
           // Delete the external calendar event
           try {
-            const deleteResponse = await fetch(`https://api.nylas.com/v3/grants/${connection.id}/events/${mapping.external_event_id}`, {
+            const grantId = connection.grant_id || connection.id
+            const deleteResponse = await fetch(`https://api.us.nylas.com/v3/grants/${grantId}/events/${mapping.external_event_id}`, {
               method: 'DELETE',
               headers: {
-                'Authorization': `Bearer ${connection.access_token}`,
+                'Authorization': `Bearer ${nylasApiKey}`,
               },
             })
 
             if (!deleteResponse.ok) {
-              console.error('Failed to delete external calendar event:', await deleteResponse.text())
-              // Continue with mapping deletion even if external delete fails
+              const errorText = await deleteResponse.text()
+              console.error('[nylas-sync-appointments] Failed to delete external event:', {
+                status: deleteResponse.status,
+                error: errorText
+              })
+            } else {
+              console.log('[nylas-sync-appointments] External event deleted successfully')
             }
           } catch (error) {
-            console.error('Error deleting external calendar event:', error)
-            // Continue with mapping deletion even if external delete fails
+            console.error('[nylas-sync-appointments] Error deleting external event:', error)
           }
         }
 
         // Delete the mapping
-        await supabaseClient
+        const { error: deleteError } = await supabaseClient
           .from('external_calendar_mappings')
           .delete()
           .eq('id', mapping.id)
+
+        if (deleteError) {
+          console.error('[nylas-sync-appointments] Failed to delete mapping:', deleteError)
+        }
 
         return new Response(
           JSON.stringify({ 
@@ -212,6 +265,8 @@ serve(async (req) => {
           throw new Error('Clinician ID required')
         }
 
+        console.log(`[nylas-sync-appointments] Syncing calendar events to appointments for clinician ${clinicianId}`)
+
         // Get clinician's connections
         const { data: connections, error: connectionsError } = await supabaseClient
           .from('nylas_connections')
@@ -221,7 +276,7 @@ serve(async (req) => {
 
         if (connectionsError || !connections || connections.length === 0) {
           return new Response(
-            JSON.stringify({ success: true, synced_count: 0 }),
+            JSON.stringify({ success: true, synced_count: 0, message: 'No active connections found' }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           )
         }
@@ -230,19 +285,23 @@ serve(async (req) => {
 
         for (const connection of connections) {
           try {
+            console.log(`[nylas-sync-appointments] Processing connection: ${connection.id}`)
+            
             // Get calendar events
-            const eventsUrl = new URL(`https://api.nylas.com/v3/grants/${connection.id}/events`)
-            if (startDate) eventsUrl.searchParams.set('start', new Date(startDate).getTime().toString())
-            if (endDate) eventsUrl.searchParams.set('end', new Date(endDate).getTime().toString())
+            const grantId = connection.grant_id || connection.id
+            const eventsUrl = new URL(`https://api.us.nylas.com/v3/grants/${grantId}/events`)
+            if (startDate) eventsUrl.searchParams.set('start', Math.floor(new Date(startDate).getTime() / 1000).toString())
+            if (endDate) eventsUrl.searchParams.set('end', Math.floor(new Date(endDate).getTime() / 1000).toString())
 
             const eventsResponse = await fetch(eventsUrl.toString(), {
               headers: {
-                'Authorization': `Bearer ${connection.access_token}`,
+                'Authorization': `Bearer ${nylasApiKey}`,
               },
             })
 
             if (eventsResponse.ok) {
               const eventsData = await eventsResponse.json()
+              console.log(`[nylas-sync-appointments] Found ${eventsData.data?.length || 0} events for connection ${connection.id}`)
               
               for (const event of eventsData.data || []) {
                 // Check if event is already mapped
@@ -264,7 +323,7 @@ serve(async (req) => {
                       status: 'scheduled',
                       start_at: new Date(event.when.start_time * 1000).toISOString(),
                       end_at: new Date(event.when.end_time * 1000).toISOString(),
-                      notes: `Synced from ${connection.provider}: ${event.title}`,
+                      notes: `Synced from ${connection.provider}: ${event.title || 'Untitled Event'}`,
                     })
                     .select()
                     .single()
@@ -281,37 +340,43 @@ serve(async (req) => {
                       })
 
                     totalSynced++
+                    console.log(`[nylas-sync-appointments] Created appointment ${newAppointment.id} from external event ${event.id}`)
                   }
                 }
               }
+            } else {
+              const errorText = await eventsResponse.text()
+              console.error(`[nylas-sync-appointments] Failed to fetch events for connection ${connection.id}:`, {
+                status: eventsResponse.status,
+                error: errorText
+              })
             }
           } catch (error) {
-            console.error(`Error syncing connection ${connection.id}:`, error)
+            console.error(`[nylas-sync-appointments] Error syncing connection ${connection.id}:`, error)
           }
         }
 
         return new Response(
           JSON.stringify({ 
             success: true,
-            synced_count: totalSynced 
+            synced_count: totalSynced,
+            message: `Synced ${totalSynced} events from external calendar`
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
 
-      case 'sync_bidirectional': {
-        // Implement bidirectional sync (combination of above)
-        throw new Error('Bidirectional sync not yet implemented')
-      }
-
       default:
-        throw new Error('Invalid action')
+        throw new Error(`Invalid action: ${action}`)
     }
 
   } catch (error) {
-    console.error('Nylas sync error:', error)
+    console.error('[nylas-sync-appointments] Error:', error)
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        success: false 
+      }),
       { 
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 

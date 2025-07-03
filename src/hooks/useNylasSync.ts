@@ -61,11 +61,11 @@ export const useNylasSync = () => {
         }));
 
         // Refresh sync mappings
-        await loadSyncMappings();
+        await loadSyncMappings([appointmentId]);
 
         toast({
           title: 'Calendar Sync Successful',
-          description: 'Appointment has been synced to your external calendar'
+          description: data?.message || 'Appointment has been synced to your external calendar'
         });
 
         return data;
@@ -103,13 +103,16 @@ export const useNylasSync = () => {
         .from('external_calendar_mappings')
         .select('*');
 
-      if (appointmentIds) {
+      if (appointmentIds && appointmentIds.length > 0) {
         query = query.in('appointment_id', appointmentIds);
       }
 
       const { data, error } = await query;
 
-      if (error) throw error;
+      if (error) {
+        console.error('[useNylasSync] Failed to load sync mappings:', error);
+        throw error;
+      }
 
       const mappings: Record<string, SyncMapping> = {};
       data?.forEach(mapping => {
@@ -121,9 +124,11 @@ export const useNylasSync = () => {
         syncMappings: mappings
       }));
 
+      console.log(`[useNylasSync] Loaded ${Object.keys(mappings).length} sync mappings`);
       return mappings;
     } catch (error) {
       console.error('[useNylasSync] Failed to load sync mappings:', error);
+      return {};
     }
   }, []);
 
@@ -133,12 +138,15 @@ export const useNylasSync = () => {
       isSynced: !!mapping,
       syncDirection: mapping?.sync_direction,
       externalEventId: mapping?.external_event_id,
-      lastSynced: mapping?.updated_at
+      lastSynced: mapping?.updated_at,
+      syncMapping: mapping
     };
   }, [syncStatus.syncMappings]);
 
   const deleteSyncMapping = useCallback(async (appointmentId: string) => {
     try {
+      console.log(`[useNylasSync] Deleting sync mapping for appointment: ${appointmentId}`);
+      
       await syncAppointment('delete', appointmentId);
       
       // Remove from local state
@@ -148,11 +156,16 @@ export const useNylasSync = () => {
           Object.entries(prev.syncMappings).filter(([id]) => id !== appointmentId)
         )
       }));
+
+      toast({
+        title: 'Sync Removed',
+        description: 'Appointment is no longer synced with external calendar'
+      });
     } catch (error) {
       console.error('[useNylasSync] Failed to delete sync mapping:', error);
       throw error;
     }
-  }, [syncAppointment]);
+  }, [syncAppointment, toast]);
 
   return {
     syncStatus,
