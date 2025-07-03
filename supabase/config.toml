@@ -13,9 +13,6 @@ verify_jwt = true
 [functions.delete-user]
 verify_jwt = true
 
-[functions.nylas-events]
-verify_jwt = true
-
 [functions.nylas-auth]
 verify_jwt = true
 

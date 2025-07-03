@@ -1,7 +1,8 @@
 
 import { useState, useEffect, useMemo } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useNylasClient } from './useNylasClient';
 import { useToast } from '@/hooks/use-toast';
+import { useNylasIntegration } from './useNylasIntegration';
 
 interface NylasEvent {
   id: string;
@@ -23,66 +24,115 @@ interface NylasEvent {
 }
 
 export const useNylasEvents = (startDate?: Date, endDate?: Date) => {
+  const nylasClient = useNylasClient();
+  const { connections } = useNylasIntegration();
   const [events, setEvents] = useState<NylasEvent[]>([]);
-  const [connections, setConnections] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // Convert Date objects to stable string representations to prevent infinite loops
+  // Convert Date objects to stable string representations
   const startDateISO = useMemo(() => startDate?.toISOString(), [startDate?.getTime()]);
   const endDateISO = useMemo(() => endDate?.toISOString(), [endDate?.getTime()]);
 
   const fetchEvents = async () => {
+    if (!nylasClient || !connections.length || !startDate || !endDate) {
+      console.log('[useNylasEvents] Missing requirements:', {
+        hasClient: !!nylasClient,
+        connectionCount: connections.length,
+        hasDateRange: !!(startDate && endDate)
+      });
+      setEvents([]);
+      return;
+    }
+
     try {
       setIsLoading(true);
       setError(null);
 
-      console.log('[useNylasEvents] ENHANCED: Fetching events with stabilized parameters:', {
+      console.log('[useNylasEvents] Fetching events with Nylas SDK:', {
         startDateISO,
         endDateISO,
-        stabilized: true
+        connectionCount: connections.length
       });
 
-      const requestBody = {
-        action: 'fetch_events',
-        startDate: startDateISO,
-        endDate: endDateISO
-      };
+      const allEvents: NylasEvent[] = [];
 
-      console.log('[useNylasEvents] ENHANCED: Request body to nylas-events function:', requestBody);
+      for (const connection of connections) {
+        try {
+          console.log(`[useNylasEvents] Processing connection: ${connection.id} (${connection.email})`);
+          
+          // First get calendars for this connection
+          const calendarsResponse = await nylasClient.calendars.list({
+            grantId: connection.grant_id || connection.id
+          });
 
-      const { data, error } = await supabase.functions.invoke('nylas-events', {
-        body: requestBody
-      });
+          const calendars = calendarsResponse.data || [];
+          console.log(`[useNylasEvents] Found ${calendars.length} calendars for connection ${connection.id}`);
 
-      console.log('[useNylasEvents] ENHANCED: Function response:', { data, error });
+          // Get primary calendar or all calendars
+          const calendarsToFetch = calendars.filter(cal => cal.isPrimary) || calendars.slice(0, 1);
 
-      if (error) {
-        console.error('[useNylasEvents] Function error:', error);
-        throw error;
+          for (const calendar of calendarsToFetch) {
+            console.log(`[useNylasEvents] Fetching events for calendar: ${calendar.id} (${calendar.name})`);
+            
+            const eventsResponse = await nylasClient.events.list({
+              grantId: connection.grant_id || connection.id,
+              queryParams: {
+                calendar_id: calendar.id,
+                starts_after: Math.floor(startDate.getTime() / 1000),
+                ends_before: Math.floor(endDate.getTime() / 1000),
+                limit: 50,
+                expand_recurring: false
+              }
+            });
+
+            const fetchedEvents = eventsResponse.data || [];
+            console.log(`[useNylasEvents] Fetched ${fetchedEvents.length} events from calendar ${calendar.id}`);
+
+            // Transform and filter events (busy events only)
+            const transformedEvents = fetchedEvents
+              .filter(event => {
+                // Only include non-all-day events for busy sync
+                return event.when && 
+                       event.when.object === 'timespan' && 
+                       event.when.startTime && 
+                       event.when.endTime;
+              })
+              .map(event => ({
+                id: event.id,
+                title: event.title || 'Busy',
+                description: event.description || '',
+                when: {
+                  start_time: new Date(event.when.startTime * 1000).toISOString(),
+                  end_time: new Date(event.when.endTime * 1000).toISOString(),
+                  start_timezone: event.when.startTimezone || 'America/New_York',
+                  end_timezone: event.when.endTimezone || 'America/New_York'
+                },
+                connection_id: connection.id,
+                connection_email: connection.email,
+                connection_provider: connection.provider,
+                calendar_id: calendar.id,
+                calendar_name: calendar.name || 'Calendar',
+                status: event.status,
+                location: event.location,
+                participants: event.participants || []
+              }));
+
+            allEvents.push(...transformedEvents);
+          }
+        } catch (connectionError) {
+          console.error(`[useNylasEvents] Error processing connection ${connection.id}:`, connectionError);
+          continue;
+        }
       }
 
-      const fetchedEvents = data?.events || [];
-      const fetchedConnections = data?.connections || [];
+      console.log(`[useNylasEvents] Total events fetched: ${allEvents.length}`);
+      setEvents(allEvents);
 
-      // Enhanced logging for event data verification
-      console.log('[useNylasEvents] ENHANCED: Events fetched with date range verification:', {
-        startDateISO,
-        endDateISO,
-        totalEvents: fetchedEvents.length,
-        eventSample: fetchedEvents.slice(0, 3).map((e: any) => ({
-          title: e.title,
-          start_time: e.when?.start_time,
-          connection_email: e.connection_email
-        }))
-      });
-
-      setEvents(fetchedEvents);
-      setConnections(fetchedConnections);
     } catch (error) {
-      console.error('[useNylasEvents] ENHANCED: Error fetching Nylas events:', error);
-      setError(error.message || 'Failed to fetch calendar events');
+      console.error('[useNylasEvents] Error fetching events with SDK:', error);
+      setError(error instanceof Error ? error.message : 'Failed to fetch calendar events');
       toast({
         title: "Error",
         description: "Failed to load external calendar events",
@@ -93,33 +143,16 @@ export const useNylasEvents = (startDate?: Date, endDate?: Date) => {
     }
   };
 
-  // Use stabilized string dependencies instead of Date objects
   useEffect(() => {
-    console.log('[useNylasEvents] ENHANCED: Effect triggered with stabilized dates:', {
+    console.log('[useNylasEvents] Effect triggered:', {
+      hasClient: !!nylasClient,
+      connectionCount: connections.length,
       startDateISO,
-      endDateISO,
-      stabilized: true
+      endDateISO
     });
+    
     fetchEvents();
-  }, [startDateISO, endDateISO]);
-
-  useEffect(() => {
-    console.log('[useNylasEvents] ENHANCED: State updated with stabilized data:', {
-      eventsCount: events.length,
-      connectionsCount: connections.length,
-      isLoading,
-      error,
-      dateRangeUsed: {
-        startDateISO,
-        endDateISO
-      },
-      eventsSample: events.slice(0, 3).map(e => ({
-        id: e.id,
-        title: e.title,
-        start_time: e.when?.start_time
-      }))
-    });
-  }, [events, connections, isLoading, error, startDateISO, endDateISO]);
+  }, [nylasClient, connections.length, startDateISO, endDateISO]);
 
   return {
     events,

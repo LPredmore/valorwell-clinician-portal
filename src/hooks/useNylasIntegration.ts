@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/context/UserContext';
+import { useNylasClient } from './useNylasClient';
 
 interface NylasConnection {
   id: string;
@@ -18,13 +19,22 @@ interface NylasConnection {
   last_sync_at?: string;
 }
 
+interface NylasCalendar {
+  id: string;
+  name: string;
+  isPrimary: boolean;
+  readOnly: boolean;
+}
+
 export const useNylasIntegration = () => {
   const [connections, setConnections] = useState<NylasConnection[]>([]);
+  const [calendars, setCalendars] = useState<NylasCalendar[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [infrastructureError, setInfrastructureError] = useState<string | null>(null);
   const { toast } = useToast();
   const { userId, authInitialized } = useUser();
+  const nylasClient = useNylasClient();
 
   // Listen for callback success and error messages
   useEffect(() => {
@@ -55,6 +65,43 @@ export const useNylasIntegration = () => {
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   }, []);
+
+  // Fetch calendars directly with Nylas SDK
+  const fetchCalendars = async () => {
+    if (!nylasClient || !connections.length) {
+      setCalendars([]);
+      return;
+    }
+
+    try {
+      console.log('[useNylasIntegration] Fetching calendars with Nylas SDK');
+      const allCalendars: NylasCalendar[] = [];
+
+      for (const connection of connections) {
+        try {
+          const calendarsResponse = await nylasClient.calendars.list({
+            grantId: connection.grant_id || connection.id
+          });
+
+          const connectionCalendars = (calendarsResponse.data || []).map(cal => ({
+            id: cal.id,
+            name: cal.name || 'Unnamed Calendar',
+            isPrimary: cal.isPrimary || false,
+            readOnly: cal.readOnly || false
+          }));
+
+          allCalendars.push(...connectionCalendars);
+        } catch (error) {
+          console.error(`[useNylasIntegration] Error fetching calendars for connection ${connection.id}:`, error);
+        }
+      }
+
+      console.log(`[useNylasIntegration] Fetched ${allCalendars.length} calendars`);
+      setCalendars(allCalendars);
+    } catch (error) {
+      console.error('[useNylasIntegration] Error fetching calendars:', error);
+    }
+  };
 
   // Fetch user's calendar connections
   const fetchConnections = async () => {
@@ -265,6 +312,13 @@ export const useNylasIntegration = () => {
     }
   };
 
+  // Fetch calendars when connections change
+  useEffect(() => {
+    if (connections.length > 0) {
+      fetchCalendars();
+    }
+  }, [nylasClient, connections.length]);
+
   useEffect(() => {
     if (authInitialized && userId) {
       fetchConnections();
@@ -273,12 +327,14 @@ export const useNylasIntegration = () => {
 
   return {
     connections,
+    calendars,
     isLoading,
     isConnecting,
     infrastructureError,
     connectCalendar: connectGoogleCalendar,
     connectGoogleCalendar,
     disconnectCalendar,
-    refreshConnections: fetchConnections
+    refreshConnections: fetchConnections,
+    fetchCalendars
   };
 };
