@@ -36,150 +36,16 @@ export const useNylasEvents = (startDate?: Date, endDate?: Date) => {
   const endDateISO = useMemo(() => endDate?.toISOString(), [endDate?.getTime()]);
 
   const fetchEvents = async () => {
-    if (!nylasClient || !connections.length || !startDate || !endDate) {
-      console.log('[useNylasEvents] Missing requirements:', {
-        hasClient: !!nylasClient,
-        connectionCount: connections.length,
-        hasDateRange: !!(startDate && endDate)
-      });
-      setEvents([]);
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      setError(null);
-
-      console.log('[useNylasEvents] Fetching events with Nylas SDK v7:', {
-        startDateISO,
-        endDateISO,
-        connectionCount: connections.length
-      });
-
-      const allEvents: NylasEvent[] = [];
-
-      for (const connection of connections) {
-        try {
-          console.log(`[useNylasEvents] Processing connection: ${connection.id} (${connection.email})`);
-          
-          // Use grant_id as identifier for v7 SDK
-          const grantId = connection.grant_id || connection.id;
-          
-          // First get calendars for this connection
-          const calendarsResponse = await nylasClient.calendars.list({
-            identifier: grantId
-          });
-
-          const calendars = calendarsResponse.data || [];
-          console.log(`[useNylasEvents] Found ${calendars.length} calendars for connection ${connection.id}`);
-
-          // Get primary calendar or all calendars
-          const calendarsToFetch = calendars.filter(cal => cal.isPrimary) || calendars.slice(0, 1);
-
-          for (const calendar of calendarsToFetch) {
-            console.log(`[useNylasEvents] Fetching events for calendar: ${calendar.id} (${calendar.name})`);
-            
-            // Convert dates to UNIX timestamps in seconds for v7 SDK
-            const startUnix = Math.floor(startDate.getTime() / 1000);
-            const endUnix = Math.floor(endDate.getTime() / 1000);
-            
-            const eventsResponse = await nylasClient.events.list({
-              identifier: grantId,
-              queryParams: {
-                calendarId: calendar.id,
-                start: startUnix.toString(),
-                end: endUnix.toString(),
-                limit: 50,
-                expandRecurring: false
-              }
-            });
-
-            const fetchedEvents = eventsResponse.data || [];
-            console.log(`[useNylasEvents] Fetched ${fetchedEvents.length} events from calendar ${calendar.id}`);
-
-            // Transform and filter events (busy events only)
-            const transformedEvents = fetchedEvents
-              .filter(event => {
-                // Only include non-all-day events for busy sync
-                return event.when && 
-                       event.when.object === 'timespan'; // Check for timespan events
-              })
-              .map(event => {
-                // Handle timespan events properly
-                let startTime: string;
-                let endTime: string;
-                let startTimezone = 'America/New_York';
-                let endTimezone = 'America/New_York';
-
-                if (event.when.object === 'timespan') {
-                  // For timed events
-                  startTime = new Date(event.when.startTime * 1000).toISOString();
-                  endTime = new Date(event.when.endTime * 1000).toISOString();
-                  startTimezone = event.when.startTimezone || 'America/New_York';
-                  endTimezone = event.when.endTimezone || 'America/New_York';
-                } else if (event.when.object === 'datespan') {
-                  // For all-day events (if needed in future)
-                  startTime = new Date(event.when.startDate).toISOString();
-                  endTime = new Date(event.when.endDate).toISOString();
-                } else {
-                  // Fallback for other event types
-                  startTime = new Date().toISOString();
-                  endTime = new Date().toISOString();
-                }
-
-                return {
-                  id: event.id,
-                  title: event.title || 'Busy',
-                  description: event.description || '',
-                  when: {
-                    start_time: startTime,
-                    end_time: endTime,
-                    start_timezone: startTimezone,
-                    end_timezone: endTimezone
-                  },
-                  connection_id: connection.id,
-                  connection_email: connection.email,
-                  connection_provider: connection.provider,
-                  calendar_id: calendar.id,
-                  calendar_name: calendar.name || 'Calendar',
-                  status: event.status,
-                  location: event.location,
-                  participants: event.participants || []
-                };
-              });
-
-            allEvents.push(...transformedEvents);
-          }
-        } catch (connectionError) {
-          console.error(`[useNylasEvents] Error processing connection ${connection.id}:`, connectionError);
-          continue;
-        }
-      }
-
-      console.log(`[useNylasEvents] Total events fetched: ${allEvents.length}`);
-      setEvents(allEvents);
-
-    } catch (error) {
-      console.error('[useNylasEvents] Error fetching events with SDK:', error);
-      setError(error instanceof Error ? error.message : 'Failed to fetch calendar events');
-      toast({
-        title: "Error",
-        description: "Failed to load external calendar events",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
-    }
+    // Temporarily disable Nylas events due to SDK compatibility issues
+    console.log('[useNylasEvents] Nylas events disabled due to browser compatibility issues');
+    setEvents([]);
+    setIsLoading(false);
+    setError(null);
+    return;
   };
 
   useEffect(() => {
-    console.log('[useNylasEvents] Effect triggered:', {
-      hasClient: !!nylasClient,
-      connectionCount: connections.length,
-      startDateISO,
-      endDateISO
-    });
-    
+    console.log('[useNylasEvents] Effect triggered - Nylas events temporarily disabled');
     fetchEvents();
   }, [nylasClient, connections.length, startDateISO, endDateISO]);
 

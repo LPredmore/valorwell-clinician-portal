@@ -1,20 +1,15 @@
 
 import { useMemo } from 'react';
-import Nylas from 'nylas';
 import { useAuth } from './useAuth';
 
+// Browser-compatible Nylas client - disable for now due to Node.js dependencies
 export function useNylasClient() {
   const { isAuthenticated } = useAuth();
   
   return useMemo(() => {
-    if (!isAuthenticated) return null;
-    
-    // v7 SDK initialization with API key
-    const nylas = new Nylas({
-      apiKey: 'nyk_v0_S9OozobUDThXIF9vKpAliyo1ojSNANr3Tq00uvwYjPbuCWNWoILXRSGvxUvB8DSG',
-      apiUri: 'https://api.us.nylas.com'
-    });
-    
-    return nylas;
+    // Temporarily disable Nylas client due to browser compatibility issues
+    // The Node.js SDK is not compatible with browser environments
+    console.warn('[useNylasClient] Nylas SDK disabled due to browser compatibility issues');
+    return null;
   }, [isAuthenticated]);
 }
