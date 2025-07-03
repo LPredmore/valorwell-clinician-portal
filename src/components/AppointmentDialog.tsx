@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -49,6 +50,7 @@ export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
   const { toast } = useToast();
   const [clients, setClients] = useState<Client[]>([]);
   const [isLoadingClients, setIsLoadingClients] = useState(false);
+  const [isCreatingAppointment, setIsCreatingAppointment] = useState(false);
   const [formData, setFormData] = useState({
     clientId: '',
     notes: '',
@@ -131,6 +133,8 @@ export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
       return;
     }
 
+    setIsCreatingAppointment(true);
+
     try {
       // Parse start time and compute end time (start + 1 hour)
       const startDT = DateTime.fromISO(formData.startTime, { zone: clinicianTimeZone });
@@ -140,7 +144,7 @@ export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
       const startUtc = startDT.toUTC().toISO();
       const endUtc = endDT.toUTC().toISO();
 
-      console.log('[AppointmentDialog] Creating appointment:', {
+      console.log('[AppointmentDialog] Creating appointment (video room will be auto-created by trigger):', {
         client_id: formData.clientId,
         clinician_id: clinicianId,
         start_at: startUtc,
@@ -151,6 +155,7 @@ export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
         appointment_timezone: clinicianTimeZone
       });
 
+      // Create appointment - video room URL will be automatically created by database trigger
       const { error } = await supabase
         .from('appointments')
         .insert({
@@ -168,7 +173,8 @@ export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
 
       toast({
         title: 'Success',
-        description: 'Appointment created successfully'
+        description: 'Appointment created successfully. Video room will be available shortly.',
+        duration: 4000
       });
 
       // Reset form and close dialog
@@ -187,6 +193,8 @@ export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
         description: error instanceof Error ? error.message : 'Failed to create appointment',
         variant: 'destructive'
       });
+    } finally {
+      setIsCreatingAppointment(false);
     }
   };
 
@@ -210,7 +218,7 @@ export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
             <Select
               value={formData.clientId}
               onValueChange={(value) => handleInputChange('clientId', value)}
-              disabled={isLoadingClients}
+              disabled={isLoadingClients || isCreatingAppointment}
             >
               <SelectTrigger className="col-span-3">
                 <SelectValue placeholder={isLoadingClients ? "Loading clients..." : "Select a client"} />
@@ -236,6 +244,7 @@ export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
               value={formData.startTime}
               onChange={(e) => handleInputChange('startTime', e.target.value)}
               className="col-span-3"
+              disabled={isCreatingAppointment}
             />
           </div>
           
@@ -251,21 +260,22 @@ export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
               className="col-span-3"
               rows={3}
               placeholder="Additional notes for this appointment..."
+              disabled={isCreatingAppointment}
             />
           </div>
 
           {/* Timezone indicator */}
           <div className="text-xs text-gray-500 text-center">
-            Times displayed in: {clinicianTimeZone} | Duration: 1 hour
+            Times displayed in: {clinicianTimeZone} | Duration: 1 hour | Video room created automatically
           </div>
         </div>
         
         <div className="flex justify-end space-x-2">
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" onClick={onClose} disabled={isCreatingAppointment}>
             Cancel
           </Button>
-          <Button onClick={handleSave}>
-            Save Appointment
+          <Button onClick={handleSave} disabled={isCreatingAppointment}>
+            {isCreatingAppointment ? 'Creating...' : 'Save Appointment'}
           </Button>
         </div>
       </DialogContent>
