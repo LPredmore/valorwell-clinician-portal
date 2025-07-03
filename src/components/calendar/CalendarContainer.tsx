@@ -1,13 +1,13 @@
-
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "../layout/Layout";
 import { useUser } from "@/context/UserContext";
 import { useToast } from "@/hooks/use-toast";
 import ReactBigCalendar from "./ReactBigCalendar";
+import AvailabilityManagementSidebar from "./AvailabilityManagementSidebar";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { Plus, Clock } from "lucide-react";
+import { Plus, Clock, Calendar as CalendarIcon } from "lucide-react";
 import { DateTime } from "luxon";
 import { useAppointments } from "@/hooks/useAppointments";
 import { useNylasEvents } from "@/hooks/useNylasEvents";
@@ -17,6 +17,13 @@ import { getWeekRange } from "@/utils/dateRangeUtils";
 import { getClinicianTimeZone } from "@/hooks/useClinicianData";
 import { TimeZoneService } from "@/utils/timeZoneService";
 import { CalendarEvent } from "./types";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 
 const CalendarContainer: React.FC = () => {
   const { userId, authInitialized, userRole } = useUser();
@@ -24,6 +31,7 @@ const CalendarContainer: React.FC = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [userTimeZone, setUserTimeZone] = useState<string>(TimeZoneService.DEFAULT_TIMEZONE);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [isAvailabilityOpen, setIsAvailabilityOpen] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -187,6 +195,10 @@ const CalendarContainer: React.FC = () => {
     }
   }, [toast, navigate]);
 
+  const handleAvailabilityRefresh = useCallback(() => {
+    setRefreshTrigger(prev => prev + 1);
+  }, []);
+
   // Auth effect
   useEffect(() => {
     if (!authInitialized) return;
@@ -235,6 +247,11 @@ const CalendarContainer: React.FC = () => {
               <Clock className="h-4 w-4 mr-2" />
               Block Time
             </Button>
+
+            <Button variant="outline" onClick={() => setIsAvailabilityOpen(true)}>
+              <CalendarIcon className="h-4 w-4 mr-2" />
+              Availability
+            </Button>
           </div>
           
           <div className="text-sm text-gray-600 text-right">
@@ -252,6 +269,25 @@ const CalendarContainer: React.FC = () => {
           onNavigate={handleCalendarNavigate}
           userTimeZone={userTimeZone}
         />
+
+        <Sheet open={isAvailabilityOpen} onOpenChange={setIsAvailabilityOpen}>
+          <SheetContent side="right" className="w-[400px] sm:w-[540px]">
+            <SheetHeader>
+              <SheetTitle>Manage Availability</SheetTitle>
+              <SheetDescription>
+                Set your available time slots for appointments
+              </SheetDescription>
+            </SheetHeader>
+            <div className="mt-6">
+              <AvailabilityManagementSidebar
+                clinicianId={userId}
+                userTimeZone={userTimeZone}
+                refreshTrigger={refreshTrigger}
+                onRefresh={handleAvailabilityRefresh}
+              />
+            </div>
+          </SheetContent>
+        </Sheet>
       </div>
     </Layout>
   );
