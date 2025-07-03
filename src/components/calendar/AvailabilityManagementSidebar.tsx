@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
@@ -32,8 +31,10 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
 }) => {
   const [selectedDay, setSelectedDay] = useState<string>('monday');
   const [selectedSlot, setSelectedSlot] = useState<number>(1);
-  const [startTime, setStartTime] = useState<string>('');
-  const [endTime, setEndTime] = useState<string>('');
+  const [startHour, setStartHour] = useState<string>('09');
+  const [startMinute, setStartMinute] = useState<string>('00');
+  const [endHour, setEndHour] = useState<string>('17');
+  const [endMinute, setEndMinute] = useState<string>('00');
   const [currentAvailability, setCurrentAvailability] = useState<AvailabilitySlot[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -47,6 +48,20 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
     { value: 'friday', label: 'Friday' },
     { value: 'saturday', label: 'Saturday' },
     { value: 'sunday', label: 'Sunday' }
+  ];
+
+  // Generate hour options (0-23)
+  const hourOptions = Array.from({ length: 24 }, (_, i) => ({
+    value: i.toString().padStart(2, '0'),
+    label: i.toString().padStart(2, '0')
+  }));
+
+  // Generate minute options (only 00, 15, 30, 45)
+  const minuteOptions = [
+    { value: '00', label: '00' },
+    { value: '15', label: '15' },
+    { value: '30', label: '30' },
+    { value: '45', label: '45' }
   ];
 
   // Load current availability when component mounts or clinician changes
@@ -135,11 +150,17 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
     );
     
     if (slot) {
-      setStartTime(slot.startTime);
-      setEndTime(slot.endTime);
+      const [startH, startM] = slot.startTime.split(':');
+      const [endH, endM] = slot.endTime.split(':');
+      setStartHour(startH);
+      setStartMinute(startM);
+      setEndHour(endH);
+      setEndMinute(endM);
     } else {
-      setStartTime('');
-      setEndTime('');
+      setStartHour('09');
+      setStartMinute('00');
+      setEndHour('17');
+      setEndMinute('00');
     }
   };
 
@@ -152,6 +173,9 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
       });
       return;
     }
+
+    const startTime = `${startHour}:${startMinute}`;
+    const endTime = `${endHour}:${endMinute}`;
 
     if (!startTime || !endTime) {
       toast({
@@ -238,8 +262,10 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
       });
 
       // Clear form and reload
-      setStartTime('');
-      setEndTime('');
+      setStartHour('09');
+      setStartMinute('00');
+      setEndHour('17');
+      setEndMinute('00');
       await loadCurrentAvailability();
       onRefresh();
     } catch (error) {
@@ -300,24 +326,67 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
         </div>
 
         {/* Time Inputs */}
-        <div className="grid grid-cols-2 gap-2">
+        <div className="space-y-4">
           <div>
-            <Label htmlFor="startTime">Start Time</Label>
-            <Input
-              id="startTime"
-              type="time"
-              value={startTime}
-              onChange={(e) => setStartTime(e.target.value)}
-            />
+            <Label>Start Time</Label>
+            <div className="flex gap-2 mt-1">
+              <Select value={startHour} onValueChange={setStartHour}>
+                <SelectTrigger className="flex-1">
+                  <SelectValue placeholder="Hour" />
+                </SelectTrigger>
+                <SelectContent>
+                  {hourOptions.map((hour) => (
+                    <SelectItem key={hour.value} value={hour.value}>
+                      {hour.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <span className="self-center">:</span>
+              <Select value={startMinute} onValueChange={setStartMinute}>
+                <SelectTrigger className="flex-1">
+                  <SelectValue placeholder="Min" />
+                </SelectTrigger>
+                <SelectContent>
+                  {minuteOptions.map((minute) => (
+                    <SelectItem key={minute.value} value={minute.value}>
+                      {minute.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
+          
           <div>
-            <Label htmlFor="endTime">End Time</Label>
-            <Input
-              id="endTime"
-              type="time"
-              value={endTime}
-              onChange={(e) => setEndTime(e.target.value)}
-            />
+            <Label>End Time</Label>
+            <div className="flex gap-2 mt-1">
+              <Select value={endHour} onValueChange={setEndHour}>
+                <SelectTrigger className="flex-1">
+                  <SelectValue placeholder="Hour" />
+                </SelectTrigger>
+                <SelectContent>
+                  {hourOptions.map((hour) => (
+                    <SelectItem key={hour.value} value={hour.value}>
+                      {hour.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <span className="self-center">:</span>
+              <Select value={endMinute} onValueChange={setEndMinute}>
+                <SelectTrigger className="flex-1">
+                  <SelectValue placeholder="Min" />
+                </SelectTrigger>
+                <SelectContent>
+                  {minuteOptions.map((minute) => (
+                    <SelectItem key={minute.value} value={minute.value}>
+                      {minute.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
 
@@ -337,7 +406,7 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
             {isSaving ? 'Saving...' : 'Save'}
           </Button>
           
-          {(startTime || endTime) && (
+          {(startHour !== '09' || startMinute !== '00' || endHour !== '17' || endMinute !== '00') && (
             <Button
               onClick={deleteAvailability}
               disabled={isSaving || isLoading}

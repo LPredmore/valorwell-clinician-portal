@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -53,7 +54,8 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
   const [clients, setClients] = useState<Client[]>([]);
   const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [date, setDate] = useState<string>('');
-  const [startTime, setStartTime] = useState<string>('');
+  const [startHour, setStartHour] = useState<string>('09');
+  const [startMinute, setStartMinute] = useState<string>('00');
   const [notes, setNotes] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingClients, setIsLoadingClients] = useState(false);
@@ -63,6 +65,20 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
   const { toast } = useToast();
 
   const appointmentId = editingAppointment?.id;
+
+  // Generate hour options (0-23)
+  const hourOptions = Array.from({ length: 24 }, (_, i) => ({
+    value: i.toString().padStart(2, '0'),
+    label: i.toString().padStart(2, '0')
+  }));
+
+  // Generate minute options (only 00, 15, 30, 45)
+  const minuteOptions = [
+    { value: '00', label: '00' },
+    { value: '15', label: '15' },
+    { value: '30', label: '30' },
+    { value: '45', label: '45' }
+  ];
 
   // Load clients when dialog opens
   useEffect(() => {
@@ -100,7 +116,8 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
         
         if (startDateTime) {
           setDate(startDateTime.toFormat('yyyy-MM-dd'));
-          setStartTime(startDateTime.toFormat('HH:mm'));
+          setStartHour(startDateTime.toFormat('HH'));
+          setStartMinute(startDateTime.toFormat('mm'));
         }
       } else if (selectedSlot) {
         // Handle slot selection for new appointments
@@ -108,13 +125,15 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
           const startDateTime = DateTime.fromJSDate(selectedSlot.start)
             .setZone(userTimeZone);
           setDate(startDateTime.toFormat('yyyy-MM-dd'));
-          setStartTime(startDateTime.toFormat('HH:mm'));
+          setStartHour(startDateTime.toFormat('HH'));
+          setStartMinute(startDateTime.toFormat('mm'));
         }
       } else {
         // Reset form for new appointments
         setSelectedClientId('');
         setDate('');
-        setStartTime('');
+        setStartHour('09');
+        setStartMinute('00');
         setNotes('');
       }
       
@@ -129,7 +148,8 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
   const resetForm = () => {
     setSelectedClientId('');
     setDate('');
-    setStartTime('');
+    setStartHour('09');
+    setStartMinute('00');
     setNotes('');
     setShowDeleteConfirm(false);
   };
@@ -160,7 +180,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!selectedClientId || !date || !startTime) {
+    if (!selectedClientId || !date || !startHour || !startMinute) {
       toast({
         title: 'Validation Error',
         description: 'Please fill in all required fields',
@@ -177,7 +197,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
         throw new Error('User timezone not found - cannot create appointment');
       }
 
-      const localDateTimeStart = `${date}T${startTime}`;
+      const localDateTimeStart = `${date}T${startHour}:${startMinute}`;
       
       console.log('[AppointmentDialog] Converting times:', {
         localDateTimeStart,
@@ -321,15 +341,34 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
                 className="col-span-3"
               />
 
-              <Label htmlFor="startTime" className="text-right">Start Time *</Label>
-              <Input
-                id="startTime"
-                type="time"
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-                required
-                className="col-span-3"
-              />
+              <Label className="text-right">Start Time *</Label>
+              <div className="col-span-3 flex gap-2">
+                <Select value={startHour} onValueChange={setStartHour}>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Hour" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {hourOptions.map((hour) => (
+                      <SelectItem key={hour.value} value={hour.value}>
+                        {hour.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <span className="self-center">:</span>
+                <Select value={startMinute} onValueChange={setStartMinute}>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Min" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {minuteOptions.map((minute) => (
+                      <SelectItem key={minute.value} value={minute.value}>
+                        {minute.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
               <Label htmlFor="notes" className="text-right">Notes</Label>
               <Textarea
