@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import Layout from '../components/layout/Layout';
 import PracticeTab from '@/components/settings/PracticeTab';
@@ -7,6 +8,7 @@ import BillingTab from '@/components/settings/BillingTab';
 import TemplatesTab from '@/components/settings/TemplatesTab';
 import SecurityTab from '@/components/settings/SecurityTab';
 import LicensesTab from '@/components/settings/LicensesTab';
+import CalendarConnectionsPanel from '@/components/calendar/CalendarConnectionsPanel';
 import { AddUserDialog } from '@/components/AddUserDialog';
 
 const SettingsTabs = {
@@ -16,7 +18,8 @@ const SettingsTabs = {
   BILLING: 'billing',
   TEMPLATES: 'templates',
   SECURITY: 'security',
-  LICENSES: 'licenses'
+  LICENSES: 'licenses',
+  CALENDAR: 'calendar'
 };
 
 const Settings = () => {
@@ -69,15 +72,24 @@ const Settings = () => {
           >
             Licenses
           </button>
+          <button 
+            className={`settings-tab ${activeTab === SettingsTabs.CALENDAR ? 'active' : ''}`}
+            onClick={() => setActiveTab(SettingsTabs.CALENDAR)}
+          >
+            Calendar
+          </button>
         </div>
         
-        {activeTab === SettingsTabs.PRACTICE && <PracticeTab />}
-        {activeTab === SettingsTabs.CLINICIANS && <CliniciansTab />}
-        {activeTab === SettingsTabs.USERS && <UsersTab />}
-        {activeTab === SettingsTabs.BILLING && <BillingTab />}
-        {activeTab === SettingsTabs.TEMPLATES && <TemplatesTab />}
-        {activeTab === SettingsTabs.SECURITY && <SecurityTab />}
-        {activeTab === SettingsTabs.LICENSES && <LicensesTab />}
+        <div className="p-6">
+          {activeTab === SettingsTabs.PRACTICE && <PracticeTab />}
+          {activeTab === SettingsTabs.CLINICIANS && <CliniciansTab />}
+          {activeTab === SettingsTabs.USERS && <UsersTab />}
+          {activeTab === SettingsTabs.BILLING && <BillingTab />}
+          {activeTab === SettingsTabs.TEMPLATES && <TemplatesTab />}
+          {activeTab === SettingsTabs.SECURITY && <SecurityTab />}
+          {activeTab === SettingsTabs.LICENSES && <LicensesTab />}
+          {activeTab === SettingsTabs.CALENDAR && <CalendarConnectionsPanel />}
+        </div>
       </div>
       
       <AddUserDialog 

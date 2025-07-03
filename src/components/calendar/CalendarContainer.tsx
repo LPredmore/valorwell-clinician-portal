@@ -28,6 +28,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { SyncStatusIndicator } from './SyncStatusIndicator';
+import { CalendarConnectionsButton } from "@/components/CalendarConnectionsButton";
 
 const CalendarContainer: React.FC = () => {
   const { userId, authInitialized, userRole } = useUser();
@@ -318,8 +319,11 @@ const CalendarContainer: React.FC = () => {
             </Button>
           </div>
           
-          <div className="text-sm text-gray-600 text-right">
-            <p>Timezone: {userTimeZone}</p>
+          <div className="flex items-center gap-4">
+            <CalendarConnectionsButton />
+            <div className="text-sm text-gray-600 text-right">
+              <p>Timezone: {userTimeZone}</p>
+            </div>
           </div>
         </div>
 
