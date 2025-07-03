@@ -118,7 +118,7 @@ const AppointmentBookingDialog: React.FC<AppointmentBookingDialogProps> = ({
 
       console.log('[AppointmentBookingDialog] Appointment created successfully:', appointment.id);
 
-      // Create video room for therapy sessions
+      // Create video room for therapy sessions and UPDATE the appointment
       if (appointment.type === 'therapy_session') {
         const videoRoomUrl = await createVideoRoom(appointment.id);
         
@@ -140,7 +140,7 @@ const AppointmentBookingDialog: React.FC<AppointmentBookingDialogProps> = ({
 
       toast({
         title: 'Success',
-        description: 'Appointment booked successfully! Video room will be available shortly.',
+        description: 'Appointment booked successfully! Video room created.',
         duration: 4000
       });
 
