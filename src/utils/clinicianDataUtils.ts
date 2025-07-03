@@ -1,30 +1,36 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { Appointment } from '@/types/appointment';
+import { validateQuerySchema } from './database.types';
 
 export const fetchClinicianAppointments = async (clinicianId: string): Promise<Appointment[]> => {
   try {
     console.log('[fetchClinicianAppointments] Fetching clean appointments for clinician:', clinicianId);
     
+    // Validate schema before making the query
+    const selectString = `
+      *,
+      client:clients!appointments_client_id_fkey (
+        client_first_name,
+        client_last_name,
+        client_preferred_name,
+        client_email,
+        client_phone,
+        client_status,
+        client_date_of_birth,
+        client_gender,
+        client_address,
+        client_city,
+        client_state,
+        client_zip_code
+      )
+    `;
+    
+    validateQuerySchema('appointments', selectString);
+    
     const { data, error } = await supabase
       .from('appointments')
-      .select(`
-        *,
-        client:clients!appointments_client_id_fkey (
-          client_first_name,
-          client_last_name,
-          client_preferred_name,
-          client_email,
-          client_phone,
-          client_status,
-          client_date_of_birth,
-          client_gender,
-          client_address,
-          client_city,
-          client_state,
-          client_zipcode
-        )
-      `)
+      .select(selectString)
       .eq('clinician_id', clinicianId)
       .eq('status', 'scheduled') // Only get real scheduled appointments
       .order('start_at', { ascending: true });
@@ -51,7 +57,7 @@ export const fetchClinicianAppointments = async (clinicianId: string): Promise<A
           client_address: appointment.client.client_address,
           client_city: appointment.client.client_city,
           client_state: appointment.client.client_state,
-          client_zipcode: appointment.client.client_zipcode
+          client_zipcode: appointment.client.client_zip_code // Map correct column name
         } : undefined,
         clientName: appointment.client 
           ? `${appointment.client.client_preferred_name || appointment.client.client_first_name || ''} ${appointment.client.client_last_name || ''}`.trim()
