@@ -79,6 +79,11 @@
   }
 }
 
+/* React Big Calendar Reset - Solution C */
+.rbc-reset, .rbc-reset * {
+  all: revert;
+}
+
 /* Animation classes */
 .animate-fade-in {
   animation: fadeIn 0.3s ease-in-out;
