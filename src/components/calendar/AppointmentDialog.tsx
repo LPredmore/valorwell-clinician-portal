@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -418,23 +419,26 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
                   </SelectContent>
                 </Select>
               </div>
+            </div>
 
-              <Label htmlFor="notes" className="text-right col-span-1">Notes</Label>
+            {/* Notes section spanning full width */}
+            <div className="space-y-2">
+              <Label htmlFor="notes">Notes</Label>
               <Textarea
                 id="notes"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Additional notes for this appointment..."
                 rows={3}
-                className="col-span-4 w-full"
+                className="w-full"
               />
-
-              {userTimeZone && (
-                <div className="col-span-4 text-sm text-gray-500 text-center">
-                  Times will be saved in timezone: {userTimeZone} | Duration: 1 hour
-                </div>
-              )}
             </div>
+
+            {userTimeZone && (
+              <div className="text-sm text-gray-500 text-center">
+                Times will be saved in timezone: {userTimeZone} | Duration: 1 hour
+              </div>
+            )}
 
             <div className="flex justify-between pt-4">
               <div>
