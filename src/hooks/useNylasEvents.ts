@@ -79,15 +79,17 @@ export const useNylasEvents = (startDate?: Date, endDate?: Date) => {
           for (const calendar of calendarsToFetch) {
             console.log(`[useNylasEvents] Fetching events for calendar: ${calendar.id} (${calendar.name})`);
             
+            // Convert dates to UNIX timestamps in seconds for v7 SDK
+            const startUnix = Math.floor(startDate.getTime() / 1000);
+            const endUnix = Math.floor(endDate.getTime() / 1000);
+            
             const eventsResponse = await nylasClient.events.list({
               identifier: grantId,
-              queryParams: {
-                calendarId: calendar.id, // Fixed: Use camelCase calendarId
-                startsAfter: Math.floor(startDate.getTime() / 1000),
-                endsBefore: Math.floor(endDate.getTime() / 1000),
-                limit: 50,
-                expandRecurring: false
-              }
+              calendarId: calendar.id,
+              start: startUnix, // Use 'start' instead of 'startsAfter'
+              end: endUnix, // Use 'end' instead of 'endsBefore'
+              limit: 50,
+              expandRecurring: false
             });
 
             const fetchedEvents = eventsResponse.data || [];
