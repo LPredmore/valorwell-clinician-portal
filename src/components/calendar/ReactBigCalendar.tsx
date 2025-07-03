@@ -1,4 +1,3 @@
-
 import React, { useCallback, useMemo } from 'react';
 import { Calendar, Views } from 'react-big-calendar';
 import { globalLocalizer } from '@/main';
@@ -54,11 +53,11 @@ const ReactBigCalendar: React.FC<ExtendedReactBigCalendarProps> = ({
     };
   }, []);
 
-  // Background event styling for availability - changed to light green
+  // Background event styling for availability - using a clearer light green
   const backgroundEventPropGetter = useCallback(() => ({
     style: {
-      backgroundColor: '#e8f5e9', // light green for availability
-      opacity: 0.4,
+      backgroundColor: '#d4edda', // slightly more visible light green
+      opacity: 0.5,
       border: 'none'
     }
   }), []);
