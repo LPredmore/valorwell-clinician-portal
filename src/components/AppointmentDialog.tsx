@@ -1,205 +1,125 @@
+
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem
+} from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { TimeZoneService } from '@/utils/timeZoneService';
 import { DateTime } from 'luxon';
-import { useNylasSync } from '@/hooks/useNylasSync';
 
 interface Client {
   id: string;
-  client_first_name: string | null;
-  client_last_name: string | null;
-  client_preferred_name: string | null;
+  name: string;
 }
 
 interface AppointmentDialogProps {
   isOpen: boolean;
   onClose: () => void;
   clinicianId: string;
-  userTimeZone: string;
-  onAppointmentCreated?: () => void;
-  onAppointmentUpdated?: () => void;
-  selectedSlot?: any;
-  isEditMode?: boolean;
-  editingAppointment?: any;
+  clinicianTimeZone: string;
+  onAppointmentCreated: () => void;
+  initialData?: {
+    start?: Date;
+    end?: Date;
+    start_at?: string;
+    end_at?: string;
+    title?: string;
+    clientName?: string;
+    notes?: string;
+    appointment_timezone?: string;
+  } | null;
 }
 
-const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
+export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
   isOpen,
   onClose,
   clinicianId,
-  userTimeZone,
+  clinicianTimeZone,
   onAppointmentCreated,
-  onAppointmentUpdated,
-  selectedSlot,
-  isEditMode = false,
-  editingAppointment
+  initialData,
 }) => {
-  const { syncAppointment, getSyncStatusForAppointment, deleteSyncMapping } = useNylasSync();
-
-  const [clients, setClients] = useState<Client[]>([]);
-  const [selectedClientId, setSelectedClientId] = useState<string>('');
-  const [date, setDate] = useState<string>('');
-  const [startHour, setStartHour] = useState<string>('09');
-  const [startMinute, setStartMinute] = useState<string>('00');
-  const [startAMPM, setStartAMPM] = useState<string>('AM');
-  const [notes, setNotes] = useState<string>('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [isLoadingClients, setIsLoadingClients] = useState(false);
-  const [isInitialized, setIsInitialized] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
-
-  const appointmentId = editingAppointment?.id;
-
-  // Generate hour options (1-12 for AM/PM format)
-  const hourOptions = Array.from({ length: 12 }, (_, i) => ({
-    value: (i + 1).toString().padStart(2, '0'),
-    label: (i + 1).toString().padStart(2, '0')
-  }));
-
-  // Generate minute options (only 00, 15, 30, 45)
-  const minuteOptions = [
-    { value: '00', label: '00' },
-    { value: '15', label: '15' },
-    { value: '30', label: '30' },
-    { value: '45', label: '45' }
-  ];
-
-  // AM/PM options
-  const ampmOptions = [
-    { value: 'AM', label: 'AM' },
-    { value: 'PM', label: 'PM' }
-  ];
+  const [clients, setClients] = useState<Client[]>([]);
+  const [isLoadingClients, setIsLoadingClients] = useState(false);
+  const [isCreatingAppointment, setIsCreatingAppointment] = useState(false);
+  const [formData, setFormData] = useState({
+    clientId: '',
+    notes: '',
+    startTime: '',
+  });
 
   // Load clients when dialog opens
   useEffect(() => {
-    if (isOpen && clinicianId) {
-      loadClients();
-    }
-  }, [isOpen, clinicianId]);
-
-  // Initialize form data when dialog opens
-  useEffect(() => {
-    if (isOpen && !isInitialized) {
-      console.log('[AppointmentDialog] Initializing form state', {
-        isEdit: isEditMode,
-        appointmentId,
-        editingAppointment,
-        selectedSlot
-      });
-
-      if (editingAppointment) {
-        if (editingAppointment.client_id) {
-          setSelectedClientId(editingAppointment.client_id);
-        }
-        
-        setNotes(editingAppointment.notes || '');
-        
-        let startDateTime: DateTime | null = null;
-        
-        if (editingAppointment.start_at) {
-          startDateTime = DateTime.fromISO(editingAppointment.start_at, { zone: 'UTC' })
-            .setZone(editingAppointment.appointment_timezone || userTimeZone);
-        } else if (editingAppointment.start) {
-          startDateTime = DateTime.fromJSDate(editingAppointment.start)
-            .setZone(userTimeZone);
-        }
-        
-        if (startDateTime) {
-          setDate(startDateTime.toFormat('yyyy-MM-dd'));
-          const hour24 = startDateTime.hour;
-          const hour12 = hour24 === 0 ? 12 : hour24 > 12 ? hour24 - 12 : hour24;
-          const ampm = hour24 >= 12 ? 'PM' : 'AM';
-          setStartHour(hour12.toString().padStart(2, '0'));
-          setStartMinute(startDateTime.toFormat('mm'));
-          setStartAMPM(ampm);
-        }
-      } else if (selectedSlot) {
-        // Handle slot selection for new appointments
-        if (selectedSlot.start) {
-          const startDateTime = DateTime.fromJSDate(selectedSlot.start)
-            .setZone(userTimeZone);
-          setDate(startDateTime.toFormat('yyyy-MM-dd'));
-          const hour24 = startDateTime.hour;
-          const hour12 = hour24 === 0 ? 12 : hour24 > 12 ? hour24 - 12 : hour24;
-          const ampm = hour24 >= 12 ? 'PM' : 'AM';
-          setStartHour(hour12.toString().padStart(2, '0'));
-          setStartMinute(startDateTime.toFormat('mm'));
-          setStartAMPM(ampm);
-        }
-      } else {
-        // Reset form for new appointments
-        setSelectedClientId('');
-        setDate('');
-        setStartHour('09');
-        setStartMinute('00');
-        setStartAMPM('AM');
-        setNotes('');
-      }
-      
-      setIsInitialized(true);
-    } else if (!isOpen) {
-      // Reset when dialog closes
-      setIsInitialized(false);
-      resetForm();
-    }
-  }, [isOpen, editingAppointment, selectedSlot, isInitialized, userTimeZone, isEditMode]);
-
-  const resetForm = () => {
-    setSelectedClientId('');
-    setDate('');
-    setStartHour('09');
-    setStartMinute('00');
-    setStartAMPM('AM');
-    setNotes('');
-    setShowDeleteConfirm(false);
-  };
-
-  const loadClients = async () => {
-    try {
+    if (!isOpen || !clinicianId) return;
+    
+    const loadClients = async () => {
       setIsLoadingClients(true);
-      const { data, error } = await supabase
-        .from('clients')
-        .select('id, client_first_name, client_last_name, client_preferred_name')
-        .eq('client_assigned_therapist', clinicianId)
-        .order('client_first_name');
+      try {
+        const { data, error } = await supabase
+          .from('clients')
+          .select('id, client_first_name, client_last_name, client_preferred_name')
+          .eq('client_assigned_therapist', clinicianId)
+          .order('client_first_name');
 
-      if (error) throw error;
-      setClients(data || []);
-    } catch (error) {
-      console.error('Error loading clients:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load clients',
-        variant: 'destructive'
+        if (error) throw error;
+        
+        const clientList = (data || []).map(c => ({
+          id: c.id,
+          name: `${c.client_preferred_name || c.client_first_name || ''} ${c.client_last_name || ''}`.trim() || 'Unknown Client'
+        }));
+        
+        setClients(clientList);
+      } catch (error) {
+        console.error('Error loading clients:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load clients',
+          variant: 'destructive'
+        });
+      } finally {
+        setIsLoadingClients(false);
+      }
+    };
+
+    loadClients();
+  }, [isOpen, clinicianId, toast]);
+
+  // Set initial values from props
+  useEffect(() => {
+    if (initialData && initialData.start) {
+      // Convert the selected slot time to local datetime-local format
+      const startDT = DateTime.fromJSDate(initialData.start);
+      const startTime = startDT.toFormat("yyyy-MM-dd'T'HH:mm");
+      
+      setFormData({
+        clientId: '',
+        notes: initialData.notes || '',
+        startTime,
       });
-    } finally {
-      setIsLoadingClients(false);
+    } else {
+      // Reset form for new appointments
+      setFormData({
+        clientId: '',
+        notes: '',
+        startTime: '',
+      });
     }
-  };
+  }, [initialData]);
 
-  const getSelectedClientName = () => {
-    if (!selectedClientId || !clients.length) return '';
-    const selectedClient = clients.find(client => client.id === selectedClientId);
-    return selectedClient ? formatClientName(selectedClient) : '';
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value,
+    }));
   };
 
   const createVideoRoom = async (appointmentId: string): Promise<string | null> => {
@@ -231,108 +151,82 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!selectedClientId || !date || !startHour || !startMinute) {
+  const handleSave = async () => {
+    // Validate required fields
+    if (!formData.clientId || !formData.startTime) {
       toast({
         title: 'Validation Error',
-        description: 'Please fill in all required fields',
+        description: 'Please select a client and start time',
         variant: 'destructive'
       });
       return;
     }
 
+    setIsCreatingAppointment(true);
+
     try {
-      setIsLoading(true);
-
-      // Validate timezone - use userTimeZone instead of clinicianTimeZone
-      if (!userTimeZone) {
-        throw new Error('User timezone not found - cannot create appointment');
-      }
-
-      // Convert 12-hour format to 24-hour format
-      let hour24 = parseInt(startHour);
-      if (startAMPM === 'PM' && hour24 !== 12) {
-        hour24 += 12;
-      } else if (startAMPM === 'AM' && hour24 === 12) {
-        hour24 = 0;
-      }
-
-      const localDateTimeStart = `${date}T${hour24.toString().padStart(2, '0')}:${startMinute}`;
+      // Parse start time and compute end time (start + 1 hour)
+      const startDT = DateTime.fromISO(formData.startTime, { zone: clinicianTimeZone });
+      const endDT = startDT.plus({ hours: 1 });
       
-      console.log('[AppointmentDialog] Converting times:', {
-        localDateTimeStart,
-        userTimeZone,
-        isEdit: isEditMode
-      });
+      // Convert to UTC for storage
+      const startUtc = startDT.toUTC().toISO();
+      const endUtc = endDT.toUTC().toISO();
 
-      const startAtUTC = TimeZoneService.convertLocalToUTC(localDateTimeStart, userTimeZone);
-      const endAtUTC = startAtUTC.plus({ hours: 1 });
-
-      const appointmentData = {
-        client_id: selectedClientId,
+      console.log('[AppointmentDialog] Creating appointment:', {
+        client_id: formData.clientId,
         clinician_id: clinicianId,
-        start_at: startAtUTC.toISO(),
-        end_at: endAtUTC.toISO(),
-        appointment_timezone: userTimeZone,
+        start_at: startUtc,
+        end_at: endUtc,
         type: 'therapy_session',
         status: 'scheduled',
-        notes: notes || null
-      };
+        notes: formData.notes,
+        appointment_timezone: clinicianTimeZone
+      });
 
-      console.log('[AppointmentDialog] Appointment data:', appointmentData);
+      // Create appointment first
+      const { data: appointment, error: appointmentError } = await supabase
+        .from('appointments')
+        .insert({
+          client_id: formData.clientId,
+          clinician_id: clinicianId,
+          start_at: startUtc,
+          end_at: endUtc,
+          type: 'therapy_session',
+          status: 'scheduled',
+          notes: formData.notes || null,
+          appointment_timezone: clinicianTimeZone
+        })
+        .select()
+        .single();
 
-      let savedAppointment;
-      let error;
-      if (isEditMode && appointmentId) {
-        const result = await supabase
-          .from('appointments')
-          .update(appointmentData)
-          .eq('id', appointmentId)
-          .select()
-          .single();
-        error = result.error;
-        savedAppointment = result.data;
-      } else {
-        const result = await supabase
-          .from('appointments')
-          .insert(appointmentData)
-          .select()
-          .single();
-        error = result.error;
-        savedAppointment = result.data;
-      }
+      if (appointmentError) throw appointmentError;
 
-      if (error) throw error;
+      console.log('[AppointmentDialog] Appointment created successfully:', appointment.id);
 
-      console.log('[AppointmentDialog] Appointment saved successfully:', savedAppointment.id);
-
-      // Create video room for therapy sessions and UPDATE the appointment
-      if (savedAppointment.type === 'therapy_session') {
-        const videoRoomUrl = await createVideoRoom(savedAppointment.id);
+      // Create video room for therapy sessions
+      if (appointment.type === 'therapy_session') {
+        const videoRoomUrl = await createVideoRoom(appointment.id);
         
         if (videoRoomUrl) {
           // Update appointment with video room URL
           const { error: updateError } = await supabase
             .from('appointments')
             .update({ video_room_url: videoRoomUrl })
-            .eq('id', savedAppointment.id);
+            .eq('id', appointment.id);
 
           if (updateError) {
             console.error('[AppointmentDialog] Failed to update video room URL:', updateError);
             // Don't fail the entire operation for this
           } else {
             console.log('[AppointmentDialog] Video room URL updated successfully');
-            // Update the savedAppointment object so callbacks get the correct data
-            savedAppointment.video_room_url = videoRoomUrl;
           }
         }
       }
 
       toast({
         title: 'Success',
-        description: isEditMode ? 'Appointment updated successfully' : 'Appointment created successfully' + (savedAppointment.type === 'therapy_session' ? '. Video room created.' : ''),
+        description: 'Appointment created successfully' + (appointment.type === 'therapy_session' ? '. Video room will be available shortly.' : ''),
         duration: 4000
       });
 
@@ -343,12 +237,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
         startTime: '',
       });
       
-      // Call the appropriate callback
-      if (isEditMode && onAppointmentUpdated) {
-        onAppointmentUpdated();
-      } else if (onAppointmentCreated) {
-        onAppointmentCreated();
-      }
+      onAppointmentCreated();
       onClose();
     } catch (error) {
       console.error('Error creating appointment:', error);
@@ -358,215 +247,91 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
         variant: 'destructive'
       });
     } finally {
-      setIsLoading(false);
+      setIsCreatingAppointment(false);
     }
-  };
-
-  const handleDelete = async () => {
-    if (!appointmentId) return;
-    
-    try {
-      setIsDeleting(true);
-      
-      // Delete sync mapping first
-      try {
-        await deleteSyncMapping(appointmentId);
-      } catch (syncError) {
-        console.warn('[AppointmentDialog] Failed to delete sync mapping:', syncError);
-        // Continue with appointment deletion even if sync cleanup fails
-      }
-      
-      const { error } = await supabase
-        .from('appointments')
-        .delete()
-        .eq('id', appointmentId);
-        
-      if (error) throw error;
-      
-      toast({
-        title: 'Success',
-        description: 'Appointment deleted successfully'
-      });
-      
-      onAppointmentUpdated?.();
-      onClose();
-    } catch (error) {
-      console.error('Error deleting appointment:', error);
-      toast({
-        title: 'Error', 
-        description: 'Failed to delete appointment',
-        variant: 'destructive'
-      });
-    } finally {
-      setIsDeleting(false);
-      setShowDeleteConfirm(false);
-    }
-  };
-
-  const formatClientName = (client: Client) => {
-    const preferredName = client.client_preferred_name || client.client_first_name;
-    const lastName = client.client_last_name;
-    return `${preferredName || ''} ${lastName || ''}`.trim() || 'Unknown Client';
   };
 
   return (
-    <>
-      <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>{isEditMode ? 'Edit Appointment' : 'Create New Appointment'}</DialogTitle>
-          </DialogHeader>
+    <Dialog open={isOpen} onOpenChange={onClose} modal={false}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>New Appointment</DialogTitle>
+        </DialogHeader>
+        
+        <div className="grid gap-4 py-4">
+          {/* Title (read-only) */}
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label className="text-right">Title</Label>
+            <div className="col-span-3 py-2 text-sm">Therapy Session</div>
+          </div>
           
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-4 gap-4">
-              <Label className="text-right">Title</Label>
-              <div className="col-span-3 py-2 text-sm">Therapy Session</div>
-              
-              <Label htmlFor="client" className="text-right">Client *</Label>
-              <div className="col-span-3">
-                {isEditMode && selectedClientId ? (
-                  <div className="py-2 text-sm font-medium">{getSelectedClientName()}</div>
-                ) : (
-                  <Select
-                    value={selectedClientId}
-                    onValueChange={setSelectedClientId}
-                    disabled={isLoadingClients}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={isLoadingClients ? "Loading clients..." : "Select client..."} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {clients.map((client) => (
-                        <SelectItem key={client.id} value={client.id}>
-                          {formatClientName(client)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              </div>
-
-              <Label htmlFor="date" className="text-right">Date *</Label>
-              <Input
-                id="date"
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                required
-                className="col-span-3"
-              />
-
-              <Label className="text-right">Start Time *</Label>
-              <div className="col-span-3 flex gap-2">
-                <Select value={startHour} onValueChange={setStartHour}>
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="Hour" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {hourOptions.map((hour) => (
-                      <SelectItem key={hour.value} value={hour.value}>
-                        {hour.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <span className="self-center">:</span>
-                <Select value={startMinute} onValueChange={setStartMinute}>
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="Min" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {minuteOptions.map((minute) => (
-                      <SelectItem key={minute.value} value={minute.value}>
-                        {minute.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={startAMPM} onValueChange={setStartAMPM}>
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="AM/PM" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ampmOptions.map((ampm) => (
-                      <SelectItem key={ampm.value} value={ampm.value}>
-                        {ampm.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {/* Notes section spanning full width */}
-            <div className="space-y-2">
-              <Label htmlFor="notes">Notes</Label>
-              <Textarea
-                id="notes"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Additional notes for this appointment..."
-                rows={3}
-                className="w-full"
-              />
-            </div>
-
-            {userTimeZone && (
-              <div className="text-sm text-gray-500 text-center">
-                Times will be saved in timezone: {userTimeZone} | Duration: 1 hour
-              </div>
-            )}
-
-            <div className="flex justify-between pt-4">
-              <div>
-                {isEditMode && (
-                  <Button 
-                    type="button" 
-                    variant="destructive"
-                    onClick={() => setShowDeleteConfirm(true)}
-                    disabled={isLoading}
-                  >
-                    Delete Appointment
-                  </Button>
-                )}
-              </div>
-              
-              <div className="flex space-x-2">
-                <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={isLoading}>
-                  {isLoading ? (isEditMode ? 'Updating...' : 'Creating...') : (isEditMode ? 'Save Changes' : 'Create Appointment')}
-                </Button>
-              </div>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Appointment</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete this appointment? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={handleDelete}
-              disabled={isDeleting}
-              className="bg-red-600 hover:bg-red-700"
+          {/* Client (searchable dropdown) */}
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label className="text-right">Client *</Label>
+            <Select
+              value={formData.clientId}
+              onValueChange={(value) => handleInputChange('clientId', value)}
+              disabled={isLoadingClients || isCreatingAppointment}
             >
-              {isDeleting ? 'Deleting...' : 'Delete'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
+              <SelectTrigger className="col-span-3">
+                <SelectValue placeholder={isLoadingClients ? "Loading clients..." : "Select a client"} />
+              </SelectTrigger>
+              <SelectContent>
+                {clients.map((client) => (
+                  <SelectItem key={client.id} value={client.id}>
+                    {client.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          
+          {/* Start Time */}
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="startTime" className="text-right">
+              Start *
+            </Label>
+            <Input
+              id="startTime"
+              type="datetime-local"
+              value={formData.startTime}
+              onChange={(e) => handleInputChange('startTime', e.target.value)}
+              className="col-span-3"
+              disabled={isCreatingAppointment}
+            />
+          </div>
+          
+          {/* Notes */}
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="notes" className="text-right">
+              Notes
+            </Label>
+            <Textarea
+              id="notes"
+              value={formData.notes}
+              onChange={(e) => handleInputChange('notes', e.target.value)}
+              className="col-span-3"
+              rows={3}
+              placeholder="Additional notes for this appointment..."
+              disabled={isCreatingAppointment}
+            />
+          </div>
+
+          {/* Timezone indicator */}
+          <div className="text-xs text-gray-500 text-center">
+            Times displayed in: {clinicianTimeZone} | Duration: 1 hour | Video room created automatically
+          </div>
+        </div>
+        
+        <div className="flex justify-end space-x-2">
+          <Button variant="outline" onClick={onClose} disabled={isCreatingAppointment}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave} disabled={isCreatingAppointment}>
+            {isCreatingAppointment ? 'Creating...' : 'Save Appointment'}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 };
-
-export default AppointmentDialog;

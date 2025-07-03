@@ -164,31 +164,19 @@ export const formatDateForDB = (date: Date | string | null | undefined): string 
  * This REPLACES all previous conversion methods and eliminates double-conversion issues.
  */
 export function toEventDate(iso: string, zone: string): Date {
-  console.log('[toEventDate] CRITICAL: Converting appointment time:', {
-    input: iso,
-    zone,
-    inputType: typeof iso
-  });
-
-  // Parse the ISO string - if it contains timezone info (Z, +, -), it's already in UTC
-  // If it doesn't contain timezone info, treat it as local time in the specified zone
-  const dt = iso.includes('Z') || iso.includes('+') || (iso.includes('-') && iso.lastIndexOf('-') > 10)
+  // Parse either UTC ISO (with Z/offset) or local ISO (no offset) in specified zone
+  const dt = iso.includes('Z') || iso.includes('+') || iso.includes('-') 
     ? DateTime.fromISO(iso).setZone(zone)  // UTC ISO → convert to zone
     : DateTime.fromISO(iso, { zone });     // Local ISO → parse in zone
   
   if (dt.isValid) {
-    console.log('[toEventDate] CRITICAL: Successful conversion:', {
+    console.log('[toEventDate] CRITICAL: Single conversion path:', {
       input: iso,
       zone,
-      parsedDateTime: dt.toISO(),
-      jsDate: dt.toJSDate()
+      parsedDateTime: dt.toISO()
     });
   } else {
-    console.error('[toEventDate] Invalid date created:', { 
-      input: iso, 
-      zone, 
-      error: dt.invalidReason 
-    });
+    console.warn('[toEventDate] Invalid date created:', { input: iso, zone });
   }
   
   return dt.toJSDate();  // Absolute instant for React Big Calendar
