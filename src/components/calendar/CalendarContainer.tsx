@@ -58,11 +58,11 @@ const CalendarContainer: React.FC = () => {
     refreshTrigger
   );
 
-  // Simplified event transformations for pure RBC compatibility
+  // Pure RBC event transformations with proper typing
   const allEvents = useMemo((): CalendarEvent[] => {
     const events: CalendarEvent[] = [];
     
-    // Transform appointments to RBC format
+    // Transform appointments to RBC format with proper typing
     if (appointments) {
       events.push(...appointments.map(apt => {
         const startDT = DateTime.fromISO(apt.start_at, { zone: 'utc' }).setZone(userTimeZone);
@@ -73,25 +73,25 @@ const CalendarContainer: React.FC = () => {
           title: apt.clientName || 'Internal Appointment',
           start: startDT.toJSDate(),
           end: endDT.toJSDate(),
-          source: 'internal',
+          source: 'internal' as const,
           resource: apt
         };
       }));
     }
     
-    // Transform Nylas events to RBC format
+    // Transform Nylas events to RBC format with proper typing
     if (nylasEvents) {
       events.push(...nylasEvents.map(evt => ({
         id: evt.id,
         title: evt.title,
-        start: evt.when?.start_time,
-        end: evt.when?.end_time,
-        source: 'nylas',
+        start: new Date(evt.when?.start_time || ''),
+        end: new Date(evt.when?.end_time || ''),
+        source: 'nylas' as const,
         resource: evt
       })));
     }
 
-    // Transform blocked time to RBC format
+    // Transform blocked time to RBC format with proper typing
     events.push(...blockedTimes.map(blockedTime => {
       const startDT = DateTime.fromISO(blockedTime.start_at, { zone: 'utc' }).setZone(userTimeZone);
       const endDT = DateTime.fromISO(blockedTime.end_at, { zone: 'utc' }).setZone(userTimeZone);
@@ -101,12 +101,12 @@ const CalendarContainer: React.FC = () => {
         title: blockedTime.label,
         start: startDT.toJSDate(),
         end: endDT.toJSDate(),
-        source: 'blocked_time',
+        source: 'blocked_time' as const,
         resource: blockedTime
       };
     }));
 
-    // Transform availability slots to RBC format
+    // Transform availability slots to RBC format with proper typing
     const tz = userTimeZone;
     const startDT = DateTime.fromJSDate(weekStart).setZone(tz).startOf('day');
     const endDT = DateTime.fromJSDate(weekEnd).setZone(tz).startOf('day');
@@ -139,7 +139,7 @@ const CalendarContainer: React.FC = () => {
           title: 'Available',
           start: startDT.toJSDate(),
           end: endDT.toJSDate(),
-          source: 'availability',
+          source: 'availability' as const,
           resource: slot
         };
       });
@@ -162,7 +162,7 @@ const CalendarContainer: React.FC = () => {
     }
   }, []);
 
-  // Pure RBC event handlers
+  // Pure RBC event handlers - native only
   const handleCalendarNavigate = useCallback((newDate: Date) => {
     setCurrentDate(newDate);
     setRefreshTrigger(prev => prev + 1);
@@ -182,7 +182,7 @@ const CalendarContainer: React.FC = () => {
       navigate(`/appointments/${event.id}`);
     } else if (event.source === 'nylas') {
       toast({
-        title: "📅 External Event",
+        title: "External Event",
         description: `${event.title} - Synced from external calendar`,
         duration: 3000,
       });
@@ -190,7 +190,7 @@ const CalendarContainer: React.FC = () => {
       navigate(`/blocked-time/${event.id}`);
     } else if (event.source === 'availability') {
       toast({
-        title: "✅ Available Time",
+        title: "Available Time",
         description: `Available slot: ${event.resource.startTime} - ${event.resource.endTime}`,
         duration: 3000,
       });
