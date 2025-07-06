@@ -588,9 +588,12 @@ const CalendarContainer: React.FC = () => {
           isOpen={isAppointmentDialogOpen}
           onClose={handleCloseAppointmentDialog}
           clinicianId={userId}
-          clinicianTimeZone={userTimeZone}
+          userTimeZone={userTimeZone}
           onAppointmentCreated={handleAppointmentCreated}
-          initialData={isEditMode ? editingAppointment : selectedSlot}
+          onAppointmentUpdated={handleAppointmentUpdated}
+          selectedSlot={selectedSlot}
+          isEditMode={isEditMode}
+          editingAppointment={editingAppointment}
         />
 
         {editingBlockedTime && (
