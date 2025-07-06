@@ -373,7 +373,8 @@ export const useAppointments = (
       // Use the appointment's saved timezone if available, otherwise fall back to user timezone
       const appointmentTimeZone = appointment.appointment_timezone || safeUserTimeZone;
       const now = DateTime.now().setZone(appointmentTimeZone);
-      const apptDateTime = DateTime.fromISO(appointment.start_at).setZone(appointmentTimeZone);
+      // FIXED: Specify UTC as source zone when parsing database timestamp
+      const apptDateTime = DateTime.fromISO(appointment.start_at, { zone: 'UTC' }).setZone(appointmentTimeZone);
 
       return now.hasSame(apptDateTime, "day");
     } catch (e) {
@@ -405,7 +406,8 @@ export const useAppointments = (
         // Use the appointment's saved timezone if available, otherwise fall back to user timezone
         const appointmentTimeZone = appt.appointment_timezone || safeUserTimeZone;
         const now = DateTime.now().setZone(appointmentTimeZone);
-        const apptDateTime = DateTime.fromISO(appt.start_at).setZone(appointmentTimeZone);
+        // FIXED: Specify UTC as source zone when parsing database timestamp
+        const apptDateTime = DateTime.fromISO(appt.start_at, { zone: 'UTC' }).setZone(appointmentTimeZone);
         
         // Upcoming means: not today and in the future
         return apptDateTime > now && !now.hasSame(apptDateTime, "day");
@@ -424,7 +426,8 @@ export const useAppointments = (
         // Use the appointment's saved timezone if available, otherwise fall back to user timezone
         const appointmentTimeZone = appt.appointment_timezone || safeUserTimeZone;
         const now = DateTime.now().setZone(appointmentTimeZone);
-        const apptDateTime = DateTime.fromISO(appt.start_at).setZone(appointmentTimeZone);
+        // FIXED: Specify UTC as source zone when parsing database timestamp
+        const apptDateTime = DateTime.fromISO(appt.start_at, { zone: 'UTC' }).setZone(appointmentTimeZone);
         
         // Past means: before now
         return apptDateTime < now;

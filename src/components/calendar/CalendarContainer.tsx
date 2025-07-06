@@ -117,17 +117,27 @@ const CalendarContainer: React.FC = () => {
     // Transform appointments to RBC format
     if (appointments) {
       events.push(...appointments.map(apt => {
-        const startDT = DateTime.fromISO(apt.start_at, { zone: 'utc' }).setZone(userTimeZone);
-        const endDT = DateTime.fromISO(apt.end_at, { zone: 'utc' }).setZone(userTimeZone);
+        // FIXED: Use appointment's saved timezone for consistent display
+        const appointmentTimeZone = apt.appointment_timezone || userTimeZone;
+        const startDT = TimeZoneService.convertUTCToCalendarEvent(apt.start_at, appointmentTimeZone);
+        const endDT = TimeZoneService.convertUTCToCalendarEvent(apt.end_at, appointmentTimeZone);
 
         // Get sync status for this appointment
         const syncStatus = getSyncStatusForAppointment(apt.id);
 
+        TimeZoneService.logTimezoneOperation('Calendar event creation', {
+          appointmentId: apt.id,
+          savedTimezone: apt.appointment_timezone,
+          displayTimezone: appointmentTimeZone,
+          originalStart: apt.start_at,
+          calendarStart: startDT
+        });
+
         return {
           id: apt.id,
           title: apt.clientName || 'Internal Appointment',
-          start: startDT.toJSDate(),
-          end: endDT.toJSDate(),
+          start: startDT,
+          end: endDT,
           source: 'internal' as const,
           resource: { 
             ...apt,
@@ -151,14 +161,16 @@ const CalendarContainer: React.FC = () => {
 
     // Transform blocked time to RBC format
     events.push(...blockedTimes.map(blockedTime => {
-      const startDT = DateTime.fromISO(blockedTime.start_at, { zone: 'utc' }).setZone(userTimeZone);
-      const endDT = DateTime.fromISO(blockedTime.end_at, { zone: 'utc' }).setZone(userTimeZone);
+      // FIXED: Use blocked time's saved timezone for consistent display
+      const blockedTimeZone = blockedTime.timezone || userTimeZone;
+      const startDT = TimeZoneService.convertUTCToCalendarEvent(blockedTime.start_at, blockedTimeZone);
+      const endDT = TimeZoneService.convertUTCToCalendarEvent(blockedTime.end_at, blockedTimeZone);
 
       return {
         id: blockedTime.id,
         title: blockedTime.label,
-        start: startDT.toJSDate(),
-        end: endDT.toJSDate(),
+        start: startDT,
+        end: endDT,
         source: 'blocked_time' as const,
         resource: blockedTime
       };
@@ -232,8 +244,20 @@ const CalendarContainer: React.FC = () => {
 
   const handleSelectEvent = useCallback((event: CalendarEvent) => {
     if (event.source === 'internal') {
-      // Open edit dialog for internal appointments
-      setEditingAppointment(event.resource);
+      // Open edit dialog for internal appointments - pass complete appointment data
+      const appointmentData = {
+        start: event.start,
+        end: event.end,
+        start_at: event.resource.start_at,
+        end_at: event.resource.end_at,
+        clientId: event.resource.client_id,
+        clientName: event.resource.clientName,
+        notes: event.resource.notes,
+        appointment_timezone: event.resource.appointment_timezone,
+        title: event.title
+      };
+      
+      setEditingAppointment(appointmentData);
       setSelectedSlot(null);
       setIsEditMode(true);
       setIsAppointmentDialogOpen(true);
@@ -564,12 +588,9 @@ const CalendarContainer: React.FC = () => {
           isOpen={isAppointmentDialogOpen}
           onClose={handleCloseAppointmentDialog}
           clinicianId={userId}
-          userTimeZone={userTimeZone}
+          clinicianTimeZone={userTimeZone}
           onAppointmentCreated={handleAppointmentCreated}
-          onAppointmentUpdated={handleAppointmentUpdated}
-          selectedSlot={selectedSlot}
-          isEditMode={isEditMode}
-          editingAppointment={editingAppointment}
+          initialData={isEditMode ? editingAppointment : selectedSlot}
         />
 
         {editingBlockedTime && (

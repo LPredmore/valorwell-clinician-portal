@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/context/UserContext';
 import { DateTime } from 'luxon';
+import { TimeZoneService } from '@/utils/timeZoneService';
 
 interface AppointmentBookingDialogProps {
   isOpen: boolean;
@@ -81,12 +82,12 @@ const AppointmentBookingDialog: React.FC<AppointmentBookingDialogProps> = ({
 
     try {
       // Parse start time and compute end time (start + 1 hour)
-      const startDT = DateTime.fromISO(formData.startTime);
+      const startDT = TimeZoneService.convertLocalToUTC(formData.startTime, Intl.DateTimeFormat().resolvedOptions().timeZone);
       const endDT = startDT.plus({ hours: 1 });
       
-      // Convert to UTC for storage
-      const startUtc = startDT.toUTC().toISO();
-      const endUtc = endDT.toUTC().toISO();
+      // Get UTC ISO strings for storage
+      const startUtc = startDT.toISO();
+      const endUtc = endDT.toISO();
 
       console.log('[AppointmentBookingDialog] Creating appointment:', {
         client_id: userId,

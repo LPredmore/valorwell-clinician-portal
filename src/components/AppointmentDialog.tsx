@@ -15,6 +15,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { DateTime } from 'luxon';
+import { TimeZoneService } from '@/utils/timeZoneService';
 
 interface Client {
   id: string;
@@ -34,6 +35,7 @@ interface AppointmentDialogProps {
     end_at?: string;
     title?: string;
     clientName?: string;
+    clientId?: string;
     notes?: string;
     appointment_timezone?: string;
   } | null;
@@ -96,12 +98,33 @@ export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
   // Set initial values from props
   useEffect(() => {
     if (initialData && initialData.start) {
-      // Convert the selected slot time to local datetime-local format
-      const startDT = DateTime.fromJSDate(initialData.start);
-      const startTime = startDT.toFormat("yyyy-MM-dd'T'HH:mm");
+      // FIXED: Handle both calendar event dates and database timestamp editing
+      let startTime: string;
+      
+      if (initialData.start_at) {
+        // Editing existing appointment - use database timestamp with appointment's timezone
+        const appointmentTimeZone = initialData.appointment_timezone || clinicianTimeZone;
+        const dbDateTime = TimeZoneService.fromUTC(initialData.start_at, appointmentTimeZone);
+        startTime = dbDateTime.toFormat("yyyy-MM-dd'T'HH:mm");
+        
+        TimeZoneService.logTimezoneOperation('Edit appointment form initialization', {
+          dbTimestamp: initialData.start_at,
+          appointmentTimezone: appointmentTimeZone,
+          formValue: startTime
+        });
+      } else {
+        // Creating new appointment from calendar slot - use calendar event date
+        startTime = TimeZoneService.convertCalendarEventToFormInput(initialData.start, clinicianTimeZone);
+        
+        TimeZoneService.logTimezoneOperation('New appointment form initialization', {
+          calendarDate: initialData.start,
+          clinicianTimezone: clinicianTimeZone,
+          formValue: startTime
+        });
+      }
       
       setFormData({
-        clientId: '',
+        clientId: initialData.clientId || '',
         notes: initialData.notes || '',
         startTime,
       });
@@ -113,7 +136,7 @@ export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
         startTime: '',
       });
     }
-  }, [initialData]);
+  }, [initialData, clinicianTimeZone]);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
