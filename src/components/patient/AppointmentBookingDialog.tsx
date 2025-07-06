@@ -118,23 +118,40 @@ const AppointmentBookingDialog: React.FC<AppointmentBookingDialogProps> = ({
 
       console.log('[AppointmentBookingDialog] Appointment created successfully:', appointment.id);
 
-      // Create video room and update appointment with video URL in one operation
+      // Create video room and update appointment atomically
       if (appointment.type === 'therapy_session') {
-        const videoRoomUrl = await createVideoRoom(appointment.id);
-        
-        if (videoRoomUrl) {
-          // Update appointment with video room URL
-          const { error: updateError } = await supabase
-            .from('appointments')
-            .update({ video_room_url: videoRoomUrl })
-            .eq('id', appointment.id);
+        try {
+          const videoRoomUrl = await createVideoRoom(appointment.id);
+          
+          if (videoRoomUrl) {
+            // Update appointment with video room URL
+            const { data: updatedAppointment, error: updateError } = await supabase
+              .from('appointments')
+              .update({ video_room_url: videoRoomUrl })
+              .eq('id', appointment.id)
+              .select()
+              .single();
 
-          if (updateError) {
-            console.error('[AppointmentBookingDialog] Failed to update video room URL:', updateError);
-            // Don't fail the entire operation for this
-          } else {
-            console.log('[AppointmentBookingDialog] Video room URL updated successfully');
+            if (updateError) {
+              console.error('[AppointmentBookingDialog] Failed to update video room URL:', updateError);
+              toast({
+                title: 'Warning',
+                description: 'Appointment booked but video room setup incomplete. Please check your appointments.',
+                variant: 'destructive'
+              });
+            } else {
+              console.log('[AppointmentBookingDialog] Video room URL updated successfully');
+              // Update the appointment object with the video URL for immediate UI reflection
+              appointment.video_room_url = videoRoomUrl;
+            }
           }
+        } catch (videoError) {
+          console.error('[AppointmentBookingDialog] Video room creation failed:', videoError);
+          toast({
+            title: 'Warning',
+            description: 'Appointment booked but video room setup failed. You can still join via phone if needed.',
+            variant: 'destructive'
+          });
         }
       }
 
