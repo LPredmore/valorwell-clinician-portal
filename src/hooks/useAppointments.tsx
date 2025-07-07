@@ -7,7 +7,6 @@ import { TimeZoneService } from "@/utils/timeZoneService";
 import { DateTime } from "luxon";
 import { Appointment } from "@/types/appointment";
 import { formatClientName } from "@/utils/appointmentUtils";
-import { useNylasSync } from '@/hooks/useNylasSync';
 
 // Interface for the raw Supabase response - simplified for debugging
 interface RawSupabaseAppointment {
@@ -54,7 +53,6 @@ export const useAppointments = (
   refreshTrigger: number = 0
 ) => {
   const { toast } = useToast();
-  const { loadSyncMappings, getSyncStatusForAppointment } = useNylasSync();
   const [currentAppointment, setCurrentAppointment] =
     useState<Appointment | null>(null);
   const [isVideoOpen, setIsVideoOpen] = useState(false);
@@ -279,17 +277,6 @@ export const useAppointments = (
     retry: false,
   });
 
-  // Properly type and handle fetchedAppointments array
-  const appointments = fetchedAppointments || [];
-
-  // Load sync mappings when appointments change
-  useEffect(() => {
-    if (appointments && appointments.length > 0) {
-      const appointmentIds = appointments.map(apt => apt.id);
-      loadSyncMappings(appointmentIds);
-    }
-  }, [appointments, loadSyncMappings]);
-
   // Handle errors with separate useEffect
   useEffect(() => {
     if (error) {
@@ -307,6 +294,9 @@ export const useAppointments = (
       });
     }
   }, [error, toast]);
+
+  // Properly type and handle fetchedAppointments array
+  const appointments = fetchedAppointments || [];
 
   // Log query results
   useEffect(() => {
@@ -373,8 +363,7 @@ export const useAppointments = (
       // Use the appointment's saved timezone if available, otherwise fall back to user timezone
       const appointmentTimeZone = appointment.appointment_timezone || safeUserTimeZone;
       const now = DateTime.now().setZone(appointmentTimeZone);
-      // FIXED: Specify UTC as source zone when parsing database timestamp
-      const apptDateTime = DateTime.fromISO(appointment.start_at, { zone: 'UTC' }).setZone(appointmentTimeZone);
+      const apptDateTime = DateTime.fromISO(appointment.start_at).setZone(appointmentTimeZone);
 
       return now.hasSame(apptDateTime, "day");
     } catch (e) {
@@ -406,8 +395,7 @@ export const useAppointments = (
         // Use the appointment's saved timezone if available, otherwise fall back to user timezone
         const appointmentTimeZone = appt.appointment_timezone || safeUserTimeZone;
         const now = DateTime.now().setZone(appointmentTimeZone);
-        // FIXED: Specify UTC as source zone when parsing database timestamp
-        const apptDateTime = DateTime.fromISO(appt.start_at, { zone: 'UTC' }).setZone(appointmentTimeZone);
+        const apptDateTime = DateTime.fromISO(appt.start_at).setZone(appointmentTimeZone);
         
         // Upcoming means: not today and in the future
         return apptDateTime > now && !now.hasSame(apptDateTime, "day");
@@ -426,8 +414,7 @@ export const useAppointments = (
         // Use the appointment's saved timezone if available, otherwise fall back to user timezone
         const appointmentTimeZone = appt.appointment_timezone || safeUserTimeZone;
         const now = DateTime.now().setZone(appointmentTimeZone);
-        // FIXED: Specify UTC as source zone when parsing database timestamp
-        const apptDateTime = DateTime.fromISO(appt.start_at, { zone: 'UTC' }).setZone(appointmentTimeZone);
+        const apptDateTime = DateTime.fromISO(appt.start_at).setZone(appointmentTimeZone);
         
         // Past means: before now
         return apptDateTime < now;
@@ -508,6 +495,5 @@ export const useAppointments = (
     clientData: sessionClientData,
     isLoadingClientData: isLoadingSessionClientData,
     addDisplayFormattingToAppointment,
-    getSyncStatusForAppointment,
   };
 };

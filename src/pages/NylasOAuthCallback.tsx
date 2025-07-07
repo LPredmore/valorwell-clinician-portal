@@ -180,11 +180,11 @@ const NylasOAuthCallback: React.FC = () => {
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle className="text-center">Google Calendar Connection</CardTitle>
-          <CardDescription className="text-center" id="oauth-callback-desc">
+          <CardDescription className="text-center">
             Processing your Google Calendar authorization via Nylas
           </CardDescription>
         </CardHeader>
-        <CardContent aria-describedby="oauth-callback-desc">
+        <CardContent>
           <div className="flex flex-col items-center space-y-4">
             {getIcon()}
             <p className={`text-center font-medium ${getStatusColor()}`}>

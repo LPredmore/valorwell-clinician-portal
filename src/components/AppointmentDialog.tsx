@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -15,7 +14,6 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { DateTime } from 'luxon';
-import { TimeZoneService } from '@/utils/timeZoneService';
 
 interface Client {
   id: string;
@@ -35,7 +33,6 @@ interface AppointmentDialogProps {
     end_at?: string;
     title?: string;
     clientName?: string;
-    clientId?: string;
     notes?: string;
     appointment_timezone?: string;
   } | null;
@@ -52,7 +49,6 @@ export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
   const { toast } = useToast();
   const [clients, setClients] = useState<Client[]>([]);
   const [isLoadingClients, setIsLoadingClients] = useState(false);
-  const [isCreatingAppointment, setIsCreatingAppointment] = useState(false);
   const [formData, setFormData] = useState({
     clientId: '',
     notes: '',
@@ -98,33 +94,12 @@ export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
   // Set initial values from props
   useEffect(() => {
     if (initialData && initialData.start) {
-      // FIXED: Handle both calendar event dates and database timestamp editing
-      let startTime: string;
-      
-      if (initialData.start_at) {
-        // Editing existing appointment - use database timestamp with appointment's timezone
-        const appointmentTimeZone = initialData.appointment_timezone || clinicianTimeZone;
-        const dbDateTime = TimeZoneService.fromUTC(initialData.start_at, appointmentTimeZone);
-        startTime = dbDateTime.toFormat("yyyy-MM-dd'T'HH:mm");
-        
-        TimeZoneService.logTimezoneOperation('Edit appointment form initialization', {
-          dbTimestamp: initialData.start_at,
-          appointmentTimezone: appointmentTimeZone,
-          formValue: startTime
-        });
-      } else {
-        // Creating new appointment from calendar slot - use calendar event date
-        startTime = TimeZoneService.convertCalendarEventToFormInput(initialData.start, clinicianTimeZone);
-        
-        TimeZoneService.logTimezoneOperation('New appointment form initialization', {
-          calendarDate: initialData.start,
-          clinicianTimezone: clinicianTimeZone,
-          formValue: startTime
-        });
-      }
+      // Convert the selected slot time to local datetime-local format
+      const startDT = DateTime.fromJSDate(initialData.start);
+      const startTime = startDT.toFormat("yyyy-MM-dd'T'HH:mm");
       
       setFormData({
-        clientId: initialData.clientId || '',
+        clientId: '',
         notes: initialData.notes || '',
         startTime,
       });
@@ -136,42 +111,13 @@ export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
         startTime: '',
       });
     }
-  }, [initialData, clinicianTimeZone]);
+  }, [initialData]);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
       ...prev,
       [field]: value,
     }));
-  };
-
-  const createVideoRoom = async (appointmentId: string): Promise<string | null> => {
-    try {
-      console.log('[AppointmentDialog] Creating video room for appointment:', appointmentId);
-      
-      const { data, error } = await supabase.functions.invoke('create-daily-room', {
-        body: {
-          appointmentId: appointmentId,
-          forceNew: false
-        }
-      });
-
-      if (error) {
-        console.error('[AppointmentDialog] Video room creation error:', error);
-        throw error;
-      }
-
-      if (data && data.url) {
-        console.log('[AppointmentDialog] Video room created successfully:', data.url);
-        return data.url;
-      } else {
-        console.error('[AppointmentDialog] No video URL in response:', data);
-        return null;
-      }
-    } catch (error) {
-      console.error('[AppointmentDialog] Failed to create video room:', error);
-      return null;
-    }
   };
 
   const handleSave = async () => {
@@ -184,8 +130,6 @@ export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
       });
       return;
     }
-
-    setIsCreatingAppointment(true);
 
     try {
       // Parse start time and compute end time (start + 1 hour)
@@ -207,8 +151,7 @@ export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
         appointment_timezone: clinicianTimeZone
       });
 
-      // Create appointment first
-      const { data: appointment, error: appointmentError } = await supabase
+      const { error } = await supabase
         .from('appointments')
         .insert({
           client_id: formData.clientId,
@@ -219,55 +162,13 @@ export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
           status: 'scheduled',
           notes: formData.notes || null,
           appointment_timezone: clinicianTimeZone
-        })
-        .select()
-        .single();
+        });
 
-      if (appointmentError) throw appointmentError;
-
-      console.log('[AppointmentDialog] Appointment created successfully:', appointment.id);
-
-      // Create video room and update appointment atomically
-      if (appointment.type === 'therapy_session') {
-        try {
-          const videoRoomUrl = await createVideoRoom(appointment.id);
-          
-          if (videoRoomUrl) {
-            // Update appointment with video room URL
-            const { data: updatedAppointment, error: updateError } = await supabase
-              .from('appointments')
-              .update({ video_room_url: videoRoomUrl })
-              .eq('id', appointment.id)
-              .select()
-              .single();
-
-            if (updateError) {
-              console.error('[AppointmentDialog] Failed to update video room URL:', updateError);
-              toast({
-                title: 'Warning',
-                description: 'Appointment created but video room setup incomplete. Please refresh to see video link.',
-                variant: 'destructive'
-              });
-            } else {
-              console.log('[AppointmentDialog] Video room URL updated successfully');
-              // Update the appointment object with the video URL for immediate UI reflection
-              appointment.video_room_url = videoRoomUrl;
-            }
-          }
-        } catch (videoError) {
-          console.error('[AppointmentDialog] Video room creation failed:', videoError);
-          toast({
-            title: 'Warning', 
-            description: 'Appointment created but video room setup failed. Please try editing the appointment.',
-            variant: 'destructive'
-          });
-        }
-      }
+      if (error) throw error;
 
       toast({
         title: 'Success',
-        description: 'Appointment created successfully' + (appointment.type === 'therapy_session' ? '. Video room will be available shortly.' : ''),
-        duration: 4000
+        description: 'Appointment created successfully'
       });
 
       // Reset form and close dialog
@@ -286,8 +187,6 @@ export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
         description: error instanceof Error ? error.message : 'Failed to create appointment',
         variant: 'destructive'
       });
-    } finally {
-      setIsCreatingAppointment(false);
     }
   };
 
@@ -311,7 +210,7 @@ export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
             <Select
               value={formData.clientId}
               onValueChange={(value) => handleInputChange('clientId', value)}
-              disabled={isLoadingClients || isCreatingAppointment}
+              disabled={isLoadingClients}
             >
               <SelectTrigger className="col-span-3">
                 <SelectValue placeholder={isLoadingClients ? "Loading clients..." : "Select a client"} />
@@ -337,7 +236,6 @@ export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
               value={formData.startTime}
               onChange={(e) => handleInputChange('startTime', e.target.value)}
               className="col-span-3"
-              disabled={isCreatingAppointment}
             />
           </div>
           
@@ -353,22 +251,21 @@ export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
               className="col-span-3"
               rows={3}
               placeholder="Additional notes for this appointment..."
-              disabled={isCreatingAppointment}
             />
           </div>
 
           {/* Timezone indicator */}
           <div className="text-xs text-gray-500 text-center">
-            Times displayed in: {clinicianTimeZone} | Duration: 1 hour | Video room created automatically
+            Times displayed in: {clinicianTimeZone} | Duration: 1 hour
           </div>
         </div>
         
         <div className="flex justify-end space-x-2">
-          <Button variant="outline" onClick={onClose} disabled={isCreatingAppointment}>
+          <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={isCreatingAppointment}>
-            {isCreatingAppointment ? 'Creating...' : 'Save Appointment'}
+          <Button onClick={handleSave}>
+            Save Appointment
           </Button>
         </div>
       </DialogContent>

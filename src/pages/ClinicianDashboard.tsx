@@ -103,9 +103,7 @@ const ClinicianDashboard = () => {
     const fetchAppointments = async () => {
       setIsLoadingAppointments(true);
       try {
-        console.log("[ClinicianDashboard] Fetching appointments for clinician:", userId);
         const appointmentsData = await fetchClinicianAppointments(userId);
-        console.log("[ClinicianDashboard] Fetched appointments:", appointmentsData.length);
         setAppointments(appointmentsData);
         setError(null);
         dataFetchCountRef.current = 0; // Reset on success
@@ -118,66 +116,30 @@ const ClinicianDashboard = () => {
     };
     
     fetchAppointments();
-  }, [userId]);
+  }, [userId]); // Remove refreshTrigger from dependencies
 
   // Memoize expensive appointment calculations
   const appointmentCategories = useMemo(() => {
-    console.log("[ClinicianDashboard] Calculating appointment categories with:", {
-      totalAppointments: appointments.length,
-      sampleAppointments: appointments.slice(0, 3).map(apt => ({
-        id: apt.id,
-        start_at: apt.start_at,
-        status: apt.status,
-        clientName: apt.clientName
-      }))
-    });
-
     const today = new Date();
     const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
     const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
 
-    // Filter appointments by category
-    const todayAppointments = appointments.filter(apt => {
-      const aptDate = new Date(apt.start_at);
-      const isToday = aptDate >= todayStart && aptDate < todayEnd;
-      const isScheduled = apt.status === 'scheduled';
-      console.log("[ClinicianDashboard] Today check:", {
-        appointmentId: apt.id,
-        aptDate: aptDate.toISOString(),
-        todayStart: todayStart.toISOString(),
-        todayEnd: todayEnd.toISOString(),
-        isToday,
-        isScheduled,
-        status: apt.status
-      });
-      return isToday && isScheduled;
-    });
-
-    const upcomingAppointments = appointments.filter(apt => {
-      const aptDate = new Date(apt.start_at);
-      const isFuture = aptDate >= todayEnd;
-      const isScheduled = apt.status === 'scheduled';
-      return isFuture && isScheduled;
-    });
-
-    const pastAppointments = appointments.filter(apt => {
-      const aptDate = new Date(apt.start_at);
-      const isPast = aptDate < todayStart;
-      const isCompleted = apt.status === 'completed';
-      const needsDocumentation = !apt.notes;
-      return isPast && isCompleted && needsDocumentation;
-    });
-
-    console.log("[ClinicianDashboard] Appointment categories calculated:", {
-      today: todayAppointments.length,
-      upcoming: upcomingAppointments.length,
-      past: pastAppointments.length
-    });
+    // Simplified to use all appointments (blocked time now in separate table)
+    const realAppointments = appointments;
 
     return {
-      today: todayAppointments,
-      upcoming: upcomingAppointments,
-      past: pastAppointments
+      today: realAppointments.filter(apt => {
+        const aptDate = new Date(apt.start_at);
+        return aptDate >= todayStart && aptDate < todayEnd && apt.status !== 'cancelled';
+      }),
+      upcoming: realAppointments.filter(apt => {
+        const aptDate = new Date(apt.start_at);
+        return aptDate >= todayEnd && apt.status !== 'cancelled';
+      }),
+      past: realAppointments.filter(apt => {
+        const aptDate = new Date(apt.start_at);
+        return aptDate < todayStart && apt.status === 'completed' && !apt.notes;
+      })
     };
   }, [appointments]);
 
@@ -345,7 +307,7 @@ const ClinicianDashboard = () => {
     };
   };
 
-  console.log("[ClinicianDashboard] Rendering with:", {
+  console.log("[ClinicianDashboard] Rendering with stabilized data management:", {
     clinicianTimeZone,
     safeClinicianTimeZone,
     timeZoneDisplay,
@@ -354,8 +316,7 @@ const ClinicianDashboard = () => {
     totalAppointments: appointments.length,
     todayCount: appointmentCategories.today.length,
     upcomingCount: appointmentCategories.upcoming.length,
-    pastCount: appointmentCategories.past.length,
-    isLoadingAppointments
+    pastCount: appointmentCategories.past.length
   });
 
   if (showSessionTemplate && currentAppointment) {

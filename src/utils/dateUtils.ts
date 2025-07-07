@@ -159,24 +159,25 @@ export const formatDateForDB = (date: Date | string | null | undefined): string 
 };
 
 /**
- * CRITICAL: Fixed single conversion path for React Big Calendar events
- * Converts UTC ISO string to local Date object for calendar display
- * This replaces previous double-conversion issues
+ * CRITICAL: Single conversion path for all React Big Calendar events
+ * Parse any ISO (with or without offset) as UTC if offset present, else in zone; then toJSDate
+ * This REPLACES all previous conversion methods and eliminates double-conversion issues.
  */
-export function toEventDate(utcISO: string, zone: string): Date {
-  // Parse UTC ISO string and convert to specified timezone
-  const dt = DateTime.fromISO(utcISO, { zone: 'UTC' }).setZone(zone);
+export function toEventDate(iso: string, zone: string): Date {
+  // Parse either UTC ISO (with Z/offset) or local ISO (no offset) in specified zone
+  const dt = iso.includes('Z') || iso.includes('+') || iso.includes('-') 
+    ? DateTime.fromISO(iso).setZone(zone)  // UTC ISO → convert to zone
+    : DateTime.fromISO(iso, { zone });     // Local ISO → parse in zone
   
   if (dt.isValid) {
-    console.log('[toEventDate] FIXED: Single conversion path:', {
-      input: utcISO,
+    console.log('[toEventDate] CRITICAL: Single conversion path:', {
+      input: iso,
       zone,
-      outputDateTime: dt.toISO(),
-      outputJSDate: dt.toJSDate()
+      parsedDateTime: dt.toISO()
     });
   } else {
-    console.warn('[toEventDate] Invalid date conversion:', { input: utcISO, zone });
+    console.warn('[toEventDate] Invalid date created:', { input: iso, zone });
   }
   
-  return dt.toJSDate();  // Return Date object for React Big Calendar
+  return dt.toJSDate();  // Absolute instant for React Big Calendar
 }

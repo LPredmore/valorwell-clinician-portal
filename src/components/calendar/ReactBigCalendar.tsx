@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { Calendar, Views } from 'react-big-calendar';
 import { globalLocalizer } from '@/main';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
@@ -17,8 +17,6 @@ interface ExtendedReactBigCalendarProps extends ReactBigCalendarProps {
     startTime: string;
     endTime: string;
   }>;
-  view?: string;
-  onViewChange?: (view: string) => void;
 }
 
 const ReactBigCalendar: React.FC<ExtendedReactBigCalendarProps> = ({
@@ -29,59 +27,8 @@ const ReactBigCalendar: React.FC<ExtendedReactBigCalendarProps> = ({
   onSelectEvent,
   date,
   onNavigate,
-  view: externalView,
-  onViewChange,
   userTimeZone = 'America/New_York',
 }) => {
-  // View mapping between string and Views enum
-  const getViewFromString = (viewString: string) => {
-    switch (viewString.toLowerCase()) {
-      case 'month': return Views.MONTH;
-      case 'week': return Views.WEEK;
-      case 'day': return Views.DAY;
-      default: return Views.WEEK;
-    }
-  };
-
-  const getStringFromView = (view: any) => {
-    if (typeof view === 'string') return view;
-    switch (view) {
-      case Views.MONTH: return 'month';
-      case Views.WEEK: return 'week';
-      case Views.DAY: return 'day';
-      default: return 'week';
-    }
-  };
-
-  // Controlled view state - use enum internally
-  const [internalView, setInternalView] = useState(Views.WEEK);
-  const currentView = externalView ? getViewFromString(externalView) : internalView;
-  
-  // Handle view changes
-  const handleViewChange = useCallback((newView: any) => {
-    const viewString = getStringFromView(newView);
-    console.log('[ReactBigCalendar] View change:', { from: getStringFromView(currentView), to: viewString });
-    
-    if (onViewChange) {
-      onViewChange(viewString);
-    } else {
-      setInternalView(getViewFromString(viewString));
-    }
-  }, [currentView, onViewChange]);
-  console.log('[ReactBigCalendar] Rendered with:', {
-    eventsCount: events.length,
-    backgroundEventsCount: backgroundEvents.length,
-    availabilitySlotsCount: availabilitySlots.length,
-    date: date.toISOString(),
-    userTimeZone,
-    sampleEvents: events.slice(0, 2).map(e => ({
-      id: e.id,
-      title: e.title,
-      start: e.start.toISOString(),
-      end: e.end.toISOString(),
-      source: e.source
-    }))
-  });
   // Pure RBC event styling - minimal differentiation for real events only
   const eventPropGetter = useCallback((event: CalendarEvent) => {
     let backgroundColor = '#3174ad';
@@ -120,15 +67,13 @@ const ReactBigCalendar: React.FC<ExtendedReactBigCalendarProps> = ({
     onNavigate(newDate);
   }, [onNavigate]);
 
-  // Pure RBC configuration with controlled state for React 19 compatibility
+  // Pure RBC configuration with native availability features
   const calendarConfig = useMemo(() => ({
     localizer: globalLocalizer,
     events,
     backgroundEvents, // RBC native background events
-    date, // Controlled date
-    view: currentView, // Controlled view
+    date,
     onNavigate: handleNavigate,
-    onView: handleViewChange, // Controlled view changes
     startAccessor: 'start',
     endAccessor: 'end',
     titleAccessor: 'title',
@@ -137,6 +82,7 @@ const ReactBigCalendar: React.FC<ExtendedReactBigCalendarProps> = ({
       week: true,
       day: true,
     },
+    defaultView: Views.WEEK,
     step: 30,
     timeslots: 1, // Use 1 timeslot per step for cleaner availability display
     eventPropGetter,
@@ -155,9 +101,7 @@ const ReactBigCalendar: React.FC<ExtendedReactBigCalendarProps> = ({
     onSelectSlot,
     onSelectEvent,
     date,
-    currentView, // Add currentView to dependencies
-    handleNavigate,
-    handleViewChange // Add handleViewChange to dependencies
+    handleNavigate
   ]);
 
   return (

@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import Layout from '../components/layout/Layout';
 import PracticeTab from '@/components/settings/PracticeTab';
@@ -8,10 +7,7 @@ import BillingTab from '@/components/settings/BillingTab';
 import TemplatesTab from '@/components/settings/TemplatesTab';
 import SecurityTab from '@/components/settings/SecurityTab';
 import LicensesTab from '@/components/settings/LicensesTab';
-import CalendarTab from '@/components/settings/CalendarTab';
 import { AddUserDialog } from '@/components/AddUserDialog';
-import { useLocation } from 'react-router-dom';
-import { useEffect } from 'react';
 
 const SettingsTabs = {
   PRACTICE: 'practice',
@@ -20,21 +16,12 @@ const SettingsTabs = {
   BILLING: 'billing',
   TEMPLATES: 'templates',
   SECURITY: 'security',
-  LICENSES: 'licenses',
-  CALENDAR: 'calendar'
+  LICENSES: 'licenses'
 };
 
 const Settings = () => {
-  const location = useLocation();
   const [activeTab, setActiveTab] = useState(SettingsTabs.PRACTICE);
   const [isAddUserDialogOpen, setIsAddUserDialogOpen] = useState(false);
-  
-  // Handle navigation state for direct tab access
-  useEffect(() => {
-    if (location.state?.activeTab) {
-      setActiveTab(location.state.activeTab);
-    }
-  }, [location.state]);
   
   return (
     <Layout>
@@ -82,24 +69,15 @@ const Settings = () => {
           >
             Licenses
           </button>
-          <button 
-            className={`settings-tab ${activeTab === SettingsTabs.CALENDAR ? 'active' : ''}`}
-            onClick={() => setActiveTab(SettingsTabs.CALENDAR)}
-          >
-            Calendar
-          </button>
         </div>
         
-        <div className="p-6">
-          {activeTab === SettingsTabs.PRACTICE && <PracticeTab />}
-          {activeTab === SettingsTabs.CLINICIANS && <CliniciansTab />}
-          {activeTab === SettingsTabs.USERS && <UsersTab />}
-          {activeTab === SettingsTabs.BILLING && <BillingTab />}
-          {activeTab === SettingsTabs.TEMPLATES && <TemplatesTab />}
-          {activeTab === SettingsTabs.SECURITY && <SecurityTab />}
-          {activeTab === SettingsTabs.LICENSES && <LicensesTab />}
-          {activeTab === SettingsTabs.CALENDAR && <CalendarTab />}
-        </div>
+        {activeTab === SettingsTabs.PRACTICE && <PracticeTab />}
+        {activeTab === SettingsTabs.CLINICIANS && <CliniciansTab />}
+        {activeTab === SettingsTabs.USERS && <UsersTab />}
+        {activeTab === SettingsTabs.BILLING && <BillingTab />}
+        {activeTab === SettingsTabs.TEMPLATES && <TemplatesTab />}
+        {activeTab === SettingsTabs.SECURITY && <SecurityTab />}
+        {activeTab === SettingsTabs.LICENSES && <LicensesTab />}
       </div>
       
       <AddUserDialog 

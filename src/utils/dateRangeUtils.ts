@@ -10,31 +10,6 @@ export const getWeekRange = (date: Date, timeZone: string) => {
   };
 };
 
-// Add stable week range utility for better memoization
-export const getStableWeekRange = (date: Date, timeZone: string) => {
-  const dt = DateTime.fromJSDate(date).setZone(timeZone);
-  const start = dt.startOf('week');
-  const end = dt.endOf('week');
-  
-  return {
-    start: start.toJSDate(),
-    end: end.toJSDate(),
-    // Add stable string representations for comparison
-    startISO: start.toISO(),
-    endISO: end.toISO(),
-    weekKey: start.toFormat('yyyy-WW') // Week-based key for memoization
-  };
-};
-
-// Utility for comparing date ranges without reference issues
-export const areDateRangesEqual = (
-  range1: { start: Date; end: Date },
-  range2: { start: Date; end: Date }
-): boolean => {
-  return range1.start.getTime() === range2.start.getTime() &&
-         range1.end.getTime() === range2.end.getTime();
-};
-
 export const temporalOverlapQuery = (
   query: PostgrestFilterBuilder<any, any, any>,
   startDate: Date,

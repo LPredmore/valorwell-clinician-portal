@@ -1,244 +1,238 @@
-
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Calendar, Clock, User, Phone, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useUser } from '@/context/UserContext';
+import { supabase } from '@/integrations/supabase/client';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet"
 import { DateTime } from 'luxon';
-import { TimeZoneService } from '@/utils/timeZoneService';
 
 interface AppointmentBookingDialogProps {
   isOpen: boolean;
   onClose: () => void;
   clinicianId: string;
-  onBookingComplete?: () => void;
+  selectedDate?: Date;
+  selectedTime?: string;
 }
 
 const AppointmentBookingDialog: React.FC<AppointmentBookingDialogProps> = ({
   isOpen,
   onClose,
   clinicianId,
-  onBookingComplete
+  selectedDate,
+  selectedTime
 }) => {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [notes, setNotes] = useState('');
+  const [availableSlots, setAvailableSlots] = useState<string[]>([]);
+  const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const { toast } = useToast();
-  const { userId } = useUser();
-  const [isBooking, setIsBooking] = useState(false);
-  const [formData, setFormData] = useState({
-    startTime: '',
-    notes: '',
-  });
 
-  const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value,
-    }));
-  };
+  useEffect(() => {
+    fetchAvailableSlots();
+  }, [selectedDate, clinicianId]);
 
-  const createVideoRoom = async (appointmentId: string): Promise<string | null> => {
+  const fetchAvailableSlots = async () => {
+    if (!selectedDate) return;
+    
     try {
-      console.log('[AppointmentBookingDialog] Creating video room for appointment:', appointmentId);
+      const { data: appointments, error } = await supabase
+        .from('appointments')
+        .select('start_at, end_at')
+        .eq('clinician_id', clinicianId);
+
+      if (error) throw error;
       
-      const { data, error } = await supabase.functions.invoke('create-daily-room', {
-        body: {
-          appointmentId: appointmentId,
-          forceNew: false
-        }
-      });
+      const bookedSlots = appointments?.map(apt => {
+        const start = DateTime.fromISO(apt.start_at);
+        const end = DateTime.fromISO(apt.end_at);
+        
+        let timeFormatOptions: Intl.DateTimeFormatOptions = {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
+        };
+        
+        return `${start.toLocaleString(timeFormatOptions)} - ${end.toLocaleString(timeFormatOptions)}`;
+      }) || [];
 
-      if (error) {
-        console.error('[AppointmentBookingDialog] Video room creation error:', error);
-        throw error;
+      // Generate time slots (adjust interval as needed)
+      const startTime = DateTime.fromJSDate(selectedDate).set({ hour: 9, minute: 0, second: 0 });
+      const endTime = DateTime.fromJSDate(selectedDate).set({ hour: 17, minute: 0, second: 0 });
+      let current = startTime;
+      const slots = [];
+
+      while (current <= endTime) {
+        let timeFormatOptions: Intl.DateTimeFormatOptions = {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
+        };
+        
+        const slotEnd = current.plus({ minutes: 60 });
+        const slot = `${current.toLocaleString(timeFormatOptions)} - ${slotEnd.toLocaleString(timeFormatOptions)}`;
+        slots.push(slot);
+        current = slotEnd;
       }
 
-      if (data && data.url) {
-        console.log('[AppointmentBookingDialog] Video room created successfully:', data.url);
-        return data.url;
-      } else {
-        console.error('[AppointmentBookingDialog] No video URL in response:', data);
-        return null;
-      }
+      // Filter out booked slots
+      const available = slots.filter(slot => !bookedSlots.includes(slot));
+      setAvailableSlots(available);
     } catch (error) {
-      console.error('[AppointmentBookingDialog] Failed to create video room:', error);
-      return null;
+      console.error('Error fetching available slots:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch available appointment slots.",
+        variant: "destructive",
+      });
     }
   };
 
-  const handleBooking = async () => {
-    if (!formData.startTime || !userId) {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!selectedDate || !selectedSlot) {
       toast({
-        title: 'Validation Error',
-        description: 'Please select a start time',
-        variant: 'destructive'
+        title: "Error",
+        description: "Please select a date and time slot.",
+        variant: "destructive",
       });
       return;
     }
 
-    setIsBooking(true);
+    // Extract start and end times from the selected slot
+    const [startTimeStr, endTimeStr] = selectedSlot.split(' - ');
+    
+    // Parse the date and time using Luxon, setting the correct time zone
+    const startDateTime = DateTime.fromJSDate(selectedDate);
+    const [startHour, startMinute, startAMPM] = startTimeStr.split(/:|\s/);
+    const startHourAdjusted = (startAMPM === 'PM' && parseInt(startHour) !== 12) ? parseInt(startHour) + 12 : (startAMPM === 'AM' && parseInt(startHour) === 12) ? 0 : parseInt(startHour);
+    const startMinuteParsed = parseInt(startMinute);
+    
+    const endDateTime = DateTime.fromJSDate(selectedDate);
+    const [endHour, endMinute, endAMPM] = endTimeStr.split(/:|\s/);
+    const endHourAdjusted = (endAMPM === 'PM' && parseInt(endHour) !== 12) ? parseInt(endHour) + 12 : (endAMPM === 'AM' && parseInt(endHour) === 12) ? 0 : parseInt(endHour);
+    const endMinuteParsed = parseInt(endMinute);
+
+    const start = startDateTime.set({
+      hour: startHourAdjusted,
+      minute: startMinuteParsed,
+      second: 0,
+      millisecond: 0
+    }).toISO();
+
+    const end = endDateTime.set({
+      hour: endHourAdjusted,
+      minute: endMinuteParsed,
+      second: 0,
+      millisecond: 0
+    }).toISO();
 
     try {
-      // Parse start time and compute end time (start + 1 hour)
-      const startDT = TimeZoneService.convertLocalToUTC(formData.startTime, Intl.DateTimeFormat().resolvedOptions().timeZone);
-      const endDT = startDT.plus({ hours: 1 });
-      
-      // Get UTC ISO strings for storage
-      const startUtc = startDT.toISO();
-      const endUtc = endDT.toISO();
-
-      console.log('[AppointmentBookingDialog] Creating appointment:', {
-        client_id: userId,
-        clinician_id: clinicianId,
-        start_at: startUtc,
-        end_at: endUtc,
-        type: 'therapy_session',
-        status: 'scheduled',
-        notes: formData.notes
-      });
-
-      // Create appointment first
-      const { data: appointment, error: appointmentError } = await supabase
+      const { data, error } = await supabase
         .from('appointments')
-        .insert({
-          client_id: userId,
-          clinician_id: clinicianId,
-          start_at: startUtc,
-          end_at: endUtc,
-          type: 'therapy_session',
-          status: 'scheduled',
-          notes: formData.notes || null,
-          appointment_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
-        })
-        .select()
-        .single();
+        .insert([
+          {
+            clinician_id: clinicianId,
+            start_at: start,
+            end_at: end,
+            name: name,
+            email: email,
+            phone: phone,
+            notes: notes,
+          },
+        ]);
 
-      if (appointmentError) throw appointmentError;
-
-      console.log('[AppointmentBookingDialog] Appointment created successfully:', appointment.id);
-
-      // Create video room and update appointment atomically
-      if (appointment.type === 'therapy_session') {
-        try {
-          const videoRoomUrl = await createVideoRoom(appointment.id);
-          
-          if (videoRoomUrl) {
-            // Update appointment with video room URL
-            const { data: updatedAppointment, error: updateError } = await supabase
-              .from('appointments')
-              .update({ video_room_url: videoRoomUrl })
-              .eq('id', appointment.id)
-              .select()
-              .single();
-
-            if (updateError) {
-              console.error('[AppointmentBookingDialog] Failed to update video room URL:', updateError);
-              toast({
-                title: 'Warning',
-                description: 'Appointment booked but video room setup incomplete. Please check your appointments.',
-                variant: 'destructive'
-              });
-            } else {
-              console.log('[AppointmentBookingDialog] Video room URL updated successfully');
-              // Update the appointment object with the video URL for immediate UI reflection
-              appointment.video_room_url = videoRoomUrl;
-            }
-          }
-        } catch (videoError) {
-          console.error('[AppointmentBookingDialog] Video room creation failed:', videoError);
-          toast({
-            title: 'Warning',
-            description: 'Appointment booked but video room setup failed. You can still join via phone if needed.',
-            variant: 'destructive'
-          });
-        }
-      }
+      if (error) throw error;
 
       toast({
-        title: 'Success',
-        description: 'Appointment booked successfully! Video room will be available shortly.',
-        duration: 4000
+        title: "Success",
+        description: "Appointment booked successfully!",
       });
-
-      // Reset form and close dialog
-      setFormData({
-        startTime: '',
-        notes: '',
-      });
-      
-      if (onBookingComplete) {
-        onBookingComplete();
-      }
       onClose();
     } catch (error) {
       console.error('Error booking appointment:', error);
       toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to book appointment',
-        variant: 'destructive'
+        title: "Error",
+        description: "Failed to book appointment.",
+        variant: "destructive",
       });
-    } finally {
-      setIsBooking(false);
     }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Book Appointment</DialogTitle>
-        </DialogHeader>
-        
+    <Sheet open={isOpen} onOpenChange={onClose}>
+      <SheetContent>
+        <SheetHeader>
+          <SheetTitle>Book Appointment</SheetTitle>
+          <SheetDescription>
+            {selectedDate ? selectedDate.toLocaleDateString() : 'Select a date to book an appointment.'}
+          </SheetDescription>
+        </SheetHeader>
         <div className="grid gap-4 py-4">
-          {/* Start Time */}
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="startTime" className="text-right">
-              Start Time *
+            <Label htmlFor="name" className="text-right">
+              Name
             </Label>
-            <Input
-              id="startTime"
-              type="datetime-local"
-              value={formData.startTime}
-              onChange={(e) => handleInputChange('startTime', e.target.value)}
-              className="col-span-3"
-              disabled={isBooking}
-            />
+            <Input id="name" value={name} onChange={(e) => setName(e.target.value)} className="col-span-3" />
           </div>
-          
-          {/* Notes */}
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="notes" className="text-right">
+            <Label htmlFor="email" className="text-right">
+              Email
+            </Label>
+            <Input id="email" value={email} onChange={(e) => setEmail(e.target.value)} className="col-span-3" />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="phone" className="text-right">
+              Phone
+            </Label>
+            <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} className="col-span-3" />
+          </div>
+          <div className="grid grid-cols-4 items-start gap-4">
+            <Label htmlFor="notes" className="text-right mt-2">
               Notes
             </Label>
-            <Textarea
-              id="notes"
-              value={formData.notes}
-              onChange={(e) => handleInputChange('notes', e.target.value)}
-              className="col-span-3"
-              rows={3}
-              placeholder="Any additional notes for your appointment..."
-              disabled={isBooking}
-            />
+            <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} className="col-span-3" />
           </div>
-
-          {/* Info */}
-          <div className="text-xs text-gray-500 text-center">
-            Duration: 1 hour | Video room will be created automatically
-          </div>
+          {availableSlots.length > 0 ? (
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="time" className="text-right">
+                Time
+              </Label>
+              <select
+                id="time"
+                className="col-span-3 rounded-md border border-gray-200 px-2 py-1"
+                value={selectedSlot || ''}
+                onChange={(e) => setSelectedSlot(e.target.value)}
+              >
+                <option value="">Select a time slot</option>
+                {availableSlots.map((slot) => (
+                  <option key={slot} value={slot}>{slot}</option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">
+                Available Slots
+              </Label>
+              <div className="col-span-3">No slots available for the selected date.</div>
+            </div>
+          )}
         </div>
-        
-        <div className="flex justify-end space-x-2">
-          <Button variant="outline" onClick={onClose} disabled={isBooking}>
-            Cancel
-          </Button>
-          <Button onClick={handleBooking} disabled={isBooking}>
-            {isBooking ? 'Booking...' : 'Book Appointment'}
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+        <Button onClick={handleSubmit}>Book Appointment</Button>
+      </SheetContent>
+    </Sheet>
   );
 };
 

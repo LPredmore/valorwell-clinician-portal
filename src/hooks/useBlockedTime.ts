@@ -1,5 +1,4 @@
-
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { temporalOverlapQuery } from '@/utils/dateRangeUtils';
@@ -27,10 +26,6 @@ export const useBlockedTime = (
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // Convert Date objects to stable string representations to prevent infinite loops
-  const startDateISO = useMemo(() => startDate?.toISOString(), [startDate?.getTime()]);
-  const endDateISO = useMemo(() => endDate?.toISOString(), [endDate?.getTime()]);
-
   const fetchBlockedTimes = async () => {
     if (!clinicianId) return;
 
@@ -38,10 +33,10 @@ export const useBlockedTime = (
       setIsLoading(true);
       setError(null);
 
-      console.log('[useBlockedTime] STABLE: Fetching with stabilized dependencies:', {
+      console.log('[useBlockedTime] CRITICAL: Fetching with FIXED dependencies:', {
         clinicianId,
-        startDateISO,
-        endDateISO,
+        startDate: startDate?.toISOString(),
+        endDate: endDate?.toISOString(),
         refreshTrigger
       });
 
@@ -54,8 +49,8 @@ export const useBlockedTime = (
       if (startDate && endDate) {
         query = temporalOverlapQuery(query, startDate, endDate);
         console.log('[useBlockedTime] Applied temporal overlap filter:', {
-          rangeStart: startDateISO,
-          rangeEnd: endDateISO
+          rangeStart: startDate.toISOString(),
+          rangeEnd: endDate.toISOString()
         });
       }
 
@@ -63,13 +58,13 @@ export const useBlockedTime = (
 
       if (error) throw error;
 
-      console.log('[useBlockedTime] STABLE: Fetch results with dependencies:', {
+      console.log('[useBlockedTime] CRITICAL: Fetch results with dependencies:', {
         clinicianId,
         count: data?.length || 0,
         refreshTrigger,
         dateRange: { 
-          startDateISO, 
-          endDateISO 
+          startDate: startDate?.toISOString(), 
+          endDate: endDate?.toISOString() 
         }
       });
 
@@ -189,10 +184,10 @@ export const useBlockedTime = (
     }
   };
 
-  // Use stabilized string dependencies instead of Date objects
+  // CRITICAL: Include ALL necessary dependencies
   useEffect(() => {
     fetchBlockedTimes();
-  }, [clinicianId, startDateISO, endDateISO, refreshTrigger]);
+  }, [clinicianId, startDate, endDate, refreshTrigger]);
 
   return {
     blockedTimes,
