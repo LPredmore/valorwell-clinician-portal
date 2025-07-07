@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { videoRoomService } from '@/utils/videoRoomService';
 import { TimeZoneService } from '@/utils/timeZoneService';
 import { DateTime } from 'luxon';
 
@@ -288,24 +289,36 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
       console.log('[AppointmentDialog] Appointment data:', appointmentData);
 
       let error;
+      let newAppointmentId;
+      
       if (isEditMode && appointmentId) {
         const result = await supabase
           .from('appointments')
           .update(appointmentData)
           .eq('id', appointmentId);
         error = result.error;
+        newAppointmentId = appointmentId;
       } else {
         const result = await supabase
           .from('appointments')
-          .insert(appointmentData);
+          .insert(appointmentData)
+          .select()
+          .single();
         error = result.error;
+        newAppointmentId = result.data?.id;
       }
 
       if (error) throw error;
 
+      // Create video room for new appointments (non-blocking)
+      if (!isEditMode && newAppointmentId) {
+        console.log('[AppointmentDialog] Triggering async video room creation for appointment:', newAppointmentId);
+        videoRoomService.createVideoRoomAsync(newAppointmentId, 'high');
+      }
+
       toast({
         title: 'Success',
-        description: isEditMode ? 'Appointment updated successfully' : 'Appointment created successfully'
+        description: isEditMode ? 'Appointment updated successfully' : 'Appointment created successfully. Video room will be ready shortly.'
       });
 
       resetForm();

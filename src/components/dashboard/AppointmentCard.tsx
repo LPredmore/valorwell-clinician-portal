@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Appointment } from '@/types/appointment';
 import { formatAppointmentDate, formatAppointmentTime } from '@/utils/appointmentUtils';
 import { TimeZoneService } from '@/utils/timeZoneService';
+import VideoRoomStatusIndicator from './VideoRoomStatusIndicator';
 
 export interface AppointmentCardProps {
   appointment: Appointment;
@@ -116,13 +117,23 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
               <span className="text-xs text-gray-500 ml-1">({displayTimeZoneLabel})</span>
             </span>
           </div>
-          <div className="text-sm mt-1">{appointment.type}</div>
-          {/* STEP 5: Show timezone conversion info for debugging */}
-          {process.env.NODE_ENV !== 'production' && appointment.appointment_timezone && (
-            <div className="text-xs text-gray-400 mt-1">
-              Saved in: {appointment.appointment_timezone}
-            </div>
-          )}
+        <div className="text-sm mt-1">{appointment.type}</div>
+        
+        {/* Video Room Status */}
+        <div className="flex items-center mt-2">
+          <VideoRoomStatusIndicator 
+            appointmentId={appointment.id} 
+            size="small"
+            showRecreateButton={!!onDocumentSession}
+          />
+        </div>
+        
+        {/* STEP 5: Show timezone conversion info for debugging */}
+        {process.env.NODE_ENV !== 'production' && appointment.appointment_timezone && (
+          <div className="text-xs text-gray-400 mt-1">
+            Saved in: {appointment.appointment_timezone}
+          </div>
+        )}
         </CardContent>
         <CardFooter className="flex flex-col gap-2">
           <Button
@@ -172,6 +183,16 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
           </span>
         </div>
         <div className="text-sm mt-1">{appointment.type}</div>
+        
+        {/* Video Room Status */}
+        <div className="flex items-center mt-2">
+          <VideoRoomStatusIndicator 
+            appointmentId={appointment.id} 
+            size="small"
+            showRecreateButton={showStartButton}
+          />
+        </div>
+        
         {/* STEP 5: Show timezone conversion info for debugging */}
         {process.env.NODE_ENV !== 'production' && appointment.appointment_timezone && (
           <div className="text-xs text-gray-400 mt-1">

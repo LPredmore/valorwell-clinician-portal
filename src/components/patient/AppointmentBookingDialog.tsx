@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { videoRoomService } from '@/utils/videoRoomService';
 import {
   Sheet,
   SheetContent,
@@ -139,25 +140,32 @@ const AppointmentBookingDialog: React.FC<AppointmentBookingDialogProps> = ({
     }).toISO();
 
     try {
-      const { data, error } = await supabase
+      const { data: newAppointment, error } = await supabase
         .from('appointments')
         .insert([
           {
             clinician_id: clinicianId,
             start_at: start,
             end_at: end,
-            name: name,
-            email: email,
-            phone: phone,
+            type: 'therapy_session',
+            status: 'scheduled',
             notes: notes,
           },
-        ]);
+        ])
+        .select()
+        .single();
 
       if (error) throw error;
 
+      // Create video room asynchronously (non-blocking)
+      if (newAppointment?.id) {
+        console.log('[AppointmentBookingDialog] Triggering async video room creation for appointment:', newAppointment.id);
+        videoRoomService.createVideoRoomAsync(newAppointment.id, 'normal');
+      }
+
       toast({
         title: "Success",
-        description: "Appointment booked successfully!",
+        description: "Appointment booked successfully! Video room will be ready shortly.",
       });
       onClose();
     } catch (error) {

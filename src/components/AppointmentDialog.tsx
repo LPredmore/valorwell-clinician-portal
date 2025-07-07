@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { videoRoomService } from '@/utils/videoRoomService';
 import { DateTime } from 'luxon';
 
 interface Client {
@@ -151,7 +152,7 @@ export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
         appointment_timezone: clinicianTimeZone
       });
 
-      const { error } = await supabase
+      const { data: newAppointment, error } = await supabase
         .from('appointments')
         .insert({
           client_id: formData.clientId,
@@ -162,13 +163,21 @@ export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
           status: 'scheduled',
           notes: formData.notes || null,
           appointment_timezone: clinicianTimeZone
-        });
+        })
+        .select()
+        .single();
 
       if (error) throw error;
 
+      // Create video room asynchronously (non-blocking)
+      if (newAppointment?.id) {
+        console.log('[AppointmentDialog] Triggering async video room creation for appointment:', newAppointment.id);
+        videoRoomService.createVideoRoomAsync(newAppointment.id, 'high');
+      }
+
       toast({
         title: 'Success',
-        description: 'Appointment created successfully'
+        description: 'Appointment created successfully. Video room will be ready shortly.'
       });
 
       // Reset form and close dialog

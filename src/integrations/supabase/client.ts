@@ -23,63 +23,23 @@ export const supabase = createClient(
 // Use our centralized date parsing utility
 export { parseDateString, formatDateForDB };
 
-// Updated function to get or create a video room for an appointment, with option to force new room creation
+// Import the new video room service
+import { videoRoomService } from '@/utils/videoRoomService';
+
+// Updated function to get or create a video room for an appointment - now uses the new service
 export const getOrCreateVideoRoom = async (appointmentId: string, forceNew: boolean = false) => {
+  console.log('[getOrCreateVideoRoom] Using new video room service for appointment:', appointmentId);
+  
   try {
-    console.log('Getting or creating video room for appointment:', appointmentId, forceNew ? '(forcing new room)' : '');
+    const result = await videoRoomService.createVideoRoomSync(appointmentId, forceNew);
     
-    if (!forceNew) {
-      // First check if the appointment already has a video room URL
-      const { data: appointment, error: fetchError } = await supabase
-        .from('appointments')
-        .select('video_room_url')
-        .eq('id', appointmentId)
-        .single();
-        
-      if (fetchError) {
-        console.error('Error fetching appointment:', fetchError);
-        throw fetchError;
-      }
-      
-      // If a video room URL already exists, return it
-      if (appointment && appointment.video_room_url) {
-        console.log('Appointment already has video room URL:', appointment.video_room_url);
-        return { url: appointment.video_room_url, success: true };
-      }
+    if (result.success) {
+      return { url: result.url, success: true };
+    } else {
+      return { success: false, error: result.error };
     }
-    
-    console.log('Creating new video room via Edge Function');
-    // Create a new room via the Edge Function
-    const { data, error } = await supabase.functions.invoke('create-daily-room', {
-      body: { appointmentId, forceNew }
-    });
-    
-    if (error) {
-      console.error('Edge function error:', error);
-      throw error;
-    }
-    
-    if (!data?.url) {
-      console.error('No URL returned from edge function:', data);
-      throw new Error('Failed to get video room URL');
-    }
-    
-    console.log('Video room created, URL:', data.url);
-    
-    // Store the room URL in the appointment record
-    const { error: updateError } = await supabase
-      .from('appointments')
-      .update({ video_room_url: data.url })
-      .eq('id', appointmentId);
-      
-    if (updateError) {
-      console.error('Error updating appointment with video URL:', updateError);
-      throw updateError;
-    }
-    
-    return { url: data.url, success: true };
   } catch (error) {
-    console.error('Error getting/creating video room:', error);
+    console.error('[getOrCreateVideoRoom] Error:', error);
     return { success: false, error };
   }
 };
