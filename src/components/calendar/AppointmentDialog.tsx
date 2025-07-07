@@ -21,6 +21,8 @@ import { useToast } from '@/hooks/use-toast';
 import { videoRoomService } from '@/utils/videoRoomService';
 import { TimeZoneService } from '@/utils/timeZoneService';
 import { DateTime } from 'luxon';
+import RecurringOptions, { RecurrenceFrequency } from './RecurringOptions';
+import RecurringActionDialog from './RecurringActionDialog';
 
 interface Client {
   id: string;
@@ -65,6 +67,14 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [clinicianTimeZone, setClinicianTimeZone] = useState<string | null>(null);
+  
+  // Recurring appointment states
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurrenceFrequency, setRecurrenceFrequency] = useState<RecurrenceFrequency>('weekly');
+  const [recurrenceCount, setRecurrenceCount] = useState(4);
+  const [showRecurringAction, setShowRecurringAction] = useState(false);
+  const [recurringActionType, setRecurringActionType] = useState<'edit' | 'delete'>('edit');
+  
   const { toast } = useToast();
 
   const appointmentId = editingAppointment?.id;
@@ -172,6 +182,10 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
     setStartAMPM('AM');
     setNotes('');
     setShowDeleteConfirm(false);
+    setIsRecurring(false);
+    setRecurrenceFrequency('weekly');
+    setRecurrenceCount(4);
+    setShowRecurringAction(false);
   };
 
   const loadClients = async () => {
@@ -230,6 +244,46 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
     return selectedClient ? formatClientName(selectedClient) : '';
   };
 
+  const createRecurringAppointments = async (baseData: any, recurringGroupId: string) => {
+    const appointments = [];
+    const effectiveTimeZone = clinicianTimeZone || userTimeZone;
+    
+    // Convert the base start time to DateTime for calculations
+    const baseStartDateTime = DateTime.fromISO(baseData.start_at, { zone: 'utc' });
+    
+    for (let i = 0; i < recurrenceCount; i++) {
+      let nextStartDateTime = baseStartDateTime;
+      
+      // Calculate the next appointment date based on frequency
+      switch (recurrenceFrequency) {
+        case 'weekly':
+          nextStartDateTime = baseStartDateTime.plus({ weeks: i });
+          break;
+        case 'every_2_weeks':
+          nextStartDateTime = baseStartDateTime.plus({ weeks: i * 2 });
+          break;
+        case 'every_3_weeks':
+          nextStartDateTime = baseStartDateTime.plus({ weeks: i * 3 });
+          break;
+        case 'every_4_weeks':
+          nextStartDateTime = baseStartDateTime.plus({ weeks: i * 4 });
+          break;
+      }
+      
+      const nextEndDateTime = nextStartDateTime.plus({ hours: 1 });
+      
+      appointments.push({
+        ...baseData,
+        start_at: nextStartDateTime.toISO(),
+        end_at: nextEndDateTime.toISO(),
+        recurring_group_id: recurringGroupId,
+        appointment_recurring: recurrenceFrequency
+      });
+    }
+    
+    return appointments;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -237,6 +291,15 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
       toast({
         title: 'Validation Error',
         description: 'Please fill in all required fields',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    if (isRecurring && (!recurrenceFrequency || recurrenceCount < 4)) {
+      toast({
+        title: 'Validation Error',
+        description: 'Please complete recurring appointment settings',
         variant: 'destructive'
       });
       return;
@@ -289,36 +352,70 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
       console.log('[AppointmentDialog] Appointment data:', appointmentData);
 
       let error;
-      let newAppointmentId;
+      let newAppointmentIds: string[] = [];
       
       if (isEditMode && appointmentId) {
-        const result = await supabase
-          .from('appointments')
-          .update(appointmentData)
-          .eq('id', appointmentId);
-        error = result.error;
-        newAppointmentId = appointmentId;
+        // Handle editing existing appointments
+        if (editingAppointment?.recurring_group_id) {
+          // This is a recurring appointment - show action dialog
+          setRecurringActionType('edit');
+          setShowRecurringAction(true);
+          setIsLoading(false);
+          return;
+        } else {
+          // Regular single appointment update
+          const result = await supabase
+            .from('appointments')
+            .update(appointmentData)
+            .eq('id', appointmentId);
+          error = result.error;
+          newAppointmentIds = [appointmentId];
+        }
       } else {
-        const result = await supabase
-          .from('appointments')
-          .insert(appointmentData)
-          .select()
-          .single();
-        error = result.error;
-        newAppointmentId = result.data?.id;
+        // Creating new appointments
+        if (isRecurring) {
+          // Create recurring appointments
+          const recurringGroupId = crypto.randomUUID();
+          const appointments = await createRecurringAppointments(appointmentData, recurringGroupId);
+          
+          const result = await supabase
+            .from('appointments')
+            .insert(appointments)
+            .select('id');
+          
+          error = result.error;
+          newAppointmentIds = result.data?.map(a => a.id) || [];
+        } else {
+          // Create single appointment
+          const result = await supabase
+            .from('appointments')
+            .insert(appointmentData)
+            .select()
+            .single();
+          error = result.error;
+          newAppointmentIds = result.data ? [result.data.id] : [];
+        }
       }
 
       if (error) throw error;
 
-      // Create video room for new appointments (non-blocking)
-      if (!isEditMode && newAppointmentId) {
-        console.log('[AppointmentDialog] Triggering async video room creation for appointment:', newAppointmentId);
-        videoRoomService.createVideoRoomAsync(newAppointmentId, 'high');
+      // Create video rooms for new appointments (non-blocking)
+      if (!isEditMode && newAppointmentIds.length > 0) {
+        console.log('[AppointmentDialog] Triggering async video room creation for appointments:', newAppointmentIds);
+        newAppointmentIds.forEach(id => {
+          videoRoomService.createVideoRoomAsync(id, 'high');
+        });
       }
+
+      const successMessage = isEditMode 
+        ? 'Appointment updated successfully' 
+        : isRecurring 
+          ? `${recurrenceCount} recurring appointments created successfully. Video rooms will be ready shortly.`
+          : 'Appointment created successfully. Video room will be ready shortly.';
 
       toast({
         title: 'Success',
-        description: isEditMode ? 'Appointment updated successfully' : 'Appointment created successfully. Video room will be ready shortly.'
+        description: successMessage
       });
 
       resetForm();
@@ -342,6 +439,20 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
   };
 
   const handleDelete = async () => {
+    if (!appointmentId) return;
+    
+    // Check if this is a recurring appointment
+    if (editingAppointment?.recurring_group_id) {
+      setRecurringActionType('delete');
+      setShowRecurringAction(true);
+      return;
+    }
+    
+    // Handle single appointment deletion
+    await deleteSingleAppointment();
+  };
+
+  const deleteSingleAppointment = async () => {
     if (!appointmentId) return;
     
     try {
@@ -370,6 +481,208 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
     } finally {
       setIsDeleting(false);
       setShowDeleteConfirm(false);
+    }
+  };
+
+  const handleRecurringSingleEdit = async () => {
+    if (!appointmentId) return;
+    
+    try {
+      setIsLoading(true);
+      
+      // Remove from recurring group and update
+      const effectiveTimeZone = clinicianTimeZone || userTimeZone;
+      let hour24 = parseInt(startHour);
+      if (startAMPM === 'PM' && hour24 !== 12) {
+        hour24 += 12;
+      } else if (startAMPM === 'AM' && hour24 === 12) {
+        hour24 = 0;
+      }
+
+      const localDateTimeStart = `${date}T${hour24.toString().padStart(2, '0')}:${startMinute}`;
+      const startAtUTC = TimeZoneService.convertLocalToUTC(localDateTimeStart, effectiveTimeZone);
+      const endAtUTC = startAtUTC.plus({ hours: 1 });
+
+      const { error } = await supabase
+        .from('appointments')
+        .update({
+          client_id: selectedClientId,
+          start_at: startAtUTC.toISO(),
+          end_at: endAtUTC.toISO(),
+          appointment_timezone: effectiveTimeZone,
+          notes: notes || null,
+          recurring_group_id: null,
+          appointment_recurring: null
+        })
+        .eq('id', appointmentId);
+        
+      if (error) throw error;
+      
+      toast({
+        title: 'Success',
+        description: 'Appointment updated and removed from recurring series'
+      });
+      
+      onAppointmentUpdated?.();
+      onClose();
+    } catch (error) {
+      console.error('Error updating appointment:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update appointment',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsLoading(false);
+      setShowRecurringAction(false);
+    }
+  };
+
+  const handleRecurringSeriesEdit = async () => {
+    if (!appointmentId || !editingAppointment?.recurring_group_id) return;
+    
+    try {
+      setIsLoading(true);
+      
+      // Update all future appointments in the series
+      const effectiveTimeZone = clinicianTimeZone || userTimeZone;
+      let hour24 = parseInt(startHour);
+      if (startAMPM === 'PM' && hour24 !== 12) {
+        hour24 += 12;
+      } else if (startAMPM === 'AM' && hour24 === 12) {
+        hour24 = 0;
+      }
+
+      const localDateTimeStart = `${date}T${hour24.toString().padStart(2, '0')}:${startMinute}`;
+      const startAtUTC = TimeZoneService.convertLocalToUTC(localDateTimeStart, effectiveTimeZone);
+      
+      // Get the original appointment start time to calculate time difference
+      const originalStart = DateTime.fromISO(editingAppointment.start_at, { zone: 'utc' });
+      const newStart = startAtUTC;
+      const timeDiff = newStart.diff(originalStart);
+      
+      // Get all future appointments in the series (including current)
+      const { data: futureAppointments, error: fetchError } = await supabase
+        .from('appointments')
+        .select('id, start_at, end_at')
+        .eq('recurring_group_id', editingAppointment.recurring_group_id)
+        .gte('start_at', editingAppointment.start_at);
+        
+      if (fetchError) throw fetchError;
+      
+      // Update each future appointment
+      const updates = futureAppointments?.map(apt => {
+        const oldStart = DateTime.fromISO(apt.start_at, { zone: 'utc' });
+        const oldEnd = DateTime.fromISO(apt.end_at, { zone: 'utc' });
+        const newAptStart = oldStart.plus(timeDiff);
+        const newAptEnd = oldEnd.plus(timeDiff);
+        
+        return {
+          id: apt.id,
+          client_id: selectedClientId,
+          start_at: newAptStart.toISO(),
+          end_at: newAptEnd.toISO(),
+          appointment_timezone: effectiveTimeZone,
+          notes: notes || null
+        };
+      }) || [];
+      
+      // Batch update all appointments
+      for (const update of updates) {
+        const { error } = await supabase
+          .from('appointments')
+          .update(update)
+          .eq('id', update.id);
+          
+        if (error) throw error;
+      }
+      
+      toast({
+        title: 'Success',
+        description: `${updates.length} appointments in the series updated successfully`
+      });
+      
+      onAppointmentUpdated?.();
+      onClose();
+    } catch (error) {
+      console.error('Error updating recurring series:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update recurring series',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsLoading(false);
+      setShowRecurringAction(false);
+    }
+  };
+
+  const handleRecurringSingleDelete = async () => {
+    if (!appointmentId) return;
+    
+    try {
+      setIsDeleting(true);
+      
+      // Just delete this appointment
+      const { error } = await supabase
+        .from('appointments')
+        .delete()
+        .eq('id', appointmentId);
+        
+      if (error) throw error;
+      
+      toast({
+        title: 'Success',
+        description: 'Appointment deleted from series'
+      });
+      
+      onAppointmentUpdated?.();
+      onClose();
+    } catch (error) {
+      console.error('Error deleting appointment:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete appointment',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsDeleting(false);
+      setShowRecurringAction(false);
+    }
+  };
+
+  const handleRecurringSeriesDelete = async () => {
+    if (!appointmentId || !editingAppointment?.recurring_group_id) return;
+    
+    try {
+      setIsDeleting(true);
+      
+      // Delete all future appointments in the series (including current)
+      const { error } = await supabase
+        .from('appointments')
+        .delete()
+        .eq('recurring_group_id', editingAppointment.recurring_group_id)
+        .gte('start_at', editingAppointment.start_at);
+        
+      if (error) throw error;
+      
+      toast({
+        title: 'Success',
+        description: 'All future appointments in the series deleted successfully'
+      });
+      
+      onAppointmentUpdated?.();
+      onClose();
+    } catch (error) {
+      console.error('Error deleting recurring series:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete recurring series',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsDeleting(false);
+      setShowRecurringAction(false);
     }
   };
 
@@ -481,6 +794,19 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
               />
             </div>
 
+            {/* Recurring Options - only show for new appointments */}
+            {!isEditMode && (
+              <RecurringOptions
+                isRecurring={isRecurring}
+                onRecurringChange={setIsRecurring}
+                recurrenceFrequency={recurrenceFrequency}
+                onFrequencyChange={setRecurrenceFrequency}
+                recurrenceCount={recurrenceCount}
+                onCountChange={setRecurrenceCount}
+                disabled={isLoading}
+              />
+            )}
+
             {(clinicianTimeZone || userTimeZone) && (
               <div className="text-sm text-gray-500 text-center">
                 Times will be saved in timezone: {clinicianTimeZone || userTimeZone} | Duration: 1 hour
@@ -526,7 +852,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction 
-              onClick={handleDelete}
+              onClick={deleteSingleAppointment}
               disabled={isDeleting}
               className="bg-red-600 hover:bg-red-700"
             >
@@ -535,6 +861,16 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Recurring Action Dialog */}
+      <RecurringActionDialog
+        isOpen={showRecurringAction}
+        onOpenChange={setShowRecurringAction}
+        actionType={recurringActionType}
+        onSingleAction={recurringActionType === 'edit' ? handleRecurringSingleEdit : handleRecurringSingleDelete}
+        onSeriesAction={recurringActionType === 'edit' ? handleRecurringSeriesEdit : handleRecurringSeriesDelete}
+        isLoading={isLoading || isDeleting}
+      />
     </>
   );
 };
