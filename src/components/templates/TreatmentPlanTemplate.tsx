@@ -215,6 +215,10 @@ const TreatmentPlanTemplate: React.FC<TreatmentPlanTemplateProps> = ({
           description: "Please log in to save the treatment plan",
           variant: "destructive"
         });
+        // Redirect to login if not already there
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login';
+        }
         return;
       }
       console.log('✅ User authenticated:', currentUser.id);
@@ -234,7 +238,8 @@ const TreatmentPlanTemplate: React.FC<TreatmentPlanTemplateProps> = ({
 
       // Step 4: Validate date conversion
       const convertedNextUpdate = convertDateForDatabase(formState.nextUpdate);
-      if (!convertedNextUpdate && formState.nextUpdate) {
+      // Only fail if there's a nextUpdate value but conversion failed (not for empty strings)
+      if (formState.nextUpdate && !convertedNextUpdate) {
         console.error('❌ Save failed: Date conversion failed for:', formState.nextUpdate);
         toast({
           title: "Date Error",
