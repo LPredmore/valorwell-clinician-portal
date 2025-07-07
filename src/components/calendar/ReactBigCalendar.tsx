@@ -33,17 +33,39 @@ const ReactBigCalendar: React.FC<ExtendedReactBigCalendarProps> = ({
   onViewChange,
   userTimeZone = 'America/New_York',
 }) => {
-  // Controlled view state
+  // View mapping between string and Views enum
+  const getViewFromString = (viewString: string) => {
+    switch (viewString.toLowerCase()) {
+      case 'month': return Views.MONTH;
+      case 'week': return Views.WEEK;
+      case 'day': return Views.DAY;
+      default: return Views.WEEK;
+    }
+  };
+
+  const getStringFromView = (view: any) => {
+    if (typeof view === 'string') return view;
+    switch (view) {
+      case Views.MONTH: return 'month';
+      case Views.WEEK: return 'week';
+      case Views.DAY: return 'day';
+      default: return 'week';
+    }
+  };
+
+  // Controlled view state - use enum internally
   const [internalView, setInternalView] = useState(Views.WEEK);
-  const currentView = externalView || internalView;
+  const currentView = externalView ? getViewFromString(externalView) : internalView;
   
   // Handle view changes
-  const handleViewChange = useCallback((newView: string) => {
-    console.log('[ReactBigCalendar] View change:', { from: currentView, to: newView });
+  const handleViewChange = useCallback((newView: any) => {
+    const viewString = getStringFromView(newView);
+    console.log('[ReactBigCalendar] View change:', { from: getStringFromView(currentView), to: viewString });
+    
     if (onViewChange) {
-      onViewChange(newView);
+      onViewChange(viewString);
     } else {
-      setInternalView(newView as any);
+      setInternalView(getViewFromString(viewString));
     }
   }, [currentView, onViewChange]);
   console.log('[ReactBigCalendar] Rendered with:', {

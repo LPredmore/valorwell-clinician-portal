@@ -11,6 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Plus, Clock, Calendar as CalendarIcon, Link2, Settings } from "lucide-react";
 import { DateTime } from "luxon";
+import { Views } from "react-big-calendar";
 import { useAppointments } from "@/hooks/useAppointments";
 import { useNylasEvents } from "@/hooks/useNylasEvents";
 import { useClinicianAvailability } from "@/hooks/useClinicianAvailability";
@@ -37,7 +38,7 @@ const CalendarContainer: React.FC = () => {
   const { userId, authInitialized, userRole } = useUser();
   const { user } = useAuth();
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [currentView, setCurrentView] = useState('week');
+  const [currentView, setCurrentView] = useState<string>('week');
   const [userTimeZone, setUserTimeZone] = useState<string>(TimeZoneService.DEFAULT_TIMEZONE);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [isAvailabilityOpen, setIsAvailabilityOpen] = useState(false);
