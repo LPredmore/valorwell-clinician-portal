@@ -81,10 +81,9 @@ const CalendarContainer: React.FC = () => {
     // Transform appointments to RBC format
     if (appointments) {
       events.push(...appointments.map(apt => {
-        // Use the appointment's stored timezone, fallback to user timezone
-        const appointmentTimeZone = TimeZoneService.ensureIANATimeZone(apt.appointment_timezone || userTimeZone);
-        const startDT = DateTime.fromISO(apt.start_at, { zone: 'utc' }).setZone(appointmentTimeZone);
-        const endDT = DateTime.fromISO(apt.end_at, { zone: 'utc' }).setZone(appointmentTimeZone);
+        // Convert UTC times directly to user's timezone for display
+        const startDT = DateTime.fromISO(apt.start_at, { zone: 'utc' }).setZone(userTimeZone);
+        const endDT = DateTime.fromISO(apt.end_at, { zone: 'utc' }).setZone(userTimeZone);
 
         return {
           id: apt.id,
@@ -159,9 +158,13 @@ const CalendarContainer: React.FC = () => {
         const startDT = DateTime.fromISO(startISO, { zone: clinicianTz });
         const endDT = DateTime.fromISO(endISO, { zone: clinicianTz });
         
+        // Convert from clinician timezone to user timezone for display
+        const userStartDT = startDT.setZone(userTimeZone);
+        const userEndDT = endDT.setZone(userTimeZone);
+        
         return {
-          start: startDT.toJSDate(),
-          end: endDT.toJSDate(),
+          start: userStartDT.toJSDate(),
+          end: userEndDT.toJSDate(),
           resource: slot
         };
       });
