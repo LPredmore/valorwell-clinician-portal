@@ -213,7 +213,7 @@ export const useSessionNoteForm = ({
 
   useEffect(() => {
     if (appointment && appointment.client) {
-      const appointmentDate = appointment.date ? new Date(appointment.date).toISOString().split('T')[0] : '';
+      const appointmentDate = appointment.start_at ? new Date(appointment.start_at).toISOString().split('T')[0] : '';
       
       setFormState(prevState => ({
         ...prevState,
