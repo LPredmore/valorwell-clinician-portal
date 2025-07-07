@@ -114,8 +114,22 @@ const DocumentationTab: React.FC<DocumentationTabProps> = ({
 
   return <div className="grid grid-cols-1 gap-6">
       <Card>
-        
-        
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5 text-valorwell-600" />
+            Treatment Plan
+          </CardTitle>
+          <CardDescription>Create and manage treatment plans for this client</CardDescription>
+        </CardHeader>
+        <CardContent className="py-6">
+          <Button 
+            onClick={() => setShowTreatmentPlanTemplate(true)}
+            className="w-full sm:w-auto"
+          >
+            <FileText className="h-4 w-4 mr-2" />
+            Create New Treatment Plan
+          </Button>
+        </CardContent>
       </Card>
 
       {showTreatmentPlanTemplate && <div className="animate-fade-in">
