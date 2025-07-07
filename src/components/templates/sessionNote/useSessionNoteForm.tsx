@@ -195,19 +195,18 @@ export const useSessionNoteForm = ({
           : prevState.patientName
       }));
 
-      if (clientData?.id && appointmentDate) {
-        fetchPHQ9Assessment(clientData.id, appointmentDate);
+      if (appointment.id) {
+        fetchPHQ9Assessment(appointment.id);
       }
     }
   }, [appointment, clientData]);
 
-  const fetchPHQ9Assessment = async (clientId: string, assessmentDate: string) => {
+  const fetchPHQ9Assessment = async (appointmentId: string) => {
     try {
       const { data, error } = await supabase
         .from('phq9_assessments')
         .select('*')
-        .eq('client_id', clientId)
-        .eq('assessment_date', assessmentDate)
+        .eq('appointment_id', appointmentId)
         .maybeSingle();
 
       if (error) {
