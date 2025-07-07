@@ -487,6 +487,57 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
           </Button>
         </div>
 
+        {/* Calendar Display Settings */}
+        <div className="mt-6 p-3 border rounded-md">
+          <h4 className="font-medium mb-2">Calendar Display</h4>
+          <p className="text-sm text-muted-foreground mb-3">
+            Set the time range displayed in your calendar view
+          </p>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-xs">Start Time</Label>
+                <Select defaultValue="08:00">
+                  <SelectTrigger className="h-8">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({length: 24}, (_, i) => {
+                      const hour = i.toString().padStart(2, '0');
+                      return (
+                        <SelectItem key={hour} value={`${hour}:00`}>
+                          {hour}:00
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">End Time</Label>
+                <Select defaultValue="21:00">
+                  <SelectTrigger className="h-8">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({length: 24}, (_, i) => {
+                      const hour = i.toString().padStart(2, '0');
+                      return (
+                        <SelectItem key={hour} value={`${hour}:00`}>
+                          {hour}:00
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <Button variant="outline" size="sm" className="w-full">
+              Save Display Settings
+            </Button>
+          </div>
+        </div>
+
         {/* Current Availability Summary */}
         <div className="mt-6">
           <h4 className="font-medium mb-2">Current Availability</h4>
