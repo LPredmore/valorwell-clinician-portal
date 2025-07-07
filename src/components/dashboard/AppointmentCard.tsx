@@ -6,7 +6,6 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Appointment } from '@/types/appointment';
 import { formatAppointmentDate, formatAppointmentTime } from '@/utils/appointmentUtils';
 import { TimeZoneService } from '@/utils/timeZoneService';
-import VideoRoomStatusIndicator from './VideoRoomStatusIndicator';
 
 export interface AppointmentCardProps {
   appointment: Appointment;
@@ -119,14 +118,6 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
           </div>
         <div className="text-sm mt-1">{appointment.type}</div>
         
-        {/* Video Room Status */}
-        <div className="flex items-center mt-2">
-          <VideoRoomStatusIndicator 
-            appointmentId={appointment.id} 
-            size="small"
-            showRecreateButton={!!onDocumentSession}
-          />
-        </div>
         
         {/* STEP 5: Show timezone conversion info for debugging */}
         {process.env.NODE_ENV !== 'production' && appointment.appointment_timezone && (
@@ -184,14 +175,6 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
         </div>
         <div className="text-sm mt-1">{appointment.type}</div>
         
-        {/* Video Room Status */}
-        <div className="flex items-center mt-2">
-          <VideoRoomStatusIndicator 
-            appointmentId={appointment.id} 
-            size="small"
-            showRecreateButton={showStartButton}
-          />
-        </div>
         
         {/* STEP 5: Show timezone conversion info for debugging */}
         {process.env.NODE_ENV !== 'production' && appointment.appointment_timezone && (
