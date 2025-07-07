@@ -4,6 +4,9 @@ project_id = "gqlkritspnhjxfejvgfg"
 [functions.create-daily-room]
 verify_jwt = true
 
+[functions.generate-clinical-note]
+verify_jwt = true
+
 [functions.getavailabilitysettings]
 verify_jwt = true
 
