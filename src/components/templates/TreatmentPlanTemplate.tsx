@@ -190,18 +190,61 @@ const TreatmentPlanTemplate: React.FC<TreatmentPlanTemplateProps> = ({
 
   const handleSave = async () => {
     setIsSaving(true);
+    
     try {
+      console.log('🔄 Starting treatment plan save process...');
+      
+      // Step 1: Validate prerequisites
       if (!clientData?.id) {
+        console.error('❌ Save failed: Missing client data');
         toast({
           title: "Error",
           description: "Cannot save - client data is missing",
           variant: "destructive"
         });
-        setIsSaving(false);
         return;
       }
 
-      // Map form data back to database schema
+      // Step 2: Check authentication
+      console.log('🔐 Checking user authentication...');
+      const currentUser = await getCurrentUser();
+      if (!currentUser) {
+        console.error('❌ Save failed: User not authenticated');
+        toast({
+          title: "Authentication Required",
+          description: "Please log in to save the treatment plan",
+          variant: "destructive"
+        });
+        return;
+      }
+      console.log('✅ User authenticated:', currentUser.id);
+
+      // Step 3: Validate form data
+      console.log('📝 Validating form data...');
+      if (!validateForm()) {
+        console.error('❌ Save failed: Form validation failed');
+        toast({
+          title: "Validation Error",
+          description: "Please fill in all required fields before saving",
+          variant: "destructive"
+        });
+        return;
+      }
+      console.log('✅ Form validation passed');
+
+      // Step 4: Validate date conversion
+      const convertedNextUpdate = convertDateForDatabase(formState.nextUpdate);
+      if (!convertedNextUpdate && formState.nextUpdate) {
+        console.error('❌ Save failed: Date conversion failed for:', formState.nextUpdate);
+        toast({
+          title: "Date Error",
+          description: "Invalid date format for next treatment plan update",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Step 5: Prepare database updates
       const updates = {
         client_planlength: formState.planLength,
         client_treatmentfrequency: formState.treatmentFrequency,
@@ -217,62 +260,89 @@ const TreatmentPlanTemplate: React.FC<TreatmentPlanTemplateProps> = ({
         client_intervention4: formState.intervention4,
         client_intervention5: formState.intervention5,
         client_intervention6: formState.intervention6,
-        client_nexttreatmentplanupdate: convertDateForDatabase(formState.nextUpdate),
+        client_nexttreatmentplanupdate: convertedNextUpdate,
         client_privatenote: formState.privateNote
       };
 
-      console.log('Saving treatment plan with updates:', updates);
-      console.log('For client with ID:', clientData.id);
+      console.log('💾 Saving treatment plan to database...', {
+        clientId: clientData.id,
+        updateFields: Object.keys(updates)
+      });
 
-      // Update client in database
-      const { error, data } = await supabase
+      // Step 6: Save to database first (critical operation)
+      const { error: dbError, data } = await supabase
         .from('clients')
         .update(updates)
         .eq('id', clientData.id)
         .select();
 
-      if (error) {
-        console.error('Error from Supabase:', error);
-        throw error;
+      if (dbError) {
+        console.error('❌ Database save failed:', dbError);
+        toast({
+          title: "Database Error",
+          description: `Failed to save treatment plan: ${dbError.message}`,
+          variant: "destructive"
+        });
+        return;
       }
 
-      console.log('Treatment plan saved successfully:', data);
+      console.log('✅ Treatment plan saved to database successfully');
 
-      // Generate and save PDF
+      // Step 7: Generate PDF (non-critical operation)
+      let pdfSuccess = false;
       if (treatmentPlanRef.current) {
-        const currentUser = await getCurrentUser();
-        const documentInfo = {
-          clientId: clientData.id,
-          documentType: 'Treatment Plan',
-          documentDate: formState.startDate || new Date(),
-          documentTitle: `Treatment Plan - ${format(formState.startDate || new Date(), 'yyyy-MM-dd')}`,
-          createdBy: currentUser?.id
-        };
+        try {
+          console.log('📄 Generating PDF document...');
+          const documentInfo = {
+            clientId: clientData.id,
+            documentType: 'Treatment Plan',
+            documentDate: formState.startDate || new Date(),
+            documentTitle: `Treatment Plan - ${format(formState.startDate || new Date(), 'yyyy-MM-dd')}`,
+            createdBy: currentUser.id
+          };
 
-        const pdfPath = await generateAndSavePDF('treatment-plan-content', documentInfo);
-        
-        if (pdfPath) {
-          console.log('PDF saved successfully at path:', pdfPath);
-        } else {
-          console.error('Failed to generate or save PDF');
+          const pdfPath = await generateAndSavePDF('treatment-plan-content', documentInfo);
+          
+          if (pdfPath) {
+            console.log('✅ PDF generated and saved successfully:', pdfPath);
+            pdfSuccess = true;
+          } else {
+            console.warn('⚠️ PDF generation returned null - check PDF utils for details');
+          }
+        } catch (pdfError) {
+          console.error('❌ PDF generation failed:', pdfError);
         }
+      } else {
+        console.warn('⚠️ Treatment plan content ref not available for PDF generation');
       }
 
-      toast({
-        title: "Success",
-        description: "Treatment plan saved successfully"
-      });
+      // Step 8: Show appropriate success message
+      if (pdfSuccess) {
+        toast({
+          title: "Success",
+          description: "Treatment plan saved and PDF generated successfully"
+        });
+      } else {
+        toast({
+          title: "Partially Saved",
+          description: "Treatment plan saved to database, but PDF generation failed. You can regenerate the PDF later.",
+          variant: "default"
+        });
+      }
 
+      console.log('🎉 Treatment plan save process completed');
       onClose();
+
     } catch (err) {
-      console.error('Error saving treatment plan:', err);
+      console.error('💥 Unexpected error during save:', err);
       toast({
-        title: "Error",
-        description: "Failed to save treatment plan",
+        title: "Unexpected Error",
+        description: `Failed to save treatment plan: ${err instanceof Error ? err.message : 'Unknown error'}`,
         variant: "destructive"
       });
     } finally {
       setIsSaving(false);
+      console.log('🔄 Save operation completed, resetting saving state');
     }
   };
 
