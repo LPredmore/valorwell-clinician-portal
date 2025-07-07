@@ -26,7 +26,7 @@ export const fetchClinicianAppointments = async (clinicianId: string): Promise<A
         )
       `)
       .eq('clinician_id', clinicianId)
-      .eq('status', 'scheduled') // Only get real scheduled appointments
+      .in('status', ['scheduled', 'completed', 'no-show']) // Get appointments that need to be shown
       .order('start_at', { ascending: true });
 
     if (error) {

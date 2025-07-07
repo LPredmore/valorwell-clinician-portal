@@ -118,30 +118,55 @@ const ClinicianDashboard = () => {
     fetchAppointments();
   }, [userId]); // Remove refreshTrigger from dependencies
 
-  // Memoize expensive appointment calculations
+  // Memoize expensive appointment calculations using clinician timezone
   const appointmentCategories = useMemo(() => {
-    const today = new Date();
-    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+    if (!appointments.length) {
+      return { today: [], upcoming: [], outstanding: [] };
+    }
 
-    // Simplified to use all appointments (blocked time now in separate table)
-    const realAppointments = appointments;
+    // Use clinician timezone for all date calculations
+    const now = TimeZoneService.now(safeClinicianTimeZone);
+    const todayStart = now.startOf('day');
+    const todayEnd = now.endOf('day');
 
-    return {
-      today: realAppointments.filter(apt => {
-        const aptDate = new Date(apt.start_at);
-        return aptDate >= todayStart && aptDate < todayEnd && apt.status !== 'cancelled';
-      }),
-      upcoming: realAppointments.filter(apt => {
-        const aptDate = new Date(apt.start_at);
-        return aptDate >= todayEnd && apt.status !== 'cancelled';
-      }),
-      past: realAppointments.filter(apt => {
-        const aptDate = new Date(apt.start_at);
-        return aptDate < todayStart && apt.status === 'completed' && !apt.notes;
-      })
+    console.log('[ClinicianDashboard] Categorizing appointments using clinician timezone:', {
+      clinicianTimeZone: safeClinicianTimeZone,
+      todayStart: todayStart.toISO(),
+      todayEnd: todayEnd.toISO(),
+      totalAppointments: appointments.length
+    });
+
+    // Filter out cancelled appointments
+    const activeAppointments = appointments.filter(apt => apt.status !== 'cancelled');
+
+    const categorized = {
+      today: activeAppointments.filter(apt => {
+        const aptDateTime = TimeZoneService.fromUTC(apt.start_at, safeClinicianTimeZone);
+        const isToday = aptDateTime >= todayStart && aptDateTime <= todayEnd;
+        return isToday;
+      }).sort((a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime()),
+      
+      outstanding: activeAppointments.filter(apt => {
+        const aptDateTime = TimeZoneService.fromUTC(apt.start_at, safeClinicianTimeZone);
+        const isTodayOrEarlier = aptDateTime <= todayEnd;
+        return isTodayOrEarlier;
+      }).sort((a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime()),
+      
+      upcoming: activeAppointments.filter(apt => {
+        const aptDateTime = TimeZoneService.fromUTC(apt.start_at, safeClinicianTimeZone);
+        const isFuture = aptDateTime > todayEnd;
+        return isFuture;
+      }).sort((a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime())
     };
-  }, [appointments]);
+
+    console.log('[ClinicianDashboard] Appointment categorization results:', {
+      todayCount: categorized.today.length,
+      outstandingCount: categorized.outstanding.length,
+      upcomingCount: categorized.upcoming.length
+    });
+
+    return categorized;
+  }, [appointments, safeClinicianTimeZone]);
 
   // Video session handlers
   const startVideoSession = (appointment: Appointment) => {
@@ -316,7 +341,7 @@ const ClinicianDashboard = () => {
     totalAppointments: appointments.length,
     todayCount: appointmentCategories.today.length,
     upcomingCount: appointmentCategories.upcoming.length,
-    pastCount: appointmentCategories.past.length
+    outstandingCount: appointmentCategories.outstanding.length
   });
 
   if (showSessionTemplate && currentAppointment) {
@@ -359,7 +384,7 @@ const ClinicianDashboard = () => {
             <AppointmentsList
               title="Outstanding Documentation"
               icon={<AlertCircle className="h-5 w-5 mr-2" />}
-              appointments={appointmentCategories.past}
+              appointments={appointmentCategories.outstanding}
               isLoading={isLoadingAppointments || isLoadingTimeZone || isLoadingClientData}
               error={error}
               emptyMessage="No outstanding documentation."
