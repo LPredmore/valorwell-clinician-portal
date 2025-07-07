@@ -244,9 +244,18 @@ const CalendarContainer: React.FC = () => {
         return;
       }
 
+      // Round to reasonable business hours
+      // Round start time down to the nearest hour
+      const startHour = earliestStart.getHours();
+      const roundedStartHour = Math.max(7, startHour); // Don't go earlier than 7 AM
+      
+      // Round end time up to the nearest hour
+      const endHour = latestEnd.getHours();
+      const roundedEndHour = Math.min(22, endHour + (latestEnd.getMinutes() > 0 ? 1 : 0)); // Don't go later than 10 PM
+
       // Format to HH:MM with validation
-      const newStartTime = earliestStart.toTimeString().substring(0, 5);
-      const newEndTime = latestEnd.toTimeString().substring(0, 5);
+      const newStartTime = `${roundedStartHour.toString().padStart(2, '0')}:00`;
+      const newEndTime = `${roundedEndHour.toString().padStart(2, '0')}:00`;
 
       // Validate time format (should be HH:MM)
       const timePattern = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
