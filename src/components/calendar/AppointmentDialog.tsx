@@ -63,6 +63,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
   const [isInitialized, setIsInitialized] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [clinicianTimeZone, setClinicianTimeZone] = useState<string | null>(null);
   const { toast } = useToast();
 
   const appointmentId = editingAppointment?.id;
@@ -87,10 +88,11 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
     { value: 'PM', label: 'PM' }
   ];
 
-  // Load clients when dialog opens
+  // Load clients and clinician timezone when dialog opens
   useEffect(() => {
     if (isOpen && clinicianId) {
       loadClients();
+      loadClinicianTimeZone();
     }
   }, [isOpen, clinicianId]);
 
@@ -194,6 +196,32 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
     }
   };
 
+  const loadClinicianTimeZone = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('clinicians')
+        .select('clinician_time_zone')
+        .eq('id', clinicianId)
+        .single();
+
+      if (error) throw error;
+      
+      const timezone = data?.clinician_time_zone || userTimeZone;
+      setClinicianTimeZone(timezone);
+      
+      console.log('[AppointmentDialog] Loaded clinician timezone:', {
+        clinicianId,
+        fetchedTimezone: data?.clinician_time_zone,
+        fallbackTimezone: userTimeZone,
+        finalTimezone: timezone
+      });
+    } catch (error) {
+      console.error('Error loading clinician timezone:', error);
+      // Fallback to userTimeZone
+      setClinicianTimeZone(userTimeZone);
+    }
+  };
+
   // Get the client name for the selected client (for edit mode display)
   const getSelectedClientName = () => {
     if (!selectedClientId || !clients.length) return '';
@@ -216,12 +244,13 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
     try {
       setIsLoading(true);
 
-      // Use browser timezone for creation (matching blocked time logic)
-      const browserTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      // Use clinician's timezone for creation (like blocked time logic)
+      const effectiveTimeZone = clinicianTimeZone || userTimeZone;
       
-      console.log('[AppointmentDialog] Using browser timezone for creation (like blocked time):', {
-        browserTimeZone,
+      console.log('[AppointmentDialog] Using clinician timezone for creation:', {
+        clinicianTimeZone,
         userTimeZone,
+        effectiveTimeZone,
         isEdit: isEditMode
       });
 
@@ -235,14 +264,14 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
 
       const localDateTimeStart = `${date}T${hour24.toString().padStart(2, '0')}:${startMinute}`;
       
-      console.log('[AppointmentDialog] Converting times (fixed to match blocked time exactly):', {
+      console.log('[AppointmentDialog] Converting times using clinician timezone:', {
         localDateTimeStart,
-        browserTimeZone,
+        effectiveTimeZone,
         isEdit: isEditMode
       });
 
-      // Use same UTC conversion logic as blocked time (which works correctly)
-      const startAtUTC = TimeZoneService.convertLocalToUTC(localDateTimeStart, browserTimeZone);
+      // Use same UTC conversion logic as blocked time with clinician's timezone
+      const startAtUTC = TimeZoneService.convertLocalToUTC(localDateTimeStart, effectiveTimeZone);
       const endAtUTC = startAtUTC.plus({ hours: 1 });
 
       const appointmentData = {
@@ -250,7 +279,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
         clinician_id: clinicianId,
         start_at: startAtUTC.toISO(),
         end_at: endAtUTC.toISO(),
-        appointment_timezone: browserTimeZone,
+        appointment_timezone: effectiveTimeZone,
         type: 'therapy_session',
         status: 'scheduled',
         notes: notes || null
@@ -439,9 +468,9 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
               />
             </div>
 
-            {userTimeZone && (
+            {(clinicianTimeZone || userTimeZone) && (
               <div className="text-sm text-gray-500 text-center">
-                Times will be saved in timezone: {userTimeZone} | Duration: 1 hour
+                Times will be saved in timezone: {clinicianTimeZone || userTimeZone} | Duration: 1 hour
               </div>
             )}
 
