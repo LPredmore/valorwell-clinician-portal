@@ -81,8 +81,10 @@ const CalendarContainer: React.FC = () => {
     // Transform appointments to RBC format
     if (appointments) {
       events.push(...appointments.map(apt => {
-        const startDT = DateTime.fromISO(apt.start_at, { zone: 'utc' }).setZone(userTimeZone);
-        const endDT = DateTime.fromISO(apt.end_at, { zone: 'utc' }).setZone(userTimeZone);
+        // Use the appointment's stored timezone, fallback to user timezone
+        const appointmentTimeZone = TimeZoneService.ensureIANATimeZone(apt.appointment_timezone || userTimeZone);
+        const startDT = DateTime.fromISO(apt.start_at, { zone: 'utc' }).setZone(appointmentTimeZone);
+        const endDT = DateTime.fromISO(apt.end_at, { zone: 'utc' }).setZone(appointmentTimeZone);
 
         return {
           id: apt.id,
@@ -127,6 +129,7 @@ const CalendarContainer: React.FC = () => {
 
   // Transform availability slots to background events
   const backgroundEvents = useMemo(() => {
+    // Use user timezone for date range calculation
     const tz = userTimeZone;
     const startDT = DateTime.fromJSDate(weekStart).setZone(tz).startOf('day');
     const endDT = DateTime.fromJSDate(weekEnd).setZone(tz).startOf('day');
@@ -151,8 +154,10 @@ const CalendarContainer: React.FC = () => {
         const startISO = `${d.toISODate()}T${slot.startTime}`;
         const endISO = `${d.toISODate()}T${slot.endTime}`;
         
-        const startDT = DateTime.fromISO(startISO, { zone: tz });
-        const endDT = DateTime.fromISO(endISO, { zone: tz });
+        // Use clinician's timezone to interpret the time strings
+        const clinicianTz = TimeZoneService.ensureIANATimeZone(slot.clinicianTimeZone);
+        const startDT = DateTime.fromISO(startISO, { zone: clinicianTz });
+        const endDT = DateTime.fromISO(endISO, { zone: clinicianTz });
         
         return {
           start: startDT.toJSDate(),
