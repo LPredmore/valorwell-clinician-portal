@@ -69,8 +69,6 @@ const CalendarContainer: React.FC = () => {
 
   const availabilitySlots = useClinicianAvailability(
     userId,
-    weekStart,
-    weekEnd,
     refreshTrigger
   );
 

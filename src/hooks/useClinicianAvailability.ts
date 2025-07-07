@@ -13,8 +13,6 @@ export interface AvailabilitySlot {
 
 export function useClinicianAvailability(
   clinicianId: string | null, 
-  weekStart: Date,
-  weekEnd: Date,
   refreshTrigger = 0
 ) {
   const [slots, setSlots] = useState<AvailabilitySlot[]>([]);
@@ -94,7 +92,7 @@ export function useClinicianAvailability(
     };
 
     loadAvailability();
-  }, [clinicianId, weekStart, weekEnd, toast, refreshTrigger]);
+  }, [clinicianId, refreshTrigger]);
 
   return slots;
 }
