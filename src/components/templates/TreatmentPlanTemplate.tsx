@@ -346,7 +346,7 @@ const TreatmentPlanTemplate: React.FC<TreatmentPlanTemplateProps> = ({
                   value={formState.planLength}
                   onValueChange={(value) => handleChange('planLength', value)}
                 >
-                  <SelectTrigger id="plan-type">
+                  <SelectTrigger id="plan-type" data-select-value={formState.planLength}>
                     <SelectValue placeholder="Select plan length" />
                   </SelectTrigger>
                   <SelectContent>
@@ -357,6 +357,13 @@ const TreatmentPlanTemplate: React.FC<TreatmentPlanTemplateProps> = ({
                     <SelectItem value="12month">12 month</SelectItem>
                   </SelectContent>
                 </Select>
+                <span className="select-pdf-value hidden">
+                  {formState.planLength === '1month' && '1 month'}
+                  {formState.planLength === '3month' && '3 month'}
+                  {formState.planLength === '6month' && '6 month'}
+                  {formState.planLength === '9month' && '9 month'}
+                  {formState.planLength === '12month' && '12 month'}
+                </span>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="treatment-frequency" className="text-sm text-valorwell-700 font-semibold">Treatment Frequency</Label>
@@ -364,7 +371,7 @@ const TreatmentPlanTemplate: React.FC<TreatmentPlanTemplateProps> = ({
                   value={formState.treatmentFrequency}
                   onValueChange={(value) => handleChange('treatmentFrequency', value)}
                 >
-                  <SelectTrigger id="treatment-frequency">
+                  <SelectTrigger id="treatment-frequency" data-select-value={formState.treatmentFrequency}>
                     <SelectValue placeholder="Select frequency" />
                   </SelectTrigger>
                   <SelectContent>
@@ -374,6 +381,12 @@ const TreatmentPlanTemplate: React.FC<TreatmentPlanTemplateProps> = ({
                     <SelectItem value="asneeded">As Needed</SelectItem>
                   </SelectContent>
                 </Select>
+                <span className="select-pdf-value hidden">
+                  {formState.treatmentFrequency === 'weekly' && 'Weekly'}
+                  {formState.treatmentFrequency === 'biweekly' && 'Bi-Weekly'}
+                  {formState.treatmentFrequency === 'monthly' && 'Monthly'}
+                  {formState.treatmentFrequency === 'asneeded' && 'As Needed'}
+                </span>
               </div>
             </div>
             

@@ -168,13 +168,24 @@ const processFormElementsForPDF = (element: HTMLElement) => {
   inputs.forEach(input => {
     if (input.type === 'text' || input.type === 'date') {
       // Create a visible text representation of the input value
-      const valueSpan = document.createElement('div');
-      valueSpan.className = 'pdf-value-display';
-      valueSpan.textContent = input.value || '';
+      const valueDiv = document.createElement('div');
+      valueDiv.className = 'pdf-value-display';
+      valueDiv.textContent = input.value || '';
       
-      // Replace the input with the span
+      // Ensure proper sizing and padding
+      valueDiv.style.minHeight = '32px';
+      valueDiv.style.padding = '8px 12px';
+      valueDiv.style.border = '1px solid #d1d5db';
+      valueDiv.style.borderRadius = '6px';
+      valueDiv.style.backgroundColor = '#ffffff';
+      valueDiv.style.fontSize = '14px';
+      valueDiv.style.lineHeight = '1.5';
+      valueDiv.style.wordWrap = 'break-word';
+      valueDiv.style.overflow = 'visible';
+      
+      // Replace the input with the div
       if (input.parentNode) {
-        input.parentNode.replaceChild(valueSpan, input);
+        input.parentNode.replaceChild(valueDiv, input);
       }
     }
   });
@@ -184,17 +195,30 @@ const processFormElementsForPDF = (element: HTMLElement) => {
   textareas.forEach(textarea => {
     // Create a div to represent the textarea content
     const contentDiv = document.createElement('div');
-    contentDiv.className = 'pdf-value-display';
+    contentDiv.className = 'pdf-value-display textarea-content';
     
     // Preserve content and line breaks
-    contentDiv.textContent = textarea.value || '';
+    const content = textarea.value || '';
+    contentDiv.textContent = content;
     contentDiv.style.whiteSpace = 'pre-wrap';
+    contentDiv.style.wordWrap = 'break-word';
+    contentDiv.style.overflow = 'visible';
     
-    // Add more height for textareas with substantial content
-    const lineCount = (textarea.value.match(/\n/g) || []).length + 1;
-    if (lineCount > 2 || textarea.value.length > 100) {
-      contentDiv.style.minHeight = Math.min(Math.max(lineCount * 20, 60), 300) + 'px';
-    }
+    // Calculate proper height based on content
+    const lineCount = (content.match(/\n/g) || []).length + 1;
+    const estimatedLines = Math.max(lineCount, Math.ceil(content.length / 60));
+    const minHeight = Math.max(estimatedLines * 24, 80); // 24px per line, minimum 80px
+    
+    contentDiv.style.minHeight = `${minHeight}px`;
+    contentDiv.style.height = 'auto';
+    contentDiv.style.maxHeight = 'none';
+    contentDiv.style.padding = '12px';
+    contentDiv.style.border = '1px solid #d1d5db';
+    contentDiv.style.borderRadius = '6px';
+    contentDiv.style.backgroundColor = '#ffffff';
+    contentDiv.style.fontSize = '14px';
+    contentDiv.style.lineHeight = '1.6';
+    contentDiv.style.fontFamily = 'Arial, sans-serif';
     
     // Replace the textarea with the content div
     if (textarea.parentNode) {
@@ -214,6 +238,15 @@ const processFormElementsForPDF = (element: HTMLElement) => {
       valueDiv.className = 'pdf-value-display';
       valueDiv.textContent = pdfValue;
       valueDiv.style.whiteSpace = 'pre-wrap';
+      valueDiv.style.minHeight = '32px';
+      valueDiv.style.padding = '8px 12px';
+      valueDiv.style.border = '1px solid #d1d5db';
+      valueDiv.style.borderRadius = '6px';
+      valueDiv.style.backgroundColor = '#ffffff';
+      valueDiv.style.fontSize = '14px';
+      valueDiv.style.lineHeight = '1.5';
+      valueDiv.style.wordWrap = 'break-word';
+      valueDiv.style.overflow = 'visible';
       
       if (el.parentNode) {
         el.parentNode.replaceChild(valueDiv, el as Node);
@@ -222,7 +255,7 @@ const processFormElementsForPDF = (element: HTMLElement) => {
   });
   
   // Hide any remaining form controls that might interfere with PDF rendering
-  const formControls = element.querySelectorAll('button:not(.pdf-visible)');
+  const formControls = element.querySelectorAll('button:not(.pdf-visible), .lucide');
   formControls.forEach(control => {
     (control as HTMLElement).style.display = 'none';
   });
@@ -244,32 +277,67 @@ const processSelectElements = (element: HTMLElement) => {
   const selects = element.querySelectorAll('select');
   selects.forEach(select => {
     const selectedOption = select.options[select.selectedIndex];
-    const valueSpan = document.createElement('div');
-    valueSpan.className = 'pdf-value-display';
-    valueSpan.textContent = selectedOption ? selectedOption.text : '';
+    const valueDiv = document.createElement('div');
+    valueDiv.className = 'pdf-value-display';
+    valueDiv.textContent = selectedOption ? selectedOption.text : '';
     
-    // Replace the select with the span
+    // Style the select replacement
+    valueDiv.style.minHeight = '32px';
+    valueDiv.style.padding = '8px 12px';
+    valueDiv.style.border = '1px solid #d1d5db';
+    valueDiv.style.borderRadius = '6px';
+    valueDiv.style.backgroundColor = '#ffffff';
+    valueDiv.style.fontSize = '14px';
+    valueDiv.style.lineHeight = '1.5';
+    valueDiv.style.wordWrap = 'break-word';
+    valueDiv.style.overflow = 'visible';
+    
+    // Replace the select with the div
     if (select.parentNode) {
-      select.parentNode.replaceChild(valueSpan, select);
+      select.parentNode.replaceChild(valueDiv, select);
     }
   });
   
-  // Process Radix UI Select components
-  const radixSelects = element.querySelectorAll('[data-radix-select-trigger]');
-  radixSelects.forEach(selectTrigger => {
-    const selectValue = selectTrigger.querySelector('[data-radix-select-value]');
-    const valueDiv = document.createElement('div');
-    valueDiv.className = 'pdf-value-display';
+  // Process Radix UI Select components by finding the trigger and its associated value
+  const selectTriggers = element.querySelectorAll('[data-radix-select-trigger]');
+  selectTriggers.forEach(selectTrigger => {
+    let valueText = '';
     
-    // Extract the displayed value from the select component
-    const valueText = selectValue ? selectValue.textContent : '';
+    // Try multiple methods to get the select value
+    const selectValue = selectTrigger.querySelector('[data-radix-select-value]');
+    if (selectValue && selectValue.textContent && selectValue.textContent.trim() !== '') {
+      valueText = selectValue.textContent.trim();
+    }
+    
+    // Look for data attribute on the trigger itself
+    const dataValue = selectTrigger.getAttribute('data-select-value');
+    if (dataValue) {
+      valueText = dataValue;
+    }
+    
+    // Look for a hidden span with the value
+    const parentContainer = selectTrigger.parentNode as HTMLElement;
+    if (parentContainer) {
+      const hiddenValue = parentContainer.querySelector('.select-pdf-value');
+      if (hiddenValue && hiddenValue.textContent) {
+        valueText = hiddenValue.textContent.trim();
+      }
+    }
+    
+    const valueDiv = document.createElement('div');
+    valueDiv.className = 'pdf-value-display select-value';
     valueDiv.textContent = valueText || '';
     
-    // Try to find a hidden span for PDF that might contain the value
-    const hiddenSpan = (selectTrigger.parentNode as HTMLElement)?.querySelector('.pdf-only');
-    if (hiddenSpan && hiddenSpan.textContent) {
-      valueDiv.textContent = hiddenSpan.textContent;
-    }
+    // Style the select replacement
+    valueDiv.style.minHeight = '32px';
+    valueDiv.style.padding = '8px 12px';
+    valueDiv.style.border = '1px solid #d1d5db';
+    valueDiv.style.borderRadius = '6px';
+    valueDiv.style.backgroundColor = '#ffffff';
+    valueDiv.style.fontSize = '14px';
+    valueDiv.style.lineHeight = '1.5';
+    valueDiv.style.wordWrap = 'break-word';
+    valueDiv.style.overflow = 'visible';
     
     // Replace the select trigger with the value div
     if (selectTrigger.parentNode) {
@@ -277,18 +345,26 @@ const processSelectElements = (element: HTMLElement) => {
     }
   });
   
-  // Look for any hidden fields with select values
-  const hiddenFields = element.querySelectorAll('.hidden.pdf-only');
-  hiddenFields.forEach(field => {
-    if (field.textContent && field.textContent.trim() !== '') {
-      const valueDiv = document.createElement('div');
-      valueDiv.className = 'pdf-value-display';
-      valueDiv.textContent = field.textContent;
-      
-      // Make the hidden field visible by replacing it
-      if (field.parentNode) {
-        field.parentNode.replaceChild(valueDiv, field as Node);
-      }
+  // Process any remaining select containers
+  const selectContainers = element.querySelectorAll('[role="combobox"]');
+  selectContainers.forEach(container => {
+    const valueDiv = document.createElement('div');
+    valueDiv.className = 'pdf-value-display';
+    valueDiv.textContent = container.textContent?.trim() || '';
+    
+    // Style the replacement
+    valueDiv.style.minHeight = '32px';
+    valueDiv.style.padding = '8px 12px';
+    valueDiv.style.border = '1px solid #d1d5db';
+    valueDiv.style.borderRadius = '6px';
+    valueDiv.style.backgroundColor = '#ffffff';
+    valueDiv.style.fontSize = '14px';
+    valueDiv.style.lineHeight = '1.5';
+    valueDiv.style.wordWrap = 'break-word';
+    valueDiv.style.overflow = 'visible';
+    
+    if (container.parentNode) {
+      container.parentNode.replaceChild(valueDiv, container as Node);
     }
   });
 };

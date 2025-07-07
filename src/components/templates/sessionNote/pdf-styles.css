@@ -8,12 +8,15 @@
   /* Set dimensions more appropriate for print */
   width: 210mm !important; /* A4 width */
   min-height: 297mm !important; /* A4 height */
-  padding: 15mm !important;
+  padding: 20mm !important;
   /* Reset styles that could affect PDF generation */
   transform: none !important;
   box-shadow: none !important;
   margin: 0 !important;
   border: none !important;
+  /* Ensure proper font rendering */
+  font-family: Arial, sans-serif !important;
+  color: #000000 !important;
 }
 
 /* Add page break controls for PDF sections */
@@ -44,17 +47,37 @@
 
 /* Style for displaying values in PDF */
 .generating-pdf .pdf-value-display {
-  border: 1px solid #ccc !important;
+  border: 1px solid #d1d5db !important;
   background-color: white !important;
-  color: black !important;
-  padding: 8px !important;
-  font-size: 12px !important;
+  color: #000000 !important;
+  padding: 8px 12px !important;
+  font-size: 14px !important;
   font-family: Arial, sans-serif !important;
-  min-height: 24px !important;
+  min-height: 32px !important;
   margin-bottom: 8px !important;
   white-space: pre-wrap !important;
-  word-break: break-word !important;
+  word-wrap: break-word !important;
+  overflow: visible !important;
   width: 100% !important;
+  box-sizing: border-box !important;
+  border-radius: 4px !important;
+  line-height: 1.5 !important;
+  display: block !important;
+}
+
+/* Special styling for textarea content */
+.generating-pdf .pdf-value-display.textarea-content {
+  min-height: 80px !important;
+  padding: 12px !important;
+  line-height: 1.6 !important;
+  vertical-align: top !important;
+}
+
+/* Special styling for select values */
+.generating-pdf .pdf-value-display.select-value {
+  min-height: 32px !important;
+  display: flex !important;
+  align-items: center !important;
 }
 
 /* Force select elements to show their value */
@@ -72,11 +95,27 @@
 /* Adjust grid layouts for PDF */
 .generating-pdf .grid {
   display: block !important;
+  width: 100% !important;
 }
 
 .generating-pdf .grid > div {
   margin-bottom: 15px !important;
   page-break-inside: avoid !important;
+  width: 100% !important;
+  display: block !important;
+}
+
+/* Ensure proper spacing for form fields */
+.generating-pdf .space-y-2 > * + * {
+  margin-top: 8px !important;
+}
+
+.generating-pdf .space-y-4 > * + * {
+  margin-top: 16px !important;
+}
+
+.generating-pdf .space-y-6 > * + * {
+  margin-top: 24px !important;
 }
 
 /* Hide elements with this class in PDFs */
@@ -118,7 +157,10 @@
 /* Hide UI elements that shouldn't appear in PDF */
 .generating-pdf button,
 .generating-pdf [role="combobox"],
-.generating-pdf [data-radix-select-trigger] {
+.generating-pdf [data-radix-select-trigger],
+.generating-pdf .lucide,
+.generating-pdf [data-radix-popover-trigger],
+.generating-pdf [data-radix-popover-content] {
   display: none !important;
 }
 
