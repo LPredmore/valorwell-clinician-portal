@@ -22,7 +22,7 @@ export const fetchClinicianAppointments = async (clinicianId: string): Promise<A
           client_address,
           client_city,
           client_state,
-          client_zipcode
+          client_zip_code
         )
       `)
       .eq('clinician_id', clinicianId)
@@ -51,7 +51,7 @@ export const fetchClinicianAppointments = async (clinicianId: string): Promise<A
           client_address: appointment.client.client_address,
           client_city: appointment.client.client_city,
           client_state: appointment.client.client_state,
-          client_zipcode: appointment.client.client_zipcode
+          client_zip_code: appointment.client.client_zip_code
         } : undefined,
         clientName: appointment.client 
           ? `${appointment.client.client_preferred_name || appointment.client.client_first_name || ''} ${appointment.client.client_last_name || ''}`.trim()
