@@ -17,6 +17,8 @@ interface ExtendedReactBigCalendarProps extends ReactBigCalendarProps {
     startTime: string;
     endTime: string;
   }>;
+  calendarStartTime?: string;
+  calendarEndTime?: string;
 }
 
 const ReactBigCalendar: React.FC<ExtendedReactBigCalendarProps> = ({
@@ -28,6 +30,8 @@ const ReactBigCalendar: React.FC<ExtendedReactBigCalendarProps> = ({
   date,
   onNavigate,
   userTimeZone = 'America/New_York',
+  calendarStartTime = '08:00',
+  calendarEndTime = '21:00',
 }) => {
   // Pure RBC event styling - minimal differentiation for real events only
   const eventPropGetter = useCallback((event: CalendarEvent) => {
@@ -67,6 +71,16 @@ const ReactBigCalendar: React.FC<ExtendedReactBigCalendarProps> = ({
     onNavigate(newDate);
   }, [onNavigate]);
 
+  // Convert time strings to Date objects for min/max props
+  const getTimeAsDate = useCallback((timeString: string) => {
+    const today = new Date();
+    const [hours, minutes] = timeString.split(':').map(Number);
+    return new Date(today.getFullYear(), today.getMonth(), today.getDate(), hours, minutes);
+  }, []);
+
+  const minTime = useMemo(() => getTimeAsDate(calendarStartTime), [calendarStartTime, getTimeAsDate]);
+  const maxTime = useMemo(() => getTimeAsDate(calendarEndTime), [calendarEndTime, getTimeAsDate]);
+
   // Pure RBC configuration with native availability features
   const calendarConfig = useMemo(() => ({
     localizer: globalLocalizer,
@@ -85,6 +99,8 @@ const ReactBigCalendar: React.FC<ExtendedReactBigCalendarProps> = ({
     defaultView: Views.WEEK,
     step: 30,
     timeslots: 1, // Use 1 timeslot per step for cleaner availability display
+    min: minTime, // Calendar display start time
+    max: maxTime, // Calendar display end time
     eventPropGetter,
     backgroundEventPropGetter, // Style background events (availability)
     onSelectSlot,
@@ -101,7 +117,9 @@ const ReactBigCalendar: React.FC<ExtendedReactBigCalendarProps> = ({
     onSelectSlot,
     onSelectEvent,
     date,
-    handleNavigate
+    handleNavigate,
+    minTime,
+    maxTime
   ]);
 
   return (

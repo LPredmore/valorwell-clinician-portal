@@ -10,6 +10,7 @@ import EditBlockedTimeDialog from "./EditBlockedTimeDialog";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Plus, Clock, Calendar as CalendarIcon } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import { DateTime } from "luxon";
 import { useAppointments } from "@/hooks/useAppointments";
 import { useNylasEvents } from "@/hooks/useNylasEvents";
@@ -33,6 +34,8 @@ const CalendarContainer: React.FC = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [userTimeZone, setUserTimeZone] = useState<string>(TimeZoneService.DEFAULT_TIMEZONE);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [calendarStartTime, setCalendarStartTime] = useState<string>('08:00');
+  const [calendarEndTime, setCalendarEndTime] = useState<string>('21:00');
   const [isAvailabilityOpen, setIsAvailabilityOpen] = useState(false);
   const [isAppointmentDialogOpen, setIsAppointmentDialogOpen] = useState(false);
   const [isBlockedTimeDialogOpen, setIsBlockedTimeDialogOpen] = useState(false);
@@ -169,7 +172,7 @@ const CalendarContainer: React.FC = () => {
     });
   }, [availabilitySlots, weekStart, weekEnd, userTimeZone]);
 
-  // Load user timezone
+  // Load user timezone and calendar display settings
   const loadUserTimeZone = useCallback(async (clinicianId: string) => {
     try {
       const timeZone = await getClinicianTimeZone(clinicianId);
@@ -177,6 +180,25 @@ const CalendarContainer: React.FC = () => {
     } catch (error) {
       const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
       setUserTimeZone(TimeZoneService.ensureIANATimeZone(browserTimezone));
+    }
+  }, []);
+
+  const loadCalendarDisplaySettings = useCallback(async (clinicianId: string) => {
+    try {
+      const { data } = await supabase
+        .from('clinicians')
+        .select('clinician_calendar_start_time, clinician_calendar_end_time')
+        .eq('id', clinicianId)
+        .single();
+
+      if (data) {
+        setCalendarStartTime(data.clinician_calendar_start_time?.substring(0, 5) || '08:00');
+        setCalendarEndTime(data.clinician_calendar_end_time?.substring(0, 5) || '21:00');
+      }
+    } catch (error) {
+      // Use defaults if loading fails
+      setCalendarStartTime('08:00');
+      setCalendarEndTime('21:00');
     }
   }, []);
 
@@ -260,11 +282,12 @@ const CalendarContainer: React.FC = () => {
     }
   }, [authInitialized, userId, userRole, navigate]);
 
-  // Timezone loading effect
+  // Timezone and calendar settings loading effect
   useEffect(() => {
     if (!userId) return;
     loadUserTimeZone(userId);
-  }, [userId, loadUserTimeZone]);
+    loadCalendarDisplaySettings(userId);
+  }, [userId, loadUserTimeZone, loadCalendarDisplaySettings]);
 
   if (!authInitialized || !userId) {
     return (
@@ -319,6 +342,8 @@ const CalendarContainer: React.FC = () => {
           date={currentDate}
           onNavigate={handleCalendarNavigate}
           userTimeZone={userTimeZone}
+          calendarStartTime={calendarStartTime}
+          calendarEndTime={calendarEndTime}
         />
 
         <Sheet open={isAvailabilityOpen} onOpenChange={setIsAvailabilityOpen}>

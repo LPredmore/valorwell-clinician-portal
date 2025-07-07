@@ -1439,6 +1439,8 @@ export type Database = {
           clinician_availability_timezone_wednesday_2: string | null
           clinician_availability_timezone_wednesday_3: string | null
           clinician_bio: string | null
+          clinician_calendar_end_time: string | null
+          clinician_calendar_start_time: string | null
           clinician_email: string | null
           clinician_first_name: string | null
           clinician_image_url: string | null
@@ -1536,6 +1538,8 @@ export type Database = {
           clinician_availability_timezone_wednesday_2?: string | null
           clinician_availability_timezone_wednesday_3?: string | null
           clinician_bio?: string | null
+          clinician_calendar_end_time?: string | null
+          clinician_calendar_start_time?: string | null
           clinician_email?: string | null
           clinician_first_name?: string | null
           clinician_image_url?: string | null
@@ -1635,6 +1639,8 @@ export type Database = {
           clinician_availability_timezone_wednesday_2?: string | null
           clinician_availability_timezone_wednesday_3?: string | null
           clinician_bio?: string | null
+          clinician_calendar_end_time?: string | null
+          clinician_calendar_start_time?: string | null
           clinician_email?: string | null
           clinician_first_name?: string | null
           clinician_image_url?: string | null

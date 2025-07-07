@@ -66,6 +66,8 @@ const ClinicianAvailabilityPanel: React.FC<ClinicianAvailabilityPanelProps> = ({
   const [timeGranularity, setTimeGranularity] = useState<'hour' | 'half-hour'>('hour');
   const [minDaysAhead, setMinDaysAhead] = useState<number>(1);
   const [maxDaysAhead, setMaxDaysAhead] = useState<number>(30);
+  const [calendarStartTime, setCalendarStartTime] = useState<string>('08:00');
+  const [calendarEndTime, setCalendarEndTime] = useState<string>('21:00');
   const [clinicianData, setClinicianData] = useState<any>(null);
   const { toast } = useToast();
 
@@ -138,6 +140,8 @@ const ClinicianAvailabilityPanel: React.FC<ClinicianAvailabilityPanelProps> = ({
             setTimeGranularity(data.clinician_time_granularity || 'hour');
             setMinDaysAhead(Number(data.clinician_min_notice_days) || 1);
             setMaxDaysAhead(Number(data.clinician_max_advance_days) || 30);
+            setCalendarStartTime(data.clinician_calendar_start_time?.substring(0, 5) || '08:00');
+            setCalendarEndTime(data.clinician_calendar_end_time?.substring(0, 5) || '21:00');
             
             // Transform the database columns into our internal data structure
             const newSchedule = [...weekSchedule];
@@ -343,7 +347,9 @@ const ClinicianAvailabilityPanel: React.FC<ClinicianAvailabilityPanelProps> = ({
         // Add the settings directly to the clinicians table
         clinician_time_granularity: timeGranularity,
         clinician_min_notice_days: minDaysAhead,
-        clinician_max_advance_days: maxDaysAhead
+        clinician_max_advance_days: maxDaysAhead,
+        clinician_calendar_start_time: calendarStartTime,
+        clinician_calendar_end_time: calendarEndTime
       };
       
       // For each day of the week, set all possible slots
@@ -538,6 +544,59 @@ const ClinicianAvailabilityPanel: React.FC<ClinicianAvailabilityPanelProps> = ({
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-3 border rounded-md">
+            <h3 className="font-medium mb-2">Calendar Display Settings</h3>
+            <Separator className="my-2" />
+            <div className="space-y-3">
+              <div>
+                <p className="text-sm text-muted-foreground mb-2">
+                  Set your calendar display time range
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Start Time</Label>
+                    <Select
+                      value={calendarStartTime}
+                      onValueChange={setCalendarStartTime}
+                    >
+                      <SelectTrigger className="h-8">
+                        <SelectValue placeholder="Start time" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {timeOptions.map((time) => (
+                          <SelectItem key={`cal-start-${time}`} value={time}>
+                            {time}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">End Time</Label>
+                    <Select
+                      value={calendarEndTime}
+                      onValueChange={setCalendarEndTime}
+                    >
+                      <SelectTrigger className="h-8">
+                        <SelectValue placeholder="End time" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {timeOptions.map((time) => (
+                          <SelectItem key={`cal-end-${time}`} value={time}>
+                            {time}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  This controls the time range displayed in your calendar view (default: 8am - 9pm)
+                </p>
               </div>
             </div>
           </div>
