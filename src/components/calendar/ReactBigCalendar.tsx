@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { Calendar, Views } from 'react-big-calendar';
 import { globalLocalizer } from '@/main';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
@@ -17,6 +17,8 @@ interface ExtendedReactBigCalendarProps extends ReactBigCalendarProps {
     startTime: string;
     endTime: string;
   }>;
+  view?: string;
+  onViewChange?: (view: string) => void;
 }
 
 const ReactBigCalendar: React.FC<ExtendedReactBigCalendarProps> = ({
@@ -27,8 +29,23 @@ const ReactBigCalendar: React.FC<ExtendedReactBigCalendarProps> = ({
   onSelectEvent,
   date,
   onNavigate,
+  view: externalView,
+  onViewChange,
   userTimeZone = 'America/New_York',
 }) => {
+  // Controlled view state
+  const [internalView, setInternalView] = useState(Views.WEEK);
+  const currentView = externalView || internalView;
+  
+  // Handle view changes
+  const handleViewChange = useCallback((newView: string) => {
+    console.log('[ReactBigCalendar] View change:', { from: currentView, to: newView });
+    if (onViewChange) {
+      onViewChange(newView);
+    } else {
+      setInternalView(newView as any);
+    }
+  }, [currentView, onViewChange]);
   console.log('[ReactBigCalendar] Rendered with:', {
     eventsCount: events.length,
     backgroundEventsCount: backgroundEvents.length,
@@ -81,13 +98,15 @@ const ReactBigCalendar: React.FC<ExtendedReactBigCalendarProps> = ({
     onNavigate(newDate);
   }, [onNavigate]);
 
-  // Pure RBC configuration with native availability features
+  // Pure RBC configuration with controlled state for React 19 compatibility
   const calendarConfig = useMemo(() => ({
     localizer: globalLocalizer,
     events,
     backgroundEvents, // RBC native background events
-    date,
+    date, // Controlled date
+    view: currentView, // Controlled view
     onNavigate: handleNavigate,
+    onView: handleViewChange, // Controlled view changes
     startAccessor: 'start',
     endAccessor: 'end',
     titleAccessor: 'title',
@@ -96,7 +115,6 @@ const ReactBigCalendar: React.FC<ExtendedReactBigCalendarProps> = ({
       week: true,
       day: true,
     },
-    defaultView: Views.WEEK,
     step: 30,
     timeslots: 1, // Use 1 timeslot per step for cleaner availability display
     eventPropGetter,
@@ -115,7 +133,9 @@ const ReactBigCalendar: React.FC<ExtendedReactBigCalendarProps> = ({
     onSelectSlot,
     onSelectEvent,
     date,
-    handleNavigate
+    currentView, // Add currentView to dependencies
+    handleNavigate,
+    handleViewChange // Add handleViewChange to dependencies
   ]);
 
   return (

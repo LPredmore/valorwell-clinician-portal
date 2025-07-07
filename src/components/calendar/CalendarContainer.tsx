@@ -37,6 +37,7 @@ const CalendarContainer: React.FC = () => {
   const { userId, authInitialized, userRole } = useUser();
   const { user } = useAuth();
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentView, setCurrentView] = useState('week');
   const [userTimeZone, setUserTimeZone] = useState<string>(TimeZoneService.DEFAULT_TIMEZONE);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [isAvailabilityOpen, setIsAvailabilityOpen] = useState(false);
@@ -271,6 +272,12 @@ const CalendarContainer: React.FC = () => {
     }
   }, [currentDate]);
 
+  // Handle controlled view changes
+  const handleViewChange = useCallback((newView: string) => {
+    console.log('[CalendarContainer] View change requested:', { from: currentView, to: newView });
+    setCurrentView(newView);
+  }, [currentView]);
+
   const handleSelectSlot = useCallback((slotInfo: { start: Date; end: Date }) => {
     setSelectedSlot(slotInfo);
     setIsEditMode(false);
@@ -468,6 +475,8 @@ const CalendarContainer: React.FC = () => {
           onSelectSlot={handleSelectSlot}
           onSelectEvent={handleSelectEvent}
           date={currentDate}
+          view={currentView}
+          onViewChange={handleViewChange}
           onNavigate={handleCalendarNavigate}
           userTimeZone={userTimeZone}
         />
