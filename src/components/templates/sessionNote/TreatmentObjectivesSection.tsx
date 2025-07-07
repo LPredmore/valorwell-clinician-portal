@@ -2,15 +2,23 @@
 import React from 'react';
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface TreatmentObjectivesSectionProps {
   formState: any;
   handleChange: (field: string, value: string) => void;
+  // AI Assist props
+  isAiAssistMode?: boolean;
+  selectedInterventions?: string[];
+  toggleInterventionSelection?: (intervention: string) => void;
 }
 
 export const TreatmentObjectivesSection: React.FC<TreatmentObjectivesSectionProps> = ({
   formState,
-  handleChange
+  handleChange,
+  isAiAssistMode = false,
+  selectedInterventions = [],
+  toggleInterventionSelection
 }) => {
   // Check if an objective and its interventions have values
   const hasPrimaryObjective = !!formState.primaryObjective?.trim();
@@ -48,7 +56,15 @@ export const TreatmentObjectivesSection: React.FC<TreatmentObjectivesSectionProp
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
           {hasIntervention1 && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Intervention 1</label>
+              <div className="flex items-center gap-2 mb-1">
+                <label className="block text-sm font-medium text-gray-700">Intervention 1</label>
+                {isAiAssistMode && toggleInterventionSelection && (
+                  <Checkbox
+                    checked={selectedInterventions.includes(formState.intervention1)}
+                    onCheckedChange={() => toggleInterventionSelection(formState.intervention1)}
+                  />
+                )}
+              </div>
               <Input
                 placeholder="Describe intervention"
                 value={formState.intervention1}
@@ -60,7 +76,15 @@ export const TreatmentObjectivesSection: React.FC<TreatmentObjectivesSectionProp
           )}
           {hasIntervention2 && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Intervention 2</label>
+              <div className="flex items-center gap-2 mb-1">
+                <label className="block text-sm font-medium text-gray-700">Intervention 2</label>
+                {isAiAssistMode && toggleInterventionSelection && (
+                  <Checkbox
+                    checked={selectedInterventions.includes(formState.intervention2)}
+                    onCheckedChange={() => toggleInterventionSelection(formState.intervention2)}
+                  />
+                )}
+              </div>
               <Input
                 placeholder="Describe intervention"
                 value={formState.intervention2}
@@ -92,7 +116,15 @@ export const TreatmentObjectivesSection: React.FC<TreatmentObjectivesSectionProp
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
           {hasIntervention3 && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Intervention 3</label>
+              <div className="flex items-center gap-2 mb-1">
+                <label className="block text-sm font-medium text-gray-700">Intervention 3</label>
+                {isAiAssistMode && toggleInterventionSelection && (
+                  <Checkbox
+                    checked={selectedInterventions.includes(formState.intervention3)}
+                    onCheckedChange={() => toggleInterventionSelection(formState.intervention3)}
+                  />
+                )}
+              </div>
               <Input
                 placeholder="Describe intervention"
                 value={formState.intervention3}
@@ -104,7 +136,15 @@ export const TreatmentObjectivesSection: React.FC<TreatmentObjectivesSectionProp
           )}
           {hasIntervention4 && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Intervention 4</label>
+              <div className="flex items-center gap-2 mb-1">
+                <label className="block text-sm font-medium text-gray-700">Intervention 4</label>
+                {isAiAssistMode && toggleInterventionSelection && (
+                  <Checkbox
+                    checked={selectedInterventions.includes(formState.intervention4)}
+                    onCheckedChange={() => toggleInterventionSelection(formState.intervention4)}
+                  />
+                )}
+              </div>
               <Input
                 placeholder="Describe intervention"
                 value={formState.intervention4}
@@ -136,7 +176,15 @@ export const TreatmentObjectivesSection: React.FC<TreatmentObjectivesSectionProp
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
           {hasIntervention5 && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Intervention 5</label>
+              <div className="flex items-center gap-2 mb-1">
+                <label className="block text-sm font-medium text-gray-700">Intervention 5</label>
+                {isAiAssistMode && toggleInterventionSelection && (
+                  <Checkbox
+                    checked={selectedInterventions.includes(formState.intervention5)}
+                    onCheckedChange={() => toggleInterventionSelection(formState.intervention5)}
+                  />
+                )}
+              </div>
               <Input
                 placeholder="Describe intervention"
                 value={formState.intervention5}
@@ -148,7 +196,15 @@ export const TreatmentObjectivesSection: React.FC<TreatmentObjectivesSectionProp
           )}
           {hasIntervention6 && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Intervention 6</label>
+              <div className="flex items-center gap-2 mb-1">
+                <label className="block text-sm font-medium text-gray-700">Intervention 6</label>
+                {isAiAssistMode && toggleInterventionSelection && (
+                  <Checkbox
+                    checked={selectedInterventions.includes(formState.intervention6)}
+                    onCheckedChange={() => toggleInterventionSelection(formState.intervention6)}
+                  />
+                )}
+              </div>
               <Input
                 placeholder="Describe intervention"
                 value={formState.intervention6}

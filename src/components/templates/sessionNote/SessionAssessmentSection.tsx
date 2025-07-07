@@ -2,6 +2,7 @@
 import React from 'react';
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { 
   Select,
   SelectContent,
@@ -10,17 +11,31 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { PHQ9AssessmentSection } from './PHQ9AssessmentSection';
+import { Sparkles, Check } from 'lucide-react';
 
 interface SessionAssessmentSectionProps {
   formState: any;
   handleChange: (field: string, value: string) => void;
   phq9Data?: any;
+  // AI Assist props
+  isAiAssistMode?: boolean;
+  selectedInterventions?: string[];
+  isGeneratingNote?: boolean;
+  toggleAiAssistMode?: () => void;
+  toggleInterventionSelection?: (intervention: string) => void;
+  handleAiAssist?: () => void;
 }
 
 export const SessionAssessmentSection: React.FC<SessionAssessmentSectionProps> = ({
   formState,
   handleChange,
-  phq9Data
+  phq9Data,
+  isAiAssistMode = false,
+  selectedInterventions = [],
+  isGeneratingNote = false,
+  toggleAiAssistMode,
+  toggleInterventionSelection,
+  handleAiAssist
 }) => {
   // Options for the dropdown menus
   const functioningOptions = [
@@ -135,13 +150,42 @@ export const SessionAssessmentSection: React.FC<SessionAssessmentSectionProps> =
       </div>
 
       <div className="mb-6 pdf-section">
-        <label className="block text-sm font-medium text-gray-700 mb-1">Session Narrative</label>
+        <div className="flex items-center gap-2 mb-1">
+          <label className="block text-sm font-medium text-gray-700">Session Narrative</label>
+          {toggleAiAssistMode && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={toggleAiAssistMode}
+              className="h-6 px-2 text-xs"
+              disabled={isGeneratingNote}
+            >
+              <Sparkles className="h-3 w-3 mr-1" />
+              AI Assist
+            </Button>
+          )}
+          {isAiAssistMode && handleAiAssist && (
+            <Button
+              type="button"
+              variant="default"
+              size="sm"
+              onClick={handleAiAssist}
+              disabled={isGeneratingNote || selectedInterventions.length === 0}
+              className="h-6 px-2 text-xs bg-primary hover:bg-primary/90"
+            >
+              <Check className="h-3 w-3 mr-1" />
+              {isGeneratingNote ? 'Generating...' : 'Confirm AI Assist'}
+            </Button>
+          )}
+        </div>
         <Textarea
           placeholder="Provide a detailed narrative of the session"
           className="min-h-[100px] resize-y"
           value={formState.sessionNarrative}
           onChange={(e) => handleChange('sessionNarrative', e.target.value)}
           data-field-name="Session Narrative"
+          disabled={isGeneratingNote}
         />
       </div>
       

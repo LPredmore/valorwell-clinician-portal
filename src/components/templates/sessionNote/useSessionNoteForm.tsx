@@ -86,6 +86,11 @@ export const useSessionNoteForm = ({
     insightJudgement: false
   });
 
+  // AI Assist state
+  const [isAiAssistMode, setIsAiAssistMode] = useState(false);
+  const [selectedInterventions, setSelectedInterventions] = useState<string[]>([]);
+  const [isGeneratingNote, setIsGeneratingNote] = useState(false);
+
   useEffect(() => {
     const fetchClinicianInsuranceName = async () => {
       if (!clientData) return;
@@ -273,6 +278,65 @@ export const useSessionNoteForm = ({
     }
   };
 
+  const toggleAiAssistMode = () => {
+    setIsAiAssistMode(!isAiAssistMode);
+    setSelectedInterventions([]);
+  };
+
+  const toggleInterventionSelection = (intervention: string) => {
+    setSelectedInterventions(prev => 
+      prev.includes(intervention) 
+        ? prev.filter(i => i !== intervention)
+        : [...prev, intervention]
+    );
+  };
+
+  const handleAiAssist = async () => {
+    if (!formState.sessionNarrative?.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a session narrative before using AI assist.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsGeneratingNote(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-clinical-note', {
+        body: {
+          sessionNarrative: formState.sessionNarrative,
+          currentSymptoms: formState.currentSymptoms,
+          selectedInterventions: selectedInterventions
+        }
+      });
+
+      if (error) throw error;
+
+      if (data.success) {
+        handleChange('sessionNarrative', data.clinicalNote);
+        setIsAiAssistMode(false);
+        setSelectedInterventions([]);
+        toast({
+          title: "Success",
+          description: "Clinical note generated successfully.",
+        });
+      } else {
+        throw new Error(data.error || 'Failed to generate clinical note');
+      }
+    } catch (error) {
+      console.error('Error generating clinical note:', error);
+      toast({
+        title: "Error",
+        description: "Failed to generate clinical note. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingNote(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!clientData?.id) {
       toast({
@@ -443,6 +507,13 @@ export const useSessionNoteForm = ({
     phq9Data,
     handleChange,
     toggleEditMode,
-    handleSave
+    handleSave,
+    // AI Assist functionality
+    isAiAssistMode,
+    selectedInterventions,
+    isGeneratingNote,
+    toggleAiAssistMode,
+    toggleInterventionSelection,
+    handleAiAssist
   };
 };

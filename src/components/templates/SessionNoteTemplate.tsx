@@ -28,7 +28,13 @@ const SessionNoteTemplate: React.FC<SessionNoteTemplateProps> = ({
     phq9Data,
     handleChange,
     toggleEditMode,
-    handleSave
+    handleSave,
+    isAiAssistMode,
+    selectedInterventions,
+    isGeneratingNote,
+    toggleAiAssistMode,
+    toggleInterventionSelection,
+    handleAiAssist
   } = useSessionNoteForm({
     clientData,
     clinicianName,
@@ -117,7 +123,10 @@ const SessionNoteTemplate: React.FC<SessionNoteTemplateProps> = ({
         <div className="pdf-section">
           <TreatmentObjectivesSection 
             formState={formState} 
-            handleChange={handleChange} 
+            handleChange={handleChange}
+            isAiAssistMode={isAiAssistMode}
+            selectedInterventions={selectedInterventions}
+            toggleInterventionSelection={toggleInterventionSelection}
           />
         </div>
 
@@ -127,6 +136,12 @@ const SessionNoteTemplate: React.FC<SessionNoteTemplateProps> = ({
             formState={formState} 
             handleChange={handleChange}
             phq9Data={phq9Data}
+            isAiAssistMode={isAiAssistMode}
+            selectedInterventions={selectedInterventions}
+            isGeneratingNote={isGeneratingNote}
+            toggleAiAssistMode={toggleAiAssistMode}
+            toggleInterventionSelection={toggleInterventionSelection}
+            handleAiAssist={handleAiAssist}
           />
         </div>
       </div>
