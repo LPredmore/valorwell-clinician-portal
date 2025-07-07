@@ -203,49 +203,81 @@ const CalendarContainer: React.FC = () => {
   }, []);
 
   const autoUpdateCalendarDisplayTimes = useCallback(async (clinicianId: string) => {
-    // Calculate earliest start and latest end from all events and availability
-    const allStartTimes: Date[] = [];
-    const allEndTimes: Date[] = [];
+    try {
+      // Calculate earliest start and latest end from all events and availability
+      const allStartTimes: Date[] = [];
+      const allEndTimes: Date[] = [];
 
-    // Add real events times
-    realEvents.forEach(event => {
-      allStartTimes.push(event.start);
-      allEndTimes.push(event.end);
-    });
+      // Add real events times with validation
+      realEvents.forEach(event => {
+        if (event.start && event.start instanceof Date && !isNaN(event.start.getTime())) {
+          allStartTimes.push(event.start);
+        }
+        if (event.end && event.end instanceof Date && !isNaN(event.end.getTime())) {
+          allEndTimes.push(event.end);
+        }
+      });
 
-    // Add background events (availability) times
-    backgroundEvents.forEach(event => {
-      allStartTimes.push(event.start);
-      allEndTimes.push(event.end);
-    });
+      // Add background events (availability) times with validation
+      backgroundEvents.forEach(event => {
+        if (event.start && event.start instanceof Date && !isNaN(event.start.getTime())) {
+          allStartTimes.push(event.start);
+        }
+        if (event.end && event.end instanceof Date && !isNaN(event.end.getTime())) {
+          allEndTimes.push(event.end);
+        }
+      });
 
-    if (allStartTimes.length === 0) return;
-
-    // Find the earliest start time and latest end time
-    const earliestStart = new Date(Math.min(...allStartTimes.map(d => d.getTime())));
-    const latestEnd = new Date(Math.max(...allEndTimes.map(d => d.getTime())));
-
-    // Format to HH:MM
-    const newStartTime = earliestStart.toTimeString().substring(0, 5);
-    const newEndTime = latestEnd.toTimeString().substring(0, 5);
-
-    // Only update if times have changed
-    if (newStartTime !== calendarStartTime || newEndTime !== calendarEndTime) {
-      setCalendarStartTime(newStartTime);
-      setCalendarEndTime(newEndTime);
-
-      // Update database
-      try {
-        await supabase
-          .from('clinicians')
-          .update({
-            clinician_calendar_start_time: newStartTime + ':00',
-            clinician_calendar_end_time: newEndTime + ':00'
-          })
-          .eq('id', clinicianId);
-      } catch (error) {
-        console.error('Failed to update calendar display times:', error);
+      // Exit early if no valid dates found
+      if (allStartTimes.length === 0 || allEndTimes.length === 0) {
+        console.log('No valid dates found for calendar display time calculation');
+        return;
       }
+
+      // Find the earliest start time and latest end time
+      const earliestStart = new Date(Math.min(...allStartTimes.map(d => d.getTime())));
+      const latestEnd = new Date(Math.max(...allEndTimes.map(d => d.getTime())));
+
+      // Validate the calculated dates
+      if (isNaN(earliestStart.getTime()) || isNaN(latestEnd.getTime())) {
+        console.error('Calculated dates are invalid');
+        return;
+      }
+
+      // Format to HH:MM with validation
+      const newStartTime = earliestStart.toTimeString().substring(0, 5);
+      const newEndTime = latestEnd.toTimeString().substring(0, 5);
+
+      // Validate time format (should be HH:MM)
+      const timePattern = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
+      if (!timePattern.test(newStartTime) || !timePattern.test(newEndTime)) {
+        console.error('Invalid time format generated:', { newStartTime, newEndTime });
+        return;
+      }
+
+      // Only update if times have changed
+      if (newStartTime !== calendarStartTime || newEndTime !== calendarEndTime) {
+        setCalendarStartTime(newStartTime);
+        setCalendarEndTime(newEndTime);
+
+        // Update database with validated times
+        try {
+          await supabase
+            .from('clinicians')
+            .update({
+              clinician_calendar_start_time: newStartTime + ':00',
+              clinician_calendar_end_time: newEndTime + ':00'
+            })
+            .eq('id', clinicianId);
+        } catch (error) {
+          console.error('Failed to update calendar display times:', error);
+          // Revert state on database error
+          setCalendarStartTime(calendarStartTime);
+          setCalendarEndTime(calendarEndTime);
+        }
+      }
+    } catch (error) {
+      console.error('Error in autoUpdateCalendarDisplayTimes:', error);
     }
   }, [realEvents, backgroundEvents, calendarStartTime, calendarEndTime]);
 
