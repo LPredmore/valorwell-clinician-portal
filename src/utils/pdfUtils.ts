@@ -119,7 +119,7 @@ export const generateAndSavePDF = async (
     // Step 2: Upload PDF to Supabase storage
     const filePath = `${documentInfo.clientId}/${documentInfo.documentType}/${formattedDate}.pdf`;
     const { error: uploadError } = await supabase.storage
-      .from('clinical_documents')
+      .from('Clinical Documents')
       .upload(filePath, pdfBlob, {
         contentType: 'application/pdf',
         upsert: true
@@ -132,7 +132,7 @@ export const generateAndSavePDF = async (
     
     // Step 3: Get the URL of the uploaded file
     const { data: urlData } = supabase.storage
-      .from('clinical_documents')
+      .from('Clinical Documents')
       .getPublicUrl(filePath);
     
     // Step 4: Save document metadata to clinical_documents table

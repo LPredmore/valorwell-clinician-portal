@@ -163,6 +163,19 @@ const TreatmentPlanTemplate: React.FC<TreatmentPlanTemplateProps> = ({
     }
   }, [formState.startDate, formState.planLength]);
 
+  // Convert display date to database format
+  const convertDateForDatabase = (displayDate: string): string => {
+    try {
+      if (!displayDate) return '';
+      // Parse "January 7, 2026" format and convert to "2026-01-07"
+      const date = new Date(displayDate);
+      return format(date, 'yyyy-MM-dd');
+    } catch (error) {
+      console.error('Error converting date for database:', error);
+      return displayDate; // Fallback to original
+    }
+  };
+
   const handleChange = (field: string, value: any) => {
     setFormState(prev => ({ ...prev, [field]: value }));
   };
@@ -204,7 +217,7 @@ const TreatmentPlanTemplate: React.FC<TreatmentPlanTemplateProps> = ({
         client_intervention4: formState.intervention4,
         client_intervention5: formState.intervention5,
         client_intervention6: formState.intervention6,
-        client_nexttreatmentplanupdate: formState.nextUpdate,
+        client_nexttreatmentplanupdate: convertDateForDatabase(formState.nextUpdate),
         client_privatenote: formState.privateNote
       };
 
