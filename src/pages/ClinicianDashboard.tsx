@@ -11,9 +11,12 @@ import { SessionDidNotOccurDialog } from '@/components/dashboard/SessionDidNotOc
 import { Appointment } from '@/types/appointment';
 import { ClientDetails } from '@/types/client';
 import { fetchClinicianAppointments, fetchClinicianProfile } from '@/utils/clinicianDataUtils';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 const ClinicianDashboard = () => {
   const { userRole, userId } = useUser();
+  const { toast } = useToast();
   const [clinicianProfile, setClinicianProfile] = useState<any>(null);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [clinicianTimeZone, setClinicianTimeZone] = useState<string>(TimeZoneService.DEFAULT_TIMEZONE);
@@ -182,17 +185,48 @@ const ClinicianDashboard = () => {
   };
 
   // Session template handlers
-  const openSessionTemplate = (appointment: Appointment) => {
+  const openSessionTemplate = async (appointment: Appointment) => {
     setCurrentAppointment(appointment);
     setShowSessionTemplate(true);
+    setIsLoadingClientData(true);
     
-    // Set client data from appointment
-    if (appointment.client) {
-      setClientData({
-        client_first_name: appointment.client.client_first_name,
-        client_last_name: appointment.client.client_last_name,
-        client_preferred_name: appointment.client.client_preferred_name
+    try {
+      // Fetch complete client data from database
+      const { data: fullClientData, error } = await supabase
+        .from('clients')
+        .select('*')
+        .eq('id', appointment.client_id)
+        .single();
+
+      if (error) {
+        console.error('Error fetching client data:', error);
+        toast({
+          title: "Warning",
+          description: "Could not load complete client data.",
+          variant: "default",
+        });
+        
+        // Fallback to basic data from appointment
+        if (appointment.client) {
+          setClientData({
+            id: appointment.client_id,
+            client_first_name: appointment.client.client_first_name,
+            client_last_name: appointment.client.client_last_name,
+            client_preferred_name: appointment.client.client_preferred_name
+          } as any);
+        }
+      } else {
+        setClientData(fullClientData);
+      }
+    } catch (error) {
+      console.error('Error in openSessionTemplate:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load client data.",
+        variant: "destructive",
       });
+    } finally {
+      setIsLoadingClientData(false);
     }
   };
 
@@ -220,116 +254,8 @@ const ClinicianDashboard = () => {
   const prepareClientDataForTemplate = (): ClientDetails | null => {
     if (!clientData) return null;
     
-    return {
-      id: currentAppointment?.client_id || '',
-      client_first_name: clientData.client_first_name || null,
-      client_last_name: clientData.client_last_name || null,
-      client_preferred_name: clientData.client_preferred_name || null,
-      client_email: null,
-      client_phone: null,
-      client_date_of_birth: null,
-      client_age: null,
-      client_gender: null,
-      client_gender_identity: null,
-      client_state: null,
-      client_time_zone: null,
-      client_minor: null,
-      client_status: null,
-      client_assigned_therapist: null,
-      client_referral_source: null,
-      client_self_goal: null,
-      client_diagnosis: null,
-      client_insurance_company_primary: null,
-      client_policy_number_primary: null,
-      client_group_number_primary: null,
-      client_subscriber_name_primary: null,
-      client_insurance_type_primary: null,
-      client_subscriber_dob_primary: null,
-      client_subscriber_relationship_primary: null,
-      client_insurance_company_secondary: null,
-      client_policy_number_secondary: null,
-      client_group_number_secondary: null,
-      client_subscriber_name_secondary: null,
-      client_insurance_type_secondary: null,
-      client_subscriber_dob_secondary: null,
-      client_subscriber_relationship_secondary: null,
-      client_insurance_company_tertiary: null,
-      client_policy_number_tertiary: null,
-      client_group_number_tertiary: null,
-      client_subscriber_name_tertiary: null,
-      client_insurance_type_tertiary: null,
-      client_subscriber_dob_tertiary: null,
-      client_subscriber_relationship_tertiary: null,
-      client_planlength: null,
-      client_treatmentfrequency: null,
-      client_problem: null,
-      client_treatmentgoal: null,
-      client_primaryobjective: null,
-      client_secondaryobjective: null,
-      client_tertiaryobjective: null,
-      client_intervention1: null,
-      client_intervention2: null,
-      client_intervention3: null,
-      client_intervention4: null,
-      client_intervention5: null,
-      client_intervention6: null,
-      client_nexttreatmentplanupdate: null,
-      client_privatenote: null,
-      client_appearance: null,
-      client_attitude: null,
-      client_behavior: null,
-      client_speech: null,
-      client_affect: null,
-      client_thoughtprocess: null,
-      client_perception: null,
-      client_orientation: null,
-      client_memoryconcentration: null,
-      client_insightjudgement: null,
-      client_mood: null,
-      client_substanceabuserisk: null,
-      client_suicidalideation: null,
-      client_homicidalideation: null,
-      client_functioning: null,
-      client_prognosis: null,
-      client_progress: null,
-      client_sessionnarrative: null,
-      client_medications: null,
-      client_personsinattendance: null,
-      client_currentsymptoms: null,
-      client_vacoverage: null,
-      client_champva: null,
-      client_tricare_beneficiary_category: null,
-      client_tricare_sponsor_name: null,
-      client_tricare_sponsor_branch: null,
-      client_tricare_sponsor_id: null,
-      client_tricare_plan: null,
-      client_tricare_region: null,
-      client_tricare_policy_id: null,
-      client_tricare_has_referral: null,
-      client_tricare_referral_number: null,
-      client_recentdischarge: null,
-      client_branchOS: null,
-      client_disabilityrating: null,
-      client_relationship: null,
-      client_is_profile_complete: null,
-      client_treatmentplan_startdate: null,
-      client_temppassword: null,
-      client_primary_payer_id: null,
-      client_secondary_payer_id: null,
-      client_tertiary_payer_id: null,
-      eligibility_status_primary: null,
-      eligibility_last_checked_primary: null,
-      eligibility_claimmd_id_primary: null,
-      eligibility_response_details_primary_json: null,
-      eligibility_copay_primary: null,
-      eligibility_deductible_primary: null,
-      eligibility_coinsurance_primary_percent: null,
-      stripe_customer_id: null,
-      client_city: null,
-      client_zipcode: null,
-      client_address: null,
-      client_zip_code: null
-    };
+    // Now clientData should have all the fields from the database
+    return clientData as ClientDetails;
   };
 
   console.log("[ClinicianDashboard] Rendering with stabilized data management:", {
