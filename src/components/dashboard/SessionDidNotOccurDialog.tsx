@@ -39,22 +39,41 @@ export const SessionDidNotOccurDialog = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isValid, setIsValid] = useState(false);
 
-  // Validate form
+  // Map display strings to database enum values
+  const getStatusFromReason = (reason: string): string => {
+    switch (reason) {
+      case 'No Call/No Show':
+        return 'no_show';
+      case 'Cancelled':
+        return 'cancelled';
+      default:
+        return reason;
+    }
+  };
+
+  // Validate form - only reason is required, notes are optional
   useEffect(() => {
-    setIsValid(!!reason && !!notes?.trim());
-  }, [reason, notes]);
+    setIsValid(!!reason);
+  }, [reason]);
 
   const handleSubmit = async () => {
     if (!isValid) return;
     
     setIsSubmitting(true);
     try {
+      const statusValue = getStatusFromReason(reason);
+      const updateData: { status: string; notes?: string } = { 
+        status: statusValue
+      };
+      
+      // Only include notes if they're provided
+      if (notes?.trim()) {
+        updateData.notes = notes.trim();
+      }
+
       const { error } = await supabase
         .from('appointments')
-        .update({ 
-          status: reason,
-          notes: notes 
-        })
+        .update(updateData)
         .eq('id', appointmentId);
 
       if (error) throw error;

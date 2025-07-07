@@ -3330,7 +3330,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "client" | "clinician"
-      appointment_status: "scheduled" | "documented" | "no show"
+      appointment_status: "scheduled" | "documented" | "no show" | "cancelled"
       client_gender_identity_type: "Male" | "Female" | "Other"
       client_gender_type: "Male" | "Female"
       client_relationship_type: "Self" | "Parent/Guardian" | "Spouse" | "Child"
@@ -3572,7 +3572,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "client", "clinician"],
-      appointment_status: ["scheduled", "documented", "no show"],
+      appointment_status: ["scheduled", "documented", "no show", "cancelled"],
       client_gender_identity_type: ["Male", "Female", "Other"],
       client_gender_type: ["Male", "Female"],
       client_relationship_type: ["Self", "Parent/Guardian", "Spouse", "Child"],
