@@ -29,6 +29,20 @@ const ReactBigCalendar: React.FC<ExtendedReactBigCalendarProps> = ({
   onNavigate,
   userTimeZone = 'America/New_York',
 }) => {
+  console.log('[ReactBigCalendar] Rendered with:', {
+    eventsCount: events.length,
+    backgroundEventsCount: backgroundEvents.length,
+    availabilitySlotsCount: availabilitySlots.length,
+    date: date.toISOString(),
+    userTimeZone,
+    sampleEvents: events.slice(0, 2).map(e => ({
+      id: e.id,
+      title: e.title,
+      start: e.start.toISOString(),
+      end: e.end.toISOString(),
+      source: e.source
+    }))
+  });
   // Pure RBC event styling - minimal differentiation for real events only
   const eventPropGetter = useCallback((event: CalendarEvent) => {
     let backgroundColor = '#3174ad';

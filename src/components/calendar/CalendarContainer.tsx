@@ -112,10 +112,26 @@ const CalendarContainer: React.FC = () => {
 
   // Separate real events from background availability
   const realEvents = useMemo((): CalendarEvent[] => {
+    console.log('[CalendarContainer] Calculating realEvents with:', {
+      appointments: appointments?.length || 0,
+      nylasEvents: nylasEvents?.length || 0,
+      blockedTimes: blockedTimes?.length || 0,
+      userTimeZone,
+      weekStart: weekStart.toISOString(),
+      weekEnd: weekEnd.toISOString()
+    });
+    
     const events: CalendarEvent[] = [];
     
     // Transform appointments to RBC format
     if (appointments) {
+      console.log('[CalendarContainer] Processing appointments:', appointments.map(apt => ({
+        id: apt.id,
+        start_at: apt.start_at,
+        client: apt.clientName,
+        timezone: apt.appointment_timezone
+      })));
+      
       events.push(...appointments.map(apt => {
         // FIXED: Use appointment's saved timezone for consistent display
         const appointmentTimeZone = apt.appointment_timezone || userTimeZone;
@@ -176,6 +192,18 @@ const CalendarContainer: React.FC = () => {
       };
     }));
 
+    
+    console.log('[CalendarContainer] Final realEvents created:', {
+      totalEvents: events.length,
+      eventsSummary: events.map(e => ({
+        id: e.id,
+        title: e.title,
+        start: e.start.toISOString(),
+        end: e.end.toISOString(),
+        source: e.source
+      }))
+    });
+
     return events;
   }, [appointments, nylasEvents, blockedTimes, userTimeZone, getSyncStatusForAppointment]);
 
@@ -230,10 +258,18 @@ const CalendarContainer: React.FC = () => {
 
   // Pure RBC event handlers - native only
   const handleCalendarNavigate = useCallback((newDate: Date) => {
-    console.log('[CalendarContainer] Navigating to new date:', newDate.toISOString());
-    setCurrentDate(newDate);
-    setRefreshTrigger(prev => prev + 1);
-  }, []);
+    console.log('[CalendarContainer] RBC Navigation triggered:', {
+      newDate: newDate.toISOString(),
+      currentDate: currentDate.toISOString(),
+      shouldNavigate: newDate.getTime() !== currentDate.getTime()
+    });
+    
+    // Only navigate if the date is actually different
+    if (newDate.getTime() !== currentDate.getTime()) {
+      setCurrentDate(newDate);
+      setRefreshTrigger(prev => prev + 1);
+    }
+  }, [currentDate]);
 
   const handleSelectSlot = useCallback((slotInfo: { start: Date; end: Date }) => {
     setSelectedSlot(slotInfo);
