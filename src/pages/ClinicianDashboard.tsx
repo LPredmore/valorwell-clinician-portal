@@ -186,20 +186,40 @@ const ClinicianDashboard = () => {
 
   // Session template handlers
   const openSessionTemplate = async (appointment: Appointment) => {
+    console.log('[openSessionTemplate] STEP 1 - Starting session template with appointment:', {
+      appointmentId: appointment.id,
+      clientId: appointment.client_id,
+      appointmentDate: appointment.start_at,
+      clientName: appointment.client ? `${appointment.client.client_first_name} ${appointment.client.client_last_name}` : 'No client data in appointment'
+    });
+
     setCurrentAppointment(appointment);
     setShowSessionTemplate(true);
     setIsLoadingClientData(true);
     
     try {
+      console.log('[openSessionTemplate] STEP 2 - About to fetch client data with ID:', appointment.client_id);
+      
       // Fetch complete client data from database
       const { data: fullClientData, error } = await supabase
         .from('clients')
         .select('*')
         .eq('id', appointment.client_id)
-        .single();
+        .maybeSingle();
+
+      console.log('[openSessionTemplate] STEP 3 - Database query result:', {
+        error: error,
+        hasData: !!fullClientData,
+        clientDataKeys: fullClientData ? Object.keys(fullClientData) : null,
+        clientName: fullClientData ? `${fullClientData.client_first_name} ${fullClientData.client_last_name}` : null,
+        clientDOB: fullClientData?.client_date_of_birth,
+        primaryObjective: fullClientData?.client_primaryobjective,
+        intervention1: fullClientData?.client_intervention1,
+        diagnosis: fullClientData?.client_diagnosis
+      });
 
       if (error) {
-        console.error('Error fetching client data:', error);
+        console.error('[openSessionTemplate] STEP 4 - Error fetching client data:', error);
         toast({
           title: "Warning",
           description: "Could not load complete client data.",
@@ -208,24 +228,43 @@ const ClinicianDashboard = () => {
         
         // Fallback to basic data from appointment
         if (appointment.client) {
-          setClientData({
+          const fallbackData = {
             id: appointment.client_id,
             client_first_name: appointment.client.client_first_name,
             client_last_name: appointment.client.client_last_name,
             client_preferred_name: appointment.client.client_preferred_name
-          } as any);
+          } as any;
+          
+          console.log('[openSessionTemplate] STEP 4b - Setting fallback client data:', fallbackData);
+          setClientData(fallbackData);
+        } else {
+          console.log('[openSessionTemplate] STEP 4c - No fallback data available, setting null');
+          setClientData(null);
         }
+      } else if (!fullClientData) {
+        console.warn('[openSessionTemplate] STEP 5 - No client data found for ID:', appointment.client_id);
+        setClientData(null);
       } else {
+        console.log('[openSessionTemplate] STEP 5 - Setting full client data:', {
+          clientId: fullClientData.id,
+          clientName: `${fullClientData.client_first_name} ${fullClientData.client_last_name}`,
+          hasDOB: !!fullClientData.client_date_of_birth,
+          hasPrimaryObjective: !!fullClientData.client_primaryobjective,
+          hasIntervention1: !!fullClientData.client_intervention1,
+          totalFields: Object.keys(fullClientData).length
+        });
         setClientData(fullClientData);
       }
     } catch (error) {
-      console.error('Error in openSessionTemplate:', error);
+      console.error('[openSessionTemplate] STEP 6 - Catch block error:', error);
       toast({
         title: "Error",
         description: "Failed to load client data.",
         variant: "destructive",
       });
+      setClientData(null);
     } finally {
+      console.log('[openSessionTemplate] STEP 7 - Cleanup - setting loading to false');
       setIsLoadingClientData(false);
     }
   };

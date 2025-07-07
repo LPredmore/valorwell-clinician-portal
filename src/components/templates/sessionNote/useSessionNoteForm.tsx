@@ -121,9 +121,19 @@ export const useSessionNoteForm = ({
   }, [clientData]);
 
   useEffect(() => {
+    console.log('[useSessionNoteForm] STEP 8 - clientData received:', {
+      hasClientData: !!clientData,
+      clientDataType: typeof clientData,
+      clientId: clientData?.id,
+      clientName: clientData ? `${clientData.client_first_name} ${clientData.client_last_name}` : 'No client data',
+      clientDOB: clientData?.client_date_of_birth,
+      primaryObjective: clientData?.client_primaryobjective,
+      intervention1: clientData?.client_intervention1,
+      totalFields: clientData ? Object.keys(clientData).length : 0
+    });
+
     if (clientData) {
-      setFormState(prevState => ({
-        ...prevState,
+      const newFormState = {
         patientName: `${clientData.client_first_name || ''} ${clientData.client_last_name || ''}`,
         patientDOB: clientData.client_date_of_birth || '',
         diagnosis: (clientData.client_diagnosis || []).join(', '),
@@ -165,6 +175,21 @@ export const useSessionNoteForm = ({
         sessionNarrative: clientData.client_sessionnarrative || '',
         nextTreatmentPlanUpdate: clientData.client_nexttreatmentplanupdate || '',
         privateNote: clientData.client_privatenote || ''
+      };
+
+      console.log('[useSessionNoteForm] STEP 9 - Setting form state with data:', {
+        patientName: newFormState.patientName,
+        patientDOB: newFormState.patientDOB,
+        primaryObjective: newFormState.primaryObjective,
+        intervention1: newFormState.intervention1,
+        diagnosis: newFormState.diagnosis,
+        hasObjectives: !!(newFormState.primaryObjective || newFormState.secondaryObjective || newFormState.tertiaryObjective),
+        hasInterventions: !!(newFormState.intervention1 || newFormState.intervention2 || newFormState.intervention3)
+      });
+
+      setFormState(prevState => ({
+        ...prevState,
+        ...newFormState
       }));
 
       setEditModes({
@@ -179,6 +204,10 @@ export const useSessionNoteForm = ({
         memoryConcentration: clientData.client_memoryconcentration && !['Short & Long Term Intact'].includes(clientData.client_memoryconcentration),
         insightJudgement: clientData.client_insightjudgement && !['Good'].includes(clientData.client_insightjudgement)
       });
+
+      console.log('[useSessionNoteForm] STEP 10 - Form state updated successfully');
+    } else {
+      console.log('[useSessionNoteForm] STEP 8b - No client data provided, skipping form population');
     }
   }, [clientData, clinicianName]);
 
