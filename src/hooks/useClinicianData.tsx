@@ -1,22 +1,30 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Clinician } from "@/types/client";
+import { useUser } from "@/context/UserContext";
 
 export const useClinicianData = () => {
   const [clinicianData, setClinicianData] = useState<Clinician | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const { userId, userRole } = useUser();
 
   useEffect(() => {
     const fetchClinicianData = async () => {
       try {
         setLoading(true);
         
-        // Get the first clinician for now (in a real app, you would get the current user's clinician)
+        // Only fetch if user is a clinician and userId is available
+        if (!userId || userRole !== 'clinician') {
+          setClinicianData(null);
+          setLoading(false);
+          return;
+        }
+        
         const { data, error } = await supabase
           .from('clinicians')
           .select('*')
-          .limit(1)
+          .eq('id', userId)
           .single();
 
         if (error) {
@@ -33,7 +41,7 @@ export const useClinicianData = () => {
     };
 
     fetchClinicianData();
-  }, []);
+  }, [userId, userRole]);
 
   return { clinicianData, loading, error };
 };

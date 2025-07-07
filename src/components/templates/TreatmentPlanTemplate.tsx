@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { CalendarIcon, Plus } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { format } from "date-fns";
+import { format, addMonths } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ClientDetails } from "@/types/client";
@@ -131,6 +131,37 @@ const TreatmentPlanTemplate: React.FC<TreatmentPlanTemplateProps> = ({
   useEffect(() => {
     setIsFormValid(validateForm());
   }, [formState, showSecondaryObjective, showTertiaryObjective]);
+
+  // Auto-calculate next treatment plan update date
+  useEffect(() => {
+    if (formState.startDate && formState.planLength) {
+      const calculateNextUpdateDate = (startDate: Date, planLength: string): string => {
+        try {
+          const monthsMap: Record<string, number> = {
+            '1month': 1,
+            '3month': 3,
+            '6month': 6,
+            '9month': 9,
+            '12month': 12
+          };
+          
+          const months = monthsMap[planLength];
+          if (!months) return '';
+          
+          const nextDate = addMonths(startDate, months);
+          return format(nextDate, 'MMMM d, yyyy');
+        } catch (error) {
+          console.error('Error calculating next update date:', error);
+          return '';
+        }
+      };
+      
+      const nextUpdate = calculateNextUpdateDate(formState.startDate, formState.planLength);
+      if (nextUpdate && nextUpdate !== formState.nextUpdate) {
+        setFormState(prev => ({ ...prev, nextUpdate }));
+      }
+    }
+  }, [formState.startDate, formState.planLength]);
 
   const handleChange = (field: string, value: any) => {
     setFormState(prev => ({ ...prev, [field]: value }));
