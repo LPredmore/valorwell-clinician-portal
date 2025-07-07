@@ -405,7 +405,7 @@ const ClinicianDetails = () => {
                     value={clinicianData.clinician_accepting_new_clients}
                     onSave={(value) => updateClinicianField('clinician_accepting_new_clients', value as string)}
                     type="select"
-                    options={['Yes', 'No', 'Waitlist']}
+                    options={['Yes', 'No']}
                   />
                 </div>
 
