@@ -233,15 +233,17 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
     try {
       setIsSaving(true);
 
-      // Create update object with availability times and timezone sync
+      // Create update object with availability times only
+      // Do not override clinician_time_zone - use the existing value from their profile
       const updateData = {
         [`clinician_availability_start_${selectedDay}_${selectedSlot}`]: startTime,
-        [`clinician_availability_end_${selectedDay}_${selectedSlot}`]: endTime,
-        // Force timezone sync by updating clinician_time_zone (triggers the database trigger)
-        clinician_time_zone: userTimeZone
+        [`clinician_availability_end_${selectedDay}_${selectedSlot}`]: endTime
       };
 
-      console.log('[AvailabilityManagementSidebar] Saving availability:', updateData);
+      console.log('[AvailabilityManagementSidebar] Saving availability using clinician timezone:', {
+        userTimeZone,
+        updateData
+      });
 
       const { error } = await supabase
         .from('clinicians')
@@ -276,13 +278,17 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
     try {
       setIsSaving(true);
 
-      // Clear the selected slot and force timezone sync
+      // Clear the selected slot only
+      // Do not override clinician_time_zone - use the existing value from their profile
       const updateData = {
         [`clinician_availability_start_${selectedDay}_${selectedSlot}`]: null,
-        [`clinician_availability_end_${selectedDay}_${selectedSlot}`]: null,
-        // Force timezone sync
-        clinician_time_zone: userTimeZone
+        [`clinician_availability_end_${selectedDay}_${selectedSlot}`]: null
       };
+
+      console.log('[AvailabilityManagementSidebar] Clearing availability slot using clinician timezone:', {
+        userTimeZone,
+        updateData
+      });
 
       const { error } = await supabase
         .from('clinicians')
