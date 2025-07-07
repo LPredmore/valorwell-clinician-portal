@@ -208,8 +208,20 @@ const CalendarContainer: React.FC = () => {
       const allStartTimes: Date[] = [];
       const allEndTimes: Date[] = [];
 
+      console.log('🔍 Starting calendar time calculation...');
+      console.log('Real events count:', realEvents.length);
+      console.log('Background events count:', backgroundEvents.length);
+
       // Add real events times with validation
-      realEvents.forEach(event => {
+      realEvents.forEach((event, index) => {
+        console.log(`📅 Real event ${index}:`, {
+          title: event.title,
+          start: event.start,
+          end: event.end,
+          startTime: event.start?.toTimeString(),
+          source: event.source
+        });
+        
         if (event.start && event.start instanceof Date && !isNaN(event.start.getTime())) {
           allStartTimes.push(event.start);
         }
@@ -219,7 +231,14 @@ const CalendarContainer: React.FC = () => {
       });
 
       // Add background events (availability) times with validation
-      backgroundEvents.forEach(event => {
+      backgroundEvents.forEach((event, index) => {
+        console.log(`⏰ Background event ${index}:`, {
+          start: event.start,
+          end: event.end,
+          startTime: event.start?.toTimeString(),
+          resource: event.resource
+        });
+        
         if (event.start && event.start instanceof Date && !isNaN(event.start.getTime())) {
           allStartTimes.push(event.start);
         }
@@ -230,7 +249,7 @@ const CalendarContainer: React.FC = () => {
 
       // Exit early if no valid dates found
       if (allStartTimes.length === 0 || allEndTimes.length === 0) {
-        console.log('No valid dates found for calendar display time calculation');
+        console.log('❌ No valid dates found for calendar display time calculation');
         return;
       }
 
@@ -238,34 +257,53 @@ const CalendarContainer: React.FC = () => {
       const earliestStart = new Date(Math.min(...allStartTimes.map(d => d.getTime())));
       const latestEnd = new Date(Math.max(...allEndTimes.map(d => d.getTime())));
 
+      console.log('📊 Calculated times:', {
+        earliestStart: earliestStart.toTimeString(),
+        latestEnd: latestEnd.toTimeString(),
+        earliestStartHour: earliestStart.getHours(),
+        latestEndHour: latestEnd.getHours()
+      });
+
       // Validate the calculated dates
       if (isNaN(earliestStart.getTime()) || isNaN(latestEnd.getTime())) {
-        console.error('Calculated dates are invalid');
+        console.error('❌ Calculated dates are invalid');
         return;
       }
 
-      // Round to reasonable business hours
-      // Round start time down to the nearest hour
+      // Use the actual event times, just rounded to hour boundaries
       const startHour = earliestStart.getHours();
-      const roundedStartHour = Math.max(7, startHour); // Don't go earlier than 7 AM
-      
-      // Round end time up to the nearest hour
       const endHour = latestEnd.getHours();
-      const roundedEndHour = Math.min(22, endHour + (latestEnd.getMinutes() > 0 ? 1 : 0)); // Don't go later than 10 PM
+      const endMinutes = latestEnd.getMinutes();
+      
+      // Round end time up if there are minutes
+      const roundedEndHour = endMinutes > 0 ? endHour + 1 : endHour;
 
-      // Format to HH:MM with validation
-      const newStartTime = `${roundedStartHour.toString().padStart(2, '0')}:00`;
+      console.log('🎯 Final calculation:', {
+        originalStartHour: startHour,
+        originalEndHour: endHour,
+        endMinutes: endMinutes,
+        finalStartHour: startHour,
+        finalEndHour: roundedEndHour
+      });
+
+      // Format to HH:MM
+      const newStartTime = `${startHour.toString().padStart(2, '0')}:00`;
       const newEndTime = `${roundedEndHour.toString().padStart(2, '0')}:00`;
+
+      console.log('⏰ New times:', { newStartTime, newEndTime });
+      console.log('⏰ Current times:', { calendarStartTime, calendarEndTime });
 
       // Validate time format (should be HH:MM)
       const timePattern = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
       if (!timePattern.test(newStartTime) || !timePattern.test(newEndTime)) {
-        console.error('Invalid time format generated:', { newStartTime, newEndTime });
+        console.error('❌ Invalid time format generated:', { newStartTime, newEndTime });
         return;
       }
 
       // Only update if times have changed
       if (newStartTime !== calendarStartTime || newEndTime !== calendarEndTime) {
+        console.log('✅ Updating calendar times from', { calendarStartTime, calendarEndTime }, 'to', { newStartTime, newEndTime });
+        
         setCalendarStartTime(newStartTime);
         setCalendarEndTime(newEndTime);
 
@@ -278,15 +316,18 @@ const CalendarContainer: React.FC = () => {
               clinician_calendar_end_time: newEndTime + ':00'
             })
             .eq('id', clinicianId);
+          console.log('✅ Database updated successfully');
         } catch (error) {
-          console.error('Failed to update calendar display times:', error);
+          console.error('❌ Failed to update calendar display times:', error);
           // Revert state on database error
           setCalendarStartTime(calendarStartTime);
           setCalendarEndTime(calendarEndTime);
         }
+      } else {
+        console.log('⏸️ No changes needed - times are already correct');
       }
     } catch (error) {
-      console.error('Error in autoUpdateCalendarDisplayTimes:', error);
+      console.error('❌ Error in autoUpdateCalendarDisplayTimes:', error);
     }
   }, [realEvents, backgroundEvents, calendarStartTime, calendarEndTime]);
 
