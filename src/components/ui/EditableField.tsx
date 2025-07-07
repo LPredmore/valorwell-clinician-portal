@@ -15,6 +15,8 @@ interface EditableFieldProps {
   options?: string[];
   placeholder?: string;
   disabled?: boolean;
+  valueMapper?: (displayValue: string) => string;
+  labelMapper?: (value: string) => string;
 }
 
 export const EditableField: React.FC<EditableFieldProps> = ({
@@ -24,16 +26,24 @@ export const EditableField: React.FC<EditableFieldProps> = ({
   type = 'text',
   options = [],
   placeholder,
-  disabled = false
+  disabled = false,
+  valueMapper,
+  labelMapper
 }) => {
   const [isEditing, setIsEditing] = useState(false);
-  const [editValue, setEditValue] = useState(value || '');
+  const [editValue, setEditValue] = useState(() => {
+    if (type === 'select' && labelMapper && value) {
+      return labelMapper(value as string);
+    }
+    return value || '';
+  });
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSave = async () => {
     try {
       setIsLoading(true);
-      await onSave(editValue);
+      const valueToSave = valueMapper ? valueMapper(editValue as string) : editValue;
+      await onSave(valueToSave);
       setIsEditing(false);
     } catch (error) {
       console.error('Error saving field:', error);
@@ -43,7 +53,11 @@ export const EditableField: React.FC<EditableFieldProps> = ({
   };
 
   const handleCancel = () => {
-    setEditValue(value || '');
+    if (type === 'select' && labelMapper && value) {
+      setEditValue(labelMapper(value as string));
+    } else {
+      setEditValue(value || '');
+    }
     setIsEditing(false);
   };
 
@@ -53,13 +67,14 @@ export const EditableField: React.FC<EditableFieldProps> = ({
         <div className="flex flex-wrap gap-1">
           {value.map((item: string) => (
             <Badge key={item} variant="outline" className="text-xs">
-              {item}
+              {labelMapper ? labelMapper(item) : item}
             </Badge>
           ))}
         </div>
       ) : 'Not specified';
     }
-    return value || 'Not specified';
+    const displayText = labelMapper && value ? labelMapper(value as string) : value;
+    return displayText || 'Not specified';
   };
 
   if (!isEditing) {

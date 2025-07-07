@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/context/UserContext';
 import Layout from '@/components/layout/Layout';
 import { EditableField } from '@/components/ui/EditableField';
+import { getTimeZoneEnumOptions, getTimeZoneEnumLabel } from '@/utils/timezoneEnumOptions';
 
 const ClinicianDetails = () => {
   const { clinicianId } = useParams<{ clinicianId: string }>();
@@ -363,7 +364,10 @@ const ClinicianDetails = () => {
                     label="Time Zone"
                     value={clinicianData.clinician_time_zone}
                     onSave={(value) => updateClinicianField('clinician_time_zone', value as string)}
-                    placeholder="Enter time zone"
+                    type="select"
+                    options={getTimeZoneEnumOptions().map(option => option.label)}
+                    valueMapper={(label) => getTimeZoneEnumOptions().find(option => option.label === label)?.value || label}
+                    labelMapper={(value) => getTimeZoneEnumLabel(value)}
                   />
                 </div>
               </CardContent>
