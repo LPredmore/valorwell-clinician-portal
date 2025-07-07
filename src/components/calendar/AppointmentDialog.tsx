@@ -216,7 +216,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
     try {
       setIsLoading(true);
 
-      // Validate timezone - use userTimeZone instead of clinicianTimeZone
+      // Validate timezone - use userTimeZone for appointment creation (matching blocked time logic)
       if (!userTimeZone) {
         throw new Error('User timezone not found - cannot create appointment');
       }
@@ -231,12 +231,13 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
 
       const localDateTimeStart = `${date}T${hour24.toString().padStart(2, '0')}:${startMinute}`;
       
-      console.log('[AppointmentDialog] Converting times:', {
+      console.log('[AppointmentDialog] Converting times (fixed to match blocked time):', {
         localDateTimeStart,
         userTimeZone,
         isEdit: isEditMode
       });
 
+      // Use same UTC conversion logic as blocked time (which works correctly)
       const startAtUTC = TimeZoneService.convertLocalToUTC(localDateTimeStart, userTimeZone);
       const endAtUTC = startAtUTC.plus({ hours: 1 });
 
