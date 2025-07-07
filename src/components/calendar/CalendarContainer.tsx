@@ -202,6 +202,53 @@ const CalendarContainer: React.FC = () => {
     }
   }, []);
 
+  const autoUpdateCalendarDisplayTimes = useCallback(async (clinicianId: string) => {
+    // Calculate earliest start and latest end from all events and availability
+    const allStartTimes: Date[] = [];
+    const allEndTimes: Date[] = [];
+
+    // Add real events times
+    realEvents.forEach(event => {
+      allStartTimes.push(event.start);
+      allEndTimes.push(event.end);
+    });
+
+    // Add background events (availability) times
+    backgroundEvents.forEach(event => {
+      allStartTimes.push(event.start);
+      allEndTimes.push(event.end);
+    });
+
+    if (allStartTimes.length === 0) return;
+
+    // Find the earliest start time and latest end time
+    const earliestStart = new Date(Math.min(...allStartTimes.map(d => d.getTime())));
+    const latestEnd = new Date(Math.max(...allEndTimes.map(d => d.getTime())));
+
+    // Format to HH:MM
+    const newStartTime = earliestStart.toTimeString().substring(0, 5);
+    const newEndTime = latestEnd.toTimeString().substring(0, 5);
+
+    // Only update if times have changed
+    if (newStartTime !== calendarStartTime || newEndTime !== calendarEndTime) {
+      setCalendarStartTime(newStartTime);
+      setCalendarEndTime(newEndTime);
+
+      // Update database
+      try {
+        await supabase
+          .from('clinicians')
+          .update({
+            clinician_calendar_start_time: newStartTime + ':00',
+            clinician_calendar_end_time: newEndTime + ':00'
+          })
+          .eq('id', clinicianId);
+      } catch (error) {
+        console.error('Failed to update calendar display times:', error);
+      }
+    }
+  }, [realEvents, backgroundEvents, calendarStartTime, calendarEndTime]);
+
   // Pure RBC event handlers - native only
   const handleCalendarNavigate = useCallback((newDate: Date) => {
     setCurrentDate(newDate);
@@ -288,6 +335,12 @@ const CalendarContainer: React.FC = () => {
     loadUserTimeZone(userId);
     loadCalendarDisplaySettings(userId);
   }, [userId, loadUserTimeZone, loadCalendarDisplaySettings]);
+
+  // Auto-update calendar display times when data changes
+  useEffect(() => {
+    if (!userId || realEvents.length === 0 && backgroundEvents.length === 0) return;
+    autoUpdateCalendarDisplayTimes(userId);
+  }, [userId, realEvents, backgroundEvents, autoUpdateCalendarDisplayTimes]);
 
   if (!authInitialized || !userId) {
     return (
