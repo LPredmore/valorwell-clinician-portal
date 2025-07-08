@@ -461,9 +461,9 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
       return;
     }
     
-    console.log('[AppointmentDialog] Single appointment deletion');
-    // Handle single appointment deletion
-    await deleteSingleAppointment();
+    console.log('[AppointmentDialog] Single appointment deletion, showing confirmation');
+    // Show delete confirmation dialog for non-recurring appointments
+    setShowDeleteConfirm(true);
   };
 
   const deleteSingleAppointment = async () => {
@@ -839,7 +839,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
                         hasRecurringGroup: !!editingAppointment?.recurring_group_id,
                         recurringGroupId: editingAppointment?.recurring_group_id
                       });
-                      setShowDeleteConfirm(true);
+                      handleDelete();
                     }}
                     disabled={isLoading}
                   >
