@@ -498,7 +498,6 @@ export type Database = {
           label: string
           notes: string | null
           start_at: string
-          timezone: string
           updated_at: string
         }
         Insert: {
@@ -509,7 +508,6 @@ export type Database = {
           label?: string
           notes?: string | null
           start_at: string
-          timezone?: string
           updated_at?: string
         }
         Update: {
@@ -520,7 +518,6 @@ export type Database = {
           label?: string
           notes?: string | null
           start_at?: string
-          timezone?: string
           updated_at?: string
         }
         Relationships: [
@@ -1393,6 +1390,27 @@ export type Database = {
           clinician_availability_end_tuesday_1: string | null
           clinician_availability_end_tuesday_2: string | null
           clinician_availability_end_tuesday_3: string | null
+          clinician_availability_end_utc_friday_1: string | null
+          clinician_availability_end_utc_friday_2: string | null
+          clinician_availability_end_utc_friday_3: string | null
+          clinician_availability_end_utc_monday_1: string | null
+          clinician_availability_end_utc_monday_2: string | null
+          clinician_availability_end_utc_monday_3: string | null
+          clinician_availability_end_utc_saturday_1: string | null
+          clinician_availability_end_utc_saturday_2: string | null
+          clinician_availability_end_utc_saturday_3: string | null
+          clinician_availability_end_utc_sunday_1: string | null
+          clinician_availability_end_utc_sunday_2: string | null
+          clinician_availability_end_utc_sunday_3: string | null
+          clinician_availability_end_utc_thursday_1: string | null
+          clinician_availability_end_utc_thursday_2: string | null
+          clinician_availability_end_utc_thursday_3: string | null
+          clinician_availability_end_utc_tuesday_1: string | null
+          clinician_availability_end_utc_tuesday_2: string | null
+          clinician_availability_end_utc_tuesday_3: string | null
+          clinician_availability_end_utc_wednesday_1: string | null
+          clinician_availability_end_utc_wednesday_2: string | null
+          clinician_availability_end_utc_wednesday_3: string | null
           clinician_availability_end_wednesday_1: string | null
           clinician_availability_end_wednesday_2: string | null
           clinician_availability_end_wednesday_3: string | null
@@ -1414,6 +1432,27 @@ export type Database = {
           clinician_availability_start_tuesday_1: string | null
           clinician_availability_start_tuesday_2: string | null
           clinician_availability_start_tuesday_3: string | null
+          clinician_availability_start_utc_friday_1: string | null
+          clinician_availability_start_utc_friday_2: string | null
+          clinician_availability_start_utc_friday_3: string | null
+          clinician_availability_start_utc_monday_1: string | null
+          clinician_availability_start_utc_monday_2: string | null
+          clinician_availability_start_utc_monday_3: string | null
+          clinician_availability_start_utc_saturday_1: string | null
+          clinician_availability_start_utc_saturday_2: string | null
+          clinician_availability_start_utc_saturday_3: string | null
+          clinician_availability_start_utc_sunday_1: string | null
+          clinician_availability_start_utc_sunday_2: string | null
+          clinician_availability_start_utc_sunday_3: string | null
+          clinician_availability_start_utc_thursday_1: string | null
+          clinician_availability_start_utc_thursday_2: string | null
+          clinician_availability_start_utc_thursday_3: string | null
+          clinician_availability_start_utc_tuesday_1: string | null
+          clinician_availability_start_utc_tuesday_2: string | null
+          clinician_availability_start_utc_tuesday_3: string | null
+          clinician_availability_start_utc_wednesday_1: string | null
+          clinician_availability_start_utc_wednesday_2: string | null
+          clinician_availability_start_utc_wednesday_3: string | null
           clinician_availability_start_wednesday_1: string | null
           clinician_availability_start_wednesday_2: string | null
           clinician_availability_start_wednesday_3: string | null
@@ -1492,6 +1531,27 @@ export type Database = {
           clinician_availability_end_tuesday_1?: string | null
           clinician_availability_end_tuesday_2?: string | null
           clinician_availability_end_tuesday_3?: string | null
+          clinician_availability_end_utc_friday_1?: string | null
+          clinician_availability_end_utc_friday_2?: string | null
+          clinician_availability_end_utc_friday_3?: string | null
+          clinician_availability_end_utc_monday_1?: string | null
+          clinician_availability_end_utc_monday_2?: string | null
+          clinician_availability_end_utc_monday_3?: string | null
+          clinician_availability_end_utc_saturday_1?: string | null
+          clinician_availability_end_utc_saturday_2?: string | null
+          clinician_availability_end_utc_saturday_3?: string | null
+          clinician_availability_end_utc_sunday_1?: string | null
+          clinician_availability_end_utc_sunday_2?: string | null
+          clinician_availability_end_utc_sunday_3?: string | null
+          clinician_availability_end_utc_thursday_1?: string | null
+          clinician_availability_end_utc_thursday_2?: string | null
+          clinician_availability_end_utc_thursday_3?: string | null
+          clinician_availability_end_utc_tuesday_1?: string | null
+          clinician_availability_end_utc_tuesday_2?: string | null
+          clinician_availability_end_utc_tuesday_3?: string | null
+          clinician_availability_end_utc_wednesday_1?: string | null
+          clinician_availability_end_utc_wednesday_2?: string | null
+          clinician_availability_end_utc_wednesday_3?: string | null
           clinician_availability_end_wednesday_1?: string | null
           clinician_availability_end_wednesday_2?: string | null
           clinician_availability_end_wednesday_3?: string | null
@@ -1513,6 +1573,27 @@ export type Database = {
           clinician_availability_start_tuesday_1?: string | null
           clinician_availability_start_tuesday_2?: string | null
           clinician_availability_start_tuesday_3?: string | null
+          clinician_availability_start_utc_friday_1?: string | null
+          clinician_availability_start_utc_friday_2?: string | null
+          clinician_availability_start_utc_friday_3?: string | null
+          clinician_availability_start_utc_monday_1?: string | null
+          clinician_availability_start_utc_monday_2?: string | null
+          clinician_availability_start_utc_monday_3?: string | null
+          clinician_availability_start_utc_saturday_1?: string | null
+          clinician_availability_start_utc_saturday_2?: string | null
+          clinician_availability_start_utc_saturday_3?: string | null
+          clinician_availability_start_utc_sunday_1?: string | null
+          clinician_availability_start_utc_sunday_2?: string | null
+          clinician_availability_start_utc_sunday_3?: string | null
+          clinician_availability_start_utc_thursday_1?: string | null
+          clinician_availability_start_utc_thursday_2?: string | null
+          clinician_availability_start_utc_thursday_3?: string | null
+          clinician_availability_start_utc_tuesday_1?: string | null
+          clinician_availability_start_utc_tuesday_2?: string | null
+          clinician_availability_start_utc_tuesday_3?: string | null
+          clinician_availability_start_utc_wednesday_1?: string | null
+          clinician_availability_start_utc_wednesday_2?: string | null
+          clinician_availability_start_utc_wednesday_3?: string | null
           clinician_availability_start_wednesday_1?: string | null
           clinician_availability_start_wednesday_2?: string | null
           clinician_availability_start_wednesday_3?: string | null
@@ -1593,6 +1674,27 @@ export type Database = {
           clinician_availability_end_tuesday_1?: string | null
           clinician_availability_end_tuesday_2?: string | null
           clinician_availability_end_tuesday_3?: string | null
+          clinician_availability_end_utc_friday_1?: string | null
+          clinician_availability_end_utc_friday_2?: string | null
+          clinician_availability_end_utc_friday_3?: string | null
+          clinician_availability_end_utc_monday_1?: string | null
+          clinician_availability_end_utc_monday_2?: string | null
+          clinician_availability_end_utc_monday_3?: string | null
+          clinician_availability_end_utc_saturday_1?: string | null
+          clinician_availability_end_utc_saturday_2?: string | null
+          clinician_availability_end_utc_saturday_3?: string | null
+          clinician_availability_end_utc_sunday_1?: string | null
+          clinician_availability_end_utc_sunday_2?: string | null
+          clinician_availability_end_utc_sunday_3?: string | null
+          clinician_availability_end_utc_thursday_1?: string | null
+          clinician_availability_end_utc_thursday_2?: string | null
+          clinician_availability_end_utc_thursday_3?: string | null
+          clinician_availability_end_utc_tuesday_1?: string | null
+          clinician_availability_end_utc_tuesday_2?: string | null
+          clinician_availability_end_utc_tuesday_3?: string | null
+          clinician_availability_end_utc_wednesday_1?: string | null
+          clinician_availability_end_utc_wednesday_2?: string | null
+          clinician_availability_end_utc_wednesday_3?: string | null
           clinician_availability_end_wednesday_1?: string | null
           clinician_availability_end_wednesday_2?: string | null
           clinician_availability_end_wednesday_3?: string | null
@@ -1614,6 +1716,27 @@ export type Database = {
           clinician_availability_start_tuesday_1?: string | null
           clinician_availability_start_tuesday_2?: string | null
           clinician_availability_start_tuesday_3?: string | null
+          clinician_availability_start_utc_friday_1?: string | null
+          clinician_availability_start_utc_friday_2?: string | null
+          clinician_availability_start_utc_friday_3?: string | null
+          clinician_availability_start_utc_monday_1?: string | null
+          clinician_availability_start_utc_monday_2?: string | null
+          clinician_availability_start_utc_monday_3?: string | null
+          clinician_availability_start_utc_saturday_1?: string | null
+          clinician_availability_start_utc_saturday_2?: string | null
+          clinician_availability_start_utc_saturday_3?: string | null
+          clinician_availability_start_utc_sunday_1?: string | null
+          clinician_availability_start_utc_sunday_2?: string | null
+          clinician_availability_start_utc_sunday_3?: string | null
+          clinician_availability_start_utc_thursday_1?: string | null
+          clinician_availability_start_utc_thursday_2?: string | null
+          clinician_availability_start_utc_thursday_3?: string | null
+          clinician_availability_start_utc_tuesday_1?: string | null
+          clinician_availability_start_utc_tuesday_2?: string | null
+          clinician_availability_start_utc_tuesday_3?: string | null
+          clinician_availability_start_utc_wednesday_1?: string | null
+          clinician_availability_start_utc_wednesday_2?: string | null
+          clinician_availability_start_utc_wednesday_3?: string | null
           clinician_availability_start_wednesday_1?: string | null
           clinician_availability_start_wednesday_2?: string | null
           clinician_availability_start_wednesday_3?: string | null
