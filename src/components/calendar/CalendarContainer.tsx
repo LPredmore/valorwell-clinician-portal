@@ -49,7 +49,11 @@ const CalendarContainer: React.FC = () => {
 
   // Calculate week boundaries using RBC-native approach
   const { start: weekStart, end: weekEnd } = useMemo(() => {
-    const tz = userTimeZone || TimeZoneService.DEFAULT_TIMEZONE;
+    // CRITICAL: Don't use 'loading' state for date calculations
+    if (!userTimeZone || userTimeZone === 'loading') {
+      return { start: new Date(), end: new Date() };
+    }
+    const tz = TimeZoneService.ensureIANATimeZone(userTimeZone);
     return getWeekRange(currentDate, tz);
   }, [currentDate, userTimeZone]);
 

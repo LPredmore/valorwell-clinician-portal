@@ -3,7 +3,9 @@ import { DateTime } from 'luxon';
 import { PostgrestFilterBuilder } from '@supabase/postgrest-js';
 
 export const getWeekRange = (date: Date, timeZone: string) => {
-  const dt = DateTime.fromJSDate(date).setZone(timeZone);
+  // Ensure valid timezone before using with Luxon
+  const safeTimeZone = timeZone === 'loading' ? 'UTC' : timeZone;
+  const dt = DateTime.fromJSDate(date).setZone(safeTimeZone);
   return {
     start: dt.startOf('week').toJSDate(),
     end: dt.endOf('week').toJSDate()
