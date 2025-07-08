@@ -114,7 +114,9 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
         isEdit: isEditMode,
         appointmentId,
         editingAppointment,
-        selectedSlot
+        selectedSlot,
+        hasRecurringGroup: editingAppointment?.recurring_group_id,
+        recurringGroupId: editingAppointment?.recurring_group_id
       });
 
       if (editingAppointment) {
@@ -439,15 +441,27 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
   };
 
   const handleDelete = async () => {
-    if (!appointmentId) return;
+    console.log('[AppointmentDialog] handleDelete called', {
+      appointmentId,
+      editingAppointment,
+      hasRecurringGroup: !!editingAppointment?.recurring_group_id,
+      recurringGroupId: editingAppointment?.recurring_group_id
+    });
+    
+    if (!appointmentId) {
+      console.log('[AppointmentDialog] No appointment ID, returning');
+      return;
+    }
     
     // Check if this is a recurring appointment
     if (editingAppointment?.recurring_group_id) {
+      console.log('[AppointmentDialog] This is a recurring appointment, showing dialog');
       setRecurringActionType('delete');
       setShowRecurringAction(true);
       return;
     }
     
+    console.log('[AppointmentDialog] Single appointment deletion');
     // Handle single appointment deletion
     await deleteSingleAppointment();
   };
@@ -819,7 +833,14 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
                   <Button 
                     type="button" 
                     variant="destructive"
-                    onClick={() => setShowDeleteConfirm(true)}
+                    onClick={() => {
+                      console.log('[AppointmentDialog] Delete button clicked', {
+                        editingAppointment,
+                        hasRecurringGroup: !!editingAppointment?.recurring_group_id,
+                        recurringGroupId: editingAppointment?.recurring_group_id
+                      });
+                      setShowDeleteConfirm(true);
+                    }}
                     disabled={isLoading}
                   >
                     Delete Appointment
