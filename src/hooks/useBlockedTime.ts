@@ -5,6 +5,11 @@ import { temporalOverlapQuery } from '@/utils/dateRangeUtils';
 import { getClinicianTimeZone } from '@/hooks/useClinicianData';
 import { DateTime } from 'luxon';
 
+// Helper function to validate Date objects
+const isValidDate = (date: Date): boolean => {
+  return date instanceof Date && !isNaN(date.getTime());
+};
+
 interface BlockedTime {
   id: string;
   clinician_id: string;
@@ -31,6 +36,23 @@ export const useBlockedTime = (
 
   const fetchBlockedTimes = async () => {
     if (!clinicianId) return;
+    
+    // CRITICAL: Don't fetch while timezone is loading or with invalid dates
+    if (!timeZone || timeZone === 'loading') {
+      console.log('[useBlockedTime] GUARD: Skipping fetch - timezone still loading');
+      return;
+    }
+
+    // Validate dates before processing
+    if (startDate && !isValidDate(startDate)) {
+      console.log('[useBlockedTime] GUARD: Skipping fetch - invalid startDate');
+      return;
+    }
+    
+    if (endDate && !isValidDate(endDate)) {
+      console.log('[useBlockedTime] GUARD: Skipping fetch - invalid endDate');
+      return;
+    }
 
     try {
       setIsLoading(true);
@@ -51,10 +73,16 @@ export const useBlockedTime = (
 
       if (startDate && endDate) {
         // FIXED: Convert boundaries to UTC using clinician's timezone before query
-        const startUTC = DateTime.fromJSDate(startDate, { zone: timeZone || 'UTC' })
+        const startUTC = DateTime.fromJSDate(startDate, { zone: timeZone })
           .startOf('day').toUTC().toJSDate();
-        const endUTC = DateTime.fromJSDate(endDate, { zone: timeZone || 'UTC' })
+        const endUTC = DateTime.fromJSDate(endDate, { zone: timeZone })
           .endOf('day').plus({ days: 1 }).toUTC().toJSDate();
+          
+        // Validate converted dates before using them
+        if (!isValidDate(startUTC) || !isValidDate(endUTC)) {
+          console.error('[useBlockedTime] ERROR: Invalid UTC conversion results');
+          return;
+        }
           
         query = temporalOverlapQuery(query, startUTC, endUTC);
         console.log('[useBlockedTime] Applied temporal overlap filter with timezone conversion:', {

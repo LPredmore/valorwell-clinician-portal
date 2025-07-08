@@ -158,6 +158,18 @@ export const useAppointments = (
         return [];
       }
       
+      // CRITICAL: Don't query while timezone is loading or with invalid date ranges
+      if (!timeZone || timeZone === 'loading') {
+        console.log("[useAppointments] GUARD: Skipping query - timezone still loading");
+        return [];
+      }
+      
+      // Validate date range if provided
+      if ((fromDate && isNaN(fromDate.getTime())) || (toDate && isNaN(toDate.getTime()))) {
+        console.log("[useAppointments] GUARD: Skipping query - invalid date range");
+        return [];
+      }
+      
       console.log(
         "[useAppointments] STEP 1 - Building Supabase Query with CLIENT DATA for clinician:",
         formattedClinicianId,
