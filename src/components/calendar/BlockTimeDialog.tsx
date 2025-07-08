@@ -23,7 +23,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { getClinicianTimeZone } from '@/hooks/useClinicianData';
-import { TimeZoneService } from '@/utils/timeZoneService';
+import { formInputToUTC } from '@/utils/timezoneHelpers';
 import { useBlockedTime } from '@/hooks/useBlockedTime';
 
 interface BlockTimeDialogProps {
@@ -51,15 +51,6 @@ const generateTimeOptions = () => {
   return options;
 };
 
-const convertLocalToUTC = (dateString: string, timeString: string, timezone: string) => {
-  try {
-    const localDateTimeStr = `${dateString}T${timeString}`;
-    return TimeZoneService.convertLocalToUTC(localDateTimeStr, timezone);
-  } catch (error) {
-    console.error('[BlockTimeDialog] Error converting to UTC:', error);
-    throw error;
-  }
-};
 
 const isValidUUID = (uuid: string | null): boolean => {
   if (!uuid) return false;
@@ -187,8 +178,8 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
       console.log(`[BlockTimeDialog] ${timestamp} Proceeding with valid clinician ID:`, clinicianId);
 
       const dateString = format(selectedDate!, 'yyyy-MM-dd');
-      const startAtUTC = convertLocalToUTC(dateString, startTime, clinicianTimeZone);
-      const endAtUTC = convertLocalToUTC(dateString, endTime, clinicianTimeZone);
+      const startAtUTC = formInputToUTC(`${dateString}T${startTime}`, clinicianTimeZone);
+      const endAtUTC = formInputToUTC(`${dateString}T${endTime}`, clinicianTimeZone);
 
       console.log(`[BlockTimeDialog] ${timestamp} Creating blocked time slot:`, {
         clinician_id: clinicianId,
@@ -196,15 +187,15 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
         startTime,
         endTime,
         clinicianTimeZone,
-        startAtUTC: startAtUTC.toISO(),
-        endAtUTC: endAtUTC.toISO(),
+        startAtUTC,
+        endAtUTC,
         label: blockLabel,
         notes
       });
 
       const success = await createBlockedTime(
-        startAtUTC.toJSDate().toISOString(),
-        endAtUTC.toJSDate().toISOString(),
+        startAtUTC,
+        endAtUTC,
         blockLabel,
         notes || undefined
       );

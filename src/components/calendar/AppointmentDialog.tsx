@@ -19,7 +19,8 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { videoRoomService } from '@/utils/videoRoomService';
-import { TimeZoneService } from '@/utils/timeZoneService';
+import { getClinicianTimeZone } from '@/hooks/useClinicianData';
+import { formInputToUTC } from '@/utils/timezoneHelpers';
 import { DateTime } from 'luxon';
 import RecurringOptions, { RecurrenceFrequency } from './RecurringOptions';
 import RecurringActionDialog from './RecurringActionDialog';
@@ -215,21 +216,11 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
 
   const loadClinicianTimeZone = async () => {
     try {
-      const { data, error } = await supabase
-        .from('clinicians')
-        .select('clinician_time_zone')
-        .eq('id', clinicianId)
-        .single();
-
-      if (error) throw error;
-      
-      const timezone = data?.clinician_time_zone || userTimeZone;
+      const timezone = await getClinicianTimeZone(clinicianId);
       setClinicianTimeZone(timezone);
       
       console.log('[AppointmentDialog] Loaded clinician timezone:', {
         clinicianId,
-        fetchedTimezone: data?.clinician_time_zone,
-        fallbackTimezone: userTimeZone,
         finalTimezone: timezone
       });
     } catch (error) {
@@ -336,14 +327,15 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
         isEdit: isEditMode
       });
 
-      // Use same UTC conversion logic as blocked time with clinician's timezone
-      const startAtUTC = TimeZoneService.convertLocalToUTC(localDateTimeStart, effectiveTimeZone);
+      // Use unified timezone helper with clinician's timezone
+      const startAtUtcString = formInputToUTC(localDateTimeStart, effectiveTimeZone);
+      const startAtUTC = DateTime.fromISO(startAtUtcString, { zone: 'UTC' });
       const endAtUTC = startAtUTC.plus({ hours: 1 });
 
       const appointmentData = {
         client_id: selectedClientId,
         clinician_id: clinicianId,
-        start_at: startAtUTC.toISO(),
+        start_at: startAtUtcString,
         end_at: endAtUTC.toISO(),
         appointment_timezone: effectiveTimeZone,
         type: 'therapy_session',
@@ -514,14 +506,15 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
       }
 
       const localDateTimeStart = `${date}T${hour24.toString().padStart(2, '0')}:${startMinute}`;
-      const startAtUTC = TimeZoneService.convertLocalToUTC(localDateTimeStart, effectiveTimeZone);
+      const startAtUtcString = formInputToUTC(localDateTimeStart, effectiveTimeZone);
+      const startAtUTC = DateTime.fromISO(startAtUtcString, { zone: 'UTC' });
       const endAtUTC = startAtUTC.plus({ hours: 1 });
 
       const { error } = await supabase
         .from('appointments')
         .update({
           client_id: selectedClientId,
-          start_at: startAtUTC.toISO(),
+          start_at: startAtUtcString,
           end_at: endAtUTC.toISO(),
           appointment_timezone: effectiveTimeZone,
           notes: notes || null,
@@ -568,7 +561,8 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
       }
 
       const localDateTimeStart = `${date}T${hour24.toString().padStart(2, '0')}:${startMinute}`;
-      const startAtUTC = TimeZoneService.convertLocalToUTC(localDateTimeStart, effectiveTimeZone);
+      const startAtUtcString = formInputToUTC(localDateTimeStart, effectiveTimeZone);
+      const startAtUTC = DateTime.fromISO(startAtUtcString, { zone: 'UTC' });
       
       // Get the original appointment start time to calculate time difference
       const originalStart = DateTime.fromISO(editingAppointment.start_at, { zone: 'utc' });
