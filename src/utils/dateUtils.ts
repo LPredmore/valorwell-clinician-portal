@@ -32,10 +32,10 @@ export const calculateAge = (dateOfBirth: Date | string | null | undefined): num
       () => DateTime.fromSQL(dateOfBirth),
       // Try standard date format
       () => DateTime.fromFormat(dateOfBirth, 'yyyy-MM-dd'),
-      // Last resort - use JS Date constructor
+      // Last resort - use JS Date constructor but convert to UTC
       () => {
         const jsDate = new Date(dateOfBirth);
-        return DateTime.fromJSDate(jsDate);
+        return DateTime.fromJSDate(jsDate).toUTC();
       }
     ];
 
@@ -60,8 +60,8 @@ export const calculateAge = (dateOfBirth: Date | string | null | undefined): num
     return null;
   }
 
-  // Calculate age in years
-  const now = DateTime.now();
+  // Calculate age in years using UTC to eliminate browser timezone dependency
+  const now = DateTime.utc();
   const age = now.diff(dobDateTime, 'years').years;
   
   // Return whole years (floor to handle partial years)
@@ -99,11 +99,13 @@ export const parseDateString = (dateString: string | null | undefined): Date | n
   }
   
   try {
-    // Last resort: use regular JS Date constructor
+    // Last resort: use regular JS Date constructor but return UTC
     const dateObj = new Date(dateString);
     if (!isNaN(dateObj.getTime())) {
-      console.log(`Successfully parsed date ${dateString} with Date constructor:`, dateObj);
-      return dateObj;
+      // Convert to UTC to eliminate browser timezone effects
+      const utcDate = new Date(dateObj.getTime() + (dateObj.getTimezoneOffset() * 60000));
+      console.log(`Successfully parsed date ${dateString} with Date constructor (UTC):`, utcDate);
+      return utcDate;
     }
   } catch (e) {
     console.error(`Error parsing ${dateString} with Date constructor:`, e);
@@ -135,7 +137,8 @@ export const formatDateForDB = (date: Date | string | null | undefined): string 
       if (!dateTime.isValid) {
         const jsDate = new Date(date);
         if (!isNaN(jsDate.getTime())) {
-          dateTime = DateTime.fromJSDate(jsDate);
+          // Convert to UTC to eliminate browser timezone effects
+          dateTime = DateTime.fromJSDate(jsDate).toUTC();
         }
       }
     } catch (e) {
@@ -143,7 +146,8 @@ export const formatDateForDB = (date: Date | string | null | undefined): string 
       return null;
     }
   } else if (date instanceof Date) {
-    dateTime = DateTime.fromJSDate(date);
+    // Convert to UTC to eliminate browser timezone effects
+    dateTime = DateTime.fromJSDate(date).toUTC();
   }
   
   // If we couldn't parse the date, return null

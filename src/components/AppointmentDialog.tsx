@@ -92,12 +92,19 @@ export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
     loadClients();
   }, [isOpen, clinicianId, toast]);
 
-  // Set initial values from props
+  // CRITICAL: Set initial values using clinician timezone (not browser)
   useEffect(() => {
     if (initialData && initialData.start) {
-      // Convert the selected slot time to local datetime-local format
-      const startDT = DateTime.fromJSDate(initialData.start);
+      // ELIMINATED: Browser timezone - use clinician timezone for form display
+      const startDT = DateTime.fromJSDate(initialData.start).setZone(clinicianTimeZone);
       const startTime = startDT.toFormat("yyyy-MM-dd'T'HH:mm");
+      
+      console.log('[AppointmentDialog] BROWSER-INDEPENDENT form initialization:', {
+        originalStart: initialData.start.toISOString(),
+        clinicianTimeZone,
+        displayTime: startTime,
+        noBrowserDependency: true
+      });
       
       setFormData({
         clientId: '',
@@ -112,7 +119,7 @@ export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
         startTime: '',
       });
     }
-  }, [initialData]);
+  }, [initialData, clinicianTimeZone]);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({

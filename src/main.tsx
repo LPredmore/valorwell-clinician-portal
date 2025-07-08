@@ -6,25 +6,13 @@ import './index.css';
 import { DateTime, Settings } from 'luxon';
 import { luxonLocalizer } from 'react-big-calendar';
 
-// CRITICAL: Get user timezone and set globally before ANY React components mount
-const getUserTimeZone = () => {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone;
-  } catch {
-    return 'America/New_York';
-  }
-};
+// CRITICAL: Remove browser timezone dependency - force explicit timezone usage
+// Set Luxon to UTC mode to prevent any accidental browser timezone usage
+Settings.defaultZone = 'utc';
 
-// CRITICAL: Set global timezone for Luxon BEFORE any calendar components are created
-const userTimeZone = getUserTimeZone();
-console.log('[main] CRITICAL: Setting global Luxon default zone BEFORE React mount:', userTimeZone);
-
-// CRITICAL: Use Settings.defaultZone (not defaultZoneName) to bind Luxon globally
-Settings.defaultZone = userTimeZone;
-
-// CRITICAL: Create the localizer with the globally bound zone
+// CRITICAL: Create timezone-neutral localizer - all timezone handling must be explicit
 export const globalLocalizer = luxonLocalizer(DateTime);
-console.log('[main] CRITICAL: Created timezone-aware global Luxon localizer with bound zone:', userTimeZone);
+console.log('[main] ELIMINATED: Browser timezone dependency - using UTC default with explicit timezone handling');
 
 const rootElement = document.getElementById("root");
 

@@ -3,17 +3,13 @@ import { TimeZoneService } from './timeZoneService';
 import { DateTime } from 'luxon';
 
 /**
- * Get the user's timezone from the browser
- * @returns A valid IANA timezone string
+ * DEPRECATED: Browser timezone usage eliminated
+ * Use getClinicianTimeZone() from useClinicianData.tsx instead
+ * @deprecated - Do not use browser timezone
  */
 export function getUserTimeZone(): string {
-  try {
-    const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    return TimeZoneService.ensureIANATimeZone(browserTimezone);
-  } catch {
-    // Fallback to default timezone if browser API fails
-    return TimeZoneService.DEFAULT_TIMEZONE;
-  }
+  console.warn('[DEPRECATED] getUserTimeZone() - Use clinician timezone from database instead');
+  return TimeZoneService.DEFAULT_TIMEZONE;
 }
 
 /**
@@ -71,7 +67,9 @@ export function formatWithTimeZone(date: Date, timezone: string, formatStr: stri
     return TimeZoneService.formatDateTime(dt, formatStr);
   } catch (error) {
     console.error('Error formatting date with timezone:', error);
-    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+    // ELIMINATED: Browser time fallback - use UTC instead
+    const utcDt = TimeZoneService.fromJSDate(date, 'utc');
+    return utcDt.toFormat('MMM d, yyyy \'at\' h:mm a \'UTC\'');
   }
 }
 

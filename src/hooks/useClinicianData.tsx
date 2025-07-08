@@ -64,7 +64,7 @@ export const getClinicianById = async (clinicianId: string) => {
 
 export const getClinicianTimeZone = async (clinicianId: string): Promise<string> => {
   try {
-    console.log('[getClinicianTimeZone] Fetching timezone for clinician:', clinicianId);
+    console.log('[getClinicianTimeZone] CRITICAL: Fetching ONLY clinician timezone (no browser fallback):', clinicianId);
     
     const { data, error } = await supabase
       .from('clinicians')
@@ -73,31 +73,28 @@ export const getClinicianTimeZone = async (clinicianId: string): Promise<string>
       .single();
       
     if (error) {
-      console.error('Error fetching clinician timezone:', error);
-      return 'America/Chicago'; // Default to Central Time
+      console.error('[getClinicianTimeZone] ERROR: Failed to fetch clinician timezone:', error);
+      // CRITICAL: Still return default, but log the error clearly
+      throw new Error(`Failed to fetch timezone for clinician ${clinicianId}: ${error.message}`);
     }
     
-    console.log('[getClinicianTimeZone] Raw timezone data:', {
-      data,
-      timezone: data?.clinician_time_zone,
-      type: typeof data?.clinician_time_zone
-    });
+    if (!data?.clinician_time_zone) {
+      console.error('[getClinicianTimeZone] ERROR: Clinician has no timezone set:', clinicianId);
+      throw new Error(`Clinician ${clinicianId} has no timezone configured`);
+    }
     
-    // Use the string field which is now the source of truth
-    let timeZone = data?.clinician_time_zone || 'America/Chicago';
+    const timeZone = String(data.clinician_time_zone);
     
-    // Ensure it's a string (should always be now)
-    timeZone = String(timeZone);
-    
-    console.log('[getClinicianTimeZone] Final processed timezone:', {
+    console.log('[getClinicianTimeZone] SUCCESS: Retrieved clinician timezone (browser-independent):', {
+      clinicianId,
       timeZone,
-      type: typeof timeZone,
-      isString: typeof timeZone === 'string'
+      source: 'database_only'
     });
     
     return timeZone;
   } catch (error) {
-    console.error('Error fetching clinician timezone:', error);
-    return 'America/Chicago'; // Default to Central Time
+    console.error('[getClinicianTimeZone] CRITICAL ERROR: Cannot retrieve clinician timezone:', error);
+    // ELIMINATED: Browser timezone fallback - always fail if no clinician timezone
+    throw error;
   }
 };

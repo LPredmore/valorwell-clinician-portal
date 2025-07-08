@@ -172,14 +172,17 @@ const CalendarContainer: React.FC = () => {
     });
   }, [availabilitySlots, weekStart, weekEnd, userTimeZone]);
 
-  // Load user timezone and calendar display settings
+  // CRITICAL: Load ONLY clinician timezone (no browser fallback)
   const loadUserTimeZone = useCallback(async (clinicianId: string) => {
     try {
+      console.log('[CalendarContainer] CRITICAL: Loading clinician timezone (browser-independent):', clinicianId);
       const timeZone = await getClinicianTimeZone(clinicianId);
       setUserTimeZone(TimeZoneService.ensureIANATimeZone(timeZone));
+      console.log('[CalendarContainer] SUCCESS: Set clinician timezone:', timeZone);
     } catch (error) {
-      const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      setUserTimeZone(TimeZoneService.ensureIANATimeZone(browserTimezone));
+      console.error('[CalendarContainer] CRITICAL ERROR: Cannot load clinician timezone - calendar will not function:', error);
+      // ELIMINATED: Browser timezone fallback - calendar must wait for valid clinician timezone
+      throw new Error(`Calendar requires clinician timezone but failed to load for ${clinicianId}: ${error.message}`);
     }
   }, []);
 
@@ -298,13 +301,17 @@ const CalendarContainer: React.FC = () => {
     });
   }, [userTimeZone, weekStart, weekEnd]);
 
-  if (!authInitialized || !userId) {
+  // CRITICAL: Show loading until both auth AND clinician timezone are ready
+  if (!authInitialized || !userId || userTimeZone === TimeZoneService.DEFAULT_TIMEZONE) {
     return (
       <div className="bg-white rounded-lg shadow-sm p-6 animate-fade-in">
         <div className="flex justify-center items-center h-64">
           <div className="text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-            <p>Loading calendar...</p>
+            <p>Loading calendar with clinician timezone...</p>
+            {userTimeZone === TimeZoneService.DEFAULT_TIMEZONE && (
+              <p className="text-sm text-gray-500 mt-2">Waiting for clinician timezone data...</p>
+            )}
           </div>
         </div>
       </div>
