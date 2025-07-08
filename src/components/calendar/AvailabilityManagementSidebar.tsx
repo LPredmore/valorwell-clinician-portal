@@ -7,11 +7,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { TimeZoneService } from '@/utils/timeZoneService';
+import { getClinicianTimeZone } from '@/hooks/useClinicianData';
+import { formInputToUTC, utcToFormInput } from '@/utils/timezoneHelpers';
 import { Clock, Save, Trash2 } from 'lucide-react';
 
 interface AvailabilityManagementSidebarProps {
   clinicianId: string | null;
-  userTimeZone: string;
   refreshTrigger: number;
   onRefresh: () => void;
 }
@@ -25,7 +26,6 @@ interface AvailabilitySlot {
 
 const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps> = ({
   clinicianId,
-  userTimeZone,
   refreshTrigger,
   onRefresh
 }) => {
@@ -40,6 +40,7 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
   const [currentAvailability, setCurrentAvailability] = useState<AvailabilitySlot[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [clinicianTimeZone, setClinicianTimeZone] = useState<string>('loading');
   const { toast } = useToast();
 
   const daysOfWeek = [
@@ -75,65 +76,88 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
   // Load current availability when component mounts or clinician changes
   useEffect(() => {
     if (clinicianId) {
-      loadCurrentAvailability();
+      loadClinicianTimeZoneAndAvailability();
     }
   }, [clinicianId]);
+
+  const loadClinicianTimeZoneAndAvailability = async () => {
+    if (!clinicianId) return;
+    
+    try {
+      const timeZone = await getClinicianTimeZone(clinicianId);
+      setClinicianTimeZone(timeZone);
+      await loadCurrentAvailability(timeZone);
+    } catch (error) {
+      console.error('Error loading clinician timezone:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load timezone settings',
+        variant: 'destructive'
+      });
+    }
+  };
 
   // Load selected slot when day or slot changes
   useEffect(() => {
     loadSelectedSlot();
   }, [selectedDay, selectedSlot, currentAvailability]);
 
-  const loadCurrentAvailability = async () => {
+  const loadCurrentAvailability = async (timeZone?: string) => {
     if (!clinicianId) return;
+    const tz = timeZone || clinicianTimeZone;
+    if (tz === 'loading') return;
 
     try {
       setIsLoading(true);
       const { data, error } = await supabase
         .from('clinicians')
         .select(`
-          clinician_availability_start_monday_1, clinician_availability_end_monday_1,
-          clinician_availability_start_monday_2, clinician_availability_end_monday_2,
-          clinician_availability_start_monday_3, clinician_availability_end_monday_3,
-          clinician_availability_start_tuesday_1, clinician_availability_end_tuesday_1,
-          clinician_availability_start_tuesday_2, clinician_availability_end_tuesday_2,
-          clinician_availability_start_tuesday_3, clinician_availability_end_tuesday_3,
-          clinician_availability_start_wednesday_1, clinician_availability_end_wednesday_1,
-          clinician_availability_start_wednesday_2, clinician_availability_end_wednesday_2,
-          clinician_availability_start_wednesday_3, clinician_availability_end_wednesday_3,
-          clinician_availability_start_thursday_1, clinician_availability_end_thursday_1,
-          clinician_availability_start_thursday_2, clinician_availability_end_thursday_2,
-          clinician_availability_start_thursday_3, clinician_availability_end_thursday_3,
-          clinician_availability_start_friday_1, clinician_availability_end_friday_1,
-          clinician_availability_start_friday_2, clinician_availability_end_friday_2,
-          clinician_availability_start_friday_3, clinician_availability_end_friday_3,
-          clinician_availability_start_saturday_1, clinician_availability_end_saturday_1,
-          clinician_availability_start_saturday_2, clinician_availability_end_saturday_2,
-          clinician_availability_start_saturday_3, clinician_availability_end_saturday_3,
-          clinician_availability_start_sunday_1, clinician_availability_end_sunday_1,
-          clinician_availability_start_sunday_2, clinician_availability_end_sunday_2,
-          clinician_availability_start_sunday_3, clinician_availability_end_sunday_3
+          clinician_availability_start_utc_monday_1, clinician_availability_end_utc_monday_1,
+          clinician_availability_start_utc_monday_2, clinician_availability_end_utc_monday_2,
+          clinician_availability_start_utc_monday_3, clinician_availability_end_utc_monday_3,
+          clinician_availability_start_utc_tuesday_1, clinician_availability_end_utc_tuesday_1,
+          clinician_availability_start_utc_tuesday_2, clinician_availability_end_utc_tuesday_2,
+          clinician_availability_start_utc_tuesday_3, clinician_availability_end_utc_tuesday_3,
+          clinician_availability_start_utc_wednesday_1, clinician_availability_end_utc_wednesday_1,
+          clinician_availability_start_utc_wednesday_2, clinician_availability_end_utc_wednesday_2,
+          clinician_availability_start_utc_wednesday_3, clinician_availability_end_utc_wednesday_3,
+          clinician_availability_start_utc_thursday_1, clinician_availability_end_utc_thursday_1,
+          clinician_availability_start_utc_thursday_2, clinician_availability_end_utc_thursday_2,
+          clinician_availability_start_utc_thursday_3, clinician_availability_end_utc_thursday_3,
+          clinician_availability_start_utc_friday_1, clinician_availability_end_utc_friday_1,
+          clinician_availability_start_utc_friday_2, clinician_availability_end_utc_friday_2,
+          clinician_availability_start_utc_friday_3, clinician_availability_end_utc_friday_3,
+          clinician_availability_start_utc_saturday_1, clinician_availability_end_utc_saturday_1,
+          clinician_availability_start_utc_saturday_2, clinician_availability_end_utc_saturday_2,
+          clinician_availability_start_utc_saturday_3, clinician_availability_end_utc_saturday_3,
+          clinician_availability_start_utc_sunday_1, clinician_availability_end_utc_sunday_1,
+          clinician_availability_start_utc_sunday_2, clinician_availability_end_utc_sunday_2,
+          clinician_availability_start_utc_sunday_3, clinician_availability_end_utc_sunday_3
         `)
         .eq('id', clinicianId)
         .single();
 
       if (error) throw error;
 
-      // Parse availability data
+      // Parse availability data from UTC timestamps
       const availability: AvailabilitySlot[] = [];
       daysOfWeek.forEach(day => {
         for (let slot = 1; slot <= 3; slot++) {
-          const startKey = `clinician_availability_start_${day.value}_${slot}`;
-          const endKey = `clinician_availability_end_${day.value}_${slot}`;
-          const startTime = data[startKey];
-          const endTime = data[endKey];
+          const startUtcKey = `clinician_availability_start_utc_${day.value}_${slot}`;
+          const endUtcKey = `clinician_availability_end_utc_${day.value}_${slot}`;
+          const startUtc = data[startUtcKey];
+          const endUtc = data[endUtcKey];
 
-          if (startTime && endTime) {
+          if (startUtc && endUtc) {
+            // Convert UTC timestamps to local time for display
+            const startLocal = utcToFormInput(startUtc, tz);
+            const endLocal = utcToFormInput(endUtc, tz);
+            
             availability.push({
               day: day.value,
               slot,
-              startTime,
-              endTime
+              startTime: startLocal.split('T')[1], // Extract time part only
+              endTime: endLocal.split('T')[1]
             });
           }
         }
@@ -200,7 +224,7 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
   };
 
   const saveAvailability = async () => {
-    if (!clinicianId || !userTimeZone) {
+    if (!clinicianId || !clinicianTimeZone || clinicianTimeZone === 'loading') {
       toast({
         title: 'Error',
         description: 'Missing required data for saving availability',
@@ -233,15 +257,22 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
     try {
       setIsSaving(true);
 
-      // Create update object with availability times only
-      // Do not override clinician_time_zone - use the existing value from their profile
+      // Convert local times to UTC for storage
+      const startDateTimeStr = `2024-01-01T${startTime}`; // Use reference date
+      const endDateTimeStr = `2024-01-01T${endTime}`;
+      const startUtc = formInputToUTC(startDateTimeStr, clinicianTimeZone);
+      const endUtc = formInputToUTC(endDateTimeStr, clinicianTimeZone);
+
+      // Create update object with UTC timestamps
       const updateData = {
-        [`clinician_availability_start_${selectedDay}_${selectedSlot}`]: startTime,
-        [`clinician_availability_end_${selectedDay}_${selectedSlot}`]: endTime
+        [`clinician_availability_start_utc_${selectedDay}_${selectedSlot}`]: startUtc,
+        [`clinician_availability_end_utc_${selectedDay}_${selectedSlot}`]: endUtc
       };
 
       console.log('[AvailabilityManagementSidebar] Saving availability using clinician timezone:', {
-        userTimeZone,
+        clinicianTimeZone,
+        localTimes: { startTime, endTime },
+        utcTimes: { startUtc, endUtc },
         updateData
       });
 
@@ -278,15 +309,14 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
     try {
       setIsSaving(true);
 
-      // Clear the selected slot only
-      // Do not override clinician_time_zone - use the existing value from their profile
+      // Clear the selected slot only from UTC columns
       const updateData = {
-        [`clinician_availability_start_${selectedDay}_${selectedSlot}`]: null,
-        [`clinician_availability_end_${selectedDay}_${selectedSlot}`]: null
+        [`clinician_availability_start_utc_${selectedDay}_${selectedSlot}`]: null,
+        [`clinician_availability_end_utc_${selectedDay}_${selectedSlot}`]: null
       };
 
       console.log('[AvailabilityManagementSidebar] Clearing availability slot using clinician timezone:', {
-        userTimeZone,
+        clinicianTimeZone,
         updateData
       });
 
@@ -464,7 +494,7 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
 
         {/* Timezone Info */}
         <div className="text-sm text-gray-500">
-          Times in: {TimeZoneService.getTimeZoneDisplayName(userTimeZone)}
+          Times in: {TimeZoneService.getTimeZoneDisplayName(clinicianTimeZone)}
         </div>
 
         {/* Action Buttons */}

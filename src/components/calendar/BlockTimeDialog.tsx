@@ -29,9 +29,8 @@ import { useBlockedTime } from '@/hooks/useBlockedTime';
 interface BlockTimeDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  clinicianId: string; // Changed from selectedClinicianId to match CalendarSimple
-  userTimeZone: string; // Added to match CalendarSimple
-  onBlockedTimeCreated: () => void; // Changed from onBlockCreated to match CalendarSimple
+  clinicianId: string;
+  onBlockedTimeCreated: () => void;
 }
 
 // Helper function to generate time options for dropdown
@@ -71,9 +70,8 @@ const isValidUUID = (uuid: string | null): boolean => {
 const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
   isOpen,
   onClose,
-  clinicianId, // Changed from selectedClinicianId
-  userTimeZone, // Added prop
-  onBlockedTimeCreated // Changed from onBlockCreated
+  clinicianId,
+  onBlockedTimeCreated
 }) => {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [startTime, setStartTime] = useState('09:00');
@@ -81,25 +79,31 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
   const [blockLabel, setBlockLabel] = useState('Blocked');
   const [notes, setNotes] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [clinicianTimeZone, setClinicianTimeZone] = useState<string>('loading');
   const { toast } = useToast();
   const { createBlockedTime } = useBlockedTime(clinicianId || '');
 
   const timeOptions = generateTimeOptions();
 
   useEffect(() => {
-    if (isOpen) {
-      const timestamp = new Date().toISOString();
-      console.log(`[BlockTimeDialog] ${timestamp} Dialog opened with clinician ID:`, {
-        clinicianId,
-        type: typeof clinicianId,
-        isNull: clinicianId === null,
-        isUndefined: clinicianId === undefined,
-        isEmpty: clinicianId === '',
-        trimmedValue: clinicianId?.trim(),
-        isValidUUID: isValidUUID(clinicianId),
-        userTimeZone
-      });
+    if (isOpen && clinicianId) {
+      const loadClinicianTimeZone = async () => {
+        try {
+          const timeZone = await getClinicianTimeZone(clinicianId);
+          setClinicianTimeZone(timeZone);
+          console.log('[BlockTimeDialog] Loaded clinician timezone:', timeZone);
+        } catch (error) {
+          console.error('[BlockTimeDialog] Failed to load clinician timezone:', error);
+          toast({
+            title: "Error",
+            description: "Failed to load timezone settings",
+            variant: "destructive"
+          });
+        }
+      };
 
+      loadClinicianTimeZone();
+      
       // Reset form when dialog opens
       setSelectedDate(new Date());
       setStartTime('09:00');
@@ -107,7 +111,7 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
       setBlockLabel('Blocked');
       setNotes('');
     }
-  }, [isOpen, clinicianId, userTimeZone]);
+  }, [isOpen, clinicianId]);
 
   const validateInputs = () => {
     const timestamp = new Date().toISOString();
@@ -148,8 +152,8 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
       return 'End time must be after start time';
     }
 
-    if (!userTimeZone) {
-      return 'User timezone not available';
+    if (!clinicianTimeZone || clinicianTimeZone === 'loading') {
+      return 'Clinician timezone not loaded';
     }
 
     console.log(`[BlockTimeDialog] ${timestamp} Validation passed for clinician ID:`, clinicianId);
@@ -163,7 +167,7 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
       type: typeof clinicianId,
       isValidUUID: isValidUUID(clinicianId),
       trimmedValue: clinicianId?.trim(),
-      userTimeZone
+      clinicianTimeZone
     });
 
     const validationError = validateInputs();
@@ -183,15 +187,15 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
       console.log(`[BlockTimeDialog] ${timestamp} Proceeding with valid clinician ID:`, clinicianId);
 
       const dateString = format(selectedDate!, 'yyyy-MM-dd');
-      const startAtUTC = convertLocalToUTC(dateString, startTime, userTimeZone);
-      const endAtUTC = convertLocalToUTC(dateString, endTime, userTimeZone);
+      const startAtUTC = convertLocalToUTC(dateString, startTime, clinicianTimeZone);
+      const endAtUTC = convertLocalToUTC(dateString, endTime, clinicianTimeZone);
 
       console.log(`[BlockTimeDialog] ${timestamp} Creating blocked time slot:`, {
         clinician_id: clinicianId,
         dateString,
         startTime,
         endTime,
-        userTimeZone,
+        clinicianTimeZone,
         startAtUTC: startAtUTC.toISO(),
         endAtUTC: endAtUTC.toISO(),
         label: blockLabel,
@@ -202,8 +206,7 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
         startAtUTC.toJSDate().toISOString(),
         endAtUTC.toJSDate().toISOString(),
         blockLabel,
-        notes || undefined,
-        userTimeZone
+        notes || undefined
       );
 
       if (success) {
@@ -258,7 +261,7 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
               Clinician ID: {clinicianId || 'null/undefined'}<br />
               Type: {typeof clinicianId}<br />
               Valid UUID: {isValidUUID(clinicianId) ? 'Yes' : 'No'}<br />
-              User Timezone: {userTimeZone || 'not set'}
+              Clinician Timezone: {clinicianTimeZone || 'not set'}
             </div>
           )}
 

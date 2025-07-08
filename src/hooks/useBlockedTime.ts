@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { temporalOverlapQuery } from '@/utils/dateRangeUtils';
+import { getClinicianTimeZone } from '@/hooks/useClinicianData';
 
 interface BlockedTime {
   id: string;
@@ -86,8 +87,7 @@ export const useBlockedTime = (
     startAt: string,
     endAt: string,
     label: string,
-    notes?: string,
-    timezone: string = 'America/New_York'
+    notes?: string
   ): Promise<boolean> => {
     try {
       const { error } = await supabase
@@ -97,8 +97,7 @@ export const useBlockedTime = (
           start_at: startAt,
           end_at: endAt,
           label,
-          notes,
-          timezone
+          notes
         });
 
       if (error) throw error;
@@ -128,7 +127,6 @@ export const useBlockedTime = (
       end_at?: string;
       label?: string;
       notes?: string;
-      timezone?: string;
     }
   ): Promise<boolean> => {
     try {

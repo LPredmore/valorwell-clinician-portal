@@ -35,6 +35,7 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { TimeZoneService } from '@/utils/timeZoneService';
 import { useBlockedTime } from '@/hooks/useBlockedTime';
+import { getClinicianTimeZone } from '@/hooks/useClinicianData';
 import { DateTime } from 'luxon';
 
 interface BlockedTime {
@@ -53,8 +54,7 @@ interface EditBlockedTimeDialogProps {
   isOpen: boolean;
   onClose: () => void;
   blockedTime: BlockedTime;
-  userTimeZone: string; // Added to match CalendarSimple
-  onBlockedTimeUpdated: () => void; // Changed from onDeleted/onUpdated to match CalendarSimple
+  onBlockedTimeUpdated: () => void;
 }
 
 // Helper function to generate time options for dropdown
@@ -79,8 +79,7 @@ const EditBlockedTimeDialog: React.FC<EditBlockedTimeDialogProps> = ({
   isOpen,
   onClose,
   blockedTime,
-  userTimeZone, // Added prop
-  onBlockedTimeUpdated // Changed from separate onDeleted/onUpdated
+  onBlockedTimeUpdated
 }) => {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const [startTime, setStartTime] = useState('');
@@ -88,6 +87,7 @@ const EditBlockedTimeDialog: React.FC<EditBlockedTimeDialogProps> = ({
   const [blockLabel, setBlockLabel] = useState('');
   const [notes, setNotes] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [clinicianTimeZone, setClinicianTimeZone] = useState<string>('loading');
   const { toast } = useToast();
   const { updateBlockedTime, deleteBlockedTime } = useBlockedTime(blockedTime?.clinician_id || '');
 
@@ -98,34 +98,43 @@ const EditBlockedTimeDialog: React.FC<EditBlockedTimeDialogProps> = ({
     if (isOpen && blockedTime) {
       console.log('[EditBlockedTimeDialog] Initializing form with blocked time:', blockedTime);
       
-      try {
-        // Parse the UTC timestamps and convert to the stored timezone
-        const startDateTime = DateTime.fromISO(blockedTime.start_at, { zone: 'UTC' })
-          .setZone(blockedTime.timezone);
-        const endDateTime = DateTime.fromISO(blockedTime.end_at, { zone: 'UTC' })
-          .setZone(blockedTime.timezone);
+      const loadClinicianTimeZoneAndForm = async () => {
+        try {
+          // Get clinician timezone from database
+          const timeZone = await getClinicianTimeZone(blockedTime.clinician_id);
+          setClinicianTimeZone(timeZone);
+          
+          // Parse the UTC timestamps and convert to the clinician timezone
+          const startDateTime = DateTime.fromISO(blockedTime.start_at, { zone: 'UTC' })
+            .setZone(timeZone);
+          const endDateTime = DateTime.fromISO(blockedTime.end_at, { zone: 'UTC' })
+            .setZone(timeZone);
 
-        // Set form values
-        setSelectedDate(startDateTime.toJSDate());
-        setStartTime(startDateTime.toFormat('HH:mm'));
-        setEndTime(endDateTime.toFormat('HH:mm'));
-        setBlockLabel(blockedTime.label);
-        setNotes(blockedTime.notes || '');
-        
-        console.log('[EditBlockedTimeDialog] Form initialized:', {
-          date: startDateTime.toISODate(),
-          startTime: startDateTime.toFormat('HH:mm'),
-          endTime: endDateTime.toFormat('HH:mm'),
-          label: blockedTime.label
-        });
-      } catch (error) {
-        console.error('[EditBlockedTimeDialog] Error initializing form:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load blocked time data",
-          variant: "destructive"
-        });
-      }
+          // Set form values
+          setSelectedDate(startDateTime.toJSDate());
+          setStartTime(startDateTime.toFormat('HH:mm'));
+          setEndTime(endDateTime.toFormat('HH:mm'));
+          setBlockLabel(blockedTime.label);
+          setNotes(blockedTime.notes || '');
+          
+          console.log('[EditBlockedTimeDialog] Form initialized:', {
+            date: startDateTime.toISODate(),
+            startTime: startDateTime.toFormat('HH:mm'),
+            endTime: endDateTime.toFormat('HH:mm'),
+            label: blockedTime.label,
+            timeZone
+          });
+        } catch (error) {
+          console.error('[EditBlockedTimeDialog] Error initializing form:', error);
+          toast({
+            title: "Error",
+            description: "Failed to load blocked time data",
+            variant: "destructive"
+          });
+        }
+      };
+      
+      loadClinicianTimeZoneAndForm();
     }
   }, [isOpen, blockedTime, toast]);
 
@@ -135,17 +144,16 @@ const EditBlockedTimeDialog: React.FC<EditBlockedTimeDialogProps> = ({
     setIsLoading(true);
 
     try {
-      // Convert local date/time back to UTC for storage
+      // Convert local date/time back to UTC for storage using clinician timezone
       const dateString = format(selectedDate, 'yyyy-MM-dd');
-      const startDateTime = DateTime.fromISO(`${dateString}T${startTime}`, { zone: blockedTime.timezone });
-      const endDateTime = DateTime.fromISO(`${dateString}T${endTime}`, { zone: blockedTime.timezone });
+      const startDateTime = DateTime.fromISO(`${dateString}T${startTime}`, { zone: clinicianTimeZone });
+      const endDateTime = DateTime.fromISO(`${dateString}T${endTime}`, { zone: clinicianTimeZone });
 
       const updates = {
         start_at: startDateTime.toUTC().toISO(),
         end_at: endDateTime.toUTC().toISO(),
         label: blockLabel,
-        notes: notes || undefined,
-        timezone: blockedTime.timezone
+        notes: notes || undefined
       };
 
       const success = await updateBlockedTime(blockedTime.id, updates);

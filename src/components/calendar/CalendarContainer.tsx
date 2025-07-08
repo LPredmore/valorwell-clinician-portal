@@ -367,7 +367,6 @@ const CalendarContainer: React.FC = () => {
             <div className="mt-6">
               <AvailabilityManagementSidebar
                 clinicianId={userId}
-                userTimeZone={userTimeZone}
                 refreshTrigger={refreshTrigger}
                 onRefresh={handleAvailabilityRefresh}
               />
@@ -392,7 +391,6 @@ const CalendarContainer: React.FC = () => {
             isOpen={isBlockedTimeDialogOpen}
             onClose={handleCloseBlockedTimeDialog}
             blockedTime={editingBlockedTime}
-            userTimeZone={userTimeZone}
             onBlockedTimeUpdated={handleBlockedTimeUpdated}
           />
         )}
