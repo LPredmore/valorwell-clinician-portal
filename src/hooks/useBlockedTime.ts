@@ -19,8 +19,7 @@ export const useBlockedTime = (
   clinicianId: string, 
   startDate?: Date, 
   endDate?: Date, 
-  refreshTrigger = 0,
-  userTimeZone?: string
+  refreshTrigger = 0
 ) => {
   const [blockedTimes, setBlockedTimes] = useState<BlockedTime[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -34,12 +33,11 @@ export const useBlockedTime = (
       setIsLoading(true);
       setError(null);
 
-      console.log('[useBlockedTime] CRITICAL: Fetching with FIXED dependencies:', {
+      console.log('[useBlockedTime] SIMPLE: Fetching UTC data for conversion:', {
         clinicianId,
         startDate: startDate?.toISOString(),
         endDate: endDate?.toISOString(),
-        refreshTrigger,
-        userTimeZone
+        refreshTrigger
       });
 
       let query = supabase
@@ -186,10 +184,10 @@ export const useBlockedTime = (
     }
   };
 
-  // CRITICAL: Include ALL necessary dependencies including userTimeZone
+  // Simple dependencies - no timezone needed since we just convert UTC on display
   useEffect(() => {
     fetchBlockedTimes();
-  }, [clinicianId, startDate, endDate, refreshTrigger, userTimeZone]);
+  }, [clinicianId, startDate, endDate, refreshTrigger]);
 
   return {
     blockedTimes,

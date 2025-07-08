@@ -67,8 +67,7 @@ const CalendarContainer: React.FC = () => {
     userId || '',
     weekStart,
     weekEnd,
-    refreshTrigger,
-    userTimeZone
+    refreshTrigger
   );
 
   const availabilitySlots = useClinicianAvailability(
@@ -290,12 +289,14 @@ const CalendarContainer: React.FC = () => {
     loadCalendarDisplaySettings(userId);
   }, [userId, loadUserTimeZone, loadCalendarDisplaySettings]);
 
-  // Force refresh when timezone changes to update all calendar data
+  // Debug: Log timezone changes to verify conversion triggers
   useEffect(() => {
-    if (userTimeZone !== TimeZoneService.DEFAULT_TIMEZONE) {
-      setRefreshTrigger(prev => prev + 1);
-    }
-  }, [userTimeZone]);
+    console.log('[CalendarContainer] SIMPLE: Timezone changed, events will auto-reposition:', {
+      newTimezone: userTimeZone,
+      weekStart: weekStart.toISOString(),
+      weekEnd: weekEnd.toISOString()
+    });
+  }, [userTimeZone, weekStart, weekEnd]);
 
   if (!authInitialized || !userId) {
     return (
