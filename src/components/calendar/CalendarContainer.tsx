@@ -48,6 +48,7 @@ const CalendarContainer: React.FC = () => {
   const { toast } = useToast();
 
   // Calculate week boundaries using RBC-native approach
+  // CRITICAL: Recalculate UTC ranges when timezone changes to ensure proper event fetching
   const { start: weekStart, end: weekEnd } = useMemo(() => {
     // CRITICAL: Don't use 'loading' state for date calculations
     if (!userTimeZone || userTimeZone === 'loading') {
