@@ -72,6 +72,7 @@ const CalendarContainer: React.FC = () => {
     userId || '',
     weekStart,
     weekEnd,
+    userTimeZone,
     refreshTrigger
   );
 

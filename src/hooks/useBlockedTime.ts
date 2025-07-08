@@ -20,6 +20,7 @@ export const useBlockedTime = (
   clinicianId: string, 
   startDate?: Date, 
   endDate?: Date, 
+  timeZone?: string,
   refreshTrigger = 0
 ) => {
   const [blockedTimes, setBlockedTimes] = useState<BlockedTime[]>([]);
@@ -182,10 +183,10 @@ export const useBlockedTime = (
     }
   };
 
-  // Simple dependencies - no timezone needed since we just convert UTC on display
+  // Include timezone in dependencies to trigger refetch when timezone changes
   useEffect(() => {
     fetchBlockedTimes();
-  }, [clinicianId, startDate, endDate, refreshTrigger]);
+  }, [clinicianId, startDate, endDate, timeZone, refreshTrigger]);
 
   return {
     blockedTimes,

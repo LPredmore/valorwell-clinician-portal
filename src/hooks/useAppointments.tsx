@@ -148,7 +148,7 @@ export const useAppointments = (
     refetch: refetchAppointments,
   } = useQuery<Appointment[], Error>({
     // Simple query key - no timezone dependency needed since we just convert UTC on display
-    queryKey: ["appointments", formattedClinicianId, fromUTCISO, toUTCISO, refreshTrigger],
+    queryKey: ["appointments", formattedClinicianId, fromUTCISO, toUTCISO, refreshTrigger, safeUserTimeZone],
     queryFn: async (): Promise<Appointment[]> => {
 
       if (!formattedClinicianId) {
