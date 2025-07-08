@@ -20,6 +20,7 @@ import { getWeekRange } from "@/utils/dateRangeUtils";
 import { getClinicianTimeZone } from "@/hooks/useClinicianData";
 import { TimeZoneService } from "@/utils/timeZoneService";
 import { CalendarEvent } from "./types";
+import { utcToCalendarDate, getCalendarTimeBounds } from "@/utils/timezoneHelpers";
 import {
   Sheet,
   SheetContent,
@@ -79,22 +80,16 @@ const CalendarContainer: React.FC = () => {
   const realEvents = useMemo((): CalendarEvent[] => {
     const events: CalendarEvent[] = [];
     
-    // Transform appointments to RBC format
+    // Transform appointments to RBC format using unified conversion
     if (appointments) {
-      events.push(...appointments.map(apt => {
-        // Convert UTC times directly to user's timezone for display
-        const startDT = DateTime.fromISO(apt.start_at, { zone: 'utc' }).setZone(userTimeZone);
-        const endDT = DateTime.fromISO(apt.end_at, { zone: 'utc' }).setZone(userTimeZone);
-
-        return {
-          id: apt.id,
-          title: apt.clientName || 'Internal Appointment',
-          start: startDT.toJSDate(),
-          end: endDT.toJSDate(),
-          source: 'internal' as const,
-          resource: apt
-        };
-      }));
+      events.push(...appointments.map(apt => ({
+        id: apt.id,
+        title: apt.clientName || 'Internal Appointment',
+        start: utcToCalendarDate(apt.start_at, userTimeZone),
+        end: utcToCalendarDate(apt.end_at, userTimeZone),
+        source: 'internal' as const,
+        resource: apt
+      })));
     }
     
     // Transform Nylas events to RBC format
@@ -109,20 +104,15 @@ const CalendarContainer: React.FC = () => {
       })));
     }
 
-    // Transform blocked time to RBC format
-    events.push(...blockedTimes.map(blockedTime => {
-      const startDT = DateTime.fromISO(blockedTime.start_at, { zone: 'utc' }).setZone(userTimeZone);
-      const endDT = DateTime.fromISO(blockedTime.end_at, { zone: 'utc' }).setZone(userTimeZone);
-
-      return {
-        id: blockedTime.id,
-        title: blockedTime.label,
-        start: startDT.toJSDate(),
-        end: endDT.toJSDate(),
-        source: 'blocked_time' as const,
-        resource: blockedTime
-      };
-    }));
+    // Transform blocked time to RBC format using unified conversion
+    events.push(...blockedTimes.map(blockedTime => ({
+      id: blockedTime.id,
+      title: blockedTime.label,
+      start: utcToCalendarDate(blockedTime.start_at, userTimeZone),
+      end: utcToCalendarDate(blockedTime.end_at, userTimeZone),
+      source: 'blocked_time' as const,
+      resource: blockedTime
+    })));
 
     return events;
   }, [appointments, nylasEvents, blockedTimes, userTimeZone]);
@@ -301,8 +291,8 @@ const CalendarContainer: React.FC = () => {
     });
   }, [userTimeZone, weekStart, weekEnd]);
 
-  // CRITICAL: Show loading until both auth AND clinician timezone are ready
-  if (!authInitialized || !userId || userTimeZone === TimeZoneService.DEFAULT_TIMEZONE) {
+  // CRITICAL: Show loading until auth is ready and we have a valid timezone
+  if (!authInitialized || !userId || !userTimeZone || userTimeZone === TimeZoneService.DEFAULT_TIMEZONE) {
     return (
       <div className="bg-white rounded-lg shadow-sm p-6 animate-fade-in">
         <div className="flex justify-center items-center h-64">

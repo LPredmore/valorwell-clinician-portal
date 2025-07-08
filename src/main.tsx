@@ -6,9 +6,8 @@ import './index.css';
 import { DateTime, Settings } from 'luxon';
 import { luxonLocalizer } from 'react-big-calendar';
 
-// CRITICAL: Remove browser timezone dependency - force explicit timezone usage
-// Set Luxon to UTC mode to prevent any accidental browser timezone usage
-Settings.defaultZone = 'utc';
+// CRITICAL: Let Luxon use system timezone as base, then convert explicitly
+// Removed conflicting global UTC setting that broke timezone conversions
 
 // CRITICAL: Create timezone-neutral localizer - all timezone handling must be explicit
 export const globalLocalizer = luxonLocalizer(DateTime);

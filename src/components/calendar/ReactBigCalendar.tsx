@@ -3,7 +3,7 @@ import { Calendar, Views } from 'react-big-calendar';
 import { globalLocalizer } from '@/main';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import { CalendarEvent, ReactBigCalendarProps } from './types';
-import { DateTime } from 'luxon';
+import { getCalendarTimeBounds } from '@/utils/timezoneHelpers';
 
 interface ExtendedReactBigCalendarProps extends ReactBigCalendarProps {
   backgroundEvents?: Array<{
@@ -71,15 +71,10 @@ const ReactBigCalendar: React.FC<ExtendedReactBigCalendarProps> = ({
     onNavigate(newDate);
   }, [onNavigate]);
 
-  // Convert time strings to Date objects for min/max props
-  const getTimeAsDate = useCallback((timeString: string) => {
-    const today = new Date();
-    const [hours, minutes] = timeString.split(':').map(Number);
-    return new Date(today.getFullYear(), today.getMonth(), today.getDate(), hours, minutes);
-  }, []);
-
-  const minTime = useMemo(() => getTimeAsDate(calendarStartTime), [calendarStartTime, getTimeAsDate]);
-  const maxTime = useMemo(() => getTimeAsDate(calendarEndTime), [calendarEndTime, getTimeAsDate]);
+  // Get calendar time bounds using unified timezone handling
+  const { start: minTime, end: maxTime } = useMemo(() => {
+    return getCalendarTimeBounds(calendarStartTime, calendarEndTime, userTimeZone);
+  }, [calendarStartTime, calendarEndTime, userTimeZone]);
 
   // Pure RBC configuration with native availability features
   const calendarConfig = useMemo(() => ({

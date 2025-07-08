@@ -14,6 +14,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { videoRoomService } from '@/utils/videoRoomService';
+import { utcToFormInput, formInputToUTC } from '@/utils/timezoneHelpers';
 import { DateTime } from 'luxon';
 
 interface Client {
@@ -92,18 +93,18 @@ export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
     loadClients();
   }, [isOpen, clinicianId, toast]);
 
-  // CRITICAL: Set initial values using clinician timezone (not browser)
+  // Set initial values using unified timezone conversion
   useEffect(() => {
     if (initialData && initialData.start) {
-      // ELIMINATED: Browser timezone - use clinician timezone for form display
-      const startDT = DateTime.fromJSDate(initialData.start).setZone(clinicianTimeZone);
-      const startTime = startDT.toFormat("yyyy-MM-dd'T'HH:mm");
+      // Convert JavaScript Date to UTC, then to form input format
+      const utcISO = initialData.start.toISOString();
+      const startTime = utcToFormInput(utcISO, clinicianTimeZone);
       
-      console.log('[AppointmentDialog] BROWSER-INDEPENDENT form initialization:', {
+      console.log('[AppointmentDialog] Unified form initialization:', {
         originalStart: initialData.start.toISOString(),
         clinicianTimeZone,
         displayTime: startTime,
-        noBrowserDependency: true
+        conversionMethod: 'unified_timezone_helpers'
       });
       
       setFormData({
@@ -140,13 +141,12 @@ export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
     }
 
     try {
-      // Parse start time and compute end time (start + 1 hour)
-      const startDT = DateTime.fromISO(formData.startTime, { zone: clinicianTimeZone });
-      const endDT = startDT.plus({ hours: 1 });
+      // Use unified conversion: form input → UTC for storage
+      const startUtc = formInputToUTC(formData.startTime, clinicianTimeZone);
       
-      // Convert to UTC for storage
-      const startUtc = startDT.toUTC().toISO();
-      const endUtc = endDT.toUTC().toISO();
+      // Calculate end time (start + 1 hour) in UTC
+      const startDT = DateTime.fromISO(startUtc, { zone: 'UTC' });
+      const endUtc = startDT.plus({ hours: 1 }).toISO();
 
       console.log('[AppointmentDialog] Creating appointment:', {
         client_id: formData.clientId,
