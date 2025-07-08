@@ -147,8 +147,8 @@ export const useAppointments = (
     error,
     refetch: refetchAppointments,
   } = useQuery<Appointment[], Error>({
-    // Include refreshTrigger in the queryKey to force refresh when it changes
-    queryKey: ["appointments", formattedClinicianId, fromUTCISO, toUTCISO, refreshTrigger],
+    // Include refreshTrigger and userTimeZone in the queryKey to force refresh when they change
+    queryKey: ["appointments", formattedClinicianId, fromUTCISO, toUTCISO, refreshTrigger, safeUserTimeZone],
     queryFn: async (): Promise<Appointment[]> => {
 
       if (!formattedClinicianId) {

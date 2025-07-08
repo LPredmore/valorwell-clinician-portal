@@ -67,7 +67,8 @@ const CalendarContainer: React.FC = () => {
     userId || '',
     weekStart,
     weekEnd,
-    refreshTrigger
+    refreshTrigger,
+    userTimeZone
   );
 
   const availabilitySlots = useClinicianAvailability(
@@ -288,6 +289,13 @@ const CalendarContainer: React.FC = () => {
     loadUserTimeZone(userId);
     loadCalendarDisplaySettings(userId);
   }, [userId, loadUserTimeZone, loadCalendarDisplaySettings]);
+
+  // Force refresh when timezone changes to update all calendar data
+  useEffect(() => {
+    if (userTimeZone !== TimeZoneService.DEFAULT_TIMEZONE) {
+      setRefreshTrigger(prev => prev + 1);
+    }
+  }, [userTimeZone]);
 
   if (!authInitialized || !userId) {
     return (

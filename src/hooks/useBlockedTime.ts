@@ -19,7 +19,8 @@ export const useBlockedTime = (
   clinicianId: string, 
   startDate?: Date, 
   endDate?: Date, 
-  refreshTrigger = 0
+  refreshTrigger = 0,
+  userTimeZone?: string
 ) => {
   const [blockedTimes, setBlockedTimes] = useState<BlockedTime[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -37,7 +38,8 @@ export const useBlockedTime = (
         clinicianId,
         startDate: startDate?.toISOString(),
         endDate: endDate?.toISOString(),
-        refreshTrigger
+        refreshTrigger,
+        userTimeZone
       });
 
       let query = supabase
@@ -184,10 +186,10 @@ export const useBlockedTime = (
     }
   };
 
-  // CRITICAL: Include ALL necessary dependencies
+  // CRITICAL: Include ALL necessary dependencies including userTimeZone
   useEffect(() => {
     fetchBlockedTimes();
-  }, [clinicianId, startDate, endDate, refreshTrigger]);
+  }, [clinicianId, startDate, endDate, refreshTrigger, userTimeZone]);
 
   return {
     blockedTimes,
