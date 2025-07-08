@@ -84,6 +84,17 @@ const CalendarContainer: React.FC = () => {
 
   // Separate real events from background availability
   const realEvents = useMemo((): CalendarEvent[] => {
+    console.log('[CalendarContainer] MEMO RECALCULATING realEvents:', {
+      userTimeZone,
+      appointmentsCount: appointments?.length || 0,
+      blockedTimesCount: blockedTimes?.length || 0,
+      sampleAppointment: appointments?.[0] ? {
+        id: appointments[0].id,
+        start_at: appointments[0].start_at,
+        convertedStart: utcToCalendarDate(appointments[0].start_at, userTimeZone)
+      } : null
+    });
+
     const events: CalendarEvent[] = [];
     
     // Transform appointments to RBC format using unified conversion
@@ -119,6 +130,16 @@ const CalendarContainer: React.FC = () => {
       source: 'blocked_time' as const,
       resource: blockedTime
     })));
+
+    console.log('[CalendarContainer] MEMO RESULT realEvents:', {
+      totalEvents: events.length,
+      sampleEvent: events[0] ? {
+        id: events[0].id,
+        title: events[0].title,
+        start: events[0].start.toISOString(),
+        source: events[0].source
+      } : null
+    });
 
     return events;
   }, [appointments, nylasEvents, blockedTimes, userTimeZone]);
