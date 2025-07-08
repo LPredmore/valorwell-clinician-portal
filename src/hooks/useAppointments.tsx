@@ -66,7 +66,7 @@ export const useAppointments = (
 
   const formattedClinicianId = clinicianId ? clinicianId : null;
   const safeUserTimeZone = TimeZoneService.ensureIANATimeZone(
-    timeZone || TimeZoneService.DEFAULT_TIMEZONE
+    timeZone || 'UTC' // CRITICAL: Use UTC as true fallback, not Chicago
   );
 
   // Debug logging for parameters

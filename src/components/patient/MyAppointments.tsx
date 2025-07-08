@@ -58,8 +58,8 @@ const MyAppointments: React.FC<MyAppointmentsProps> = ({ pastAppointments: initi
   const [hasLoadedClientData, setHasLoadedClientData] = useState(false);
   const [hasLoadedAppointments, setHasLoadedAppointments] = useState(false);
   
-  // Client timezone with default
-  const [clientTimeZone, setClientTimeZone] = useState<string>(TimeZoneService.DEFAULT_TIMEZONE);
+  // Client timezone with loading state
+  const [clientTimeZone, setClientTimeZone] = useState<string>('loading'); // CRITICAL: Start in loading state
 
   // Reset component mount status on unmount
   useEffect(() => {

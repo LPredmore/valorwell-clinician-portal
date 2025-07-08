@@ -25,6 +25,6 @@ export const logWeekNavigation = (weekStart: Date, weekEnd: Date, userTimeZone: 
   console.log('Week Start:', DateTime.fromJSDate(weekStart).setZone(userTimeZone).toFormat('yyyy-MM-dd HH:mm'));
   console.log('Week End:', DateTime.fromJSDate(weekEnd).setZone(userTimeZone).toFormat('yyyy-MM-dd HH:mm'));
   console.log('User Timezone:', userTimeZone);
-  console.log('System Timezone:', Intl.DateTimeFormat().resolvedOptions().timeZone);
+  // REMOVED: Browser timezone dependency eliminated
   console.groupEnd();
 };

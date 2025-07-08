@@ -76,13 +76,11 @@ export function formatTimezoneForDisplay(timezone: string): string {
 }
 
 /**
- * Get default timezone based on browser
+ * DEPRECATED: Browser timezone usage eliminated
+ * Use getClinicianTimeZone() from useClinicianData.tsx instead
+ * @deprecated - Do not use browser timezone
  */
 export function getBrowserTimezone(): string {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone;
-  } catch (error) {
-    console.error('Error getting browser timezone:', error);
-    return 'America/New_York';
-  }
+  console.warn('[DEPRECATED] getBrowserTimezone() - Use clinician timezone from database instead');
+  return 'UTC'; // Return UTC as safe fallback
 }

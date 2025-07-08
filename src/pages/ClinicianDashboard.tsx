@@ -19,7 +19,7 @@ const ClinicianDashboard = () => {
   const { toast } = useToast();
   const [clinicianProfile, setClinicianProfile] = useState<any>(null);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [clinicianTimeZone, setClinicianTimeZone] = useState<string>(TimeZoneService.DEFAULT_TIMEZONE);
+  const [clinicianTimeZone, setClinicianTimeZone] = useState<string>('loading'); // CRITICAL: Start in loading state
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [isLoadingAppointments, setIsLoadingAppointments] = useState(true);
   const [isLoadingTimeZone, setIsLoadingTimeZone] = useState(true);
@@ -80,9 +80,9 @@ const ClinicianDashboard = () => {
         
         setClinicianTimeZone(safeTimeZone);
       } catch (error) {
-        console.error("Error fetching clinician timezone:", error);
-        // Fallback to system timezone
-        setClinicianTimeZone(TimeZoneService.DEFAULT_TIMEZONE);
+        console.error("CRITICAL: Error fetching clinician timezone:", error);
+        // CRITICAL: NO fallback timezone - keep in loading state
+        setClinicianTimeZone('loading');
       } finally {
         setIsLoadingTimeZone(false);
       }

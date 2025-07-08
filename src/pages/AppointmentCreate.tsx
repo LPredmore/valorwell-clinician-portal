@@ -30,7 +30,7 @@ const AppointmentCreate: React.FC = () => {
         onClose={handleClose}
         selectedSlot={selectedSlot}
         clinicianId={userId}
-        userTimeZone={Intl.DateTimeFormat().resolvedOptions().timeZone}
+        userTimeZone={'loading'} // TODO: Get clinician timezone from database
         onAppointmentCreated={handleCreated}
         onAppointmentUpdated={handleCreated}
         isEditMode={false}

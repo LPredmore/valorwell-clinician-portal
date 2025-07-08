@@ -23,7 +23,7 @@ const BlockedTimeCreate: React.FC = () => {
         isOpen={true}
         onClose={handleClose}
         clinicianId={userId || ''}
-        userTimeZone={Intl.DateTimeFormat().resolvedOptions().timeZone}
+        userTimeZone={'loading'} // TODO: Get clinician timezone from database
         onBlockedTimeCreated={handleCreated}
       />
     </Layout>

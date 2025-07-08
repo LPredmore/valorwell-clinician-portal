@@ -33,7 +33,7 @@ const CalendarContainer: React.FC = () => {
   const { userId, authInitialized, userRole } = useUser();
   const { user } = useAuth();
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [userTimeZone, setUserTimeZone] = useState<string>(TimeZoneService.DEFAULT_TIMEZONE);
+  const [userTimeZone, setUserTimeZone] = useState<string>('loading'); // CRITICAL: Start in loading state, never use hardcoded default
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [calendarStartTime, setCalendarStartTime] = useState<string>('08:00');
   const [calendarEndTime, setCalendarEndTime] = useState<string>('21:00');
