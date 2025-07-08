@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { temporalOverlapQuery } from '@/utils/dateRangeUtils';
 import { getClinicianTimeZone } from '@/hooks/useClinicianData';
+import { DateTime } from 'luxon';
 
 interface BlockedTime {
   id: string;
@@ -49,10 +50,19 @@ export const useBlockedTime = (
         .order('start_at');
 
       if (startDate && endDate) {
-        query = temporalOverlapQuery(query, startDate, endDate);
-        console.log('[useBlockedTime] Applied temporal overlap filter:', {
-          rangeStart: startDate.toISOString(),
-          rangeEnd: endDate.toISOString()
+        // FIXED: Convert boundaries to UTC using clinician's timezone before query
+        const startUTC = DateTime.fromJSDate(startDate, { zone: timeZone || 'UTC' })
+          .startOf('day').toUTC().toJSDate();
+        const endUTC = DateTime.fromJSDate(endDate, { zone: timeZone || 'UTC' })
+          .endOf('day').plus({ days: 1 }).toUTC().toJSDate();
+          
+        query = temporalOverlapQuery(query, startUTC, endUTC);
+        console.log('[useBlockedTime] Applied temporal overlap filter with timezone conversion:', {
+          originalStart: startDate.toISOString(),
+          originalEnd: endDate.toISOString(),
+          utcStart: startUTC.toISOString(),
+          utcEnd: endUTC.toISOString(),
+          timezone: timeZone
         });
       }
 

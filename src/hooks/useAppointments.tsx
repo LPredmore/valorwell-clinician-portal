@@ -109,17 +109,19 @@ export const useAppointments = (
     let toISO: string | undefined;
     try {
       if (fromDate) {
-        // CRITICAL FIX: Use UTC for boundary calculations to avoid timezone misalignment
-        fromISO = DateTime.fromJSDate(fromDate, { zone: 'utc' })
+        // FIXED: Use clinician's timezone to interpret boundaries before UTC conversion
+        fromISO = DateTime.fromJSDate(fromDate, { zone: safeUserTimeZone })
           .startOf('day')
+          .toUTC()
           .toISO();
       }
       
       if (toDate) {
-        // CRITICAL FIX: Extend end date by one day to catch adjacent appointments
-        toISO = DateTime.fromJSDate(toDate, { zone: 'utc' })
+        // FIXED: Use clinician's timezone to interpret boundaries before UTC conversion  
+        toISO = DateTime.fromJSDate(toDate, { zone: safeUserTimeZone })
           .endOf('day')
           .plus({ days: 1 }) // Extend to next day to catch Monday appointments
+          .toUTC()
           .toISO();
       }
       
