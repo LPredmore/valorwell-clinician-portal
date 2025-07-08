@@ -112,52 +112,52 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
       const { data, error } = await supabase
         .from('clinicians')
         .select(`
-          clinician_availability_start_utc_monday_1, clinician_availability_end_utc_monday_1,
-          clinician_availability_start_utc_monday_2, clinician_availability_end_utc_monday_2,
-          clinician_availability_start_utc_monday_3, clinician_availability_end_utc_monday_3,
-          clinician_availability_start_utc_tuesday_1, clinician_availability_end_utc_tuesday_1,
-          clinician_availability_start_utc_tuesday_2, clinician_availability_end_utc_tuesday_2,
-          clinician_availability_start_utc_tuesday_3, clinician_availability_end_utc_tuesday_3,
-          clinician_availability_start_utc_wednesday_1, clinician_availability_end_utc_wednesday_1,
-          clinician_availability_start_utc_wednesday_2, clinician_availability_end_utc_wednesday_2,
-          clinician_availability_start_utc_wednesday_3, clinician_availability_end_utc_wednesday_3,
-          clinician_availability_start_utc_thursday_1, clinician_availability_end_utc_thursday_1,
-          clinician_availability_start_utc_thursday_2, clinician_availability_end_utc_thursday_2,
-          clinician_availability_start_utc_thursday_3, clinician_availability_end_utc_thursday_3,
-          clinician_availability_start_utc_friday_1, clinician_availability_end_utc_friday_1,
-          clinician_availability_start_utc_friday_2, clinician_availability_end_utc_friday_2,
-          clinician_availability_start_utc_friday_3, clinician_availability_end_utc_friday_3,
-          clinician_availability_start_utc_saturday_1, clinician_availability_end_utc_saturday_1,
-          clinician_availability_start_utc_saturday_2, clinician_availability_end_utc_saturday_2,
-          clinician_availability_start_utc_saturday_3, clinician_availability_end_utc_saturday_3,
-          clinician_availability_start_utc_sunday_1, clinician_availability_end_utc_sunday_1,
-          clinician_availability_start_utc_sunday_2, clinician_availability_end_utc_sunday_2,
-          clinician_availability_start_utc_sunday_3, clinician_availability_end_utc_sunday_3
+          clinician_availability_start_monday_1, clinician_availability_end_monday_1,
+          clinician_availability_start_monday_2, clinician_availability_end_monday_2,
+          clinician_availability_start_monday_3, clinician_availability_end_monday_3,
+          clinician_availability_start_tuesday_1, clinician_availability_end_tuesday_1,
+          clinician_availability_start_tuesday_2, clinician_availability_end_tuesday_2,
+          clinician_availability_start_tuesday_3, clinician_availability_end_tuesday_3,
+          clinician_availability_start_wednesday_1, clinician_availability_end_wednesday_1,
+          clinician_availability_start_wednesday_2, clinician_availability_end_wednesday_2,
+          clinician_availability_start_wednesday_3, clinician_availability_end_wednesday_3,
+          clinician_availability_start_thursday_1, clinician_availability_end_thursday_1,
+          clinician_availability_start_thursday_2, clinician_availability_end_thursday_2,
+          clinician_availability_start_thursday_3, clinician_availability_end_thursday_3,
+          clinician_availability_start_friday_1, clinician_availability_end_friday_1,
+          clinician_availability_start_friday_2, clinician_availability_end_friday_2,
+          clinician_availability_start_friday_3, clinician_availability_end_friday_3,
+          clinician_availability_start_saturday_1, clinician_availability_end_saturday_1,
+          clinician_availability_start_saturday_2, clinician_availability_end_saturday_2,
+          clinician_availability_start_saturday_3, clinician_availability_end_saturday_3,
+          clinician_availability_start_sunday_1, clinician_availability_end_sunday_1,
+          clinician_availability_start_sunday_2, clinician_availability_end_sunday_2,
+          clinician_availability_start_sunday_3, clinician_availability_end_sunday_3
         `)
         .eq('id', clinicianId)
         .single();
 
       if (error) throw error;
 
-      // Parse availability data from UTC timestamps
+      // Parse availability data from TIME columns
       const availability: AvailabilitySlot[] = [];
       daysOfWeek.forEach(day => {
         for (let slot = 1; slot <= 3; slot++) {
-          const startUtcKey = `clinician_availability_start_utc_${day.value}_${slot}`;
-          const endUtcKey = `clinician_availability_end_utc_${day.value}_${slot}`;
-          const startUtc = data[startUtcKey];
-          const endUtc = data[endUtcKey];
+          const startKey = `clinician_availability_start_${day.value}_${slot}`;
+          const endKey = `clinician_availability_end_${day.value}_${slot}`;
+          const startTime = data[startKey];
+          const endTime = data[endKey];
 
-          if (startUtc && endUtc) {
-            // Convert UTC timestamps to local time for display
-            const startLocal = utcToFormInput(startUtc, tz);
-            const endLocal = utcToFormInput(endUtc, tz);
+          if (startTime && endTime) {
+            // startTime and endTime are already in TIME format (HH:mm:ss), just convert to HH:mm
+            const formattedStartTime = startTime.substring(0, 5); // "09:00:00" -> "09:00"
+            const formattedEndTime = endTime.substring(0, 5);     // "17:00:00" -> "17:00"
             
             availability.push({
               day: day.value,
               slot,
-              startTime: startLocal.split('T')[1], // Extract time part only
-              endTime: endLocal.split('T')[1]
+              startTime: formattedStartTime,
+              endTime: formattedEndTime
             });
           }
         }
@@ -257,22 +257,15 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
     try {
       setIsSaving(true);
 
-      // Convert local times to UTC for storage
-      const startDateTimeStr = `2024-01-01T${startTime}`; // Use reference date
-      const endDateTimeStr = `2024-01-01T${endTime}`;
-      const startUtc = formInputToUTC(startDateTimeStr, clinicianTimeZone);
-      const endUtc = formInputToUTC(endDateTimeStr, clinicianTimeZone);
-
-      // Create update object with UTC timestamps
+      // Store times directly as TIME values (no timezone conversion needed)
       const updateData = {
-        [`clinician_availability_start_utc_${selectedDay}_${selectedSlot}`]: startUtc,
-        [`clinician_availability_end_utc_${selectedDay}_${selectedSlot}`]: endUtc
+        [`clinician_availability_start_${selectedDay}_${selectedSlot}`]: startTime,
+        [`clinician_availability_end_${selectedDay}_${selectedSlot}`]: endTime
       };
 
-      console.log('[AvailabilityManagementSidebar] Saving availability using clinician timezone:', {
+      console.log('[AvailabilityManagementSidebar] Saving availability as TIME values:', {
         clinicianTimeZone,
         localTimes: { startTime, endTime },
-        utcTimes: { startUtc, endUtc },
         updateData
       });
 
@@ -309,14 +302,13 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
     try {
       setIsSaving(true);
 
-      // Clear the selected slot only from UTC columns
+      // Clear the selected slot from TIME columns
       const updateData = {
-        [`clinician_availability_start_utc_${selectedDay}_${selectedSlot}`]: null,
-        [`clinician_availability_end_utc_${selectedDay}_${selectedSlot}`]: null
+        [`clinician_availability_start_${selectedDay}_${selectedSlot}`]: null,
+        [`clinician_availability_end_${selectedDay}_${selectedSlot}`]: null
       };
 
-      console.log('[AvailabilityManagementSidebar] Clearing availability slot using clinician timezone:', {
-        clinicianTimeZone,
+      console.log('[AvailabilityManagementSidebar] Clearing availability slot:', {
         updateData
       });
 

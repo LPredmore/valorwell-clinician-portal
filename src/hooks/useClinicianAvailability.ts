@@ -30,27 +30,27 @@ export function useClinicianAvailability(
           .from('clinicians')
           .select(`
             clinician_time_zone,
-            clinician_availability_start_utc_monday_1, clinician_availability_end_utc_monday_1,
-            clinician_availability_start_utc_monday_2, clinician_availability_end_utc_monday_2,
-            clinician_availability_start_utc_monday_3, clinician_availability_end_utc_monday_3,
-            clinician_availability_start_utc_tuesday_1, clinician_availability_end_utc_tuesday_1,
-            clinician_availability_start_utc_tuesday_2, clinician_availability_end_utc_tuesday_2,
-            clinician_availability_start_utc_tuesday_3, clinician_availability_end_utc_tuesday_3,
-            clinician_availability_start_utc_wednesday_1, clinician_availability_end_utc_wednesday_1,
-            clinician_availability_start_utc_wednesday_2, clinician_availability_end_utc_wednesday_2,
-            clinician_availability_start_utc_wednesday_3, clinician_availability_end_utc_wednesday_3,
-            clinician_availability_start_utc_thursday_1, clinician_availability_end_utc_thursday_1,
-            clinician_availability_start_utc_thursday_2, clinician_availability_end_utc_thursday_2,
-            clinician_availability_start_utc_thursday_3, clinician_availability_end_utc_thursday_3,
-            clinician_availability_start_utc_friday_1, clinician_availability_end_utc_friday_1,
-            clinician_availability_start_utc_friday_2, clinician_availability_end_utc_friday_2,
-            clinician_availability_start_utc_friday_3, clinician_availability_end_utc_friday_3,
-            clinician_availability_start_utc_saturday_1, clinician_availability_end_utc_saturday_1,
-            clinician_availability_start_utc_saturday_2, clinician_availability_end_utc_saturday_2,
-            clinician_availability_start_utc_saturday_3, clinician_availability_end_utc_saturday_3,
-            clinician_availability_start_utc_sunday_1, clinician_availability_end_utc_sunday_1,
-            clinician_availability_start_utc_sunday_2, clinician_availability_end_utc_sunday_2,
-            clinician_availability_start_utc_sunday_3, clinician_availability_end_utc_sunday_3
+            clinician_availability_start_monday_1, clinician_availability_end_monday_1,
+            clinician_availability_start_monday_2, clinician_availability_end_monday_2,
+            clinician_availability_start_monday_3, clinician_availability_end_monday_3,
+            clinician_availability_start_tuesday_1, clinician_availability_end_tuesday_1,
+            clinician_availability_start_tuesday_2, clinician_availability_end_tuesday_2,
+            clinician_availability_start_tuesday_3, clinician_availability_end_tuesday_3,
+            clinician_availability_start_wednesday_1, clinician_availability_end_wednesday_1,
+            clinician_availability_start_wednesday_2, clinician_availability_end_wednesday_2,
+            clinician_availability_start_wednesday_3, clinician_availability_end_wednesday_3,
+            clinician_availability_start_thursday_1, clinician_availability_end_thursday_1,
+            clinician_availability_start_thursday_2, clinician_availability_end_thursday_2,
+            clinician_availability_start_thursday_3, clinician_availability_end_thursday_3,
+            clinician_availability_start_friday_1, clinician_availability_end_friday_1,
+            clinician_availability_start_friday_2, clinician_availability_end_friday_2,
+            clinician_availability_start_friday_3, clinician_availability_end_friday_3,
+            clinician_availability_start_saturday_1, clinician_availability_end_saturday_1,
+            clinician_availability_start_saturday_2, clinician_availability_end_saturday_2,
+            clinician_availability_start_saturday_3, clinician_availability_end_saturday_3,
+            clinician_availability_start_sunday_1, clinician_availability_end_sunday_1,
+            clinician_availability_start_sunday_2, clinician_availability_end_sunday_2,
+            clinician_availability_start_sunday_3, clinician_availability_end_sunday_3
           `)
           .eq('id', clinicianId)
           .single();
@@ -63,21 +63,21 @@ export function useClinicianAvailability(
         
         days.forEach(day => {
           for (let i = 1; i <= 3; i++) {
-            const startUtcKey = `clinician_availability_start_utc_${day}_${i}`;
-            const endUtcKey = `clinician_availability_end_utc_${day}_${i}`;
-            const startUtc = data[startUtcKey];
-            const endUtc = data[endUtcKey];
+            const startKey = `clinician_availability_start_${day}_${i}`;
+            const endKey = `clinician_availability_end_${day}_${i}`;
+            const startTime = data[startKey];
+            const endTime = data[endKey];
             
-            if (startUtc && endUtc) {
-              // Convert UTC timestamps to local time strings for RBC display
-              const startLocal = fromUTC(startUtc, clinicianTimeZone);
-              const endLocal = fromUTC(endUtc, clinicianTimeZone);
+            if (startTime && endTime) {
+              // startTime and endTime are already in TIME format (HH:mm:ss), just convert to HH:mm
+              const formattedStartTime = startTime.substring(0, 5); // "09:00:00" -> "09:00"
+              const formattedEndTime = endTime.substring(0, 5);     // "17:00:00" -> "17:00"
               
               availabilitySlots.push({ 
                 day, 
                 slot: i, 
-                startTime: startLocal.toFormat('HH:mm'),
-                endTime: endLocal.toFormat('HH:mm'),
+                startTime: formattedStartTime,
+                endTime: formattedEndTime,
                 clinicianTimeZone
               });
             }
