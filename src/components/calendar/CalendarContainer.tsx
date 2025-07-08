@@ -291,15 +291,15 @@ const CalendarContainer: React.FC = () => {
     });
   }, [userTimeZone, weekStart, weekEnd]);
 
-  // CRITICAL: Show loading until auth is ready and we have a valid timezone
-  if (!authInitialized || !userId || !userTimeZone || userTimeZone === TimeZoneService.DEFAULT_TIMEZONE) {
+  // CRITICAL: Show loading until auth is ready and we have a valid clinician timezone
+  if (!authInitialized || !userId || !userTimeZone || userTimeZone === 'loading') {
     return (
       <div className="bg-white rounded-lg shadow-sm p-6 animate-fade-in">
         <div className="flex justify-center items-center h-64">
           <div className="text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
             <p>Loading calendar with clinician timezone...</p>
-            {userTimeZone === TimeZoneService.DEFAULT_TIMEZONE && (
+            {userTimeZone === 'loading' && (
               <p className="text-sm text-gray-500 mt-2">Waiting for clinician timezone data...</p>
             )}
           </div>

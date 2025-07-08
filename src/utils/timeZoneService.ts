@@ -1,7 +1,8 @@
 import { DateTime, IANAZone } from 'luxon';
 
 export class TimeZoneService {
-  public static readonly DEFAULT_TIMEZONE = 'America/Chicago';
+  // CRITICAL: No hardcoded default timezone - force explicit timezone handling
+  public static readonly DEFAULT_TIMEZONE = 'UTC'; // Fallback only, should never be used in practice
   public static readonly TIME_FORMAT_24 = 'HH:mm';
   public static readonly TIME_FORMAT_AMPM = 'h:mm a';
   public static readonly DATE_FORMAT = 'yyyy-MM-dd';

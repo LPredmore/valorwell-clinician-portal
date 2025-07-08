@@ -25,7 +25,7 @@ export const useCalendarState = (initialClinicianId: string | null = null) => {
   const [loadingClients, setLoadingClients] = useState(false);
   const [appointmentRefreshTrigger, setAppointmentRefreshTrigger] = useState(0);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [userTimeZone, setUserTimeZone] = useState<string>(TimeZoneService.DEFAULT_TIMEZONE);
+  const [userTimeZone, setUserTimeZone] = useState<string>('loading'); // CRITICAL: Start in loading state, never use hardcoded default
   const [isLoadingTimeZone, setIsLoadingTimeZone] = useState(true);
   const [isMounted, setIsMounted] = useState(true);
 
@@ -54,15 +54,15 @@ export const useCalendarState = (initialClinicianId: string | null = null) => {
       if (timeZone) {
         setUserTimeZone(TimeZoneService.ensureIANATimeZone(timeZone));
       } else {
-        // Fallback to browser timezone
-        const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        setUserTimeZone(TimeZoneService.ensureIANATimeZone(browserTimezone));
+        // CRITICAL: NO browser timezone fallback - clinician timezone is required
+        console.error("[useCalendarState] CRITICAL: No clinician timezone found for:", clinicianId);
+        setUserTimeZone('loading'); // Set loading state, never use browser timezone
       }
     } catch (error) {
-      console.error("[useCalendarState] Error fetching timezone:", error);
+      console.error("[useCalendarState] CRITICAL: Failed to load clinician timezone:", error);
       if (isMounted) {
-        const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        setUserTimeZone(TimeZoneService.ensureIANATimeZone(browserTimezone));
+        // CRITICAL: NO browser timezone fallback - keep in loading state
+        setUserTimeZone('loading');
       }
     } finally {
       if (isMounted) {
