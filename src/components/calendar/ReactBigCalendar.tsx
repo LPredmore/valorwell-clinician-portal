@@ -76,11 +76,76 @@ const ReactBigCalendar: React.FC<ExtendedReactBigCalendarProps> = ({
     return getCalendarTimeBounds(calendarStartTime, calendarEndTime, userTimeZone);
   }, [calendarStartTime, calendarEndTime, userTimeZone]);
 
+  // CRITICAL: Validate all events and background events before passing to RBC
+  const validatedEvents = useMemo(() => {
+    const valid = events.filter(event => {
+      // Validate event structure
+      if (!event || !event.id || !event.start || !event.end) {
+        console.error('[ReactBigCalendar] Invalid event structure:', event);
+        return false;
+      }
+      
+      // Validate dates
+      if (isNaN(event.start.getTime()) || isNaN(event.end.getTime())) {
+        console.error('[ReactBigCalendar] Invalid event dates:', {
+          id: event.id,
+          title: event.title,
+          start: event.start,
+          end: event.end,
+          startTime: event.start?.getTime(),
+          endTime: event.end?.getTime()
+        });
+        return false;
+      }
+      
+      return true;
+    });
+    
+    console.log('[ReactBigCalendar] Event validation:', {
+      originalCount: events.length,
+      validCount: valid.length,
+      filteredOut: events.length - valid.length
+    });
+    
+    return valid;
+  }, [events]);
+  
+  const validatedBackgroundEvents = useMemo(() => {
+    const valid = backgroundEvents.filter(event => {
+      // Validate background event structure
+      if (!event || !event.start || !event.end) {
+        console.error('[ReactBigCalendar] Invalid background event structure:', event);
+        return false;
+      }
+      
+      // Validate dates
+      if (isNaN(event.start.getTime()) || isNaN(event.end.getTime())) {
+        console.error('[ReactBigCalendar] Invalid background event dates:', {
+          start: event.start,
+          end: event.end,
+          startTime: event.start?.getTime(),
+          endTime: event.end?.getTime()
+        });
+        return false;
+      }
+      
+      return true;
+    });
+    
+    console.log('[ReactBigCalendar] Background event validation:', {
+      originalCount: backgroundEvents.length,
+      validCount: valid.length,
+      filteredOut: backgroundEvents.length - valid.length
+    });
+    
+    return valid;
+  }, [backgroundEvents]);
+
   // Pure RBC configuration with native availability features
   const calendarConfig = useMemo(() => ({
     localizer: globalLocalizer,
-    events,
-    backgroundEvents, // RBC native background events
+    events: validatedEvents,
+    backgroundEvents: validatedBackgroundEvents, // RBC native background events
     date,
     onNavigate: handleNavigate,
     startAccessor: 'start',
@@ -105,8 +170,8 @@ const ReactBigCalendar: React.FC<ExtendedReactBigCalendarProps> = ({
     showMultiDayTimes: true,
     toolbar: true,
   }), [
-    events,
-    backgroundEvents,
+    validatedEvents,
+    validatedBackgroundEvents,
     eventPropGetter,
     backgroundEventPropGetter,
     onSelectSlot,

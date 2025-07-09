@@ -93,37 +93,141 @@ const CalendarContainer: React.FC = () => {
     
     // Transform appointments to RBC format using unified conversion
     if (appointments) {
-      events.push(...appointments.map(apt => ({
-        id: apt.id,
-        title: apt.clientName || 'Internal Appointment',
-        start: utcToCalendarDate(apt.start_at, userTimeZone),
-        end: utcToCalendarDate(apt.end_at, userTimeZone),
-        source: 'internal' as const,
-        resource: apt
-      })));
+      appointments.forEach(apt => {
+        try {
+          const startDate = utcToCalendarDate(apt.start_at, userTimeZone);
+          const endDate = utcToCalendarDate(apt.end_at, userTimeZone);
+          
+          // CRITICAL: Validate dates before adding to events
+          if (!startDate || !endDate || isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+            console.error('[CalendarContainer] realEvents - Invalid appointment dates:', {
+              appointmentId: apt.id,
+              start_at: apt.start_at,
+              end_at: apt.end_at,
+              startDate,
+              endDate,
+              startTime: startDate?.getTime(),
+              endTime: endDate?.getTime()
+            });
+            return; // Skip this invalid appointment
+          }
+          
+          events.push({
+            id: apt.id,
+            title: apt.clientName || 'Internal Appointment',
+            start: startDate,
+            end: endDate,
+            source: 'internal' as const,
+            resource: apt
+          });
+        } catch (error) {
+          console.error('[CalendarContainer] realEvents - Exception processing appointment:', {
+            appointmentId: apt.id,
+            error: error.message,
+            start_at: apt.start_at,
+            end_at: apt.end_at
+          });
+        }
+      });
     }
     
-    // Transform Nylas events to RBC format
+    // Transform Nylas events to RBC format with proper validation
     if (nylasEvents) {
-      events.push(...nylasEvents.map(evt => ({
-        id: evt.id,
-        title: evt.title,
-        start: new Date(evt.when?.start_time || ''),
-        end: new Date(evt.when?.end_time || ''),
-        source: 'nylas' as const,
-        resource: evt
-      })));
+      nylasEvents.forEach(evt => {
+        try {
+          // CRITICAL: Validate Nylas event time data before creating dates
+          if (!evt.when?.start_time || !evt.when?.end_time) {
+            console.error('[CalendarContainer] realEvents - Missing Nylas event time data:', {
+              eventId: evt.id,
+              title: evt.title,
+              when: evt.when
+            });
+            return; // Skip this invalid event
+          }
+          
+          const startDate = new Date(evt.when.start_time);
+          const endDate = new Date(evt.when.end_time);
+          
+          // CRITICAL: Validate dates before adding to events
+          if (!startDate || !endDate || isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+            console.error('[CalendarContainer] realEvents - Invalid Nylas event dates:', {
+              eventId: evt.id,
+              title: evt.title,
+              start_time: evt.when.start_time,
+              end_time: evt.when.end_time,
+              startDate,
+              endDate,
+              startTime: startDate?.getTime(),
+              endTime: endDate?.getTime()
+            });
+            return; // Skip this invalid event
+          }
+          
+          events.push({
+            id: evt.id,
+            title: evt.title,
+            start: startDate,
+            end: endDate,
+            source: 'nylas' as const,
+            resource: evt
+          });
+        } catch (error) {
+          console.error('[CalendarContainer] realEvents - Exception processing Nylas event:', {
+            eventId: evt.id,
+            title: evt.title,
+            error: error.message,
+            when: evt.when
+          });
+        }
+      });
     }
 
     // Transform blocked time to RBC format using unified conversion
-    events.push(...blockedTimes.map(blockedTime => ({
-      id: blockedTime.id,
-      title: blockedTime.label,
-      start: utcToCalendarDate(blockedTime.start_at, userTimeZone),
-      end: utcToCalendarDate(blockedTime.end_at, userTimeZone),
-      source: 'blocked_time' as const,
-      resource: blockedTime
-    })));
+    if (blockedTimes) {
+      blockedTimes.forEach(blockedTime => {
+        try {
+          const startDate = utcToCalendarDate(blockedTime.start_at, userTimeZone);
+          const endDate = utcToCalendarDate(blockedTime.end_at, userTimeZone);
+          
+          // CRITICAL: Validate dates before adding to events
+          if (!startDate || !endDate || isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+            console.error('[CalendarContainer] realEvents - Invalid blocked time dates:', {
+              blockedTimeId: blockedTime.id,
+              start_at: blockedTime.start_at,
+              end_at: blockedTime.end_at,
+              startDate,
+              endDate,
+              startTime: startDate?.getTime(),
+              endTime: endDate?.getTime()
+            });
+            return; // Skip this invalid blocked time
+          }
+          
+          events.push({
+            id: blockedTime.id,
+            title: blockedTime.label,
+            start: startDate,
+            end: endDate,
+            source: 'blocked_time' as const,
+            resource: blockedTime
+          });
+        } catch (error) {
+          console.error('[CalendarContainer] realEvents - Exception processing blocked time:', {
+            blockedTimeId: blockedTime.id,
+            error: error.message,
+            start_at: blockedTime.start_at,
+            end_at: blockedTime.end_at
+          });
+        }
+      });
+    }
+
+    console.log('[CalendarContainer] realEvents - Final validation:', {
+      totalEvents: events.length,
+      appointmentEvents: events.filter(e => e.source === 'internal').length,
+      nylasEvents: events.filter(e => e.source === 'nylas').length,
+      blockedTimeEvents: events.filter(e => e.source === 'blocked_time').length
+    });
 
     return events;
   }, [appointments, nylasEvents, blockedTimes, userTimeZone]);
