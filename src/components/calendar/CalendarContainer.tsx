@@ -130,18 +130,75 @@ const CalendarContainer: React.FC = () => {
 
   // Transform availability slots to background events
   const backgroundEvents = useMemo(() => {
+    // CRITICAL: Guard against loading state and invalid dates
+    if (!userTimeZone || userTimeZone === 'loading') {
+      console.log('[CalendarContainer] GUARD: backgroundEvents - timezone still loading');
+      return [];
+    }
+
+    // CRITICAL: Validate date range to prevent infinite loops
+    if (!weekStart || !weekEnd || isNaN(weekStart.getTime()) || isNaN(weekEnd.getTime())) {
+      console.log('[CalendarContainer] GUARD: backgroundEvents - invalid date range', {
+        weekStart: weekStart?.toISOString(),
+        weekEnd: weekEnd?.toISOString()
+      });
+      return [];
+    }
+
+    // CRITICAL: Check for reasonable date range (prevent infinite loops)
+    const daysDiff = Math.abs((weekEnd.getTime() - weekStart.getTime()) / (1000 * 60 * 60 * 24));
+    if (daysDiff > 90) { // More than 90 days is suspicious
+      console.error('[CalendarContainer] GUARD: backgroundEvents - date range too large', {
+        weekStart: weekStart.toISOString(),
+        weekEnd: weekEnd.toISOString(),
+        daysDiff
+      });
+      return [];
+    }
+
     // Use user timezone for date range calculation
     const tz = userTimeZone;
     const startDT = DateTime.fromJSDate(weekStart).setZone(tz).startOf('day');
     const endDT = DateTime.fromJSDate(weekEnd).setZone(tz).startOf('day');
     
+    // CRITICAL: Validate DateTime objects
+    if (!startDT.isValid || !endDT.isValid) {
+      console.error('[CalendarContainer] GUARD: backgroundEvents - invalid DateTime objects', {
+        startDT: startDT.toISO(),
+        endDT: endDT.toISO(),
+        startValid: startDT.isValid,
+        endValid: endDT.isValid
+      });
+      return [];
+    }
+
     const dates = [];
     let cursor = startDT;
+    let iterationCount = 0;
+    const MAX_ITERATIONS = 100; // Safety limit
     
-    while (cursor <= endDT) {
+    while (cursor <= endDT && iterationCount < MAX_ITERATIONS) {
       dates.push(cursor);
       cursor = cursor.plus({ days: 1 });
+      iterationCount++;
     }
+
+    // CRITICAL: Check if we hit the iteration limit
+    if (iterationCount >= MAX_ITERATIONS) {
+      console.error('[CalendarContainer] GUARD: backgroundEvents - hit iteration limit', {
+        iterationCount,
+        startDT: startDT.toISO(),
+        endDT: endDT.toISO(),
+        cursor: cursor.toISO()
+      });
+      return [];
+    }
+
+    console.log('[CalendarContainer] backgroundEvents - safe iteration completed', {
+      iterationCount,
+      datesGenerated: dates.length,
+      dateRange: `${startDT.toISODate()} to ${endDT.toISODate()}`
+    });
 
     const weekdayMap = { 
       monday: 1, tuesday: 2, wednesday: 3, thursday: 4, 
