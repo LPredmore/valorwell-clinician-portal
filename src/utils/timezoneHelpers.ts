@@ -91,10 +91,50 @@ export const utcToFormInput = (utcString: string, timezone: string): string => {
 export const utcToCalendarDate = (utcString: string, timezone: string): Date => {
   const safeTimezone = TimeZoneService.ensureIANATimeZone(timezone);
   
-  // Convert UTC to clinician timezone, then to JS Date
-  const localDateTime = DateTime.fromISO(utcString, { zone: 'UTC' }).setZone(safeTimezone);
+  // CRITICAL: Validate UTC string format
+  if (!utcString || typeof utcString !== 'string') {
+    console.error('[utcToCalendarDate] Invalid UTC string:', { utcString, type: typeof utcString });
+    return new Date(); // Return current time as fallback
+  }
   
-  return localDateTime.toJSDate();
+  try {
+    // Convert UTC to clinician timezone
+    const localDateTime = DateTime.fromISO(utcString, { zone: 'UTC' }).setZone(safeTimezone);
+    
+    // CRITICAL: Validate DateTime before conversion
+    if (!localDateTime.isValid) {
+      console.error('[utcToCalendarDate] Invalid DateTime object:', {
+        utcString,
+        timezone: safeTimezone,
+        error: localDateTime.invalidReason,
+        explanation: localDateTime.invalidExplanation
+      });
+      return new Date(); // Return current time as fallback
+    }
+    
+    // Convert to JS Date with additional validation
+    const jsDate = localDateTime.toJSDate();
+    
+    // CRITICAL: Validate the resulting JavaScript Date
+    if (!jsDate || isNaN(jsDate.getTime())) {
+      console.error('[utcToCalendarDate] Invalid JavaScript Date result:', {
+        utcString,
+        timezone: safeTimezone,
+        jsDate,
+        dateTime: jsDate?.getTime()
+      });
+      return new Date(); // Return current time as fallback
+    }
+    
+    return jsDate;
+  } catch (error) {
+    console.error('[utcToCalendarDate] Exception during conversion:', {
+      utcString,
+      timezone: safeTimezone,
+      error: error.message
+    });
+    return new Date(); // Return current time as fallback
+  }
 };
 
 /**

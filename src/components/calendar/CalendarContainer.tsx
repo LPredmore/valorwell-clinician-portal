@@ -217,16 +217,69 @@ const CalendarContainer: React.FC = () => {
         const startDT = DateTime.fromISO(startISO, { zone: clinicianTz });
         const endDT = DateTime.fromISO(endISO, { zone: clinicianTz });
         
+        // CRITICAL: Validate DateTime objects before proceeding
+        if (!startDT.isValid || !endDT.isValid) {
+          console.error('[CalendarContainer] backgroundEvents - Invalid DateTime in availability slot:', {
+            startISO,
+            endISO,
+            clinicianTz,
+            startValid: startDT.isValid,
+            endValid: endDT.isValid,
+            startError: startDT.invalidReason,
+            endError: endDT.invalidReason,
+            slot
+          });
+          return null; // Skip this invalid slot
+        }
+        
         // Convert from clinician timezone to user timezone for display
         const userStartDT = startDT.setZone(userTimeZone);
         const userEndDT = endDT.setZone(userTimeZone);
         
-        return {
-          start: userStartDT.toJSDate(),
-          end: userEndDT.toJSDate(),
-          resource: slot
-        };
-      });
+        // CRITICAL: Validate timezone conversion
+        if (!userStartDT.isValid || !userEndDT.isValid) {
+          console.error('[CalendarContainer] backgroundEvents - Invalid timezone conversion:', {
+            userTimeZone,
+            userStartValid: userStartDT.isValid,
+            userEndValid: userEndDT.isValid,
+            userStartError: userStartDT.invalidReason,
+            userEndError: userEndDT.invalidReason,
+            slot
+          });
+          return null; // Skip this invalid conversion
+        }
+        
+        try {
+          // CRITICAL: Validate JavaScript Date conversion
+          const startDate = userStartDT.toJSDate();
+          const endDate = userEndDT.toJSDate();
+          
+          if (!startDate || !endDate || isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+            console.error('[CalendarContainer] backgroundEvents - Invalid JavaScript Date conversion:', {
+              startDate,
+              endDate,
+              startTime: startDate?.getTime(),
+              endTime: endDate?.getTime(),
+              slot
+            });
+            return null; // Skip this invalid date conversion
+          }
+          
+          return {
+            start: startDate,
+            end: endDate,
+            resource: slot
+          };
+        } catch (error) {
+          console.error('[CalendarContainer] backgroundEvents - Exception during toJSDate conversion:', {
+            error: error.message,
+            slot,
+            userStartDT: userStartDT.toISO(),
+            userEndDT: userEndDT.toISO()
+          });
+          return null; // Skip this problematic slot
+        }
+      }).filter(Boolean); // Remove null values from failed conversions
     });
   }, [availabilitySlots, weekStart, weekEnd, userTimeZone]);
 
