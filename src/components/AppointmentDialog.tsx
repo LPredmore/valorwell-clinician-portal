@@ -36,7 +36,6 @@ interface AppointmentDialogProps {
     title?: string;
     clientName?: string;
     notes?: string;
-    appointment_timezone?: string;
   } | null;
 }
 
@@ -155,8 +154,7 @@ export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
         end_at: endUtc,
         type: 'therapy_session',
         status: 'scheduled',
-        notes: formData.notes,
-        appointment_timezone: clinicianTimeZone
+        notes: formData.notes
       });
 
       const { data: newAppointment, error } = await supabase
@@ -168,8 +166,7 @@ export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
           end_at: endUtc,
           type: 'therapy_session',
           status: 'scheduled',
-          notes: formData.notes || null,
-          appointment_timezone: clinicianTimeZone
+          notes: formData.notes || null
         })
         .select()
         .single();

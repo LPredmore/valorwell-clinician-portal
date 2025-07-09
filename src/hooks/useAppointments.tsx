@@ -21,7 +21,7 @@ interface RawSupabaseAppointment {
   recurring_group_id: string | null;
   video_room_url: string | null;
   notes: string | null;
-  appointment_timezone: string | null;
+  
   clients?: {
     client_first_name: string | null;
     client_last_name: string | null;
@@ -191,7 +191,6 @@ export const useAppointments = (
           recurring_group_id,
           video_room_url,
           notes,
-          appointment_timezone,
           clients!inner(
             client_first_name,
             client_last_name,
@@ -274,7 +273,7 @@ export const useAppointments = (
           recurring_group_id: rawAppt.recurring_group_id,
           video_room_url: rawAppt.video_room_url,
           notes: rawAppt.notes,
-          appointment_timezone: rawAppt.appointment_timezone,
+          
           client: clientData,
           clientName: clientName,
         };
@@ -323,8 +322,7 @@ export const useAppointments = (
         sampleData: appointments.slice(0, 3).map(apt => ({
           id: apt.id,
           clientName: apt.clientName,
-          start_at: apt.start_at,
-          appointment_timezone: apt.appointment_timezone
+          start_at: apt.start_at
         }))
       });
     }
@@ -369,27 +367,23 @@ export const useAppointments = (
     return result;
   };
 
-  // CRITICAL: isAppointmentToday using ONLY clinician timezone (no browser time)
+  // SIMPLIFIED: isAppointmentToday using ONLY clinician timezone
   const isAppointmentToday = (appointment: Appointment): boolean => {
     if (!appointment.start_at) return false;
 
     try {
-      // ELIMINATED: Browser time - use ONLY appointment timezone or clinician timezone
-      const appointmentTimeZone = appointment.appointment_timezone || safeUserTimeZone;
-      
-      // Use UTC, then convert to specific timezone (no browser dependency)
-      const now = DateTime.utc().setZone(appointmentTimeZone);
-      const apptDateTime = DateTime.fromISO(appointment.start_at, { zone: 'utc' }).setZone(appointmentTimeZone);
+      // Use UTC, then convert to clinician's current timezone
+      const now = DateTime.utc().setZone(safeUserTimeZone);
+      const apptDateTime = DateTime.fromISO(appointment.start_at, { zone: 'utc' }).setZone(safeUserTimeZone);
 
       const isToday = now.hasSame(apptDateTime, "day");
       
-      console.log('[useAppointments] TIMEZONE-INDEPENDENT today check:', {
+      console.log('[useAppointments] SIMPLIFIED today check:', {
         appointmentId: appointment.id,
-        appointmentTimeZone,
+        clinicianTimeZone: safeUserTimeZone,
         nowInTimezone: now.toFormat('yyyy-MM-dd HH:mm'),
         apptInTimezone: apptDateTime.toFormat('yyyy-MM-dd HH:mm'),
-        isToday,
-        noBrowserDependency: true
+        isToday
       });
 
       return isToday;
@@ -399,12 +393,11 @@ export const useAppointments = (
     }
   };
 
-  // Memoized formatted appointments - now using each appointment's saved timezone
+  // SIMPLIFIED: Memoized formatted appointments using clinician's current timezone
   const appointmentsWithDisplayFormatting = useMemo(() => {
     return appointments.map((appt) => {
-      // Use the appointment's saved timezone if available, otherwise fall back to user timezone
-      const appointmentTimeZone = appt.appointment_timezone || safeUserTimeZone;
-      return addDisplayFormattingToAppointment(appt, appointmentTimeZone);
+      // Always use clinician's current timezone for consistent display
+      return addDisplayFormattingToAppointment(appt, safeUserTimeZone);
     });
   }, [appointments, safeUserTimeZone]);
   
@@ -419,10 +412,9 @@ export const useAppointments = (
       if (!appt.start_at) return false;
 
       try {
-        // ELIMINATED: Browser time - use ONLY stored timezones
-        const appointmentTimeZone = appt.appointment_timezone || safeUserTimeZone;
-        const now = DateTime.utc().setZone(appointmentTimeZone);
-        const apptDateTime = DateTime.fromISO(appt.start_at, { zone: 'utc' }).setZone(appointmentTimeZone);
+        // SIMPLIFIED: Use clinician's current timezone
+        const now = DateTime.utc().setZone(safeUserTimeZone);
+        const apptDateTime = DateTime.fromISO(appt.start_at, { zone: 'utc' }).setZone(safeUserTimeZone);
         
         // Upcoming means: not today and in the future
         return apptDateTime > now && !now.hasSame(apptDateTime, "day");
@@ -438,10 +430,9 @@ export const useAppointments = (
       if (!appt.start_at) return false;
 
       try {
-        // ELIMINATED: Browser time - use ONLY stored timezones
-        const appointmentTimeZone = appt.appointment_timezone || safeUserTimeZone;
-        const now = DateTime.utc().setZone(appointmentTimeZone);
-        const apptDateTime = DateTime.fromISO(appt.start_at, { zone: 'utc' }).setZone(appointmentTimeZone);
+        // SIMPLIFIED: Use clinician's current timezone
+        const now = DateTime.utc().setZone(safeUserTimeZone);
+        const apptDateTime = DateTime.fromISO(appt.start_at, { zone: 'utc' }).setZone(safeUserTimeZone);
         
         // Past means: before now
         return apptDateTime < now;
