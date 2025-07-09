@@ -149,20 +149,96 @@ export const getCalendarTimeBounds = (
   endTime: string, 
   timezone: string
 ): { start: Date; end: Date } => {
+  console.log('[getCalendarTimeBounds] DIAGNOSTIC: Input parameters:', {
+    startTime,
+    endTime,
+    timezone
+  });
+  
   const safeTimezone = TimeZoneService.ensureIANATimeZone(timezone);
+  console.log('[getCalendarTimeBounds] DIAGNOSTIC: Safe timezone:', safeTimezone);
   
-  // Use today's date in the clinician's timezone
-  const today = DateTime.now().setZone(safeTimezone).startOf('day');
+  // Use a fixed, safe date instead of DateTime.now() to avoid timezone edge cases
+  const baseDate = DateTime.fromISO('2025-01-01T00:00:00', { zone: safeTimezone }).startOf('day');
+  console.log('[getCalendarTimeBounds] DIAGNOSTIC: Base date created:', {
+    baseDate: baseDate.toISO(),
+    isValid: baseDate.isValid,
+    zone: baseDate.zoneName
+  });
   
-  // Create start and end times
-  const [startHour, startMinute] = startTime.split(':').map(Number);
-  const [endHour, endMinute] = endTime.split(':').map(Number);
+  // Parse and validate time strings
+  const startTimeParts = startTime.split(':').map(Number);
+  const endTimeParts = endTime.split(':').map(Number);
   
-  const startDateTime = today.set({ hour: startHour, minute: startMinute });
-  const endDateTime = today.set({ hour: endHour, minute: endMinute });
+  if (startTimeParts.length !== 2 || endTimeParts.length !== 2) {
+    console.error('[getCalendarTimeBounds] DIAGNOSTIC: Invalid time format:', { startTime, endTime });
+    throw new Error(`Invalid time format: ${startTime} or ${endTime}`);
+  }
   
-  return {
-    start: startDateTime.toJSDate(),
-    end: endDateTime.toJSDate()
+  const [startHour, startMinute] = startTimeParts;
+  const [endHour, endMinute] = endTimeParts;
+  
+  console.log('[getCalendarTimeBounds] DIAGNOSTIC: Parsed time components:', {
+    startHour, startMinute, endHour, endMinute
+  });
+  
+  // Validate hour and minute ranges
+  if (startHour < 0 || startHour > 23 || endHour < 0 || endHour > 23 ||
+      startMinute < 0 || startMinute > 59 || endMinute < 0 || endMinute > 59) {
+    console.error('[getCalendarTimeBounds] DIAGNOSTIC: Invalid time values:', {
+      startHour, startMinute, endHour, endMinute
+    });
+    throw new Error(`Invalid time values: ${startTime} or ${endTime}`);
+  }
+  
+  // Create DateTime objects
+  const startDateTime = baseDate.set({ hour: startHour, minute: startMinute });
+  const endDateTime = baseDate.set({ hour: endHour, minute: endMinute });
+  
+  console.log('[getCalendarTimeBounds] DIAGNOSTIC: DateTime objects created:', {
+    startDateTime: startDateTime.toISO(),
+    endDateTime: endDateTime.toISO(),
+    startValid: startDateTime.isValid,
+    endValid: endDateTime.isValid
+  });
+  
+  // Validate DateTime objects
+  if (!startDateTime.isValid || !endDateTime.isValid) {
+    console.error('[getCalendarTimeBounds] DIAGNOSTIC: Invalid DateTime objects:', {
+      startDateTime: startDateTime.toISO(),
+      endDateTime: endDateTime.toISO(),
+      startReason: startDateTime.invalidReason,
+      endReason: endDateTime.invalidReason
+    });
+    throw new Error(`Invalid DateTime: ${startDateTime.invalidReason || endDateTime.invalidReason}`);
+  }
+  
+  // Convert to JavaScript Dates
+  const startJSDate = startDateTime.toJSDate();
+  const endJSDate = endDateTime.toJSDate();
+  
+  console.log('[getCalendarTimeBounds] DIAGNOSTIC: JavaScript Dates created:', {
+    startJSDate,
+    endJSDate,
+    startValid: startJSDate instanceof Date && !isNaN(startJSDate.getTime()),
+    endValid: endJSDate instanceof Date && !isNaN(endJSDate.getTime()),
+    startTimestamp: startJSDate.getTime(),
+    endTimestamp: endJSDate.getTime()
+  });
+  
+  // Final validation of JavaScript Dates
+  if (!startJSDate || !endJSDate || isNaN(startJSDate.getTime()) || isNaN(endJSDate.getTime())) {
+    console.error('[getCalendarTimeBounds] DIAGNOSTIC: Invalid JavaScript Dates:', {
+      startJSDate, endJSDate
+    });
+    throw new Error('Failed to create valid JavaScript Dates from DateTime objects');
+  }
+  
+  const result = {
+    start: startJSDate,
+    end: endJSDate
   };
+  
+  console.log('[getCalendarTimeBounds] DIAGNOSTIC: Final result:', result);
+  return result;
 };

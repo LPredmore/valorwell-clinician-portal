@@ -73,7 +73,35 @@ const ReactBigCalendar: React.FC<ExtendedReactBigCalendarProps> = ({
 
   // Get calendar time bounds using unified timezone handling
   const { start: minTime, end: maxTime } = useMemo(() => {
-    return getCalendarTimeBounds(calendarStartTime, calendarEndTime, userTimeZone);
+    console.log('[ReactBigCalendar] DIAGNOSTIC: Calculating time bounds with inputs:', {
+      calendarStartTime,
+      calendarEndTime,
+      userTimeZone
+    });
+    
+    const bounds = getCalendarTimeBounds(calendarStartTime, calendarEndTime, userTimeZone);
+    
+    console.log('[ReactBigCalendar] DIAGNOSTIC: Time bounds calculated:', {
+      startTime: bounds.start,
+      endTime: bounds.end,
+      startIsValid: bounds.start instanceof Date && !isNaN(bounds.start.getTime()),
+      endIsValid: bounds.end instanceof Date && !isNaN(bounds.end.getTime()),
+      startTimestamp: bounds.start?.getTime(),
+      endTimestamp: bounds.end?.getTime(),
+      timeDifference: bounds.end?.getTime() - bounds.start?.getTime()
+    });
+    
+    // CRITICAL: Validate time bounds before returning
+    if (!bounds.start || !bounds.end || isNaN(bounds.start.getTime()) || isNaN(bounds.end.getTime())) {
+      console.error('[ReactBigCalendar] DIAGNOSTIC: Invalid time bounds detected, using fallback');
+      const fallbackStart = new Date();
+      fallbackStart.setHours(8, 0, 0, 0);
+      const fallbackEnd = new Date();
+      fallbackEnd.setHours(18, 0, 0, 0);
+      return { start: fallbackStart, end: fallbackEnd };
+    }
+    
+    return bounds;
   }, [calendarStartTime, calendarEndTime, userTimeZone]);
 
   // CRITICAL: Validate all events and background events before passing to RBC
@@ -142,34 +170,60 @@ const ReactBigCalendar: React.FC<ExtendedReactBigCalendarProps> = ({
   }, [backgroundEvents]);
 
   // Pure RBC configuration with native availability features
-  const calendarConfig = useMemo(() => ({
-    localizer: globalLocalizer,
-    events: validatedEvents,
-    backgroundEvents: validatedBackgroundEvents, // RBC native background events
-    date,
-    onNavigate: handleNavigate,
-    startAccessor: 'start',
-    endAccessor: 'end',
-    titleAccessor: 'title',
-    views: {
-      month: true,
-      week: true,
-      day: true,
-    },
-    defaultView: Views.WEEK,
-    step: 30,
-    timeslots: 1, // Use 1 timeslot per step for cleaner availability display
-    min: minTime, // Calendar display start time
-    max: maxTime, // Calendar display end time
-    eventPropGetter,
-    backgroundEventPropGetter, // Style background events (availability)
-    onSelectSlot,
-    onSelectEvent,
-    selectable: true,
-    popup: true,
-    showMultiDayTimes: true,
-    toolbar: true,
-  }), [
+  const calendarConfig = useMemo(() => {
+    console.log('[ReactBigCalendar] DIAGNOSTIC: Building calendar config with:', {
+      eventsCount: validatedEvents.length,
+      backgroundEventsCount: validatedBackgroundEvents.length,
+      minTime,
+      maxTime,
+      minTimeValid: minTime instanceof Date && !isNaN(minTime.getTime()),
+      maxTimeValid: maxTime instanceof Date && !isNaN(maxTime.getTime()),
+      minTimeHours: minTime?.getHours(),
+      maxTimeHours: maxTime?.getHours(),
+      step: 30,
+      timeslots: 1
+    });
+    
+    const config = {
+      localizer: globalLocalizer,
+      events: validatedEvents,
+      backgroundEvents: validatedBackgroundEvents, // RBC native background events
+      date,
+      onNavigate: handleNavigate,
+      startAccessor: 'start',
+      endAccessor: 'end',
+      titleAccessor: 'title',
+      views: {
+        month: true,
+        week: true,
+        day: true,
+      },
+      defaultView: Views.WEEK,
+      step: 30,
+      timeslots: 1, // Use 1 timeslot per step for cleaner availability display
+      min: minTime, // Calendar display start time
+      max: maxTime, // Calendar display end time
+      eventPropGetter,
+      backgroundEventPropGetter, // Style background events (availability)
+      onSelectSlot,
+      onSelectEvent,
+      selectable: true,
+      popup: true,
+      showMultiDayTimes: true,
+      toolbar: true,
+    };
+    
+    console.log('[ReactBigCalendar] DIAGNOSTIC: Final calendar config created:', {
+      configKeys: Object.keys(config),
+      hasLocalizer: !!config.localizer,
+      eventsLength: config.events.length,
+      backgroundEventsLength: config.backgroundEvents.length,
+      minTimeConfig: config.min,
+      maxTimeConfig: config.max
+    });
+    
+    return config;
+  }, [
     validatedEvents,
     validatedBackgroundEvents,
     eventPropGetter,
@@ -184,7 +238,40 @@ const ReactBigCalendar: React.FC<ExtendedReactBigCalendarProps> = ({
 
   return (
     <div className="rbc-calendar-container">
-      <Calendar {...calendarConfig} />
+      {(() => {
+        try {
+          console.log('[ReactBigCalendar] DIAGNOSTIC: About to render Calendar component with config:', {
+            eventsCount: calendarConfig.events.length,
+            backgroundEventsCount: calendarConfig.backgroundEvents.length,
+            minTime: calendarConfig.min,
+            maxTime: calendarConfig.max,
+            step: calendarConfig.step,
+            timeslots: calendarConfig.timeslots
+          });
+          
+          return <Calendar {...calendarConfig} />;
+        } catch (error) {
+          console.error('[ReactBigCalendar] DIAGNOSTIC: Calendar component failed to render:', {
+            error: error.message,
+            stack: error.stack,
+            calendarConfig: {
+              eventsCount: calendarConfig.events.length,
+              backgroundEventsCount: calendarConfig.backgroundEvents.length,
+              minTime: calendarConfig.min,
+              maxTime: calendarConfig.max,
+              step: calendarConfig.step,
+              timeslots: calendarConfig.timeslots
+            }
+          });
+          
+          return (
+            <div className="p-4 bg-red-50 border border-red-200 rounded">
+              <h3 className="text-red-800 font-semibold">Calendar Error</h3>
+              <p className="text-red-600">Failed to render calendar: {error.message}</p>
+            </div>
+          );
+        }
+      })()}
     </div>
   );
 };
