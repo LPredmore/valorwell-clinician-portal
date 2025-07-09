@@ -139,6 +139,7 @@ export const utcToCalendarDate = (utcString: string, timezone: string): Date => 
 
 /**
  * Get calendar time bounds in the clinician's timezone
+ * CRITICAL: Ensures same-day bounds for React Big Calendar compatibility
  * @param startTime Time string like "08:00"
  * @param endTime Time string like "21:00"
  * @param timezone The clinician's timezone
@@ -149,96 +150,61 @@ export const getCalendarTimeBounds = (
   endTime: string, 
   timezone: string
 ): { start: Date; end: Date } => {
-  console.log('[getCalendarTimeBounds] DIAGNOSTIC: Input parameters:', {
-    startTime,
-    endTime,
-    timezone
-  });
-  
   const safeTimezone = TimeZoneService.ensureIANATimeZone(timezone);
-  console.log('[getCalendarTimeBounds] DIAGNOSTIC: Safe timezone:', safeTimezone);
-  
-  // Use a fixed, safe date instead of DateTime.now() to avoid timezone edge cases
-  const baseDate = DateTime.fromISO('2025-01-01T00:00:00', { zone: safeTimezone }).startOf('day');
-  console.log('[getCalendarTimeBounds] DIAGNOSTIC: Base date created:', {
-    baseDate: baseDate.toISO(),
-    isValid: baseDate.isValid,
-    zone: baseDate.zoneName
-  });
   
   // Parse and validate time strings
   const startTimeParts = startTime.split(':').map(Number);
   const endTimeParts = endTime.split(':').map(Number);
   
   if (startTimeParts.length !== 2 || endTimeParts.length !== 2) {
-    console.error('[getCalendarTimeBounds] DIAGNOSTIC: Invalid time format:', { startTime, endTime });
     throw new Error(`Invalid time format: ${startTime} or ${endTime}`);
   }
   
   const [startHour, startMinute] = startTimeParts;
   const [endHour, endMinute] = endTimeParts;
   
-  console.log('[getCalendarTimeBounds] DIAGNOSTIC: Parsed time components:', {
-    startHour, startMinute, endHour, endMinute
-  });
-  
   // Validate hour and minute ranges
   if (startHour < 0 || startHour > 23 || endHour < 0 || endHour > 23 ||
       startMinute < 0 || startMinute > 59 || endMinute < 0 || endMinute > 59) {
-    console.error('[getCalendarTimeBounds] DIAGNOSTIC: Invalid time values:', {
-      startHour, startMinute, endHour, endMinute
-    });
     throw new Error(`Invalid time values: ${startTime} or ${endTime}`);
   }
   
-  // Create DateTime objects
-  const startDateTime = baseDate.set({ hour: startHour, minute: startMinute });
-  const endDateTime = baseDate.set({ hour: endHour, minute: endMinute });
+  // CRITICAL FIX: Use current date in timezone to avoid cross-date boundary issues
+  const now = DateTime.now().setZone(safeTimezone);
+  const currentDate = now.startOf('day');
   
-  console.log('[getCalendarTimeBounds] DIAGNOSTIC: DateTime objects created:', {
-    startDateTime: startDateTime.toISO(),
-    endDateTime: endDateTime.toISO(),
-    startValid: startDateTime.isValid,
-    endValid: endDateTime.isValid
-  });
+  // Create time bounds on the SAME calendar date
+  let startDateTime = currentDate.set({ hour: startHour, minute: startMinute });
+  let endDateTime = currentDate.set({ hour: endHour, minute: endMinute });
   
-  // Validate DateTime objects
-  if (!startDateTime.isValid || !endDateTime.isValid) {
-    console.error('[getCalendarTimeBounds] DIAGNOSTIC: Invalid DateTime objects:', {
-      startDateTime: startDateTime.toISO(),
-      endDateTime: endDateTime.toISO(),
-      startReason: startDateTime.invalidReason,
-      endReason: endDateTime.invalidReason
-    });
-    throw new Error(`Invalid DateTime: ${startDateTime.invalidReason || endDateTime.invalidReason}`);
+  // Handle midnight edge case: if start is 00:00, use 01:00 to avoid cross-date
+  if (startHour === 0 && startMinute === 0) {
+    startDateTime = currentDate.set({ hour: 1, minute: 0 });
+    console.log('[getCalendarTimeBounds] Adjusted midnight start to 01:00 to avoid cross-date boundary');
   }
   
-  // Convert to JavaScript Dates
+  // Ensure end time is after start time on same day
+  if (endDateTime <= startDateTime) {
+    endDateTime = startDateTime.plus({ hours: 1 });
+    console.log('[getCalendarTimeBounds] Adjusted end time to ensure valid range');
+  }
+  
+  // Convert to JavaScript Dates - these will be on the same calendar date
   const startJSDate = startDateTime.toJSDate();
   const endJSDate = endDateTime.toJSDate();
   
-  console.log('[getCalendarTimeBounds] DIAGNOSTIC: JavaScript Dates created:', {
-    startJSDate,
-    endJSDate,
-    startValid: startJSDate instanceof Date && !isNaN(startJSDate.getTime()),
-    endValid: endJSDate instanceof Date && !isNaN(endJSDate.getTime()),
-    startTimestamp: startJSDate.getTime(),
-    endTimestamp: endJSDate.getTime()
-  });
+  // Final validation for same-day bounds
+  const startDate = new Date(startJSDate.getFullYear(), startJSDate.getMonth(), startJSDate.getDate());
+  const endDate = new Date(endJSDate.getFullYear(), endJSDate.getMonth(), endJSDate.getDate());
   
-  // Final validation of JavaScript Dates
-  if (!startJSDate || !endJSDate || isNaN(startJSDate.getTime()) || isNaN(endJSDate.getTime())) {
-    console.error('[getCalendarTimeBounds] DIAGNOSTIC: Invalid JavaScript Dates:', {
-      startJSDate, endJSDate
-    });
-    throw new Error('Failed to create valid JavaScript Dates from DateTime objects');
+  if (startDate.getTime() !== endDate.getTime()) {
+    console.error('[getCalendarTimeBounds] Cross-date boundary detected, using fallback');
+    // Fallback: create same-day bounds using current date
+    const fallbackDate = new Date();
+    const fallbackStart = new Date(fallbackDate.getFullYear(), fallbackDate.getMonth(), fallbackDate.getDate(), 8, 0, 0);
+    const fallbackEnd = new Date(fallbackDate.getFullYear(), fallbackDate.getMonth(), fallbackDate.getDate(), 18, 0, 0);
+    return { start: fallbackStart, end: fallbackEnd };
   }
   
-  const result = {
-    start: startJSDate,
-    end: endJSDate
-  };
-  
-  console.log('[getCalendarTimeBounds] DIAGNOSTIC: Final result:', result);
-  return result;
+  return { start: startJSDate, end: endJSDate };
 };

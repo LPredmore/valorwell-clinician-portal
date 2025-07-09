@@ -73,35 +73,32 @@ const ReactBigCalendar: React.FC<ExtendedReactBigCalendarProps> = ({
 
   // Get calendar time bounds using unified timezone handling
   const { start: minTime, end: maxTime } = useMemo(() => {
-    console.log('[ReactBigCalendar] DIAGNOSTIC: Calculating time bounds with inputs:', {
-      calendarStartTime,
-      calendarEndTime,
-      userTimeZone
-    });
-    
-    const bounds = getCalendarTimeBounds(calendarStartTime, calendarEndTime, userTimeZone);
-    
-    console.log('[ReactBigCalendar] DIAGNOSTIC: Time bounds calculated:', {
-      startTime: bounds.start,
-      endTime: bounds.end,
-      startIsValid: bounds.start instanceof Date && !isNaN(bounds.start.getTime()),
-      endIsValid: bounds.end instanceof Date && !isNaN(bounds.end.getTime()),
-      startTimestamp: bounds.start?.getTime(),
-      endTimestamp: bounds.end?.getTime(),
-      timeDifference: bounds.end?.getTime() - bounds.start?.getTime()
-    });
-    
-    // CRITICAL: Validate time bounds before returning
-    if (!bounds.start || !bounds.end || isNaN(bounds.start.getTime()) || isNaN(bounds.end.getTime())) {
-      console.error('[ReactBigCalendar] DIAGNOSTIC: Invalid time bounds detected, using fallback');
-      const fallbackStart = new Date();
-      fallbackStart.setHours(8, 0, 0, 0);
-      const fallbackEnd = new Date();
-      fallbackEnd.setHours(18, 0, 0, 0);
+    try {
+      const bounds = getCalendarTimeBounds(calendarStartTime, calendarEndTime, userTimeZone);
+      
+      // CRITICAL: Validate same-day bounds for React Big Calendar compatibility
+      const startDate = new Date(bounds.start.getFullYear(), bounds.start.getMonth(), bounds.start.getDate());
+      const endDate = new Date(bounds.end.getFullYear(), bounds.end.getMonth(), bounds.end.getDate());
+      
+      if (startDate.getTime() !== endDate.getTime()) {
+        console.error('[ReactBigCalendar] Cross-date boundary detected in time bounds');
+        throw new Error('Time bounds span different dates');
+      }
+      
+      if (bounds.start >= bounds.end) {
+        console.error('[ReactBigCalendar] Invalid time order: start >= end');
+        throw new Error('Start time must be before end time');
+      }
+      
+      return bounds;
+    } catch (error) {
+      console.error('[ReactBigCalendar] Time bounds calculation failed:', error.message);
+      // Fallback: same-day bounds that React Big Calendar can handle
+      const today = new Date();
+      const fallbackStart = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 8, 0, 0);
+      const fallbackEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 18, 0, 0);
       return { start: fallbackStart, end: fallbackEnd };
     }
-    
-    return bounds;
   }, [calendarStartTime, calendarEndTime, userTimeZone]);
 
   // CRITICAL: Validate all events and background events before passing to RBC
