@@ -177,11 +177,8 @@ export const getCalendarTimeBounds = (
   let startDateTime = currentDate.set({ hour: startHour, minute: startMinute });
   let endDateTime = currentDate.set({ hour: endHour, minute: endMinute });
   
-  // Handle midnight edge case: if start is 00:00, use 01:00 to avoid cross-date
-  if (startHour === 0 && startMinute === 0) {
-    startDateTime = currentDate.set({ hour: 1, minute: 0 });
-    console.log('[getCalendarTimeBounds] Adjusted midnight start to 01:00 to avoid cross-date boundary');
-  }
+  // Allow midnight start for 24-hour display - no adjustment needed for 00:00 to 23:59 range
+  // The same-day validation below will catch any actual cross-date issues
   
   // Ensure end time is after start time on same day
   if (endDateTime <= startDateTime) {
