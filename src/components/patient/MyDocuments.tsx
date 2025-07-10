@@ -6,7 +6,7 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@
 import { Calendar, Eye, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
-import { getCurrentUser, fetchClinicalDocuments, getDocumentDownloadURL } from '@/integrations/supabase/client';
+import { getCurrentUser, fetchFilteredClinicalDocuments, getDocumentDownloadURL } from '@/integrations/supabase/client';
 
 interface ClinicalDocument {
   id: string;
@@ -38,7 +38,7 @@ const MyDocuments: React.FC<{ clientId?: string }> = ({ clientId }) => {
           userId = user.id;
         }
         
-        const docs = await fetchClinicalDocuments(userId);
+        const docs = await fetchFilteredClinicalDocuments(userId);
         setDocuments(docs);
       } catch (error) {
         console.error('Error loading documents:', error);
@@ -74,6 +74,18 @@ const MyDocuments: React.FC<{ clientId?: string }> = ({ clientId }) => {
         description: "Failed to open document",
         variant: "destructive"
       });
+    }
+    };
+
+  // Helper function to normalize document type for display
+  const getDisplayDocumentType = (documentType: string) => {
+    switch (documentType.toLowerCase()) {
+      case 'session_note':
+        return 'Session Note';
+      case 'treatment plan':
+        return 'Treatment Plan';
+      default:
+        return documentType;
     }
   };
 
@@ -111,7 +123,7 @@ const MyDocuments: React.FC<{ clientId?: string }> = ({ clientId }) => {
                 {documents.map((doc) => (
                   <TableRow key={doc.id}>
                     <TableCell className="font-medium">{doc.document_title}</TableCell>
-                    <TableCell>{doc.document_type}</TableCell>
+                    <TableCell>{getDisplayDocumentType(doc.document_type)}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
                         <Calendar className="h-4 w-4 text-gray-500" />

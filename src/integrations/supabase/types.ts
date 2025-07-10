@@ -3279,6 +3279,19 @@ export type Database = {
           utc_end_time: string
         }[]
       }
+      get_filtered_clinical_documents: {
+        Args: { p_client_id: string }
+        Returns: {
+          id: string
+          client_id: string
+          document_title: string
+          document_type: string
+          document_date: string
+          file_path: string
+          created_at: string
+          created_by: string
+        }[]
+      }
       get_unread_notification_count: {
         Args: { p_user_id: string }
         Returns: number
