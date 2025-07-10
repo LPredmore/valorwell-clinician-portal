@@ -8,7 +8,7 @@ import PHQ9Template from "@/components/templates/PHQ9Template";
 import PCL5Template from "@/components/templates/PCL5Template";
 import { useClinicianData } from "@/hooks/useClinicianData";
 import { ClientDetails } from "@/types/client";
-import { fetchClinicalDocuments, getDocumentDownloadURL } from "@/integrations/supabase/client";
+import { fetchFilteredClinicalDocuments, getDocumentDownloadURL } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
@@ -47,7 +47,7 @@ const DocumentationTab: React.FC<DocumentationTabProps> = ({
   useEffect(() => {
     if (clientData?.id) {
       setIsLoading(true);
-      fetchClinicalDocuments(clientData.id).then(docs => {
+      fetchFilteredClinicalDocuments(clientData.id).then(docs => {
         setDocuments(docs);
         setIsLoading(false);
       }).catch(err => {
@@ -65,28 +65,40 @@ const DocumentationTab: React.FC<DocumentationTabProps> = ({
   const handleCloseTreatmentPlan = () => {
     setShowTreatmentPlanTemplate(false);
     if (clientData?.id) {
-      fetchClinicalDocuments(clientData.id).then(docs => setDocuments(docs)).catch(err => console.error('Error refreshing documents:', err));
+      fetchFilteredClinicalDocuments(clientData.id).then(docs => setDocuments(docs)).catch(err => console.error('Error refreshing documents:', err));
     }
   };
 
   const handleCloseSessionNote = () => {
     setShowSessionNoteTemplate(false);
     if (clientData?.id) {
-      fetchClinicalDocuments(clientData.id).then(docs => setDocuments(docs)).catch(err => console.error('Error refreshing documents:', err));
+      fetchFilteredClinicalDocuments(clientData.id).then(docs => setDocuments(docs)).catch(err => console.error('Error refreshing documents:', err));
     }
   };
 
   const handleClosePHQ9 = () => {
     setShowPHQ9Template(false);
     if (clientData?.id) {
-      fetchClinicalDocuments(clientData.id).then(docs => setDocuments(docs)).catch(err => console.error('Error refreshing documents:', err));
+      fetchFilteredClinicalDocuments(clientData.id).then(docs => setDocuments(docs)).catch(err => console.error('Error refreshing documents:', err));
     }
   };
 
   const handleClosePCL5 = () => {
     setShowPCL5Template(false);
     if (clientData?.id) {
-      fetchClinicalDocuments(clientData.id).then(docs => setDocuments(docs)).catch(err => console.error('Error refreshing documents:', err));
+      fetchFilteredClinicalDocuments(clientData.id).then(docs => setDocuments(docs)).catch(err => console.error('Error refreshing documents:', err));
+    }
+  };
+
+  // Helper function to normalize document type for display
+  const getDisplayDocumentType = (documentType: string) => {
+    switch (documentType.toLowerCase()) {
+      case 'session_note':
+        return 'Session Note';
+      case 'treatment plan':
+        return 'Treatment Plan';
+      default:
+        return documentType;
     }
   };
 
@@ -191,7 +203,7 @@ const DocumentationTab: React.FC<DocumentationTabProps> = ({
                 <TableBody>
                   {documents.map(doc => <TableRow key={doc.id}>
                       <TableCell className="font-medium">{doc.document_title}</TableCell>
-                      <TableCell>{doc.document_type}</TableCell>
+                      <TableCell>{getDisplayDocumentType(doc.document_type)}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
                           <Calendar className="h-4 w-4 text-gray-500" />

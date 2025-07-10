@@ -253,6 +253,23 @@ export const fetchClinicalDocuments = async (clientId: string) => {
   }
 };
 
+// Enhanced function to fetch filtered clinical documents with proper treatment plan deduplication
+export const fetchFilteredClinicalDocuments = async (clientId: string) => {
+  try {
+    const { data, error } = await supabase
+      .rpc('get_filtered_clinical_documents', { 
+        p_client_id: clientId 
+      });
+      
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching filtered clinical documents:', error);
+    // Fallback to regular fetch if RPC function doesn't exist yet
+    return await fetchClinicalDocuments(clientId);
+  }
+};
+
 // New function to get document download URL
 export const getDocumentDownloadURL = async (filePath: string) => {
   try {
