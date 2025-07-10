@@ -139,9 +139,9 @@ export const utcToCalendarDate = (utcString: string, timezone: string): Date => 
 
 /**
  * Get calendar time bounds in the clinician's timezone
- * CRITICAL: Ensures same-day bounds for React Big Calendar compatibility
- * @param startTime Time string like "08:00"
- * @param endTime Time string like "21:00"
+ * CRITICAL: Supports 24-hour display from midnight to midnight for React Big Calendar
+ * @param startTime Time string like "00:00"
+ * @param endTime Time string like "23:59"
  * @param timezone The clinician's timezone
  * @returns Object with start and end Date objects for calendar bounds
  */
@@ -151,6 +151,12 @@ export const getCalendarTimeBounds = (
   timezone: string
 ): { start: Date; end: Date } => {
   const safeTimezone = TimeZoneService.ensureIANATimeZone(timezone);
+  
+  console.log('[getCalendarTimeBounds] DIAGNOSTIC: Input parameters:', {
+    startTime,
+    endTime,
+    timezone: safeTimezone
+  });
   
   // Parse and validate time strings
   const startTimeParts = startTime.split(':').map(Number);
@@ -169,39 +175,42 @@ export const getCalendarTimeBounds = (
     throw new Error(`Invalid time values: ${startTime} or ${endTime}`);
   }
   
-  // CRITICAL FIX: Use current date in timezone to avoid cross-date boundary issues
+  // Use current date in timezone for consistent calendar display
   const now = DateTime.now().setZone(safeTimezone);
   const currentDate = now.startOf('day');
   
-  // Create time bounds on the SAME calendar date
-  let startDateTime = currentDate.set({ hour: startHour, minute: startMinute });
-  let endDateTime = currentDate.set({ hour: endHour, minute: endMinute });
+  // Create start time on current date
+  const startDateTime = currentDate.set({ hour: startHour, minute: startMinute });
   
-  // Allow midnight start for 24-hour display - no adjustment needed for 00:00 to 23:59 range
-  // The same-day validation below will catch any actual cross-date issues
-  
-  // Ensure end time is after start time on same day
-  if (endDateTime <= startDateTime) {
-    endDateTime = startDateTime.plus({ hours: 1 });
-    console.log('[getCalendarTimeBounds] Adjusted end time to ensure valid range');
+  // CRITICAL: For 24-hour display (00:00 to 23:59), React Big Calendar needs
+  // the max time to be the NEXT day at midnight for proper display
+  let endDateTime;
+  if (startHour === 0 && endHour === 23 && endMinute === 59) {
+    // 24-hour display: end time should be next day at midnight
+    endDateTime = currentDate.plus({ days: 1 }).set({ hour: 0, minute: 0 });
+    console.log('[getCalendarTimeBounds] DIAGNOSTIC: 24-hour display detected, using next-day midnight for end');
+  } else {
+    // Regular time range: use same day
+    endDateTime = currentDate.set({ hour: endHour, minute: endMinute });
+    
+    // Ensure end time is after start time for non-24-hour ranges
+    if (endDateTime <= startDateTime) {
+      endDateTime = startDateTime.plus({ hours: 1 });
+      console.log('[getCalendarTimeBounds] DIAGNOSTIC: Adjusted end time to ensure valid range');
+    }
   }
   
-  // Convert to JavaScript Dates - these will be on the same calendar date
+  // Convert to JavaScript Dates
   const startJSDate = startDateTime.toJSDate();
   const endJSDate = endDateTime.toJSDate();
   
-  // Final validation for same-day bounds
-  const startDate = new Date(startJSDate.getFullYear(), startJSDate.getMonth(), startJSDate.getDate());
-  const endDate = new Date(endJSDate.getFullYear(), endJSDate.getMonth(), endJSDate.getDate());
-  
-  if (startDate.getTime() !== endDate.getTime()) {
-    console.error('[getCalendarTimeBounds] Cross-date boundary detected, using fallback');
-    // Fallback: create same-day bounds using current date
-    const fallbackDate = new Date();
-    const fallbackStart = new Date(fallbackDate.getFullYear(), fallbackDate.getMonth(), fallbackDate.getDate(), 8, 0, 0);
-    const fallbackEnd = new Date(fallbackDate.getFullYear(), fallbackDate.getMonth(), fallbackDate.getDate(), 18, 0, 0);
-    return { start: fallbackStart, end: fallbackEnd };
-  }
+  console.log('[getCalendarTimeBounds] DIAGNOSTIC: Final time bounds:', {
+    startTime: startDateTime.toISO(),
+    endTime: endDateTime.toISO(),
+    startJSDate: startJSDate.toISOString(),
+    endJSDate: endJSDate.toISOString(),
+    is24Hour: startHour === 0 && endHour === 23 && endMinute === 59
+  });
   
   return { start: startJSDate, end: endJSDate };
 };

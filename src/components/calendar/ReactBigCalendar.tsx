@@ -76,15 +76,19 @@ const ReactBigCalendar: React.FC<ExtendedReactBigCalendarProps> = ({
     try {
       const bounds = getCalendarTimeBounds(calendarStartTime, calendarEndTime, userTimeZone);
       
-      // CRITICAL: Validate same-day bounds for React Big Calendar compatibility
-      const startDate = new Date(bounds.start.getFullYear(), bounds.start.getMonth(), bounds.start.getDate());
-      const endDate = new Date(bounds.end.getFullYear(), bounds.end.getMonth(), bounds.end.getDate());
+      console.log('[ReactBigCalendar] DIAGNOSTIC: Time bounds from getCalendarTimeBounds:', {
+        calendarStartTime,
+        calendarEndTime,
+        userTimeZone,
+        boundsStart: bounds.start.toISOString(),
+        boundsEnd: bounds.end.toISOString(),
+        startHours: bounds.start.getHours(),
+        endHours: bounds.end.getHours(),
+        spansMultipleDays: bounds.start.getDate() !== bounds.end.getDate()
+      });
       
-      if (startDate.getTime() !== endDate.getTime()) {
-        console.error('[ReactBigCalendar] Cross-date boundary detected in time bounds');
-        throw new Error('Time bounds span different dates');
-      }
-      
+      // For 24-hour display (00:00 to 23:59), bounds.end will be next day at midnight
+      // This is correct for React Big Calendar's 24-hour display
       if (bounds.start >= bounds.end) {
         console.error('[ReactBigCalendar] Invalid time order: start >= end');
         throw new Error('Start time must be before end time');
@@ -92,11 +96,13 @@ const ReactBigCalendar: React.FC<ExtendedReactBigCalendarProps> = ({
       
       return bounds;
     } catch (error) {
-      console.error('[ReactBigCalendar] Time bounds calculation failed:', error.message);
-      // Fallback: same-day bounds that React Big Calendar can handle
+      console.error('[ReactBigCalendar] CRITICAL: Time bounds calculation failed:', error.message);
+      console.error('[ReactBigCalendar] CRITICAL: This should not happen with the new 24-hour logic');
+      // Emergency fallback - but this should not be reached with proper 24-hour setup
       const today = new Date();
-      const fallbackStart = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 8, 0, 0);
-      const fallbackEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 18, 0, 0);
+      const fallbackStart = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0);
+      const fallbackEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1, 0, 0, 0);
+      console.error('[ReactBigCalendar] CRITICAL: Using emergency 24-hour fallback');
       return { start: fallbackStart, end: fallbackEnd };
     }
   }, [calendarStartTime, calendarEndTime, userTimeZone]);

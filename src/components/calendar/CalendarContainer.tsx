@@ -35,8 +35,8 @@ const CalendarContainer: React.FC = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [userTimeZone, setUserTimeZone] = useState<string>('loading'); // CRITICAL: Start in loading state, never use hardcoded default
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const [calendarStartTime, setCalendarStartTime] = useState<string>('08:00');
-  const [calendarEndTime, setCalendarEndTime] = useState<string>('21:00');
+  const [calendarStartTime, setCalendarStartTime] = useState<string>('00:00');
+  const [calendarEndTime, setCalendarEndTime] = useState<string>('23:59');
   const [isAvailabilityOpen, setIsAvailabilityOpen] = useState(false);
   const [isAppointmentDialogOpen, setIsAppointmentDialogOpen] = useState(false);
   const [isBlockedTimeDialogOpen, setIsBlockedTimeDialogOpen] = useState(false);
@@ -409,14 +409,33 @@ const CalendarContainer: React.FC = () => {
         .eq('id', clinicianId)
         .single();
 
+      console.log('[CalendarContainer] DIAGNOSTIC: Database calendar settings loaded:', {
+        clinicianId,
+        dbStartTime: data?.clinician_calendar_start_time,
+        dbEndTime: data?.clinician_calendar_end_time
+      });
+
       if (data) {
-        setCalendarStartTime(data.clinician_calendar_start_time?.substring(0, 5) || '08:00');
-        setCalendarEndTime(data.clinician_calendar_end_time?.substring(0, 5) || '21:00');
+        const startTime = data.clinician_calendar_start_time?.substring(0, 5) || '00:00';
+        const endTime = data.clinician_calendar_end_time?.substring(0, 5) || '23:59';
+        
+        console.log('[CalendarContainer] DIAGNOSTIC: Setting calendar times:', {
+          startTime,
+          endTime,
+          is24Hour: startTime === '00:00' && endTime === '23:59'
+        });
+        
+        setCalendarStartTime(startTime);
+        setCalendarEndTime(endTime);
+      } else {
+        console.log('[CalendarContainer] DIAGNOSTIC: No data returned, using 24-hour defaults');
+        setCalendarStartTime('00:00');
+        setCalendarEndTime('23:59');
       }
     } catch (error) {
-      // Use defaults if loading fails
-      setCalendarStartTime('08:00');
-      setCalendarEndTime('21:00');
+      console.error('[CalendarContainer] DIAGNOSTIC: Failed to load calendar settings, using 24-hour defaults:', error);
+      setCalendarStartTime('00:00');
+      setCalendarEndTime('23:59');
     }
   }, []);
 
