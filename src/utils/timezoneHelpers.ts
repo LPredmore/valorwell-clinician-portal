@@ -150,9 +150,22 @@ export const getCalendarTimeBounds = (
   endTime: string, 
   timezone: string
 ): { start: Date; end: Date } => {
-  // CRITICAL: Guard against "loading" timezone state
+  // CRITICAL: Handle "loading" timezone gracefully with safe fallback
   if (timezone === 'loading') {
-    throw new Error('Cannot calculate calendar bounds while timezone is loading');
+    console.log('[getCalendarTimeBounds] LOADING GUARD: Timezone loading, returning safe 24-hour fallback');
+    const today = new Date();
+    const startJSDate = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0);
+    const endJSDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1, 0, 0, 0);
+    return { start: startJSDate, end: endJSDate };
+  }
+  
+  // Additional validation for edge cases
+  if (!timezone || typeof timezone !== 'string') {
+    console.error('[getCalendarTimeBounds] DEFENSIVE GUARD: Invalid timezone value:', { timezone, type: typeof timezone });
+    const today = new Date();
+    const startJSDate = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0);
+    const endJSDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1, 0, 0, 0);
+    return { start: startJSDate, end: endJSDate };
   }
   
   const safeTimezone = TimeZoneService.ensureIANATimeZone(timezone);

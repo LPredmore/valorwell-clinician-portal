@@ -33,6 +33,18 @@ const ReactBigCalendar: React.FC<ExtendedReactBigCalendarProps> = ({
   calendarStartTime = '08:00',
   calendarEndTime = '21:00',
 }) => {
+  // CRITICAL: Early loading guard - must be BEFORE any hooks to prevent crashes
+  if (userTimeZone === 'loading') {
+    console.log('[ReactBigCalendar] LOADING GUARD: Timezone still loading, showing loading state');
+    return (
+      <div className="flex items-center justify-center h-96 bg-gray-50 rounded-lg">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading calendar...</p>
+        </div>
+      </div>
+    );
+  }
   // Pure RBC event styling - minimal differentiation for real events only
   const eventPropGetter = useCallback((event: CalendarEvent) => {
     let backgroundColor = '#3174ad';

@@ -35,6 +35,7 @@ const CalendarContainer: React.FC = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [userTimeZone, setUserTimeZone] = useState<string>('loading'); // CRITICAL: Start in loading state, never use hardcoded default
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [navigationStateError, setNavigationStateError] = useState(false);
   const [calendarStartTime, setCalendarStartTime] = useState<string>('00:00');
   const [calendarEndTime, setCalendarEndTime] = useState<string>('23:59');
   const [isAvailabilityOpen, setIsAvailabilityOpen] = useState(false);
@@ -54,8 +55,17 @@ const CalendarContainer: React.FC = () => {
     shouldExecuteHooks,
     userTimeZone,
     userId: !!userId,
+    navigationStateError,
     message: shouldExecuteHooks ? 'HOOKS WILL EXECUTE' : 'HOOKS SUSPENDED - WAITING FOR TIMEZONE'
   });
+
+  // Navigation state cleanup effect
+  useEffect(() => {
+    if (navigationStateError) {
+      console.log('[CalendarContainer] NAVIGATION STATE RESET: Clearing error state');
+      setNavigationStateError(false);
+    }
+  }, [navigationStateError]);
 
   // Calculate week boundaries using RBC-native approach
   // CRITICAL: Recalculate UTC ranges when timezone changes to ensure proper event fetching
@@ -410,10 +420,20 @@ const CalendarContainer: React.FC = () => {
     try {
       console.log('[CalendarContainer] CRITICAL: Loading clinician timezone (browser-independent):', clinicianId);
       const timeZone = await getClinicianTimeZone(clinicianId);
-      setUserTimeZone(TimeZoneService.ensureIANATimeZone(timeZone));
-      console.log('[CalendarContainer] SUCCESS: Set clinician timezone:', timeZone);
+      const safeTimeZone = TimeZoneService.ensureIANATimeZone(timeZone);
+      
+      // Clear any navigation state errors before setting timezone
+      setNavigationStateError(false);
+      setUserTimeZone(safeTimeZone);
+      
+      console.log('[CalendarContainer] SUCCESS: Set clinician timezone and cleared navigation state:', {
+        originalTimeZone: timeZone,
+        safeTimeZone,
+        navigationStateCleared: true
+      });
     } catch (error) {
       console.error('[CalendarContainer] CRITICAL ERROR: Cannot load clinician timezone - calendar will not function:', error);
+      setNavigationStateError(true);
       // ELIMINATED: Browser timezone fallback - calendar must wait for valid clinician timezone
       throw new Error(`Calendar requires clinician timezone but failed to load for ${clinicianId}: ${error.message}`);
     }
