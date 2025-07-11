@@ -47,39 +47,57 @@ const CalendarContainer: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  // CRITICAL: Prevent all hook execution until timezone is completely loaded
+  const shouldExecuteHooks = userTimeZone !== 'loading' && userTimeZone !== null && userId;
+  
+  console.log('[CalendarContainer] TIMEZONE LOADING STATE:', {
+    shouldExecuteHooks,
+    userTimeZone,
+    userId: !!userId,
+    message: shouldExecuteHooks ? 'HOOKS WILL EXECUTE' : 'HOOKS SUSPENDED - WAITING FOR TIMEZONE'
+  });
+
   // Calculate week boundaries using RBC-native approach
   // CRITICAL: Recalculate UTC ranges when timezone changes to ensure proper event fetching
   const { start: weekStart, end: weekEnd } = useMemo(() => {
     // CRITICAL: Don't use 'loading' state for date calculations
-    if (!userTimeZone || userTimeZone === 'loading') {
+    if (!shouldExecuteHooks) {
       return { start: new Date(), end: new Date() };
     }
-    const tz = TimeZoneService.ensureIANATimeZone(userTimeZone);
-    return getWeekRange(currentDate, tz);
-  }, [currentDate, userTimeZone]);
+    try {
+      const tz = TimeZoneService.ensureIANATimeZone(userTimeZone);
+      return getWeekRange(currentDate, tz);
+    } catch (error) {
+      console.error('[CalendarContainer] Error calculating week range:', error);
+      return { start: new Date(), end: new Date() };
+    }
+  }, [currentDate, userTimeZone, shouldExecuteHooks]);
 
-  // Fetch data with simplified parameters
+  // CRITICAL: Conditional hook execution - prevent execution during loading
   const { appointments } = useAppointments(
-    userId,
-    weekStart,
-    weekEnd,
-    userTimeZone,
-    refreshTrigger
+    shouldExecuteHooks ? userId : null,
+    shouldExecuteHooks ? weekStart : new Date(),
+    shouldExecuteHooks ? weekEnd : new Date(),
+    shouldExecuteHooks ? userTimeZone : 'loading',
+    shouldExecuteHooks ? refreshTrigger : 0
   );
 
-  const { events: nylasEvents } = useNylasEvents(weekStart, weekEnd);
+  const { events: nylasEvents } = useNylasEvents(
+    shouldExecuteHooks ? weekStart : new Date(),
+    shouldExecuteHooks ? weekEnd : new Date()
+  );
 
   const { blockedTimes } = useBlockedTime(
-    userId || '',
-    weekStart,
-    weekEnd,
-    userTimeZone,
-    refreshTrigger
+    shouldExecuteHooks ? (userId || '') : '',
+    shouldExecuteHooks ? weekStart : new Date(),
+    shouldExecuteHooks ? weekEnd : new Date(),
+    shouldExecuteHooks ? userTimeZone : 'loading',
+    shouldExecuteHooks ? refreshTrigger : 0
   );
 
   const availabilitySlots = useClinicianAvailability(
-    userId,
-    refreshTrigger
+    shouldExecuteHooks ? userId : null,
+    shouldExecuteHooks ? refreshTrigger : 0
   );
 
   // Separate real events from background availability

@@ -30,6 +30,16 @@ export const useNylasEvents = (startDate?: Date, endDate?: Date) => {
   const { toast } = useToast();
 
   const fetchEvents = async () => {
+    // CRITICAL: Guard against execution during loading or invalid dates
+    if (!startDate || !endDate || isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      console.log('[useNylasEvents] Skipping execution - invalid or missing dates:', { 
+        startDate: startDate?.toISOString(), 
+        endDate: endDate?.toISOString() 
+      });
+      setEvents([]);
+      return;
+    }
+
     try {
       setIsLoading(true);
       setError(null);

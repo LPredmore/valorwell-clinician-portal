@@ -31,8 +31,14 @@ export class TimeZoneService {
    * If the timezone is null, undefined, or invalid, it returns the default timezone.
    * @param timezone The timezone string to validate.
    * @returns A valid IANA timezone string.
+   * @throws Error if timezone is in "loading" state.
    */
   public static ensureIANATimeZone(timezone: string | null | undefined): string {
+    // CRITICAL: Handle "loading" state as a special case - do not convert to UTC
+    if (timezone === 'loading') {
+      throw new Error('TIMEZONE_LOADING: Timezone is still loading, operations should wait');
+    }
+
     if (!timezone || typeof timezone !== 'string') {
       console.warn('No valid timezone provided, using default timezone:', this.DEFAULT_TIMEZONE);
       return this.DEFAULT_TIMEZONE;

@@ -150,12 +150,19 @@ export const getCalendarTimeBounds = (
   endTime: string, 
   timezone: string
 ): { start: Date; end: Date } => {
+  // CRITICAL: Guard against "loading" timezone state
+  if (timezone === 'loading') {
+    throw new Error('Cannot calculate calendar bounds while timezone is loading');
+  }
+  
   const safeTimezone = TimeZoneService.ensureIANATimeZone(timezone);
   
-  console.log('[getCalendarTimeBounds] DIAGNOSTIC: Input parameters:', {
+  console.log('[getCalendarTimeBounds] TIMEZONE VALIDATION:', {
+    originalTimezone: timezone,
+    safeTimezone,
     startTime,
     endTime,
-    timezone: safeTimezone
+    isLoadingState: timezone === 'loading'
   });
   
   // Parse and validate time strings
@@ -204,12 +211,18 @@ export const getCalendarTimeBounds = (
   const startJSDate = startDateTime.toJSDate();
   const endJSDate = endDateTime.toJSDate();
   
-  console.log('[getCalendarTimeBounds] DIAGNOSTIC: Final time bounds:', {
+  console.log('[getCalendarTimeBounds] CALENDAR TIME BOUNDS VALIDATION:', {
     startTime: startDateTime.toISO(),
     endTime: endDateTime.toISO(),
     startJSDate: startJSDate.toISOString(),
     endJSDate: endJSDate.toISOString(),
-    is24Hour: startHour === 0 && endHour === 23 && endMinute === 59
+    is24Hour: startHour === 0 && endHour === 23 && endMinute === 59,
+    timezone: safeTimezone,
+    hourSpan: Math.abs(endJSDate.getTime() - startJSDate.getTime()) / (1000 * 60 * 60),
+    spansMultipleDays: startJSDate.getDate() !== endJSDate.getDate(),
+    message: startHour === 0 && endHour === 23 && endMinute === 59 ? 
+      '✅ 24-HOUR DISPLAY CONFIGURED' : 
+      '⚠️ LIMITED TIME RANGE'
   });
   
   return { start: startJSDate, end: endJSDate };
