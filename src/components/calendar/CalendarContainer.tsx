@@ -553,20 +553,21 @@ const CalendarContainer: React.FC = () => {
     });
   }, [userTimeZone, weekStart, weekEnd]);
 
-  // CRITICAL: Show loading until auth is ready and we have a valid clinician timezone
+  // CRITICAL: Move loading guard to very top - prevent ReactBigCalendar render with "loading" timezone
   if (!authInitialized || !userId || !userTimeZone || userTimeZone === 'loading') {
     return (
-      <div className="bg-white rounded-lg shadow-sm p-6 animate-fade-in">
-        <div className="flex justify-center items-center h-64">
+      <Layout>
+        <div className="flex items-center justify-center h-full">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-            <p>Loading calendar with clinician timezone...</p>
-            {userTimeZone === 'loading' && (
-              <p className="text-sm text-gray-500 mt-2">Waiting for clinician timezone data...</p>
-            )}
+            <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+            <p className="text-muted-foreground">
+              {!authInitialized ? 'Initializing authentication...' : 
+               !userId ? 'Loading user...' : 
+               'Loading timezone...'}
+            </p>
           </div>
         </div>
-      </div>
+      </Layout>
     );
   }
 
