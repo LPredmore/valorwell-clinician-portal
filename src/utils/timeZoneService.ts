@@ -240,6 +240,18 @@ export class TimeZoneService {
    * Export a method that converts UTC ISO string to a DateTime object in the user's timezone
    */
   public static fromUTC(utcString: string, timezone: string): DateTime {
+    // CRITICAL: Handle "loading" timezone gracefully to prevent application crashes
+    if (timezone === 'loading') {
+      console.log('[TimeZoneService] fromUTC: Timezone is loading, returning UTC time as fallback');
+      // Return UTC time as safe fallback during loading
+      const dt = DateTime.fromISO(utcString, { zone: 'UTC' });
+      if (!dt.isValid) {
+        console.error('Invalid DateTime from UTC conversion (loading fallback):', dt.invalidReason);
+        throw new Error(`Failed to convert UTC time: ${dt.invalidReason}`);
+      }
+      return dt;
+    }
+
     // Ensure we're working with a valid timezone
     const safeTimezone = this.ensureIANATimeZone(timezone);
 
@@ -352,6 +364,12 @@ export class TimeZoneService {
    * @returns A user-friendly display name for the timezone
    */
   public static getTimeZoneDisplayName(timezone: string): string {
+    // CRITICAL: Handle "loading" timezone gracefully to prevent application crashes
+    if (timezone === 'loading') {
+      console.log('[TimeZoneService] getTimeZoneDisplayName: Timezone is loading, returning loading message');
+      return 'Loading timezone...';
+    }
+
     // Ensure we have a valid string timezone
     const safeTimezone = this.ensureIANATimeZone(timezone);
     
@@ -371,6 +389,7 @@ export class TimeZoneService {
         zoneName = parts[parts.length - 1]?.replace(/_/g, ' ') || safeTimezone;
       }
       
+      console.log(`[TimeZoneService] getTimeZoneDisplayName: Successfully formatted timezone ${safeTimezone} as ${zoneName} (${offsetFormatted})`);
       return `${zoneName} (${offsetFormatted})`;
     } catch (error) {
       console.error('Error getting timezone display name:', error);
