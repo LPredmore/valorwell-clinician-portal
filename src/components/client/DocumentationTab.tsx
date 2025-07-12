@@ -115,21 +115,44 @@ const DocumentationTab: React.FC<DocumentationTabProps> = ({
 
   const handleViewDocument = async (filePath: string) => {
     try {
+      console.log('📄 [DocumentationTab] Attempting to view document:', filePath);
+      
+      // Check for invalid file paths that should never be displayed
+      if (filePath.startsWith('pending-pdf-generation-') || 
+          filePath.startsWith('pdf-generation-failed-') ||
+          filePath.startsWith('pdf-generation-error-') ||
+          filePath.startsWith('no-content-for-pdf-') ||
+          filePath.startsWith('temp/') ||
+          filePath === 'placeholder-path' ||
+          !filePath || filePath.trim() === '') {
+        
+        console.warn('📄 [DocumentationTab] Invalid file path detected:', filePath);
+        
+        toast({
+          title: "Document Not Available",
+          description: "This document is not available for viewing. It may still be processing or an error occurred during generation.",
+          variant: "default",
+        });
+        return;
+      }
+      
       const url = await getDocumentDownloadURL(filePath);
       if (url) {
+        console.log('✅ [DocumentationTab] Opening document in new tab');
         window.open(url, '_blank');
       } else {
+        console.error('❌ [DocumentationTab] No download URL returned');
         toast({
           title: "Error",
-          description: "Could not retrieve document URL",
+          description: "Unable to retrieve document. The file may not exist or access was denied.",
           variant: "destructive"
         });
       }
     } catch (error) {
-      console.error('Error viewing document:', error);
+      console.error('❌ [DocumentationTab] Error viewing document:', error);
       toast({
         title: "Error",
-        description: "Failed to open document",
+        description: "Failed to load document. Please try again later.",
         variant: "destructive"
       });
     }
