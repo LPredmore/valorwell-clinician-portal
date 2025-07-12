@@ -38,7 +38,7 @@ export const generateAndSavePDF = async (
         return null;
       }
       
-      const clinicalBucket = buckets?.find(b => b.name === 'clinical_documents');
+      const clinicalBucket = buckets?.find(b => b.name === 'Clinical Documents');
       if (!clinicalBucket) {
         console.error('❌ [PDF-GEN] Clinical documents bucket not found. Available buckets:', buckets?.map(b => b.name));
         return null;
@@ -180,7 +180,7 @@ export const generateAndSavePDF = async (
       filename,
       finalPath: filePath,
       blobSize: pdfBlob.size,
-      bucket: 'clinical_documents'
+      bucket: 'Clinical Documents'
     });
 
     // Validate file path before upload
@@ -199,7 +199,7 @@ export const generateAndSavePDF = async (
       console.log(`🔄 [PDF-GEN] Upload attempt ${attempt}/3`);
       
       const { error } = await supabase.storage
-        .from('clinical_documents')
+        .from('Clinical Documents')
         .upload(filePath, pdfBlob, {
           contentType: 'application/pdf',
           upsert: true
@@ -242,7 +242,7 @@ export const generateAndSavePDF = async (
     console.log('🔍 [PDF-GEN] Verifying upload...');
     try {
       const { data: fileList, error: listError } = await supabase.storage
-        .from('clinical_documents')
+        .from('Clinical Documents')
         .list(filePath.substring(0, filePath.lastIndexOf('/')));
       
       if (listError) {

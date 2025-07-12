@@ -347,7 +347,7 @@ export const getDocumentDownloadURL = async (filePath: string) => {
     
     try {
       const { data: fileList, error: listError } = await supabase.storage
-        .from('clinical_documents')
+        .from('Clinical Documents')
         .list(directoryPath);
       
       if (listError) {
@@ -383,7 +383,7 @@ export const getDocumentDownloadURL = async (filePath: string) => {
     
     console.log('🔐 [DOC-DOWNLOAD] Creating signed URL...');
     const { data, error } = await supabase.storage
-      .from('clinical_documents')
+      .from('Clinical Documents')
       .createSignedUrl(filePath, 3600); // 1 hour expiration
       
     if (error) {
