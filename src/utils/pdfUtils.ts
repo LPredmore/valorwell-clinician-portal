@@ -19,20 +19,42 @@ export const generateAndSavePDF = async (
   documentInfo: DocumentInfo
 ): Promise<string | null> => {
   try {
-    console.log('📄 Starting PDF generation for:', {
+    console.log('📄 [PDF-GEN] Starting PDF generation for:', {
       elementId,
-      documentInfo: {
-        ...documentInfo,
-        documentDate: typeof documentInfo.documentDate === 'string' 
-          ? documentInfo.documentDate 
-          : documentInfo.documentDate.toISOString().split('T')[0]
-      }
+      clientId: documentInfo.clientId,
+      documentType: documentInfo.documentType,
+      documentDate: typeof documentInfo.documentDate === 'string' 
+        ? documentInfo.documentDate 
+        : documentInfo.documentDate.toISOString().split('T')[0],
+      documentTitle: documentInfo.documentTitle
     });
+
+    // Step 0: Validate storage bucket exists
+    console.log('🪣 [PDF-GEN] Validating storage bucket...');
+    try {
+      const { data: buckets, error: bucketError } = await supabase.storage.listBuckets();
+      if (bucketError) {
+        console.error('❌ [PDF-GEN] Error listing buckets:', bucketError);
+        return null;
+      }
+      
+      const clinicalBucket = buckets?.find(b => b.name === 'clinical_documents');
+      if (!clinicalBucket) {
+        console.error('❌ [PDF-GEN] Clinical documents bucket not found. Available buckets:', buckets?.map(b => b.name));
+        return null;
+      }
+      console.log('✅ [PDF-GEN] Storage bucket validated:', clinicalBucket.name);
+    } catch (bucketValidationError) {
+      console.error('❌ [PDF-GEN] Storage bucket validation failed:', bucketValidationError);
+      return null;
+    }
 
     // Format date for file naming
     const formattedDate = typeof documentInfo.documentDate === 'string' 
       ? documentInfo.documentDate 
       : documentInfo.documentDate.toISOString().split('T')[0];
+
+    console.log('📅 [PDF-GEN] Formatted date:', formattedDate);
     
     // Step 1: Generate PDF from HTML element
     const element = document.getElementById(elementId);
@@ -135,47 +157,125 @@ export const generateAndSavePDF = async (
     const pdfBlob = pdf.output('blob');
     
     // Step 2: Upload PDF to Supabase storage
-    // Normalize document type for file path (remove spaces, lowercase)
-    const normalizedDocType = documentInfo.documentType.toLowerCase().replace(/\s+/g, '-');
-    const timestamp = Date.now();
-    const filePath = `${documentInfo.clientId}/${normalizedDocType}/${formattedDate}-${timestamp}.pdf`;
+    console.log('🛠️ [PDF-GEN] Generating file path...');
     
-    console.log('📤 Uploading PDF to storage:', {
-      filePath,
+    // Normalize document type for file path (remove spaces, special chars, lowercase)
+    const normalizedDocType = documentInfo.documentType
+      .toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[^a-z0-9\-]/g, '')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, ''); // Remove leading/trailing dashes
+    
+    const timestamp = Date.now();
+    const filename = `${formattedDate}-${timestamp}.pdf`;
+    const filePath = `${documentInfo.clientId}/${normalizedDocType}/${filename}`;
+    
+    console.log('📂 [PDF-GEN] File path details:', {
+      originalDocType: documentInfo.documentType,
+      normalizedDocType,
+      clientId: documentInfo.clientId,
+      formattedDate,
+      timestamp,
+      filename,
+      finalPath: filePath,
       blobSize: pdfBlob.size,
       bucket: 'clinical_documents'
     });
+
+    // Validate file path before upload
+    if (!filePath || filePath.includes('//') || filePath.includes(' ')) {
+      console.error('❌ [PDF-GEN] Invalid file path generated:', filePath);
+      return null;
+    }
     
-    const { error: uploadError } = await supabase.storage
-      .from('clinical_documents')
-      .upload(filePath, pdfBlob, {
-        contentType: 'application/pdf',
-        upsert: true
+    console.log('📤 [PDF-GEN] Attempting storage upload...');
+    
+    // Try upload with retry logic
+    let uploadError = null;
+    let uploadSuccess = false;
+    
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      console.log(`🔄 [PDF-GEN] Upload attempt ${attempt}/3`);
+      
+      const { error } = await supabase.storage
+        .from('clinical_documents')
+        .upload(filePath, pdfBlob, {
+          contentType: 'application/pdf',
+          upsert: true
+        });
+      
+      if (!error) {
+        uploadSuccess = true;
+        uploadError = null;
+        break;
+      }
+      
+      uploadError = error;
+      console.warn(`⚠️ [PDF-GEN] Upload attempt ${attempt} failed:`, {
+        error: error,
+        errorMessage: error.message,
+        errorCode: (error as any).statusCode || 'unknown',
+        filePath
       });
+      
+      if (attempt < 3) {
+        console.log(`🔄 [PDF-GEN] Retrying in ${attempt * 1000}ms...`);
+        await new Promise(resolve => setTimeout(resolve, attempt * 1000));
+      }
+    }
     
-    if (uploadError) {
-      console.error('❌ Error uploading PDF:', {
-        error: uploadError,
+    if (!uploadSuccess || uploadError) {
+      console.error('❌ [PDF-GEN] All upload attempts failed:', {
+        finalError: uploadError,
         filePath,
-        errorMessage: uploadError.message,
+        errorMessage: uploadError?.message,
+        errorCode: (uploadError as any)?.statusCode || 'unknown',
         errorDetails: uploadError
       });
       return null;
     }
     
-    console.log('✅ PDF uploaded successfully to:', filePath);
+    console.log('✅ [PDF-GEN] PDF uploaded successfully to:', filePath);
     
-    // Step 3: Get the URL of the uploaded file
-    const { data: urlData } = supabase.storage
-      .from('clinical_documents')
-      .getPublicUrl(filePath);
+    // Verify the upload by checking if file exists
+    console.log('🔍 [PDF-GEN] Verifying upload...');
+    try {
+      const { data: fileList, error: listError } = await supabase.storage
+        .from('clinical_documents')
+        .list(filePath.substring(0, filePath.lastIndexOf('/')));
+      
+      if (listError) {
+        console.warn('⚠️ [PDF-GEN] Could not verify upload:', listError);
+      } else {
+        const fileName = filePath.substring(filePath.lastIndexOf('/') + 1);
+        const fileExists = fileList?.some(file => file.name === fileName);
+        console.log('✅ [PDF-GEN] Upload verification:', {
+          fileExists,
+          expectedFileName: fileName,
+          filesInDirectory: fileList?.map(f => f.name)
+        });
+      }
+    } catch (verificationError) {
+      console.warn('⚠️ [PDF-GEN] Upload verification failed:', verificationError);
+    }
     
-    // Note: Document metadata is now saved separately by the calling function
+    // Step 3: Final validation and return
+    console.log('🎯 [PDF-GEN] PDF generation process completed successfully');
+    console.log('📍 [PDF-GEN] Final file path:', filePath);
+    
+    // Note: Document metadata is saved separately by the calling function
     // This function only handles PDF generation and storage
     
     return filePath;
   } catch (error) {
-    console.error('Error generating or saving PDF:', error);
+    console.error('❌ [PDF-GEN] Critical error in PDF generation:', {
+      error,
+      errorMessage: error instanceof Error ? error.message : 'Unknown error',
+      errorStack: error instanceof Error ? error.stack : undefined,
+      elementId,
+      documentInfo
+    });
     return null;
   }
 };

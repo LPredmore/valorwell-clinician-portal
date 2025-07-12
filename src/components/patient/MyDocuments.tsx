@@ -57,25 +57,58 @@ const MyDocuments: React.FC<{ clientId?: string }> = ({ clientId }) => {
 
   const handleViewDocument = async (filePath: string) => {
     try {
+      console.log('📄 [MyDocuments] Attempting to view document:', filePath);
+      
+      // Check if this is a problematic file path
+      if (filePath.startsWith('pending-pdf-generation-') || 
+          filePath.startsWith('pdf-generation-failed-') ||
+          filePath.startsWith('pdf-generation-error-') ||
+          filePath.startsWith('no-content-for-pdf-')) {
+        
+        console.warn('📄 [MyDocuments] Document has problematic file path:', filePath);
+        
+        const errorType = filePath.split('-')[0];
+        let message = "This document is not available for viewing.";
+        
+        if (errorType === 'pending') {
+          message = "This document is still being processed. Please try again in a moment.";
+        } else if (errorType === 'pdf' && filePath.includes('failed')) {
+          message = "PDF generation failed for this document. Please contact support.";
+        } else if (errorType === 'pdf' && filePath.includes('error')) {
+          message = "An error occurred during PDF generation. Please contact support.";
+        } else if (errorType === 'no') {
+          message = "No content was available for this document.";
+        }
+        
+        toast({
+          title: "Document Not Available",
+          description: message,
+          variant: "default",
+        });
+        return;
+      }
+      
       const url = await getDocumentDownloadURL(filePath);
       if (url) {
+        console.log('✅ [MyDocuments] Opening document in new tab');
         window.open(url, '_blank');
       } else {
+        console.error('❌ [MyDocuments] No download URL returned');
         toast({
           title: "Error",
-          description: "Could not retrieve document URL",
-          variant: "destructive"
+          description: "Unable to retrieve document. The file may not exist or access was denied.",
+          variant: "destructive",
         });
       }
     } catch (error) {
-      console.error('Error viewing document:', error);
+      console.error('❌ [MyDocuments] Error viewing document:', error);
       toast({
         title: "Error",
-        description: "Failed to open document",
-        variant: "destructive"
+        description: "Failed to load document. Please try again later.",
+        variant: "destructive",
       });
     }
-    };
+  };
 
   // Helper function to normalize document type for display
   const getDisplayDocumentType = (documentType: string) => {

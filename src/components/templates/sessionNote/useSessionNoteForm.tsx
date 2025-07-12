@@ -460,6 +460,8 @@ export const useSessionNoteForm = ({
       console.log('💾 Saving session note metadata to database:', documentInfo);
 
       // Step 1: Always save document metadata to database first
+      const tempTimestamp = Date.now();
+      
       try {
         const { error: dbError } = await supabase
           .from('clinical_documents')
@@ -468,7 +470,7 @@ export const useSessionNoteForm = ({
             document_type: documentInfo.documentType,
             document_date: documentInfo.documentDate,
             document_title: documentInfo.documentTitle,
-            file_path: `temp/${documentInfo.clientId}/session-notes/${sessionDate}.pdf`, // Temporary path
+            file_path: `pending-pdf-generation-${tempTimestamp}`, // Placeholder that will be updated
             created_by: documentInfo.createdBy
           });
 
@@ -479,25 +481,42 @@ export const useSessionNoteForm = ({
 
         console.log('✅ Document metadata saved successfully');
 
-        // Step 2: Try to generate PDF (non-blocking)
+        // Step 2: Try to generate PDF (critical for document completeness)
         if (contentRef?.current) {
-          console.log('📄 Attempting PDF generation...');
+          console.log('📄 [SAVE-NOTE] Attempting PDF generation...');
           
           try {
             const pdfPath = await generateAndSavePDF('session-note-content', documentInfo);
             if (pdfPath) {
-              console.log('✅ PDF generated and saved successfully:', pdfPath);
+              console.log('✅ [SAVE-NOTE] PDF generated and saved successfully:', pdfPath);
               
-              // Update the document with the real PDF path
+              // Update the document with the real PDF path (find by placeholder)
               const { error: updateError } = await supabase
                 .from('clinical_documents')
                 .update({ file_path: pdfPath })
                 .eq('client_id', documentInfo.clientId)
                 .eq('document_type', documentInfo.documentType)
-                .eq('document_date', documentInfo.documentDate);
+                .eq('document_date', documentInfo.documentDate)
+                .like('file_path', `pending-pdf-generation-${tempTimestamp}`);
 
               if (updateError) {
-                console.error('⚠️ Error updating PDF path:', updateError);
+                console.error('⚠️ [SAVE-NOTE] Error updating PDF path:', updateError);
+                
+                // Try alternative update method
+                const { error: altUpdateError } = await supabase
+                  .from('clinical_documents')
+                  .update({ file_path: pdfPath })
+                  .eq('client_id', documentInfo.clientId)
+                  .eq('document_type', documentInfo.documentType)
+                  .eq('document_date', documentInfo.documentDate)
+                  .order('created_at', { ascending: false })
+                  .limit(1);
+                  
+                if (altUpdateError) {
+                  console.error('❌ [SAVE-NOTE] Alternative update also failed:', altUpdateError);
+                }
+              } else {
+                console.log('✅ [SAVE-NOTE] PDF path updated in database successfully');
               }
 
               toast({
@@ -505,26 +524,68 @@ export const useSessionNoteForm = ({
                 description: "Session note saved and PDF generated successfully.",
               });
             } else {
-              console.error('❌ PDF generation failed but metadata was saved');
+              console.error('❌ [SAVE-NOTE] PDF generation failed but metadata was saved');
+              
+              // Mark the document as having failed PDF generation
+              const { error: failedUpdateError } = await supabase
+                .from('clinical_documents')
+                .update({ file_path: `pdf-generation-failed-${Date.now()}` })
+                .eq('client_id', documentInfo.clientId)
+                .eq('document_type', documentInfo.documentType)
+                .eq('document_date', documentInfo.documentDate)
+                .like('file_path', `pending-pdf-generation-${tempTimestamp}`);
+                
+              if (failedUpdateError) {
+                console.error('⚠️ [SAVE-NOTE] Error marking PDF generation as failed:', failedUpdateError);
+              }
+              
               toast({
                 title: "Partial Success",
-                description: "Session note saved to database, but PDF generation failed.",
+                description: "Session note saved to database, but PDF generation failed. You can retry later.",
                 variant: "default",
               });
             }
           } catch (pdfError) {
-            console.error('❌ Error during PDF generation:', pdfError);
+            console.error('❌ [SAVE-NOTE] Critical error during PDF generation:', pdfError);
+            
+            // Mark the document as having failed PDF generation
+            const { error: errorUpdateError } = await supabase
+              .from('clinical_documents')
+              .update({ file_path: `pdf-generation-error-${Date.now()}` })
+              .eq('client_id', documentInfo.clientId)
+              .eq('document_type', documentInfo.documentType)
+              .eq('document_date', documentInfo.documentDate)
+              .like('file_path', `pending-pdf-generation-${tempTimestamp}`);
+              
+            if (errorUpdateError) {
+              console.error('⚠️ [SAVE-NOTE] Error marking PDF generation error:', errorUpdateError);
+            }
+            
             toast({
               title: "Partial Success",
-              description: "Session note saved to database, but PDF generation failed.",
+              description: "Session note saved to database, but PDF generation encountered an error. You can retry later.",
               variant: "default",
             });
           }
         } else {
-          console.log('⚠️ No content reference available for PDF generation');
+          console.log('⚠️ [SAVE-NOTE] No content reference available for PDF generation');
+          
+          // Mark the document as having no content for PDF
+          const { error: noContentUpdateError } = await supabase
+            .from('clinical_documents')
+            .update({ file_path: `no-content-for-pdf-${Date.now()}` })
+            .eq('client_id', documentInfo.clientId)
+            .eq('document_type', documentInfo.documentType)
+            .eq('document_date', documentInfo.documentDate)
+            .like('file_path', `pending-pdf-generation-${tempTimestamp}`);
+            
+          if (noContentUpdateError) {
+            console.error('⚠️ [SAVE-NOTE] Error marking no content available:', noContentUpdateError);
+          }
+          
           toast({
             title: "Success",
-            description: "Session note saved successfully.",
+            description: "Session note saved successfully, but no content was available for PDF generation.",
           });
         }
 

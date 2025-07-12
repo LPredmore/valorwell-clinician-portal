@@ -311,27 +311,109 @@ export const fetchFilteredClinicalDocuments = async (clientId: string) => {
 // New function to get document download URL
 export const getDocumentDownloadURL = async (filePath: string) => {
   try {
-    console.log('🔗 Getting download URL for:', filePath);
+    console.log('🔗 [DOC-DOWNLOAD] Starting download URL generation for:', filePath);
     
-    // Check if file path starts with "temp/" - these are invalid paths
-    if (filePath.startsWith('temp/')) {
-      console.error('❌ Cannot retrieve temporary file path:', filePath);
+    // Validate file path
+    if (!filePath || typeof filePath !== 'string') {
+      console.error('❌ [DOC-DOWNLOAD] Invalid file path provided:', filePath);
       return null;
     }
     
+    // Check if file path starts with "temp/" - these are invalid paths
+    if (filePath.startsWith('temp/')) {
+      console.error('❌ [DOC-DOWNLOAD] Cannot retrieve temporary file path:', filePath);
+      return null;
+    }
+    
+    // Validate file path format
+    const pathParts = filePath.split('/');
+    if (pathParts.length < 3) {
+      console.error('❌ [DOC-DOWNLOAD] Invalid file path format. Expected: clientId/docType/filename.pdf, got:', filePath);
+      return null;
+    }
+    
+    console.log('📂 [DOC-DOWNLOAD] File path analysis:', {
+      fullPath: filePath,
+      pathParts,
+      clientId: pathParts[0],
+      docType: pathParts[1],
+      filename: pathParts[2]
+    });
+    
+    // Check if file exists before creating signed URL
+    console.log('🔍 [DOC-DOWNLOAD] Checking if file exists...');
+    const directoryPath = pathParts.slice(0, -1).join('/');
+    const fileName = pathParts[pathParts.length - 1];
+    
+    try {
+      const { data: fileList, error: listError } = await supabase.storage
+        .from('clinical_documents')
+        .list(directoryPath);
+      
+      if (listError) {
+        console.error('❌ [DOC-DOWNLOAD] Error listing directory:', {
+          error: listError,
+          directoryPath
+        });
+        return null;
+      }
+      
+      const fileExists = fileList?.some(file => file.name === fileName);
+      console.log('📁 [DOC-DOWNLOAD] Directory listing:', {
+        directoryPath,
+        fileName,
+        fileExists,
+        filesFound: fileList?.map(f => f.name)
+      });
+      
+      if (!fileExists) {
+        console.error('❌ [DOC-DOWNLOAD] File not found in storage:', {
+          filePath,
+          directoryPath,
+          fileName,
+          availableFiles: fileList?.map(f => f.name)
+        });
+        return null;
+      }
+      
+    } catch (listingError) {
+      console.warn('⚠️ [DOC-DOWNLOAD] Could not verify file existence:', listingError);
+      // Continue anyway - file might exist even if listing fails
+    }
+    
+    console.log('🔐 [DOC-DOWNLOAD] Creating signed URL...');
     const { data, error } = await supabase.storage
       .from('clinical_documents')
       .createSignedUrl(filePath, 3600); // 1 hour expiration
       
     if (error) {
-      console.error('❌ Storage error:', error);
+      console.error('❌ [DOC-DOWNLOAD] Storage error creating signed URL:', {
+        error,
+        errorMessage: error.message,
+        errorCode: (error as any).statusCode || 'unknown',
+        filePath
+      });
       throw error;
     }
     
-    console.log('✅ Generated download URL successfully');
+    if (!data?.signedUrl) {
+      console.error('❌ [DOC-DOWNLOAD] No signed URL returned from storage');
+      return null;
+    }
+    
+    console.log('✅ [DOC-DOWNLOAD] Generated download URL successfully:', {
+      filePath,
+      urlGenerated: true,
+      urlLength: data.signedUrl.length
+    });
+    
     return data.signedUrl;
   } catch (error) {
-    console.error('Error getting document download URL:', error);
+    console.error('❌ [DOC-DOWNLOAD] Critical error getting document download URL:', {
+      error,
+      errorMessage: error instanceof Error ? error.message : 'Unknown error',
+      filePath
+    });
     return null;
   }
 };
