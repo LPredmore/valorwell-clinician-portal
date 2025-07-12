@@ -203,18 +203,16 @@ export const getCalendarTimeBounds = (
   // Create start time on current date
   const startDateTime = currentDate.set({ hour: startHour, minute: startMinute });
   
-  // CRITICAL: For 24-hour display (00:00 to 23:59), React Big Calendar needs
-  // the max time to be the NEXT day at midnight for proper display
-  let endDateTime;
-  if (startHour === 0 && endHour === 23 && endMinute === 59) {
-    // 24-hour display: end time should be next day at midnight
-    endDateTime = currentDate.plus({ days: 1 }).set({ hour: 0, minute: 0 });
-    console.log('[getCalendarTimeBounds] DIAGNOSTIC: 24-hour display detected, using next-day midnight for end');
+  // Create end time on current date
+  let endDateTime = currentDate.set({ hour: endHour, minute: endMinute });
+  
+  // CRITICAL: For React Big Calendar, when endTime is "23:59", 
+  // we need to roll over to next day's midnight for proper display
+  if (endTime === '23:59') {
+    endDateTime = endDateTime.plus({ minutes: 1 }); // → next day 00:00
+    console.log('[getCalendarTimeBounds] DIAGNOSTIC: 23:59 end time detected, rolling over to next day midnight');
   } else {
-    // Regular time range: use same day
-    endDateTime = currentDate.set({ hour: endHour, minute: endMinute });
-    
-    // Ensure end time is after start time for non-24-hour ranges
+    // Ensure end time is after start time for non-rollover ranges
     if (endDateTime <= startDateTime) {
       endDateTime = startDateTime.plus({ hours: 1 });
       console.log('[getCalendarTimeBounds] DIAGNOSTIC: Adjusted end time to ensure valid range');
