@@ -71,7 +71,7 @@ const CalendarContainer: React.FC = () => {
   // CRITICAL: Recalculate UTC ranges when timezone changes to ensure proper event fetching
   const { start: weekStart, end: weekEnd } = useMemo(() => {
     // CRITICAL: Don't use 'loading' state for date calculations
-    if (!shouldExecuteHooks) {
+    if (!shouldExecuteHooks || userTimeZone === 'loading') {
       return { start: new Date(), end: new Date() };
     }
     try {
