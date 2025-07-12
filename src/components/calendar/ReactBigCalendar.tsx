@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useEffect } from 'react';
 import { Calendar, Views } from 'react-big-calendar';
 import { globalLocalizer } from '@/main';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
@@ -87,6 +87,25 @@ const ReactBigCalendar: React.FC<ExtendedReactBigCalendarProps> = ({
   const { start: minTime, end: maxTime } = useMemo(() => {
     try {
       const bounds = getCalendarTimeBounds(calendarStartTime, calendarEndTime, userTimeZone);
+      
+      // Phase 1: Browser vs User Timezone Diagnostic
+      console.log('[ReactBigCalendar] TIMEZONE DIAGNOSTIC:', {
+        userConfiguredTimezone: userTimeZone,
+        browserTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        browserUTCOffset: new Date().getTimezoneOffset(),
+        
+        // Test the Date objects directly
+        minTimeUTC: bounds.start.toISOString(),
+        maxTimeUTC: bounds.end.toISOString(),
+        minTimeLocal: bounds.start.toString(),
+        maxTimeLocal: bounds.end.toString(),
+        
+        // Show what React Big Calendar will actually use
+        minTimeHours: bounds.start.getHours(),
+        maxTimeHours: bounds.end.getHours(),
+        minTimeMinutes: bounds.start.getMinutes(),
+        maxTimeMinutes: bounds.end.getMinutes(),
+      });
       
       console.log('[ReactBigCalendar] DIAGNOSTIC: Time bounds from getCalendarTimeBounds:', {
         calendarStartTime,
@@ -186,6 +205,37 @@ const ReactBigCalendar: React.FC<ExtendedReactBigCalendarProps> = ({
 
   // Pure RBC configuration with native availability features
   const calendarConfig = useMemo(() => {
+    // Phase 3: React Big Calendar Configuration Debug
+    console.log('[ReactBigCalendar] CALENDAR CONFIG DEEP DIVE:', {
+      localizerType: typeof globalLocalizer,
+      localizerTimezone: globalLocalizer.timezone,
+      
+      // Test how RBC interprets our Date objects
+      minTimeInterpretation: {
+        asUTC: minTime.toUTCString(),
+        asLocal: minTime.toString(),
+        hours: minTime.getHours(),
+        utcHours: minTime.getUTCHours(),
+        timezoneOffset: minTime.getTimezoneOffset(),
+      },
+      
+      maxTimeInterpretation: {
+        asUTC: maxTime.toUTCString(),
+        asLocal: maxTime.toString(),
+        hours: maxTime.getHours(),
+        utcHours: maxTime.getUTCHours(),
+        timezoneOffset: maxTime.getTimezoneOffset(),
+      },
+      
+      // Show what the calendar will actually display
+      expectedDisplayRange: {
+        startHour: minTime.getHours(),
+        endHour: maxTime.getHours(),
+        totalHours: (maxTime.getTime() - minTime.getTime()) / (1000 * 60 * 60),
+        isValid: minTime < maxTime,
+      }
+    });
+    
     console.log('[ReactBigCalendar] DIAGNOSTIC: Building calendar config with:', {
       eventsCount: validatedEvents.length,
       backgroundEventsCount: validatedBackgroundEvents.length,
@@ -250,6 +300,28 @@ const ReactBigCalendar: React.FC<ExtendedReactBigCalendarProps> = ({
     minTime,
     maxTime
   ]);
+
+  // Phase 4: Real-Time Monitoring
+  useEffect(() => {
+    console.log('[ReactBigCalendar] POST-RENDER VALIDATION:', {
+      // Check if calendar actually rendered with correct times
+      renderedMinTime: minTime,
+      renderedMaxTime: maxTime,
+      
+      // Validate the time slots that should be visible
+      expectedTimeSlots: Array.from({ length: 24 }, (_, i) => {
+        const hour = i.toString().padStart(2, '0');
+        return `${hour}:00`;
+      }),
+      
+      // Browser vs user timezone comparison
+      timezoneDiscrepancy: {
+        userTimezone: userTimeZone,
+        browserTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        offsetDifference: new Date().getTimezoneOffset(),
+      }
+    });
+  }, [minTime, maxTime, userTimeZone]);
 
   return (
     <div className="rbc-calendar-container">

@@ -223,6 +223,32 @@ export const getCalendarTimeBounds = (
   const startJSDate = startDateTime.toJSDate();
   const endJSDate = endDateTime.toJSDate();
   
+  // Phase 2: Validate Time Zone Service
+  console.log('[getCalendarTimeBounds] DETAILED CONVERSION TRACE:', {
+    inputStartTime: startTime,
+    inputEndTime: endTime,
+    inputTimezone: timezone,
+    safeTimezone: safeTimezone,
+    
+    // Show intermediate DateTime objects
+    startDateTimeISO: startDateTime.toISO(),
+    endDateTimeISO: endDateTime.toISO(),
+    startDateTimeOffset: startDateTime.offset,
+    endDateTimeOffset: endDateTime.offset,
+    
+    // Show final JS Date conversion
+    startJSDateISO: startJSDate.toISOString(),
+    endJSDateISO: endJSDate.toISOString(),
+    startJSDateLocal: startJSDate.toString(),
+    endJSDateLocal: endJSDate.toString(),
+    
+    // Critical: Show what hours these represent
+    startHourUTC: startJSDate.getUTCHours(),
+    endHourUTC: endJSDate.getUTCHours(),
+    startHourLocal: startJSDate.getHours(),
+    endHourLocal: endJSDate.getHours(),
+  });
+  
   console.log('[getCalendarTimeBounds] CALENDAR TIME BOUNDS VALIDATION:', {
     startTime: startDateTime.toISO(),
     endTime: endDateTime.toISO(),
