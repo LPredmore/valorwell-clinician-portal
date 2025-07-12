@@ -192,15 +192,7 @@ const PersonalInfoTab: React.FC<TabProps> = ({
                 </FormItem>} />
             <FormField control={form.control} name="client_minor" render={({
             field
-          }) => (
-                <FormItem>
-                  <FormLabel>Minor (Under 18)</FormLabel>
-                  <FormControl>
-                    <Input {...field} readOnly={!isEditing} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
+          }) => {}} />
           </div>
         </CardContent>
       </Card>
@@ -208,7 +200,7 @@ const PersonalInfoTab: React.FC<TabProps> = ({
       <Card>
         <CardHeader>
           <CardTitle>Diagnosis</CardTitle>
-          <CardDescription>Add client diagnoses here</CardDescription>
+          
         </CardHeader>
         <CardContent>
           <FormField control={form.control} name="client_diagnosis" render={({
