@@ -1,19 +1,7 @@
-
 import React from "react";
 import { format } from "date-fns";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle
-} from "@/components/ui/card";
-import {
-  FormField,
-  FormItem,
-  FormLabel,
-  FormControl,
-  FormMessage
-} from "@/components/ui/form";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { CalendarIcon } from "lucide-react";
@@ -22,489 +10,228 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { TabProps, insuranceTypeOptions, relationshipOptions } from "@/types/client";
-
-const InsuranceTab: React.FC<TabProps> = ({ isEditing, form, clientData }) => {
-  return (
-    <>
+const InsuranceTab: React.FC<TabProps> = ({
+  isEditing,
+  form,
+  clientData
+}) => {
+  return <>
       <Card>
         <CardHeader>
           <CardTitle>Primary Insurance</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 gap-4">
-            <FormField
-              control={form.control}
-              name="client_insurance_company_primary"
-              render={({ field }) => (
-                <FormItem>
+            <FormField control={form.control} name="client_insurance_company_primary" render={({
+            field
+          }) => <FormItem>
                   <FormLabel>Insurance Company</FormLabel>
                   <FormControl>
                     <Input {...field} readOnly={!isEditing} />
                   </FormControl>
                   <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="client_insurance_type_primary"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Insurance Type</FormLabel>
-                  <Select
-                    disabled={!isEditing}
-                    onValueChange={field.onChange}
-                    defaultValue={field.value || ""}
-                    value={field.value || ""}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select type" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {insuranceTypeOptions.map((type) => (
-                        <SelectItem key={type} value={type}>
-                          {type}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="client_policy_number_primary"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Policy Number</FormLabel>
-                  <FormControl>
-                    <Input {...field} readOnly={!isEditing} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="client_group_number_primary"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Group Number</FormLabel>
-                  <FormControl>
-                    <Input {...field} readOnly={!isEditing} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="client_subscriber_name_primary"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Subscriber Name</FormLabel>
-                  <FormControl>
-                    <Input {...field} readOnly={!isEditing} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="client_subscriber_relationship_primary"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Subscriber Relationship</FormLabel>
-                  <Select
-                    disabled={!isEditing}
-                    onValueChange={field.onChange}
-                    defaultValue={field.value || ""}
-                    value={field.value || ""}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select relationship" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {relationshipOptions.map((relation) => (
-                        <SelectItem key={relation} value={relation}>
-                          {relation}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="client_subscriber_dob_primary"
-              render={({ field }) => (
-                <FormItem className="flex flex-col">
-                  <FormLabel>Subscriber Date of Birth</FormLabel>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <FormControl>
-                        <Button
-                          variant={"outline"}
-                          className={cn(
-                            "w-full pl-3 text-left font-normal",
-                            !field.value && "text-muted-foreground"
-                          )}
-                          disabled={!isEditing}
-                        >
-                          {field.value ? (
-                            format(field.value, "PPP")
-                          ) : (
-                            <span>Pick a date</span>
-                          )}
-                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                        </Button>
-                      </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={field.value || undefined}
-                        onSelect={field.onChange}
-                        disabled={date =>
-                          date > new Date() || date < new Date("1900-01-01")
-                        }
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                </FormItem>} />
+            <FormField control={form.control} name="client_insurance_type_primary" render={({
+            field
+          }) => {}} />
+            <FormField control={form.control} name="client_policy_number_primary" render={({
+            field
+          }) => {}} />
+            <FormField control={form.control} name="client_group_number_primary" render={({
+            field
+          }) => {}} />
+            <FormField control={form.control} name="client_subscriber_name_primary" render={({
+            field
+          }) => {}} />
+            <FormField control={form.control} name="client_subscriber_relationship_primary" render={({
+            field
+          }) => {}} />
+            <FormField control={form.control} name="client_subscriber_dob_primary" render={({
+            field
+          }) => {}} />
           </div>
         </CardContent>
       </Card>
 
-      {clientData?.client_vacoverage && (
-        <Card className="mt-4">
+      {clientData?.client_vacoverage && <Card className="mt-4">
           <CardHeader>
             <CardTitle>VA Insurance</CardTitle>
           </CardHeader>
           <CardContent>
-            {clientData.client_vacoverage === "CHAMPVA" && (
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="client_champva"
-                  render={({ field }) => (
-                    <FormItem>
+            {clientData.client_vacoverage === "CHAMPVA" && <div className="grid grid-cols-2 gap-4">
+                <FormField control={form.control} name="client_champva" render={({
+            field
+          }) => <FormItem>
                       <FormLabel>CHAMPVA #</FormLabel>
                       <FormControl>
-                        <Input {...field} readOnly={!isEditing} />
+                        
                       </FormControl>
                       <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                    </FormItem>} />
                 <div className="col-span-2">
-                  <p className="text-sm text-gray-500 italic">
-                    We understand that this is your SSN. And although we do not necessarily agree with them using this as their patient identifier, we do have to follow their process. The only way to verify your coverage is to have this.
-                  </p>
+                  
                 </div>
-              </div>
-            )}
+              </div>}
 
-            {clientData.client_vacoverage === "TRICARE" && (
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="client_tricare_beneficiary_category"
-                  render={({ field }) => (
-                    <FormItem>
+            {clientData.client_vacoverage === "TRICARE" && <div className="grid grid-cols-2 gap-4">
+                <FormField control={form.control} name="client_tricare_beneficiary_category" render={({
+            field
+          }) => <FormItem>
                       <FormLabel>TRICARE Beneficiary Category</FormLabel>
-                      <Select
-                        disabled={!isEditing}
-                        onValueChange={field.onChange}
-                        defaultValue={field.value || ""}
-                        value={field.value || ""}
-                      >
+                      <Select disabled={!isEditing} onValueChange={field.onChange} defaultValue={field.value || ""} value={field.value || ""}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select category" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {[
-                            "Active Duty Service Member",
-                            "Active Duty Family Member",
-                            "Retired Service Member",
-                            "Retired Family Member",
-                            "Guard/Reserve Service Member",
-                            "Guard/Reserve Family Member",
-                            "Surviving Family Member",
-                            "Medal of Honor Recipient",
-                            "TRICARE For Life",
-                            "TRICARE Young Adult",
-                            "Former Spouse",
-                            "Children with Disabilities"
-                          ].map((category) => (
-                            <SelectItem key={category} value={category}>
+                          {["Active Duty Service Member", "Active Duty Family Member", "Retired Service Member", "Retired Family Member", "Guard/Reserve Service Member", "Guard/Reserve Family Member", "Surviving Family Member", "Medal of Honor Recipient", "TRICARE For Life", "TRICARE Young Adult", "Former Spouse", "Children with Disabilities"].map(category => <SelectItem key={category} value={category}>
                               {category}
-                            </SelectItem>
-                          ))}
+                            </SelectItem>)}
                         </SelectContent>
                       </Select>
                       <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                    </FormItem>} />
                 
-                <FormField
-                  control={form.control}
-                  name="client_tricare_sponsor_name"
-                  render={({ field }) => (
-                    <FormItem>
+                <FormField control={form.control} name="client_tricare_sponsor_name" render={({
+            field
+          }) => <FormItem>
                       <FormLabel>TRICARE Sponsor's Name</FormLabel>
                       <FormControl>
                         <Input {...field} readOnly={!isEditing} />
                       </FormControl>
                       <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                    </FormItem>} />
                 
-                <FormField
-                  control={form.control}
-                  name="client_tricare_sponsor_branch"
-                  render={({ field }) => (
-                    <FormItem>
+                <FormField control={form.control} name="client_tricare_sponsor_branch" render={({
+            field
+          }) => <FormItem>
                       <FormLabel>TRICARE Sponsor's Branch of Service</FormLabel>
-                      <Select
-                        disabled={!isEditing}
-                        onValueChange={field.onChange}
-                        defaultValue={field.value || ""}
-                        value={field.value || ""}
-                      >
+                      <Select disabled={!isEditing} onValueChange={field.onChange} defaultValue={field.value || ""} value={field.value || ""}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select branch" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {[
-                            "Air Force",
-                            "Army",
-                            "Coast Guard",
-                            "Marine Corps",
-                            "Navy",
-                            "NOAA Corps",
-                            "Space Force",
-                            "USPHS"
-                          ].map((branch) => (
-                            <SelectItem key={branch} value={branch}>
+                          {["Air Force", "Army", "Coast Guard", "Marine Corps", "Navy", "NOAA Corps", "Space Force", "USPHS"].map(branch => <SelectItem key={branch} value={branch}>
                               {branch}
-                            </SelectItem>
-                          ))}
+                            </SelectItem>)}
                         </SelectContent>
                       </Select>
                       <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                    </FormItem>} />
                 
-                <FormField
-                  control={form.control}
-                  name="client_tricare_sponsor_id"
-                  render={({ field }) => (
-                    <FormItem>
+                <FormField control={form.control} name="client_tricare_sponsor_id" render={({
+            field
+          }) => <FormItem>
                       <FormLabel>TRICARE Sponsor's SSN or DOD ID Number</FormLabel>
                       <FormControl>
                         <Input {...field} readOnly={!isEditing} />
                       </FormControl>
                       <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                    </FormItem>} />
                 
-                <FormField
-                  control={form.control}
-                  name="client_tricare_plan"
-                  render={({ field }) => (
-                    <FormItem>
+                <FormField control={form.control} name="client_tricare_plan" render={({
+            field
+          }) => <FormItem>
                       <FormLabel>TRICARE Plan</FormLabel>
-                      <Select
-                        disabled={!isEditing}
-                        onValueChange={field.onChange}
-                        defaultValue={field.value || ""}
-                        value={field.value || ""}
-                      >
+                      <Select disabled={!isEditing} onValueChange={field.onChange} defaultValue={field.value || ""} value={field.value || ""}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select plan" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {[
-                            "TRICARE Prime",
-                            "TRICARE Prime Remote",
-                            "TRICARE Prime Option",
-                            "TRICARE Prime Overseas",
-                            "TRICARE Remote Overseas",
-                            "TRICARE Select",
-                            "TRICARE Select Overseas",
-                            "TRICARE For Life",
-                            "TRICARE Reserve Select",
-                            "TRICARE Retired Reserve",
-                            "TRICARE Young Adult"
-                          ].map((plan) => (
-                            <SelectItem key={plan} value={plan}>
+                          {["TRICARE Prime", "TRICARE Prime Remote", "TRICARE Prime Option", "TRICARE Prime Overseas", "TRICARE Remote Overseas", "TRICARE Select", "TRICARE Select Overseas", "TRICARE For Life", "TRICARE Reserve Select", "TRICARE Retired Reserve", "TRICARE Young Adult"].map(plan => <SelectItem key={plan} value={plan}>
                               {plan}
-                            </SelectItem>
-                          ))}
+                            </SelectItem>)}
                         </SelectContent>
                       </Select>
                       <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                    </FormItem>} />
                 
-                <FormField
-                  control={form.control}
-                  name="client_tricare_region"
-                  render={({ field }) => (
-                    <FormItem>
+                <FormField control={form.control} name="client_tricare_region" render={({
+            field
+          }) => <FormItem>
                       <FormLabel>TRICARE Region</FormLabel>
-                      <Select
-                        disabled={!isEditing}
-                        onValueChange={field.onChange}
-                        defaultValue={field.value || ""}
-                        value={field.value || ""}
-                      >
+                      <Select disabled={!isEditing} onValueChange={field.onChange} defaultValue={field.value || ""} value={field.value || ""}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select region" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {[
-                            "TRICARE East",
-                            "TRICARE West",
-                            "TRICARE Overseas"
-                          ].map((region) => (
-                            <SelectItem key={region} value={region}>
+                          {["TRICARE East", "TRICARE West", "TRICARE Overseas"].map(region => <SelectItem key={region} value={region}>
                               {region}
-                            </SelectItem>
-                          ))}
+                            </SelectItem>)}
                         </SelectContent>
                       </Select>
                       <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                    </FormItem>} />
                 
-                <FormField
-                  control={form.control}
-                  name="client_tricare_policy_id"
-                  render={({ field }) => (
-                    <FormItem>
+                <FormField control={form.control} name="client_tricare_policy_id" render={({
+            field
+          }) => <FormItem>
                       <FormLabel>Policy #/Plan ID</FormLabel>
                       <FormControl>
                         <Input {...field} readOnly={!isEditing} />
                       </FormControl>
                       <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                    </FormItem>} />
                 
-                <FormField
-                  control={form.control}
-                  name="client_tricare_has_referral"
-                  render={({ field }) => (
-                    <FormItem>
+                <FormField control={form.control} name="client_tricare_has_referral" render={({
+            field
+          }) => <FormItem>
                       <FormLabel>Do you have a Referral Number?</FormLabel>
-                      <Select
-                        disabled={!isEditing}
-                        onValueChange={field.onChange}
-                        defaultValue={field.value || ""}
-                        value={field.value || ""}
-                      >
+                      <Select disabled={!isEditing} onValueChange={field.onChange} defaultValue={field.value || ""} value={field.value || ""}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {["Yes", "No"].map((option) => (
-                            <SelectItem key={option} value={option}>
+                          {["Yes", "No"].map(option => <SelectItem key={option} value={option}>
                               {option}
-                            </SelectItem>
-                          ))}
+                            </SelectItem>)}
                         </SelectContent>
                       </Select>
                       <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                    </FormItem>} />
                 
-                {clientData.client_tricare_has_referral === "Yes" && (
-                  <FormField
-                    control={form.control}
-                    name="client_tricare_referral_number"
-                    render={({ field }) => (
-                      <FormItem>
+                {clientData.client_tricare_has_referral === "Yes" && <FormField control={form.control} name="client_tricare_referral_number" render={({
+            field
+          }) => <FormItem>
                         <FormLabel>Referral Number</FormLabel>
                         <FormControl>
                           <Input {...field} readOnly={!isEditing} />
                         </FormControl>
                         <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
-              </div>
-            )}
+                      </FormItem>} />}
+              </div>}
             
-            {clientData.client_vacoverage === "VA Community Care" && (
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="mentalHealthReferral"
-                  render={({ field }) => (
-                    <FormItem>
+            {clientData.client_vacoverage === "VA Community Care" && <div className="grid grid-cols-2 gap-4">
+                <FormField control={form.control} name="mentalHealthReferral" render={({
+            field
+          }) => <FormItem>
                       <FormLabel>Have you requested a referral from Mental Health?</FormLabel>
-                      <Select
-                        disabled={!isEditing}
-                        onValueChange={field.onChange}
-                        defaultValue={field.value || ""}
-                        value={field.value || ""}
-                      >
+                      <Select disabled={!isEditing} onValueChange={field.onChange} defaultValue={field.value || ""} value={field.value || ""}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {["Yes", "No"].map((option) => (
-                            <SelectItem key={option} value={option}>
+                          {["Yes", "No"].map(option => <SelectItem key={option} value={option}>
                               {option}
-                            </SelectItem>
-                          ))}
+                            </SelectItem>)}
                         </SelectContent>
                       </Select>
                       <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            )}
+                    </FormItem>} />
+              </div>}
           </CardContent>
-        </Card>
-      )}
-    </>
-  );
+        </Card>}
+    </>;
 };
-
 export default InsuranceTab;
