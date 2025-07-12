@@ -113,8 +113,9 @@ const ClinicianDashboard = () => {
       totalAppointments: appointments.length
     });
 
-    // Filter out cancelled appointments
+    // Filter out cancelled and documented appointments
     const activeAppointments = appointments.filter(apt => apt.status !== 'cancelled');
+    const scheduledAppointments = appointments.filter(apt => apt.status === 'scheduled');
 
     const categorized = {
       today: activeAppointments.filter(apt => {
@@ -123,7 +124,7 @@ const ClinicianDashboard = () => {
         return isToday;
       }).sort((a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime()),
       
-      outstanding: activeAppointments.filter(apt => {
+      outstanding: scheduledAppointments.filter(apt => {
         const aptDateTime = TimeZoneService.fromUTC(apt.start_at, browserTimeZone);
         const isTodayOrEarlier = aptDateTime <= todayEnd;
         return isTodayOrEarlier;

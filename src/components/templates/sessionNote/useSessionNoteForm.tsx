@@ -407,7 +407,7 @@ export const useSessionNoteForm = ({
       if (appointment?.id) {
         const { error: appointmentError } = await supabase
           .from('appointments')
-          .update({ status: 'completed' })
+          .update({ status: 'documented' })
           .eq('id', appointment.id);
 
         if (appointmentError) {
