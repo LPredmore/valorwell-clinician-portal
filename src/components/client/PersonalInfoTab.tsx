@@ -189,10 +189,7 @@ const PersonalInfoTab: React.FC<TabProps> = ({
                       <Input value={timezoneOptions.find(tz => tz.value === field.value)?.label || field.value || ""} readOnly />
                     </FormControl>}
                   <FormMessage />
-                </FormItem>} />
-            <FormField control={form.control} name="client_minor" render={({
-            field
-          }) => {}} />
+                 </FormItem>} />
           </div>
         </CardContent>
       </Card>
