@@ -238,35 +238,73 @@ export const submitInformedConsentForm = async (clientId: string, formData: any)
 
 // New function to fetch clinical documents for a client
 export const fetchClinicalDocuments = async (clientId: string) => {
+  console.log('📋 [fetchClinicalDocuments] Direct query for client:', clientId);
+  
   try {
     const { data, error } = await supabase
       .from('clinical_documents')
       .select('*')
       .eq('client_id', clientId)
       .order('document_date', { ascending: false });
-      
+
+    console.log('📋 [fetchClinicalDocuments] Query result:', {
+      error: error,
+      dataCount: data?.length || 0,
+      data: data
+    });
+
     if (error) throw error;
     return data || [];
   } catch (error) {
-    console.error('Error fetching clinical documents:', error);
+    console.error('❌ [fetchClinicalDocuments] Error:', error);
     return [];
   }
 };
 
 // Enhanced function to fetch filtered clinical documents with proper treatment plan deduplication
 export const fetchFilteredClinicalDocuments = async (clientId: string) => {
+  console.log('🔍 [fetchFilteredClinicalDocuments] Starting fetch for client:', clientId);
+  
   try {
-    const { data, error } = await supabase
+    // Check auth status
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    console.log('👤 [fetchFilteredClinicalDocuments] Auth status:', {
+      hasUser: !!user,
+      userId: user?.id,
+      userEmail: user?.email,
+      authError: authError
+    });
+
+    // Try RPC function first
+    console.log('📞 [fetchFilteredClinicalDocuments] Trying RPC function...');
+    const { data: rpcData, error: rpcError } = await supabase
       .rpc('get_filtered_clinical_documents', { 
         p_client_id: clientId 
       });
       
-    if (error) throw error;
-    return data || [];
+    if (rpcError) {
+      console.error('❌ [fetchFilteredClinicalDocuments] RPC error:', rpcError);
+      throw rpcError;
+    }
+    
+    console.log('✅ [fetchFilteredClinicalDocuments] RPC success:', {
+      dataCount: rpcData?.length || 0,
+      data: rpcData
+    });
+    
+    return rpcData || [];
   } catch (error) {
-    console.error('Error fetching filtered clinical documents:', error);
-    // Fallback to regular fetch if RPC function doesn't exist yet
-    return await fetchClinicalDocuments(clientId);
+    console.error('❌ [fetchFilteredClinicalDocuments] RPC failed, trying fallback:', error);
+    
+    // Fallback to direct table query
+    console.log('🔄 [fetchFilteredClinicalDocuments] Using fallback query...');
+    const fallbackResult = await fetchClinicalDocuments(clientId);
+    console.log('✅ [fetchFilteredClinicalDocuments] Fallback result:', {
+      count: fallbackResult.length,
+      documents: fallbackResult
+    });
+    
+    return fallbackResult;
   }
 };
 

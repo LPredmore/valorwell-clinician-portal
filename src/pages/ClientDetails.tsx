@@ -37,6 +37,8 @@ const ClientDetails = () => {
 
   useEffect(() => {
     const fetchClient = async () => {
+      console.log('🔧 [ClientDetails] Fetching client with ID:', clientId);
+      
       try {
         const { data, error } = await supabase
           .from("clients")
@@ -48,10 +50,16 @@ const ClientDetails = () => {
           throw error;
         }
 
+        console.log('✅ [ClientDetails] Client data fetched:', {
+          id: data.id,
+          name: `${data.client_first_name} ${data.client_last_name}`,
+          hasAllData: !!data
+        });
+
         setClientData(data);
         setIsLoading(false);
       } catch (err) {
-        console.error('Error fetching client:', err);
+        console.error('❌ [ClientDetails] Error fetching client:', err);
         setError(err as Error);
         setIsLoading(false);
         

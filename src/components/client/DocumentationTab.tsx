@@ -45,13 +45,31 @@ const DocumentationTab: React.FC<DocumentationTabProps> = ({
   } = useToast();
 
   useEffect(() => {
+    console.log('🔍 [DocumentationTab] useEffect triggered:', {
+      clientId: clientData?.id,
+      hasClientData: !!clientData,
+      clientDataKeys: clientData ? Object.keys(clientData) : null
+    });
+    
     if (clientData?.id) {
+      console.log('📥 [DocumentationTab] Starting to fetch documents for client:', clientData.id);
       setIsLoading(true);
+      
       fetchFilteredClinicalDocuments(clientData.id).then(docs => {
+        console.log('✅ [DocumentationTab] Received documents:', {
+          count: docs.length,
+          documents: docs,
+          clientId: clientData.id
+        });
         setDocuments(docs);
         setIsLoading(false);
       }).catch(err => {
-        console.error('Error fetching documents:', err);
+        console.error('❌ [DocumentationTab] Error fetching documents:', {
+          error: err,
+          clientId: clientData.id,
+          errorMessage: err.message,
+          errorCode: err.code
+        });
         setIsLoading(false);
         toast({
           title: "Error",
@@ -59,6 +77,8 @@ const DocumentationTab: React.FC<DocumentationTabProps> = ({
           variant: "destructive"
         });
       });
+    } else {
+      console.log('⚠️ [DocumentationTab] No client ID available, skipping document fetch');
     }
   }, [clientData?.id, toast]);
 
