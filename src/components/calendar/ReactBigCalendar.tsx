@@ -347,7 +347,6 @@ const ReactBigCalendar: React.FC<ExtendedReactBigCalendarProps> = ({
           return <Calendar 
             {...calendarConfig}
             onRangeChange={(range) => console.debug('[RBC] onRangeChange:', range)}
-            onNavigate={(date) => console.debug('[RBC] onNavigate:', date)}
           />;
         } catch (error) {
           console.error('[ReactBigCalendar] DIAGNOSTIC: Calendar component failed to render:', {
