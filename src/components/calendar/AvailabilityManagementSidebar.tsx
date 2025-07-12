@@ -39,9 +39,15 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
   const [endAMPM, setEndAMPM] = useState<string>('PM');
   const [currentAvailability, setCurrentAvailability] = useState<AvailabilitySlot[]>([]);
   
-  // Calendar display settings state
+  // Calendar display settings state (stored in 24-hour format)
   const [calendarStartTime, setCalendarStartTime] = useState<string>('08:00');
   const [calendarEndTime, setCalendarEndTime] = useState<string>('21:00');
+  
+  // Calendar display time selectors in AM/PM format
+  const [calendarStartHour, setCalendarStartHour] = useState<string>('08');
+  const [calendarStartAMPM, setCalendarStartAMPM] = useState<string>('AM');
+  const [calendarEndHour, setCalendarEndHour] = useState<string>('09');
+  const [calendarEndAMPM, setCalendarEndAMPM] = useState<string>('PM');
   
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -157,10 +163,20 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
       if (data.clinician_calendar_start_time) {
         const startTime = data.clinician_calendar_start_time.substring(0, 5); // "08:00:00" -> "08:00"
         setCalendarStartTime(startTime);
+        
+        // Convert to AM/PM for display
+        const startAMPM = convertTimeToAMPM(startTime);
+        setCalendarStartHour(startAMPM.hour);
+        setCalendarStartAMPM(startAMPM.ampm);
       }
       if (data.clinician_calendar_end_time) {
         const endTime = data.clinician_calendar_end_time.substring(0, 5); // "21:00:00" -> "21:00"
         setCalendarEndTime(endTime);
+        
+        // Convert to AM/PM for display
+        const endAMPM = convertTimeToAMPM(endTime);
+        setCalendarEndHour(endAMPM.hour);
+        setCalendarEndAMPM(endAMPM.ampm);
       }
     } catch (error) {
       console.error('Error loading availability:', error);
@@ -353,7 +369,11 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
       return;
     }
 
-    if (calendarStartTime >= calendarEndTime) {
+    // Convert AM/PM display times to 24-hour format for storage
+    const startTime24 = convertTimeFrom12To24(calendarStartHour, '00', calendarStartAMPM);
+    const endTime24 = convertTimeFrom12To24(calendarEndHour, '00', calendarEndAMPM);
+
+    if (startTime24 >= endTime24) {
       toast({
         title: 'Validation Error',
         description: 'Calendar end time must be after start time',
@@ -368,8 +388,8 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
       const { error } = await supabase
         .from('clinicians')
         .update({
-          clinician_calendar_start_time: calendarStartTime,
-          clinician_calendar_end_time: calendarEndTime
+          clinician_calendar_start_time: startTime24,
+          clinician_calendar_end_time: endTime24
         })
         .eq('id', clinicianId);
 
@@ -568,39 +588,61 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <Label className="text-xs">Start Time</Label>
-                <Select value={calendarStartTime} onValueChange={setCalendarStartTime}>
-                  <SelectTrigger className="h-8">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.from({length: 24}, (_, i) => {
-                      const hour = i.toString().padStart(2, '0');
-                      return (
-                        <SelectItem key={hour} value={`${hour}:00`}>
-                          {hour}:00
+                <div className="flex gap-1">
+                  <Select value={calendarStartHour} onValueChange={setCalendarStartHour}>
+                    <SelectTrigger className="h-8 flex-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {hourOptions.map((hour) => (
+                        <SelectItem key={hour.value} value={hour.value}>
+                          {hour.label}
                         </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={calendarStartAMPM} onValueChange={setCalendarStartAMPM}>
+                    <SelectTrigger className="h-8 w-16">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ampmOptions.map((ampm) => (
+                        <SelectItem key={ampm.value} value={ampm.value}>
+                          {ampm.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               <div>
                 <Label className="text-xs">End Time</Label>
-                <Select value={calendarEndTime} onValueChange={setCalendarEndTime}>
-                  <SelectTrigger className="h-8">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.from({length: 24}, (_, i) => {
-                      const hour = i.toString().padStart(2, '0');
-                      return (
-                        <SelectItem key={hour} value={`${hour}:00`}>
-                          {hour}:00
+                <div className="flex gap-1">
+                  <Select value={calendarEndHour} onValueChange={setCalendarEndHour}>
+                    <SelectTrigger className="h-8 flex-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {hourOptions.map((hour) => (
+                        <SelectItem key={hour.value} value={hour.value}>
+                          {hour.label}
                         </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={calendarEndAMPM} onValueChange={setCalendarEndAMPM}>
+                    <SelectTrigger className="h-8 w-16">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ampmOptions.map((ampm) => (
+                        <SelectItem key={ampm.value} value={ampm.value}>
+                          {ampm.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
             <Button 
