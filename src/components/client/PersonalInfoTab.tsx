@@ -192,7 +192,15 @@ const PersonalInfoTab: React.FC<TabProps> = ({
                 </FormItem>} />
             <FormField control={form.control} name="client_minor" render={({
             field
-          }) => {}} />
+          }) => (
+                <FormItem>
+                  <FormLabel>Minor (Under 18)</FormLabel>
+                  <FormControl>
+                    <Input {...field} readOnly={!isEditing} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
           </div>
         </CardContent>
       </Card>

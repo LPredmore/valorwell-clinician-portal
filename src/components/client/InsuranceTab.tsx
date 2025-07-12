@@ -33,22 +33,70 @@ const InsuranceTab: React.FC<TabProps> = ({
                 </FormItem>} />
             <FormField control={form.control} name="client_insurance_type_primary" render={({
             field
-          }) => {}} />
+          }) => (
+                <FormItem>
+                  <FormLabel>Insurance Type</FormLabel>
+                  <FormControl>
+                    <Input {...field} readOnly={!isEditing} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
             <FormField control={form.control} name="client_policy_number_primary" render={({
             field
-          }) => {}} />
+          }) => (
+                <FormItem>
+                  <FormLabel>Policy Number</FormLabel>
+                  <FormControl>
+                    <Input {...field} readOnly={!isEditing} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
             <FormField control={form.control} name="client_group_number_primary" render={({
             field
-          }) => {}} />
+          }) => (
+                <FormItem>
+                  <FormLabel>Group Number</FormLabel>
+                  <FormControl>
+                    <Input {...field} readOnly={!isEditing} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
             <FormField control={form.control} name="client_subscriber_name_primary" render={({
             field
-          }) => {}} />
+          }) => (
+                <FormItem>
+                  <FormLabel>Subscriber Name</FormLabel>
+                  <FormControl>
+                    <Input {...field} readOnly={!isEditing} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
             <FormField control={form.control} name="client_subscriber_relationship_primary" render={({
             field
-          }) => {}} />
+          }) => (
+                <FormItem>
+                  <FormLabel>Relationship to Subscriber</FormLabel>
+                  <FormControl>
+                    <Input {...field} readOnly={!isEditing} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
             <FormField control={form.control} name="client_subscriber_dob_primary" render={({
             field
-          }) => {}} />
+          }) => (
+                <FormItem>
+                  <FormLabel>Subscriber Date of Birth</FormLabel>
+                  <FormControl>
+                    <Input {...field} readOnly={!isEditing} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
           </div>
         </CardContent>
       </Card>
