@@ -311,11 +311,24 @@ export const fetchFilteredClinicalDocuments = async (clientId: string) => {
 // New function to get document download URL
 export const getDocumentDownloadURL = async (filePath: string) => {
   try {
+    console.log('🔗 Getting download URL for:', filePath);
+    
+    // Check if file path starts with "temp/" - these are invalid paths
+    if (filePath.startsWith('temp/')) {
+      console.error('❌ Cannot retrieve temporary file path:', filePath);
+      return null;
+    }
+    
     const { data, error } = await supabase.storage
       .from('clinical_documents')
-      .createSignedUrl(filePath, 60); // 60 seconds expiration
+      .createSignedUrl(filePath, 3600); // 1 hour expiration
       
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Storage error:', error);
+      throw error;
+    }
+    
+    console.log('✅ Generated download URL successfully');
     return data.signedUrl;
   } catch (error) {
     console.error('Error getting document download URL:', error);

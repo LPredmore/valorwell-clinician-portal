@@ -135,7 +135,11 @@ export const generateAndSavePDF = async (
     const pdfBlob = pdf.output('blob');
     
     // Step 2: Upload PDF to Supabase storage
-    const filePath = `${documentInfo.clientId}/${documentInfo.documentType}/${formattedDate}.pdf`;
+    // Normalize document type for file path (remove spaces, lowercase)
+    const normalizedDocType = documentInfo.documentType.toLowerCase().replace(/\s+/g, '-');
+    const timestamp = Date.now();
+    const filePath = `${documentInfo.clientId}/${normalizedDocType}/${formattedDate}-${timestamp}.pdf`;
+    
     console.log('📤 Uploading PDF to storage:', {
       filePath,
       blobSize: pdfBlob.size,
