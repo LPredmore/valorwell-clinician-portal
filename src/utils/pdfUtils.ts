@@ -123,7 +123,7 @@ export const generateAndSavePDF = async (
     
     // Create canvas from the prepared clone
     const canvas = await html2canvas(clone, {
-      scale: 2, // Higher scale for better quality
+      scale: 1, // Reduced from 2 to 1 to prevent massive file sizes (was causing 62MB PDFs)
       useCORS: true,
       logging: false,
       backgroundColor: '#ffffff',
