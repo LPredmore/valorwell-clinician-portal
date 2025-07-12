@@ -205,7 +205,7 @@ export const generateAndSavePDF = async (
       filename,
       finalPath: filePath,
       blobSize: pdfBlob.size,
-      bucket: 'Clinical Documents'
+      bucket: 'clinical_documents'
     });
 
     // Validate file path before upload
