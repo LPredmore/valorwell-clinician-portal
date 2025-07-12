@@ -32,6 +32,9 @@ export const generateAndSavePDF = async (
     // Skip bucket validation - proceed directly to upload
     // (Bucket validation fails with anon key due to RLS policies, but upload works)
     console.log('🪣 [PDF-GEN] Proceeding with direct upload to Clinical Documents bucket...');
+    
+    // DEBUG: Log auth context before upload (simplified)
+    console.debug('[PDF-GEN] Starting upload with Supabase client...');
 
     // Format date for file naming
     const formattedDate = typeof documentInfo.documentDate === 'string' 
@@ -175,6 +178,17 @@ export const generateAndSavePDF = async (
     
     console.log('📤 [PDF-GEN] Attempting storage upload...');
     
+    // DEBUG: Pre-upload debug info
+    console.debug('[PDF-GEN] Pre-upload debug info:', {
+      bucketName: 'Clinical Documents',
+      filePath,
+      blobSize: pdfBlob.size,
+      contentType: 'application/pdf',
+      hasFile: !!pdfBlob,
+      currentUser: 'anon (assumed)',
+      uploadOptions: { contentType: 'application/pdf', upsert: true }
+    });
+    
     // Try upload with retry logic
     let uploadError = null;
     let uploadSuccess = false;
@@ -182,7 +196,7 @@ export const generateAndSavePDF = async (
     for (let attempt = 1; attempt <= 3; attempt++) {
       console.log(`🔄 [PDF-GEN] Upload attempt ${attempt}/3`);
       
-      const { error } = await supabase.storage
+      const { data, error } = await supabase.storage
         .from('Clinical Documents')
         .upload(filePath, pdfBlob, {
           contentType: 'application/pdf',
@@ -192,15 +206,29 @@ export const generateAndSavePDF = async (
       if (!error) {
         uploadSuccess = true;
         uploadError = null;
+        console.log(`✅ [PDF-GEN] Upload attempt ${attempt} succeeded:`, {
+          data,
+          filePath,
+          uploadedPath: data?.path || 'unknown'
+        });
         break;
       }
       
       uploadError = error;
-      console.warn(`⚠️ [PDF-GEN] Upload attempt ${attempt} failed:`, {
-        error: error,
+      console.error(`❌ [PDF-GEN] Upload attempt ${attempt} failed with full error details:`, {
+        error,
         errorMessage: error.message,
-        errorCode: (error as any).statusCode || 'unknown',
-        filePath
+        errorName: error.name,
+        errorCode: (error as any)?.statusCode || 'unknown',
+        errorDetails: (error as any)?.details || 'none',
+        errorHint: (error as any)?.hint || 'none',
+        filePath,
+        attempt,
+        supabaseErrorContext: {
+          bucket: 'Clinical Documents',
+          operation: 'upload',
+          userRole: 'anon (assumed)'
+        }
       });
       
       if (attempt < 3) {
