@@ -89,6 +89,7 @@ export const utcToFormInput = (utcString: string, timezone: string): string => {
  * @returns JavaScript Date object
  */
 export const utcToCalendarDate = (utcString: string, timezone: string): Date => {
+  console.debug('[utcToCalendarDate] args:', { utcString, timezone });
   const safeTimezone = TimeZoneService.ensureIANATimeZone(timezone);
   
   // CRITICAL: Validate UTC string format

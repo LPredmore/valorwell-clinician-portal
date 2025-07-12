@@ -112,6 +112,7 @@ const CalendarContainer: React.FC = () => {
 
   // Separate real events from background availability
   const realEvents = useMemo((): CalendarEvent[] => {
+    console.debug('[realEvents useMemo] guard check', { userTimeZone, shouldExecuteHooks });
     // CRITICAL: Don't process events while timezone is loading
     if (!userTimeZone || userTimeZone === 'loading') {
       return [];
