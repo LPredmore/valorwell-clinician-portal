@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -90,6 +90,14 @@ const EditBlockedTimeDialog: React.FC<EditBlockedTimeDialogProps> = ({
   const browserTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const { toast } = useToast();
   const { updateBlockedTime, deleteBlockedTime } = useBlockedTime(blockedTime?.clinician_id || '');
+  const isMountedRef = useRef(true);
+
+  // Cleanup on unmount to prevent state updates
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const timeOptions = generateTimeOptions();
 
@@ -171,16 +179,37 @@ const EditBlockedTimeDialog: React.FC<EditBlockedTimeDialogProps> = ({
   };
 
   const handleDelete = async () => {
-    if (!blockedTime) return;
+    if (!blockedTime) {
+      console.error('[EditBlockedTimeDialog] No blocked time data for deletion');
+      return;
+    }
+
+    console.log('[EditBlockedTimeDialog] Starting deletion process:', {
+      blockedTimeId: blockedTime.id,
+      clinicianId: blockedTime.clinician_id,
+      label: blockedTime.label
+    });
 
     setIsLoading(true);
 
     try {
       const success = await deleteBlockedTime(blockedTime.id);
+      
+      console.log('[EditBlockedTimeDialog] Deletion result:', { success, blockedTimeId: blockedTime.id });
 
       if (success) {
-        onBlockedTimeUpdated();
-        onClose();
+        console.log('[EditBlockedTimeDialog] Deletion successful, triggering updates');
+        
+        // Check if component is still mounted before updating state
+        if (isMountedRef.current) {
+          // Add a small delay to prevent race conditions
+          setTimeout(() => {
+            if (isMountedRef.current) {
+              onBlockedTimeUpdated();
+              onClose();
+            }
+          }, 100);
+        }
       }
     } catch (error: any) {
       console.error('[EditBlockedTimeDialog] Error deleting blocked time:', error);
@@ -190,7 +219,9 @@ const EditBlockedTimeDialog: React.FC<EditBlockedTimeDialogProps> = ({
         variant: "destructive"
       });
     } finally {
-      setIsLoading(false);
+      if (isMountedRef.current) {
+        setIsLoading(false);
+      }
     }
   };
 

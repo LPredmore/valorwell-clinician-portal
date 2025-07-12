@@ -192,23 +192,60 @@ export const useBlockedTime = (
   };
 
   const deleteBlockedTime = async (id: string): Promise<boolean> => {
+    console.log('[useBlockedTime] Starting deleteBlockedTime:', { id, clinicianId });
+    
     try {
-      const { error } = await supabase
+      // First verify the blocked time exists and belongs to the clinician
+      const { data: existingData, error: selectError } = await supabase
+        .from('blocked_time')
+        .select('id, clinician_id, label')
+        .eq('id', id)
+        .single();
+      
+      if (selectError) {
+        console.error('[useBlockedTime] Error verifying blocked time exists:', selectError);
+        throw selectError;
+      }
+      
+      if (!existingData) {
+        console.error('[useBlockedTime] Blocked time not found:', { id });
+        throw new Error('Blocked time not found');
+      }
+      
+      console.log('[useBlockedTime] Verified blocked time exists:', existingData);
+
+      const { error, data } = await supabase
         .from('blocked_time')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .select(); // Return deleted data for verification
 
-      if (error) throw error;
+      if (error) {
+        console.error('[useBlockedTime] Delete operation failed:', error);
+        throw error;
+      }
+
+      console.log('[useBlockedTime] Delete operation completed:', { deletedData: data });
 
       toast({
         title: "Success",
         description: "Blocked time removed successfully",
       });
 
-      await fetchBlockedTimes();
+      // Delay refetch to prevent race conditions
+      setTimeout(() => {
+        fetchBlockedTimes();
+      }, 200);
+      
       return true;
     } catch (error: any) {
-      console.error('[useBlockedTime] Error deleting blocked time:', error);
+      console.error('[useBlockedTime] Error deleting blocked time:', {
+        error: error.message,
+        id,
+        clinicianId,
+        code: error.code,
+        details: error.details
+      });
       toast({
         title: "Error",
         description: error.message || "Failed to delete blocked time",
