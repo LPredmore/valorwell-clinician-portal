@@ -47,15 +47,6 @@ const DocumentationTab: React.FC<DocumentationTabProps> = ({
   // Stable client ID to prevent infinite loops
   const clientId = useMemo(() => clientData?.id, [clientData?.id]);
 
-  // Debug state changes
-  useEffect(() => {
-    console.log('🔍 [DocumentationTab] Documents state changed:', {
-      documentsCount: documents.length,
-      documents: documents,
-      isLoading
-    });
-  }, [documents, isLoading]);
-
   useEffect(() => {
     console.log('🔍 [DocumentationTab] useEffect triggered with clientId:', clientId);
     
