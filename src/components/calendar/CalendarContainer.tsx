@@ -80,12 +80,12 @@ const CalendarContainer: React.FC = () => {
     }
   }, [currentDate, userTimeZone, shouldExecuteHooks]);
 
-  // Use browser timezone only - no profile timezone injection
+  // Use browser timezone for appointments query
   const { appointments } = useAppointments(
     shouldExecuteHooks ? userId : null,
     shouldExecuteHooks ? weekStart : new Date(),
     shouldExecuteHooks ? weekEnd : new Date(),
-    undefined, // No timezone parameter - use browser default
+    shouldExecuteHooks ? userTimeZone : undefined, // Pass browser timezone
     shouldExecuteHooks ? refreshTrigger : 0
   );
 
