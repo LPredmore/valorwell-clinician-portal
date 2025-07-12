@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { BarChart2, ClipboardCheck, FileText, ClipboardList, Download, Calendar, Eye } from "lucide-react";
@@ -44,29 +44,37 @@ const DocumentationTab: React.FC<DocumentationTabProps> = ({
     toast
   } = useToast();
 
+  // Stable client ID to prevent infinite loops
+  const clientId = useMemo(() => clientData?.id, [clientData?.id]);
+
+  // Debug state changes
   useEffect(() => {
-    console.log('🔍 [DocumentationTab] useEffect triggered:', {
-      clientId: clientData?.id,
-      hasClientData: !!clientData,
-      clientDataKeys: clientData ? Object.keys(clientData) : null
+    console.log('🔍 [DocumentationTab] Documents state changed:', {
+      documentsCount: documents.length,
+      documents: documents,
+      isLoading
     });
+  }, [documents, isLoading]);
+
+  useEffect(() => {
+    console.log('🔍 [DocumentationTab] useEffect triggered with clientId:', clientId);
     
-    if (clientData?.id) {
-      console.log('📥 [DocumentationTab] Starting to fetch documents for client:', clientData.id);
+    if (clientId) {
+      console.log('📥 [DocumentationTab] Starting to fetch documents for client:', clientId);
       setIsLoading(true);
       
-      fetchFilteredClinicalDocuments(clientData.id).then(docs => {
+      fetchFilteredClinicalDocuments(clientId).then(docs => {
         console.log('✅ [DocumentationTab] Received documents:', {
           count: docs.length,
           documents: docs,
-          clientId: clientData.id
+          clientId
         });
         setDocuments(docs);
         setIsLoading(false);
       }).catch(err => {
         console.error('❌ [DocumentationTab] Error fetching documents:', {
           error: err,
-          clientId: clientData.id,
+          clientId,
           errorMessage: err.message,
           errorCode: err.code
         });
@@ -79,34 +87,36 @@ const DocumentationTab: React.FC<DocumentationTabProps> = ({
       });
     } else {
       console.log('⚠️ [DocumentationTab] No client ID available, skipping document fetch');
+      setDocuments([]);
+      setIsLoading(false);
     }
-  }, [clientData?.id, toast]);
+  }, [clientId, toast]);
 
   const handleCloseTreatmentPlan = () => {
     setShowTreatmentPlanTemplate(false);
-    if (clientData?.id) {
-      fetchFilteredClinicalDocuments(clientData.id).then(docs => setDocuments(docs)).catch(err => console.error('Error refreshing documents:', err));
+    if (clientId) {
+      fetchFilteredClinicalDocuments(clientId).then(docs => setDocuments(docs)).catch(err => console.error('Error refreshing documents:', err));
     }
   };
 
   const handleCloseSessionNote = () => {
     setShowSessionNoteTemplate(false);
-    if (clientData?.id) {
-      fetchFilteredClinicalDocuments(clientData.id).then(docs => setDocuments(docs)).catch(err => console.error('Error refreshing documents:', err));
+    if (clientId) {
+      fetchFilteredClinicalDocuments(clientId).then(docs => setDocuments(docs)).catch(err => console.error('Error refreshing documents:', err));
     }
   };
 
   const handleClosePHQ9 = () => {
     setShowPHQ9Template(false);
-    if (clientData?.id) {
-      fetchFilteredClinicalDocuments(clientData.id).then(docs => setDocuments(docs)).catch(err => console.error('Error refreshing documents:', err));
+    if (clientId) {
+      fetchFilteredClinicalDocuments(clientId).then(docs => setDocuments(docs)).catch(err => console.error('Error refreshing documents:', err));
     }
   };
 
   const handleClosePCL5 = () => {
     setShowPCL5Template(false);
-    if (clientData?.id) {
-      fetchFilteredClinicalDocuments(clientData.id).then(docs => setDocuments(docs)).catch(err => console.error('Error refreshing documents:', err));
+    if (clientId) {
+      fetchFilteredClinicalDocuments(clientId).then(docs => setDocuments(docs)).catch(err => console.error('Error refreshing documents:', err));
     }
   };
 

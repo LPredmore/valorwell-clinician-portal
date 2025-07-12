@@ -263,7 +263,7 @@ export const fetchClinicalDocuments = async (clientId: string) => {
 
 // Enhanced function to fetch filtered clinical documents with proper treatment plan deduplication
 export const fetchFilteredClinicalDocuments = async (clientId: string) => {
-  console.log('🔍 [fetchFilteredClinicalDocuments] Starting fetch for client:', clientId);
+  // Removed debug log to stop spam
   
   try {
     // Check auth status
