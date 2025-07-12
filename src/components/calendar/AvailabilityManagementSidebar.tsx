@@ -38,8 +38,14 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
   const [endMinute, setEndMinute] = useState<string>('00');
   const [endAMPM, setEndAMPM] = useState<string>('PM');
   const [currentAvailability, setCurrentAvailability] = useState<AvailabilitySlot[]>([]);
+  
+  // Calendar display settings state
+  const [calendarStartTime, setCalendarStartTime] = useState<string>('08:00');
+  const [calendarEndTime, setCalendarEndTime] = useState<string>('21:00');
+  
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSavingDisplay, setIsSavingDisplay] = useState(false);
   const browserTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const { toast } = useToast();
 
@@ -113,7 +119,8 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
           clinician_availability_start_saturday_3, clinician_availability_end_saturday_3,
           clinician_availability_start_sunday_1, clinician_availability_end_sunday_1,
           clinician_availability_start_sunday_2, clinician_availability_end_sunday_2,
-          clinician_availability_start_sunday_3, clinician_availability_end_sunday_3
+          clinician_availability_start_sunday_3, clinician_availability_end_sunday_3,
+          clinician_calendar_start_time, clinician_calendar_end_time
         `)
         .eq('id', clinicianId)
         .single();
@@ -145,6 +152,16 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
       });
 
       setCurrentAvailability(availability);
+      
+      // Load calendar display settings
+      if (data.clinician_calendar_start_time) {
+        const startTime = data.clinician_calendar_start_time.substring(0, 5); // "08:00:00" -> "08:00"
+        setCalendarStartTime(startTime);
+      }
+      if (data.clinician_calendar_end_time) {
+        const endTime = data.clinician_calendar_end_time.substring(0, 5); // "21:00:00" -> "21:00"
+        setCalendarEndTime(endTime);
+      }
     } catch (error) {
       console.error('Error loading availability:', error);
       toast({
@@ -326,6 +343,57 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
     }
   };
 
+  const saveCalendarDisplaySettings = async () => {
+    if (!clinicianId) {
+      toast({
+        title: 'Error',
+        description: 'Missing clinician ID for saving display settings',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    if (calendarStartTime >= calendarEndTime) {
+      toast({
+        title: 'Validation Error',
+        description: 'Calendar end time must be after start time',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    try {
+      setIsSavingDisplay(true);
+
+      const { error } = await supabase
+        .from('clinicians')
+        .update({
+          clinician_calendar_start_time: calendarStartTime,
+          clinician_calendar_end_time: calendarEndTime
+        })
+        .eq('id', clinicianId);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Success',
+        description: 'Calendar display settings saved successfully'
+      });
+
+      // Trigger parent refresh to update calendar display
+      onRefresh();
+    } catch (error) {
+      console.error('Error saving calendar display settings:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to save calendar display settings',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsSavingDisplay(false);
+    }
+  };
+
   const formatTimeForDisplay = (time: string) => {
     const { hour, minute, ampm } = convertTimeToAMPM(time);
     return `${hour}:${minute} ${ampm}`;
@@ -500,7 +568,7 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <Label className="text-xs">Start Time</Label>
-                <Select defaultValue="08:00">
+                <Select value={calendarStartTime} onValueChange={setCalendarStartTime}>
                   <SelectTrigger className="h-8">
                     <SelectValue />
                   </SelectTrigger>
@@ -518,7 +586,7 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
               </div>
               <div>
                 <Label className="text-xs">End Time</Label>
-                <Select defaultValue="21:00">
+                <Select value={calendarEndTime} onValueChange={setCalendarEndTime}>
                   <SelectTrigger className="h-8">
                     <SelectValue />
                   </SelectTrigger>
@@ -535,8 +603,15 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
                 </Select>
               </div>
             </div>
-            <Button variant="outline" size="sm" className="w-full">
-              Save Display Settings
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="w-full"
+              onClick={saveCalendarDisplaySettings}
+              disabled={isSavingDisplay || isLoading}
+            >
+              <Save className="h-3 w-3 mr-1" />
+              {isSavingDisplay ? 'Saving...' : 'Save Display Settings'}
             </Button>
           </div>
         </div>
