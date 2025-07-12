@@ -400,9 +400,6 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
         description: 'Calendar display settings saved successfully'
       });
 
-      // Reload the availability data to update calendar display settings
-      await loadCurrentAvailability();
-      
       // Trigger parent refresh to update calendar display
       onRefresh();
     } catch (error) {

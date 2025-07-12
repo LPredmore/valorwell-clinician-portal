@@ -509,7 +509,11 @@ const CalendarContainer: React.FC = () => {
 
   const handleAvailabilityRefresh = useCallback(() => {
     setRefreshTrigger(prev => prev + 1);
-  }, []);
+    // Also refresh calendar display settings when availability changes
+    if (userId) {
+      loadCalendarDisplaySettings(userId);
+    }
+  }, [userId, loadCalendarDisplaySettings]);
 
   const handleAppointmentCreated = useCallback(() => {
     setRefreshTrigger(prev => prev + 1);
