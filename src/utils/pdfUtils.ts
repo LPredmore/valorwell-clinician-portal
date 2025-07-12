@@ -29,25 +29,9 @@ export const generateAndSavePDF = async (
       documentTitle: documentInfo.documentTitle
     });
 
-    // Step 0: Validate storage bucket exists
-    console.log('🪣 [PDF-GEN] Validating storage bucket...');
-    try {
-      const { data: buckets, error: bucketError } = await supabase.storage.listBuckets();
-      if (bucketError) {
-        console.error('❌ [PDF-GEN] Error listing buckets:', bucketError);
-        return null;
-      }
-      
-      const clinicalBucket = buckets?.find(b => b.name === 'Clinical Documents');
-      if (!clinicalBucket) {
-        console.error('❌ [PDF-GEN] Clinical documents bucket not found. Available buckets:', buckets?.map(b => b.name));
-        return null;
-      }
-      console.log('✅ [PDF-GEN] Storage bucket validated:', clinicalBucket.name);
-    } catch (bucketValidationError) {
-      console.error('❌ [PDF-GEN] Storage bucket validation failed:', bucketValidationError);
-      return null;
-    }
+    // Skip bucket validation - proceed directly to upload
+    // (Bucket validation fails with anon key due to RLS policies, but upload works)
+    console.log('🪣 [PDF-GEN] Proceeding with direct upload to Clinical Documents bucket...');
 
     // Format date for file naming
     const formattedDate = typeof documentInfo.documentDate === 'string' 
