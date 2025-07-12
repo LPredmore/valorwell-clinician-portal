@@ -204,12 +204,12 @@ export const getCalendarTimeBounds = (
   const startDateTime = currentDate.set({ hour: startHour, minute: startMinute });
   
   // CRITICAL: For 24-hour display (00:00 to 23:59), React Big Calendar needs
-  // the max time to be the NEXT day at midnight for proper display
+  // both times to be on the same day, with max time being 23:59
   let endDateTime;
   if (startHour === 0 && endHour === 23 && endMinute === 59) {
-    // 24-hour display: end time should be next day at midnight
-    endDateTime = currentDate.plus({ days: 1 }).set({ hour: 0, minute: 0 });
-    console.log('[getCalendarTimeBounds] DIAGNOSTIC: 24-hour display detected, using next-day midnight for end');
+    // 24-hour display: end time should be 23:59 on the same day
+    endDateTime = currentDate.set({ hour: 23, minute: 59 });
+    console.log('[getCalendarTimeBounds] DIAGNOSTIC: 24-hour display detected, using same-day 23:59 for end');
   } else {
     // Regular time range: use same day
     endDateTime = currentDate.set({ hour: endHour, minute: endMinute });
