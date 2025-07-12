@@ -31,7 +31,7 @@ export const generateAndSavePDF = async (
 
     // Skip bucket validation - proceed directly to upload
     // (Bucket validation fails with anon key due to RLS policies, but upload works)
-    console.log('🪣 [PDF-GEN] Proceeding with direct upload to Clinical Documents bucket...');
+    console.log('🪣 [PDF-GEN] Proceeding with direct upload to clinical_documents bucket...');
     
     // DEBUG: Log auth context before upload (simplified)
     console.debug('[PDF-GEN] Starting upload with Supabase client...');
@@ -180,7 +180,7 @@ export const generateAndSavePDF = async (
     
     // DEBUG: Pre-upload debug info
     console.debug('[PDF-GEN] Pre-upload debug info:', {
-      bucketName: 'Clinical Documents',
+      bucketName: 'clinical_documents',
       filePath,
       blobSize: pdfBlob.size,
       contentType: 'application/pdf',
@@ -197,7 +197,7 @@ export const generateAndSavePDF = async (
       console.log(`🔄 [PDF-GEN] Upload attempt ${attempt}/3`);
       
       const { data, error } = await supabase.storage
-        .from('Clinical Documents')
+        .from('clinical_documents')
         .upload(filePath, pdfBlob, {
           contentType: 'application/pdf',
           upsert: true
@@ -225,7 +225,7 @@ export const generateAndSavePDF = async (
         filePath,
         attempt,
         supabaseErrorContext: {
-          bucket: 'Clinical Documents',
+          bucket: 'clinical_documents',
           operation: 'upload',
           userRole: 'anon (assumed)'
         }
