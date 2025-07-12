@@ -37,11 +37,8 @@ export const useBlockedTime = (
   const fetchBlockedTimes = async () => {
     if (!clinicianId) return;
     
-    // CRITICAL: Don't fetch while timezone is loading or with invalid dates
-    if (!timeZone || timeZone === 'loading') {
-      console.log('[useBlockedTime] GUARD: Skipping fetch - timezone still loading');
-      return;
-    }
+    // Use browser timezone if no timezone provided
+    const effectiveTimeZone = timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone;
 
     // Validate dates before processing
     if (startDate && !isValidDate(startDate)) {
@@ -72,10 +69,10 @@ export const useBlockedTime = (
         .order('start_at');
 
       if (startDate && endDate) {
-        // FIXED: Convert boundaries to UTC using clinician's timezone before query
-        const startUTC = DateTime.fromJSDate(startDate, { zone: timeZone })
+        // Convert boundaries to UTC using effective timezone before query
+        const startUTC = DateTime.fromJSDate(startDate, { zone: effectiveTimeZone })
           .startOf('day').toUTC().toJSDate();
-        const endUTC = DateTime.fromJSDate(endDate, { zone: timeZone })
+        const endUTC = DateTime.fromJSDate(endDate, { zone: effectiveTimeZone })
           .endOf('day').plus({ days: 1 }).toUTC().toJSDate();
           
         // Validate converted dates before using them
@@ -90,7 +87,7 @@ export const useBlockedTime = (
           originalEnd: endDate.toISOString(),
           utcStart: startUTC.toISOString(),
           utcEnd: endUTC.toISOString(),
-          timezone: timeZone
+          timezone: effectiveTimeZone
         });
       }
 

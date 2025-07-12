@@ -33,7 +33,7 @@ const CalendarContainer: React.FC = () => {
   const { userId, authInitialized, userRole } = useUser();
   const { user } = useAuth();
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [userTimeZone, setUserTimeZone] = useState<string>('loading'); // CRITICAL: Start in loading state, never use hardcoded default
+  const [userTimeZone] = useState<string>(Intl.DateTimeFormat().resolvedOptions().timeZone); // Use browser timezone
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [navigationStateError, setNavigationStateError] = useState(false);
   const [calendarStartTime, setCalendarStartTime] = useState<string>('00:00');
@@ -48,8 +48,8 @@ const CalendarContainer: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // CRITICAL: Prevent all hook execution until timezone is completely loaded
-  const shouldExecuteHooks = userTimeZone !== 'loading' && userTimeZone !== null && userId;
+  // Allow hook execution with browser timezone
+  const shouldExecuteHooks = userId;
   
   console.log('[CalendarContainer] TIMEZONE LOADING STATE:', {
     shouldExecuteHooks,
@@ -67,16 +67,13 @@ const CalendarContainer: React.FC = () => {
     }
   }, [navigationStateError]);
 
-  // Calculate week boundaries using RBC-native approach
-  // CRITICAL: Recalculate UTC ranges when timezone changes to ensure proper event fetching
+  // Calculate week boundaries using browser timezone
   const { start: weekStart, end: weekEnd } = useMemo(() => {
-    // CRITICAL: Don't use 'loading' state for date calculations
-    if (!shouldExecuteHooks || userTimeZone === 'loading') {
+    if (!shouldExecuteHooks) {
       return { start: new Date(), end: new Date() };
     }
     try {
-      const tz = TimeZoneService.ensureIANATimeZone(userTimeZone);
-      return getWeekRange(currentDate, tz);
+      return getWeekRange(currentDate, userTimeZone);
     } catch (error) {
       console.error('[CalendarContainer] Error calculating week range:', error);
       return { start: new Date(), end: new Date() };
@@ -112,9 +109,8 @@ const CalendarContainer: React.FC = () => {
 
   // Separate real events from background availability
   const realEvents = useMemo((): CalendarEvent[] => {
-    console.debug('[realEvents useMemo] guard check', { userTimeZone, shouldExecuteHooks });
-    // CRITICAL: Don't process events while timezone is loading
-    if (!userTimeZone || userTimeZone === 'loading') {
+    console.debug('[realEvents useMemo] using browser timezone', { userTimeZone, shouldExecuteHooks });
+    if (!shouldExecuteHooks) {
       return [];
     }
 
@@ -285,9 +281,9 @@ const CalendarContainer: React.FC = () => {
 
   // Transform availability slots to background events
   const backgroundEvents = useMemo(() => {
-    // CRITICAL: Guard against loading state and invalid dates
-    if (!userTimeZone || userTimeZone === 'loading') {
-      console.log('[CalendarContainer] GUARD: backgroundEvents - timezone still loading');
+    // Guard against invalid dates
+    if (!shouldExecuteHooks) {
+      console.log('[CalendarContainer] GUARD: backgroundEvents - hooks not ready');
       return [];
     }
 
@@ -438,29 +434,7 @@ const CalendarContainer: React.FC = () => {
     });
   }, [availabilitySlots, weekStart, weekEnd, userTimeZone]);
 
-  // CRITICAL: Load ONLY clinician timezone (no browser fallback)
-  const loadUserTimeZone = useCallback(async (clinicianId: string) => {
-    try {
-      console.log('[CalendarContainer] CRITICAL: Loading clinician timezone (browser-independent):', clinicianId);
-      const timeZone = await getClinicianTimeZone(clinicianId);
-      const safeTimeZone = TimeZoneService.ensureIANATimeZone(timeZone);
-      
-      // Clear any navigation state errors before setting timezone
-      setNavigationStateError(false);
-      setUserTimeZone(safeTimeZone);
-      
-      console.log('[CalendarContainer] SUCCESS: Set clinician timezone and cleared navigation state:', {
-        originalTimeZone: timeZone,
-        safeTimeZone,
-        navigationStateCleared: true
-      });
-    } catch (error) {
-      console.error('[CalendarContainer] CRITICAL ERROR: Cannot load clinician timezone - calendar will not function:', error);
-      setNavigationStateError(true);
-      // ELIMINATED: Browser timezone fallback - calendar must wait for valid clinician timezone
-      throw new Error(`Calendar requires clinician timezone but failed to load for ${clinicianId}: ${error.message}`);
-    }
-  }, []);
+  // Removed loadUserTimeZone - using browser timezone only
 
   const loadCalendarDisplaySettings = useCallback(async (clinicianId: string) => {
     try {
@@ -580,12 +554,11 @@ const CalendarContainer: React.FC = () => {
     }
   }, [authInitialized, userId, userRole, navigate]);
 
-  // Timezone and calendar settings loading effect
+  // Calendar settings loading effect
   useEffect(() => {
     if (!userId) return;
-    loadUserTimeZone(userId);
     loadCalendarDisplaySettings(userId);
-  }, [userId, loadUserTimeZone, loadCalendarDisplaySettings]);
+  }, [userId, loadCalendarDisplaySettings]);
 
   // Debug: Log timezone changes to verify conversion triggers
   useEffect(() => {
@@ -596,17 +569,15 @@ const CalendarContainer: React.FC = () => {
     });
   }, [userTimeZone, weekStart, weekEnd]);
 
-  // CRITICAL: Move loading guard to very top - prevent ReactBigCalendar render with "loading" timezone
-  if (!authInitialized || !userId || !userTimeZone || userTimeZone === 'loading') {
+  // Move loading guard to very top - prevent ReactBigCalendar render with invalid state
+  if (!authInitialized || !userId) {
     return (
       <Layout>
         <div className="flex items-center justify-center h-full">
           <div className="text-center">
             <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
             <p className="text-muted-foreground">
-              {!authInitialized ? 'Initializing authentication...' : 
-               !userId ? 'Loading user...' : 
-               'Loading timezone...'}
+              {!authInitialized ? 'Initializing authentication...' : 'Loading user...'}
             </p>
           </div>
         </div>

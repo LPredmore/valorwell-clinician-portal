@@ -67,7 +67,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
   const [isInitialized, setIsInitialized] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [clinicianTimeZone, setClinicianTimeZone] = useState<string | null>(null);
+  // Removed clinician timezone - using browser timezone
   
   // Recurring appointment states
   const [isRecurring, setIsRecurring] = useState(false);
@@ -100,11 +100,10 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
     { value: 'PM', label: 'PM' }
   ];
 
-  // Load clients and clinician timezone when dialog opens
+  // Load clients when dialog opens
   useEffect(() => {
     if (isOpen && clinicianId) {
       loadClients();
-      loadClinicianTimeZone();
     }
   }, [isOpen, clinicianId]);
 
@@ -130,11 +129,9 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
         let startDateTime: DateTime | null = null;
         
         if (editingAppointment.start_at) {
-          startDateTime = DateTime.fromISO(editingAppointment.start_at, { zone: 'UTC' })
-            .setZone(editingAppointment.appointment_timezone || userTimeZone);
+          startDateTime = DateTime.fromISO(editingAppointment.start_at, { zone: 'UTC' });
         } else if (editingAppointment.start) {
-          startDateTime = DateTime.fromJSDate(editingAppointment.start)
-            .setZone(userTimeZone);
+          startDateTime = DateTime.fromJSDate(editingAppointment.start);
         }
         
         if (startDateTime) {
@@ -149,8 +146,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
       } else if (selectedSlot) {
         // Handle slot selection for new appointments
         if (selectedSlot.start) {
-          const startDateTime = DateTime.fromJSDate(selectedSlot.start)
-            .setZone(userTimeZone);
+          const startDateTime = DateTime.fromJSDate(selectedSlot.start);
           setDate(startDateTime.toFormat('yyyy-MM-dd'));
           const hour24 = startDateTime.hour;
           const hour12 = hour24 === 0 ? 12 : hour24 > 12 ? hour24 - 12 : hour24;
@@ -214,21 +210,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
     }
   };
 
-  const loadClinicianTimeZone = async () => {
-    try {
-      const timezone = await getClinicianTimeZone(clinicianId);
-      setClinicianTimeZone(timezone);
-      
-      console.log('[AppointmentDialog] Loaded clinician timezone:', {
-        clinicianId,
-        finalTimezone: timezone
-      });
-    } catch (error) {
-      console.error('Error loading clinician timezone:', error);
-      // Fallback to userTimeZone
-      setClinicianTimeZone(userTimeZone);
-    }
-  };
+  // Removed clinician timezone loading - using browser timezone
 
   // Get the client name for the selected client (for edit mode display)
   const getSelectedClientName = () => {
@@ -239,7 +221,6 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
 
   const createRecurringAppointments = async (baseData: any, recurringGroupId: string) => {
     const appointments = [];
-    const effectiveTimeZone = clinicianTimeZone || userTimeZone;
     
     // Convert the base start time to DateTime for calculations
     const baseStartDateTime = DateTime.fromISO(baseData.start_at, { zone: 'utc' });
@@ -301,13 +282,9 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
     try {
       setIsLoading(true);
 
-      // Use clinician's timezone for creation (like blocked time logic)
-      const effectiveTimeZone = clinicianTimeZone || userTimeZone;
-      
-      console.log('[AppointmentDialog] Using clinician timezone for creation:', {
-        clinicianTimeZone,
+      // Use browser timezone for creation
+      console.log('[AppointmentDialog] Using browser timezone for creation:', {
         userTimeZone,
-        effectiveTimeZone,
         isEdit: isEditMode
       });
 
@@ -321,14 +298,13 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
 
       const localDateTimeStart = `${date}T${hour24.toString().padStart(2, '0')}:${startMinute}`;
       
-      console.log('[AppointmentDialog] Converting times using clinician timezone:', {
+      console.log('[AppointmentDialog] Converting times using browser timezone:', {
         localDateTimeStart,
-        effectiveTimeZone,
         isEdit: isEditMode
       });
 
-      // Use unified timezone helper with clinician's timezone
-      const startAtUtcString = formInputToUTC(localDateTimeStart, effectiveTimeZone);
+      // Use unified timezone helper with browser timezone
+      const startAtUtcString = formInputToUTC(localDateTimeStart);
       const startAtUTC = DateTime.fromISO(startAtUtcString, { zone: 'UTC' });
       const endAtUTC = startAtUTC.plus({ hours: 1 });
 
@@ -337,7 +313,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
         clinician_id: clinicianId,
         start_at: startAtUtcString,
         end_at: endAtUTC.toISO(),
-        appointment_timezone: effectiveTimeZone,
+        appointment_timezone: userTimeZone,
         type: 'therapy_session',
         status: 'scheduled',
         notes: notes || null
@@ -497,7 +473,6 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
       setIsLoading(true);
       
       // Remove from recurring group and update
-      const effectiveTimeZone = clinicianTimeZone || userTimeZone;
       let hour24 = parseInt(startHour);
       if (startAMPM === 'PM' && hour24 !== 12) {
         hour24 += 12;
@@ -506,7 +481,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
       }
 
       const localDateTimeStart = `${date}T${hour24.toString().padStart(2, '0')}:${startMinute}`;
-      const startAtUtcString = formInputToUTC(localDateTimeStart, effectiveTimeZone);
+      const startAtUtcString = formInputToUTC(localDateTimeStart);
       const startAtUTC = DateTime.fromISO(startAtUtcString, { zone: 'UTC' });
       const endAtUTC = startAtUTC.plus({ hours: 1 });
 
@@ -516,7 +491,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
           client_id: selectedClientId,
           start_at: startAtUtcString,
           end_at: endAtUTC.toISO(),
-          appointment_timezone: effectiveTimeZone,
+          appointment_timezone: userTimeZone,
           notes: notes || null,
           recurring_group_id: null,
           appointment_recurring: null
@@ -552,7 +527,6 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
       setIsLoading(true);
       
       // Update all future appointments in the series
-      const effectiveTimeZone = clinicianTimeZone || userTimeZone;
       let hour24 = parseInt(startHour);
       if (startAMPM === 'PM' && hour24 !== 12) {
         hour24 += 12;
@@ -561,7 +535,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
       }
 
       const localDateTimeStart = `${date}T${hour24.toString().padStart(2, '0')}:${startMinute}`;
-      const startAtUtcString = formInputToUTC(localDateTimeStart, effectiveTimeZone);
+      const startAtUtcString = formInputToUTC(localDateTimeStart);
       const startAtUTC = DateTime.fromISO(startAtUtcString, { zone: 'UTC' });
       
       // Get the original appointment start time to calculate time difference
@@ -590,7 +564,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
           client_id: selectedClientId,
           start_at: newAptStart.toISO(),
           end_at: newAptEnd.toISO(),
-          appointment_timezone: effectiveTimeZone,
+          appointment_timezone: userTimeZone,
           notes: notes || null
         };
       }) || [];
@@ -815,11 +789,9 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
               />
             )}
 
-            {(clinicianTimeZone || userTimeZone) && (
-              <div className="text-sm text-gray-500 text-center">
-                Times will be saved in timezone: {clinicianTimeZone || userTimeZone} | Duration: 1 hour
-              </div>
-            )}
+            <div className="text-sm text-gray-500 text-center">
+              Times will be saved in timezone: {userTimeZone} | Duration: 1 hour
+            </div>
 
             <div className="flex justify-between pt-4">
               <div>

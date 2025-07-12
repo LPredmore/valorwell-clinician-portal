@@ -25,8 +25,8 @@ export const useCalendarState = (initialClinicianId: string | null = null) => {
   const [loadingClients, setLoadingClients] = useState(false);
   const [appointmentRefreshTrigger, setAppointmentRefreshTrigger] = useState(0);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [userTimeZone, setUserTimeZone] = useState<string>('loading'); // CRITICAL: Start in loading state, never use hardcoded default
-  const [isLoadingTimeZone, setIsLoadingTimeZone] = useState(true);
+  const [userTimeZone] = useState<string>(Intl.DateTimeFormat().resolvedOptions().timeZone); // Use browser timezone
+  const [isLoadingTimeZone] = useState(false); // Never loading since we use browser timezone
   const [isMounted, setIsMounted] = useState(true);
 
   const formattedClinicianId = useMemo(() => ensureStringId(selectedClinicianId), [selectedClinicianId]);
@@ -39,37 +39,7 @@ export const useCalendarState = (initialClinicianId: string | null = null) => {
     };
   }, []);
 
-  // Stabilized timezone fetch function
-  const fetchClinicianTimeZone = useCallback(async (clinicianId: string) => {
-    if (!isMounted) return;
-    
-    setIsLoadingTimeZone(true);
-    
-    try {
-      console.log("[useCalendarState] Fetching timezone for:", clinicianId);
-      const timeZone = await getClinicianTimeZone(clinicianId);
-      
-      if (!isMounted) return;
-      
-      if (timeZone) {
-        setUserTimeZone(TimeZoneService.ensureIANATimeZone(timeZone));
-      } else {
-        // CRITICAL: NO browser timezone fallback - clinician timezone is required
-        console.error("[useCalendarState] CRITICAL: No clinician timezone found for:", clinicianId);
-        setUserTimeZone('loading'); // Set loading state, never use browser timezone
-      }
-    } catch (error) {
-      console.error("[useCalendarState] CRITICAL: Failed to load clinician timezone:", error);
-      if (isMounted) {
-        // CRITICAL: NO browser timezone fallback - keep in loading state
-        setUserTimeZone('loading');
-      }
-    } finally {
-      if (isMounted) {
-        setIsLoadingTimeZone(false);
-      }
-    }
-  }, [isMounted]);
+  // Removed timezone fetch function - now using browser timezone only
 
   // Stabilized clinicians fetch function
   const fetchClinicians = useCallback(async () => {
@@ -166,12 +136,7 @@ export const useCalendarState = (initialClinicianId: string | null = null) => {
     }
   }, [isMounted]);
 
-  // Set user timezone based on clinician settings - STABILIZED
-  useEffect(() => {
-    if (!formattedClinicianId || !isMounted) return;
-    
-    fetchClinicianTimeZone(formattedClinicianId);
-  }, [formattedClinicianId, fetchClinicianTimeZone, isMounted]);
+  // Removed timezone loading effect - now using browser timezone only
 
   // Load clinicians - STABILIZED
   useEffect(() => {

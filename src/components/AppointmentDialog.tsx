@@ -97,7 +97,7 @@ export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
     if (initialData && initialData.start) {
       // Convert JavaScript Date to UTC, then to form input format
       const utcISO = initialData.start.toISOString();
-      const startTime = utcToFormInput(utcISO, clinicianTimeZone);
+      const startTime = utcToFormInput(utcISO);
       
       console.log('[AppointmentDialog] Unified form initialization:', {
         originalStart: initialData.start.toISOString(),
@@ -141,7 +141,7 @@ export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
 
     try {
       // Use unified conversion: form input → UTC for storage
-      const startUtc = formInputToUTC(formData.startTime, clinicianTimeZone);
+      const startUtc = formInputToUTC(formData.startTime);
       
       // Calculate end time (start + 1 hour) in UTC
       const startDT = DateTime.fromISO(startUtc, { zone: 'UTC' });

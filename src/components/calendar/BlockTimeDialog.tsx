@@ -70,7 +70,7 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
   const [blockLabel, setBlockLabel] = useState('Blocked');
   const [notes, setNotes] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [clinicianTimeZone, setClinicianTimeZone] = useState<string>('loading');
+  // Removed clinician timezone - using browser timezone
   const { toast } = useToast();
   const { createBlockedTime } = useBlockedTime(clinicianId || '');
 
@@ -78,23 +78,6 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
 
   useEffect(() => {
     if (isOpen && clinicianId) {
-      const loadClinicianTimeZone = async () => {
-        try {
-          const timeZone = await getClinicianTimeZone(clinicianId);
-          setClinicianTimeZone(timeZone);
-          console.log('[BlockTimeDialog] Loaded clinician timezone:', timeZone);
-        } catch (error) {
-          console.error('[BlockTimeDialog] Failed to load clinician timezone:', error);
-          toast({
-            title: "Error",
-            description: "Failed to load timezone settings",
-            variant: "destructive"
-          });
-        }
-      };
-
-      loadClinicianTimeZone();
-      
       // Reset form when dialog opens
       setSelectedDate(new Date());
       setStartTime('09:00');
@@ -143,9 +126,7 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
       return 'End time must be after start time';
     }
 
-    if (!clinicianTimeZone || clinicianTimeZone === 'loading') {
-      return 'Clinician timezone not loaded';
-    }
+    // Removed timezone validation - using browser timezone
 
     console.log(`[BlockTimeDialog] ${timestamp} Validation passed for clinician ID:`, clinicianId);
     return null;
@@ -158,7 +139,7 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
       type: typeof clinicianId,
       isValidUUID: isValidUUID(clinicianId),
       trimmedValue: clinicianId?.trim(),
-      clinicianTimeZone
+      browserTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
     });
 
     const validationError = validateInputs();
@@ -178,15 +159,14 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
       console.log(`[BlockTimeDialog] ${timestamp} Proceeding with valid clinician ID:`, clinicianId);
 
       const dateString = format(selectedDate!, 'yyyy-MM-dd');
-      const startAtUTC = formInputToUTC(`${dateString}T${startTime}`, clinicianTimeZone);
-      const endAtUTC = formInputToUTC(`${dateString}T${endTime}`, clinicianTimeZone);
+      const startAtUTC = formInputToUTC(`${dateString}T${startTime}`);
+      const endAtUTC = formInputToUTC(`${dateString}T${endTime}`);
 
       console.log(`[BlockTimeDialog] ${timestamp} Creating blocked time slot:`, {
         clinician_id: clinicianId,
         dateString,
         startTime,
         endTime,
-        clinicianTimeZone,
         startAtUTC,
         endAtUTC,
         label: blockLabel,
@@ -252,7 +232,7 @@ const BlockTimeDialog: React.FC<BlockTimeDialogProps> = ({
               Clinician ID: {clinicianId || 'null/undefined'}<br />
               Type: {typeof clinicianId}<br />
               Valid UUID: {isValidUUID(clinicianId) ? 'Yes' : 'No'}<br />
-              Clinician Timezone: {clinicianTimeZone || 'not set'}
+              Using Browser Timezone: {Intl.DateTimeFormat().resolvedOptions().timeZone}
             </div>
           )}
 

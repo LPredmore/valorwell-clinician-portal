@@ -50,47 +50,38 @@ export const createDateTime = (dateStr: string, timeStr: string, timezone: strin
 };
 
 /**
- * Convert form datetime-local input to UTC for storage
+ * Convert form datetime-local input to UTC for storage using browser timezone
  * @param datetimeLocalStr String from datetime-local input (YYYY-MM-DDTHH:MM)
- * @param timezone The clinician's timezone
  * @returns UTC ISO string for database storage
  */
-export const formInputToUTC = (datetimeLocalStr: string, timezone: string): string => {
-  const safeTimezone = TimeZoneService.ensureIANATimeZone(timezone);
-  
-  // Parse the form input in the clinician's timezone
-  const localDateTime = DateTime.fromISO(datetimeLocalStr, { zone: safeTimezone });
+export const formInputToUTC = (datetimeLocalStr: string): string => {
+  // Parse the form input in the browser's timezone
+  const localDateTime = DateTime.fromISO(datetimeLocalStr);
   
   // Convert to UTC for storage
   return localDateTime.toUTC().toISO();
 };
 
 /**
- * Convert UTC timestamp to datetime-local format for form display
+ * Convert UTC timestamp to datetime-local format for form display using browser timezone
  * @param utcString UTC timestamp string
- * @param timezone The clinician's timezone
  * @returns String in YYYY-MM-DDTHH:MM format for datetime-local input
  */
-export const utcToFormInput = (utcString: string, timezone: string): string => {
-  const safeTimezone = TimeZoneService.ensureIANATimeZone(timezone);
-  
-  // Convert UTC to clinician timezone
-  const localDateTime = DateTime.fromISO(utcString, { zone: 'UTC' }).setZone(safeTimezone);
+export const utcToFormInput = (utcString: string): string => {
+  // Convert UTC to browser timezone
+  const localDateTime = DateTime.fromISO(utcString, { zone: 'UTC' });
   
   // Format for datetime-local input
   return localDateTime.toFormat("yyyy-MM-dd'T'HH:mm");
 };
 
 /**
- * Convert UTC timestamp to JavaScript Date for React Big Calendar
- * This ensures events position correctly on the calendar
+ * Convert UTC timestamp to JavaScript Date for React Big Calendar using browser timezone
  * @param utcString UTC timestamp string
- * @param timezone The clinician's timezone for display
  * @returns JavaScript Date object
  */
-export const utcToCalendarDate = (utcString: string, timezone: string): Date => {
-  console.debug('[utcToCalendarDate] args:', { utcString, timezone });
-  const safeTimezone = TimeZoneService.ensureIANATimeZone(timezone);
+export const utcToCalendarDate = (utcString: string): Date => {
+  console.debug('[utcToCalendarDate] args:', { utcString });
   
   // CRITICAL: Validate UTC string format
   if (!utcString || typeof utcString !== 'string') {
@@ -99,28 +90,13 @@ export const utcToCalendarDate = (utcString: string, timezone: string): Date => 
   }
   
   try {
-    // Convert UTC to clinician timezone
-    const localDateTime = DateTime.fromISO(utcString, { zone: 'UTC' }).setZone(safeTimezone);
-    
-    // CRITICAL: Validate DateTime before conversion
-    if (!localDateTime.isValid) {
-      console.error('[utcToCalendarDate] Invalid DateTime object:', {
-        utcString,
-        timezone: safeTimezone,
-        error: localDateTime.invalidReason,
-        explanation: localDateTime.invalidExplanation
-      });
-      return new Date(); // Return current time as fallback
-    }
-    
-    // Convert to JS Date with additional validation
-    const jsDate = localDateTime.toJSDate();
+    // Direct conversion using browser timezone
+    const jsDate = new Date(utcString);
     
     // CRITICAL: Validate the resulting JavaScript Date
     if (!jsDate || isNaN(jsDate.getTime())) {
       console.error('[utcToCalendarDate] Invalid JavaScript Date result:', {
         utcString,
-        timezone: safeTimezone,
         jsDate,
         dateTime: jsDate?.getTime()
       });
@@ -131,7 +107,6 @@ export const utcToCalendarDate = (utcString: string, timezone: string): Date => 
   } catch (error) {
     console.error('[utcToCalendarDate] Exception during conversion:', {
       utcString,
-      timezone: safeTimezone,
       error: error.message
     });
     return new Date(); // Return current time as fallback
