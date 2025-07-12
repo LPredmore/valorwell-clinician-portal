@@ -62,7 +62,7 @@ const InsuranceTab: React.FC<TabProps> = ({
                 <FormField control={form.control} name="client_champva" render={({
             field
           }) => <FormItem>
-                      <FormLabel>CHAMPVA #</FormLabel>
+                      <FormLabel>CHAMPVA</FormLabel>
                       <FormControl>
                         
                       </FormControl>
