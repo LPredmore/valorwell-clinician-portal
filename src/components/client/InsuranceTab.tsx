@@ -16,35 +16,37 @@ const InsuranceTab: React.FC<TabProps> = ({
   clientData
 }) => {
   return <>
-      <Card>
-        <CardHeader>
-          <CardTitle>Primary Insurance</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 gap-4">
-            <FormField control={form.control} name="client_insurance_company_primary" render={({
-            field
-          }) => <FormItem>
-                  <FormLabel>Insurance Company</FormLabel>
-                  <FormControl>
-                    <Input {...field} readOnly={!isEditing} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>} />
-            <FormField control={form.control} name="client_insurance_type_primary" render={({
-            field
-          }) => (
-                <FormItem>
-                  <FormLabel>Insurance Type</FormLabel>
-                  <FormControl>
-                    <Input {...field} readOnly={!isEditing} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-          </div>
-        </CardContent>
-      </Card>
+      {clientData?.client_insurance_company_primary && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Primary Insurance</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-4">
+              <FormField control={form.control} name="client_insurance_company_primary" render={({
+              field
+            }) => <FormItem>
+                    <FormLabel>Insurance Company</FormLabel>
+                    <FormControl>
+                      <Input {...field} readOnly={!isEditing} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>} />
+              <FormField control={form.control} name="client_insurance_type_primary" render={({
+              field
+            }) => (
+                  <FormItem>
+                    <FormLabel>Insurance Type</FormLabel>
+                    <FormControl>
+                      <Input {...field} readOnly={!isEditing} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {clientData?.client_vacoverage && <Card className="mt-4">
           <CardHeader>
