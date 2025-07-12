@@ -2,6 +2,10 @@
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { supabase } from '@/integrations/supabase/client';
+import { Upload } from 'tus-js-client';
+
+const supabaseUrl = 'https://gqlkritspnhjxfejvgfg.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdxbGtyaXRzcG5oanhmZWp2Z2ZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI3NjQ0NDUsImV4cCI6MjA1ODM0MDQ0NX0.BtnTfcjvHI55_fs_zor9ffQ9Aclg28RSfvgZrWpMuYs';
 
 interface DocumentInfo {
   clientId: string;
@@ -9,6 +13,37 @@ interface DocumentInfo {
   documentDate: string | Date;
   documentTitle: string;
   createdBy?: string;
+}
+
+// Create a TUS resumable upload
+async function uploadLargeFile(bucketId: string, filePath: string, fileBlob: Blob): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    const upload = new Upload(fileBlob, {
+      endpoint: `${supabaseUrl}/storage/v1/upload/resumable`,
+      retryDelays: [0, 1000, 3000, 5000],
+      metadata: { bucketName: bucketId, objectName: filePath },
+      headers: { 
+        Authorization: `Bearer ${supabaseKey}`, 
+        'x-upsert': 'true' 
+      },
+      uploadDataDuringCreation: true,
+      onError: (err) => {
+        console.error('❌ [PDF-GEN] TUS upload failed:', err);
+        reject(err);
+      },
+      onSuccess: () => {
+        console.log('✅ [PDF-GEN] TUS upload succeeded');
+        resolve();
+      },
+      onProgress: (bytesUploaded, bytesTotal) => {
+        const percentage = ((bytesUploaded / bytesTotal) * 100).toFixed(2);
+        console.log(`📊 [PDF-GEN] Upload progress: ${percentage}% (${bytesUploaded}/${bytesTotal} bytes)`);
+      }
+    });
+    
+    console.log('🚀 [PDF-GEN] Starting TUS resumable upload...');
+    upload.start();
+  });
 }
 
 /**
@@ -176,7 +211,7 @@ export const generateAndSavePDF = async (
       return null;
     }
     
-    console.log('📤 [PDF-GEN] Attempting storage upload...');
+    console.log('📤 [PDF-GEN] Attempting resumable upload with TUS...');
     
     // DEBUG: Pre-upload debug info
     console.debug('[PDF-GEN] Pre-upload debug info:', {
@@ -186,55 +221,28 @@ export const generateAndSavePDF = async (
       contentType: 'application/pdf',
       hasFile: !!pdfBlob,
       currentUser: 'anon (assumed)',
-      uploadOptions: { contentType: 'application/pdf', upsert: true }
+      uploadMethod: 'TUS resumable'
     });
     
-    // Try upload with retry logic
+    // Use TUS resumable upload instead of standard upload
     let uploadError = null;
     let uploadSuccess = false;
     
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      console.log(`🔄 [PDF-GEN] Upload attempt ${attempt}/3`);
-      
-      const { data, error } = await supabase.storage
-        .from('clinical_documents')
-        .upload(filePath, pdfBlob, {
-          contentType: 'application/pdf',
-          upsert: true
-        });
-      
-      if (!error) {
-        uploadSuccess = true;
-        uploadError = null;
-        console.log(`✅ [PDF-GEN] Upload attempt ${attempt} succeeded:`, {
-          data,
-          filePath,
-          uploadedPath: data?.path || 'unknown'
-        });
-        break;
-      }
-      
+    try {
+      await uploadLargeFile('clinical_documents', filePath, pdfBlob);
+      console.log('✅ [PDF-GEN] Resumable upload completed successfully');
+      uploadSuccess = true;
+      uploadError = null;
+    } catch (error) {
       uploadError = error;
-      console.error(`❌ [PDF-GEN] Upload attempt ${attempt} failed with full error details:`, {
+      uploadSuccess = false;
+      console.error('❌ [PDF-GEN] TUS upload failed with error:', {
         error,
-        errorMessage: error.message,
-        errorName: error.name,
-        errorCode: (error as any)?.statusCode || 'unknown',
-        errorDetails: (error as any)?.details || 'none',
-        errorHint: (error as any)?.hint || 'none',
+        errorMessage: error instanceof Error ? error.message : 'Unknown error',
         filePath,
-        attempt,
-        supabaseErrorContext: {
-          bucket: 'clinical_documents',
-          operation: 'upload',
-          userRole: 'anon (assumed)'
-        }
+        blobSize: pdfBlob.size,
+        uploadMethod: 'TUS resumable'
       });
-      
-      if (attempt < 3) {
-        console.log(`🔄 [PDF-GEN] Retrying in ${attempt * 1000}ms...`);
-        await new Promise(resolve => setTimeout(resolve, attempt * 1000));
-      }
     }
     
     if (!uploadSuccess || uploadError) {
@@ -254,7 +262,7 @@ export const generateAndSavePDF = async (
     console.log('🔍 [PDF-GEN] Verifying upload...');
     try {
       const { data: fileList, error: listError } = await supabase.storage
-        .from('Clinical Documents')
+        .from('clinical_documents')
         .list(filePath.substring(0, filePath.lastIndexOf('/')));
       
       if (listError) {
