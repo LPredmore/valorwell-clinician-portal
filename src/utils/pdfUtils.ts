@@ -121,13 +121,14 @@ export const generateAndSavePDF = async (
     const margin = 10; // margin in mm
     const contentWidth = pdfWidth - (margin * 2);
     
-    // Create canvas from the prepared clone
+    // Create canvas from the prepared clone with very conservative settings
     const canvas = await html2canvas(clone, {
-      scale: 1, // Reduced from 2 to 1 to prevent massive file sizes (was causing 62MB PDFs)
+      scale: 0.5, // Very aggressive reduction to prevent massive file sizes
       useCORS: true,
       logging: false,
       backgroundColor: '#ffffff',
       windowWidth: clone.offsetWidth,
+      removeContainer: true,
       onclone: clonedDoc => {
         // Process all form elements in the cloned document
         const clonedElement = clonedDoc.body.lastChild as HTMLElement;
@@ -147,6 +148,8 @@ export const generateAndSavePDF = async (
         });
       }
     });
+
+    console.log(`🔍 [PDF-GEN] Canvas dimensions: ${canvas.width}x${canvas.height}, Scale: 0.5`);
     
     // Calculate scaling for the PDF
     const imgWidth = contentWidth;
