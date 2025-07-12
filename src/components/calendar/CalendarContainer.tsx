@@ -88,7 +88,7 @@ const CalendarContainer: React.FC = () => {
     shouldExecuteHooks ? userId : null,
     shouldExecuteHooks ? weekStart : new Date(),
     shouldExecuteHooks ? weekEnd : new Date(),
-    shouldExecuteHooks ? userTimeZone : 'loading',
+    shouldExecuteHooks ? userTimeZone : undefined,
     shouldExecuteHooks ? refreshTrigger : 0
   );
 
@@ -101,7 +101,7 @@ const CalendarContainer: React.FC = () => {
     shouldExecuteHooks ? (userId || '') : '',
     shouldExecuteHooks ? weekStart : new Date(),
     shouldExecuteHooks ? weekEnd : new Date(),
-    shouldExecuteHooks ? userTimeZone : 'loading',
+    shouldExecuteHooks ? userTimeZone : undefined,
     shouldExecuteHooks ? refreshTrigger : 0
   );
 
