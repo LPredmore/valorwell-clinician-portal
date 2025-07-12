@@ -55,8 +55,11 @@ export const createDateTime = (dateStr: string, timeStr: string, timezone: strin
  * @returns UTC ISO string for database storage
  */
 export const formInputToUTC = (datetimeLocalStr: string): string => {
-  // Parse the form input in the browser's timezone
-  const localDateTime = DateTime.fromISO(datetimeLocalStr);
+  // Get the browser's timezone
+  const browserTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  
+  // Parse the form input explicitly in the browser's timezone
+  const localDateTime = DateTime.fromISO(datetimeLocalStr, { zone: browserTimeZone });
   
   // Convert to UTC for storage
   return localDateTime.toUTC().toISO();

@@ -313,7 +313,6 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
         clinician_id: clinicianId,
         start_at: startAtUtcString,
         end_at: endAtUTC.toISO(),
-        appointment_timezone: userTimeZone,
         type: 'therapy_session',
         status: 'scheduled',
         notes: notes || null
@@ -491,7 +490,6 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
           client_id: selectedClientId,
           start_at: startAtUtcString,
           end_at: endAtUTC.toISO(),
-          appointment_timezone: userTimeZone,
           notes: notes || null,
           recurring_group_id: null,
           appointment_recurring: null
