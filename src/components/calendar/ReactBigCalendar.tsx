@@ -86,7 +86,7 @@ const ReactBigCalendar: React.FC<ExtendedReactBigCalendarProps> = ({
   // Get calendar time bounds using unified timezone handling
   const { start: minTime, end: maxTime } = useMemo(() => {
     try {
-      const bounds = getCalendarTimeBounds(calendarStartTime, calendarEndTime, userTimeZone);
+      const bounds = getCalendarTimeBounds(calendarStartTime, calendarEndTime);
       
       // Phase 1: Browser vs User Timezone Diagnostic
       console.log('[ReactBigCalendar] TIMEZONE DIAGNOSTIC:', {
@@ -136,7 +136,7 @@ const ReactBigCalendar: React.FC<ExtendedReactBigCalendarProps> = ({
       console.error('[ReactBigCalendar] CRITICAL: Using emergency 24-hour fallback');
       return { start: fallbackStart, end: fallbackEnd };
     }
-  }, [calendarStartTime, calendarEndTime, userTimeZone]);
+  }, [calendarStartTime, calendarEndTime]);
 
   // CRITICAL: Validate all events and background events before passing to RBC
   const validatedEvents = useMemo(() => {

@@ -148,35 +148,15 @@ export const utcToCalendarDate = (utcString: string, timezone: string): Date => 
  */
 export const getCalendarTimeBounds = (
   startTime: string, 
-  endTime: string, 
-  timezone: string
+  endTime: string
 ): { start: Date; end: Date } => {
-  // CRITICAL: Handle "loading" timezone gracefully with safe fallback
-  if (timezone === 'loading') {
-    console.log('[getCalendarTimeBounds] LOADING GUARD: Timezone loading, returning safe 24-hour fallback');
-    const today = new Date();
-    const startJSDate = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0);
-    const endJSDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1, 0, 0, 0);
-    return { start: startJSDate, end: endJSDate };
-  }
+  // Use browser's local timezone exclusively
+  console.log('[getCalendarTimeBounds] BROWSER TIMEZONE MODE: Using local timezone only');
   
-  // Additional validation for edge cases
-  if (!timezone || typeof timezone !== 'string') {
-    console.error('[getCalendarTimeBounds] DEFENSIVE GUARD: Invalid timezone value:', { timezone, type: typeof timezone });
-    const today = new Date();
-    const startJSDate = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0);
-    const endJSDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1, 0, 0, 0);
-    return { start: startJSDate, end: endJSDate };
-  }
-  
-  const safeTimezone = TimeZoneService.ensureIANATimeZone(timezone);
-  
-  console.log('[getCalendarTimeBounds] TIMEZONE VALIDATION:', {
-    originalTimezone: timezone,
-    safeTimezone,
+  console.log('[getCalendarTimeBounds] BROWSER TIMEZONE:', {
+    browserTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     startTime,
-    endTime,
-    isLoadingState: timezone === 'loading'
+    endTime
   });
   
   // Parse and validate time strings
@@ -196,8 +176,8 @@ export const getCalendarTimeBounds = (
     throw new Error(`Invalid time values: ${startTime} or ${endTime}`);
   }
   
-  // Use current date in timezone for consistent calendar display
-  const now = DateTime.now().setZone(safeTimezone);
+  // Use current date in browser's local timezone
+  const now = DateTime.now(); // Uses browser's local timezone
   const currentDate = now.startOf('day');
   
   // Create start time on current date
@@ -224,11 +204,10 @@ export const getCalendarTimeBounds = (
   const endJSDate = endDateTime.toJSDate();
   
   // Phase 2: Validate Time Zone Service
-  console.log('[getCalendarTimeBounds] DETAILED CONVERSION TRACE:', {
+  console.log('[getCalendarTimeBounds] BROWSER TIMEZONE CONVERSION:', {
     inputStartTime: startTime,
     inputEndTime: endTime,
-    inputTimezone: timezone,
-    safeTimezone: safeTimezone,
+    browserTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     
     // Show intermediate DateTime objects
     startDateTimeISO: startDateTime.toISO(),
@@ -249,13 +228,13 @@ export const getCalendarTimeBounds = (
     endHourLocal: endJSDate.getHours(),
   });
   
-  console.log('[getCalendarTimeBounds] CALENDAR TIME BOUNDS VALIDATION:', {
+  console.log('[getCalendarTimeBounds] BROWSER TIMEZONE VALIDATION:', {
     startTime: startDateTime.toISO(),
     endTime: endDateTime.toISO(),
     startJSDate: startJSDate.toISOString(),
     endJSDate: endJSDate.toISOString(),
     is24Hour: startHour === 0 && endHour === 23 && endMinute === 59,
-    timezone: safeTimezone,
+    browserTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     hourSpan: Math.abs(endJSDate.getTime() - startJSDate.getTime()) / (1000 * 60 * 60),
     spansMultipleDays: startJSDate.getDate() !== endJSDate.getDate(),
     message: startHour === 0 && endHour === 23 && endMinute === 59 ? 

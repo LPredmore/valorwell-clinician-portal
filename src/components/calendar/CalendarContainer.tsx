@@ -83,12 +83,12 @@ const CalendarContainer: React.FC = () => {
     }
   }, [currentDate, userTimeZone, shouldExecuteHooks]);
 
-  // CRITICAL: Conditional hook execution - prevent execution during loading
+  // Use browser timezone only - no profile timezone injection
   const { appointments } = useAppointments(
     shouldExecuteHooks ? userId : null,
     shouldExecuteHooks ? weekStart : new Date(),
     shouldExecuteHooks ? weekEnd : new Date(),
-    shouldExecuteHooks ? userTimeZone : undefined,
+    undefined, // No timezone parameter - use browser default
     shouldExecuteHooks ? refreshTrigger : 0
   );
 
@@ -101,7 +101,7 @@ const CalendarContainer: React.FC = () => {
     shouldExecuteHooks ? (userId || '') : '',
     shouldExecuteHooks ? weekStart : new Date(),
     shouldExecuteHooks ? weekEnd : new Date(),
-    shouldExecuteHooks ? userTimeZone : undefined,
+    undefined, // No timezone parameter - use browser default
     shouldExecuteHooks ? refreshTrigger : 0
   );
 
@@ -124,8 +124,9 @@ const CalendarContainer: React.FC = () => {
     if (appointments) {
       appointments.forEach(apt => {
         try {
-          const startDate = utcToCalendarDate(apt.start_at, userTimeZone);
-          const endDate = utcToCalendarDate(apt.end_at, userTimeZone);
+          // Use browser timezone for calendar display
+          const startDate = new Date(apt.start_at);
+          const endDate = new Date(apt.end_at);
           
           // CRITICAL: Validate dates before adding to events
           if (!startDate || !endDate || isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
@@ -215,8 +216,9 @@ const CalendarContainer: React.FC = () => {
     if (blockedTimes) {
       blockedTimes.forEach(blockedTime => {
         try {
-          const startDate = utcToCalendarDate(blockedTime.start_at, userTimeZone);
-          const endDate = utcToCalendarDate(blockedTime.end_at, userTimeZone);
+          // Use browser timezone for calendar display
+          const startDate = new Date(blockedTime.start_at);
+          const endDate = new Date(blockedTime.end_at);
           
           // CRITICAL: Validate dates before adding to events
           if (!startDate || !endDate || isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
