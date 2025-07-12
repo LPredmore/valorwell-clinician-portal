@@ -135,22 +135,8 @@ export const generateAndSavePDF = async (
       .from('clinical_documents')
       .getPublicUrl(filePath);
     
-    // Step 4: Save document metadata to clinical_documents table
-    const { error: dbError } = await supabase
-      .from('clinical_documents')
-      .insert({
-        client_id: documentInfo.clientId,
-        document_type: documentInfo.documentType,
-        document_date: formattedDate,
-        document_title: documentInfo.documentTitle,
-        file_path: filePath,
-        created_by: documentInfo.createdBy
-      });
-    
-    if (dbError) {
-      console.error('Error saving document metadata:', dbError);
-      return null;
-    }
+    // Note: Document metadata is now saved separately by the calling function
+    // This function only handles PDF generation and storage
     
     return filePath;
   } catch (error) {

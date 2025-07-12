@@ -445,45 +445,95 @@ export const useSessionNoteForm = ({
         }
       }
 
-      if (contentRef?.current && appointment?.date) {
-        const sessionDate = new Date(appointment.date).toISOString().split('T')[0];
-        const clientName = formState.patientName || 'Unknown Client';
-        const documentInfo = {
-          clientId: clientData.id,
-          documentType: 'session_note',
-          documentDate: sessionDate,
-          documentTitle: `Session Note - ${clientName} - ${sessionDate}`,
-          createdBy: clinicianName
-        };
+      // Always save document metadata first, regardless of PDF generation
+      const sessionDate = appointment?.date ? new Date(appointment.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+      const clientName = formState.patientName || 'Unknown Client';
+      
+      const documentInfo = {
+        clientId: clientData.id,
+        documentType: 'Session Note', // Use consistent naming with treatment plans
+        documentDate: sessionDate,
+        documentTitle: `Session Note - ${clientName} - ${sessionDate}`,
+        createdBy: clinicianName
+      };
 
-        try {
-          const pdfPath = await generateAndSavePDF('session-note-content', documentInfo);
-          if (pdfPath) {
-            console.log('PDF saved successfully:', pdfPath);
+      console.log('💾 Saving session note metadata to database:', documentInfo);
+
+      // Step 1: Always save document metadata to database first
+      try {
+        const { error: dbError } = await supabase
+          .from('clinical_documents')
+          .insert({
+            client_id: documentInfo.clientId,
+            document_type: documentInfo.documentType,
+            document_date: documentInfo.documentDate,
+            document_title: documentInfo.documentTitle,
+            file_path: `temp/${documentInfo.clientId}/session-notes/${sessionDate}.pdf`, // Temporary path
+            created_by: documentInfo.createdBy
+          });
+
+        if (dbError) {
+          console.error('❌ Error saving document metadata:', dbError);
+          throw new Error(`Failed to save document metadata: ${dbError.message}`);
+        }
+
+        console.log('✅ Document metadata saved successfully');
+
+        // Step 2: Try to generate PDF (non-blocking)
+        if (contentRef?.current) {
+          console.log('📄 Attempting PDF generation...');
+          
+          try {
+            const pdfPath = await generateAndSavePDF('session-note-content', documentInfo);
+            if (pdfPath) {
+              console.log('✅ PDF generated and saved successfully:', pdfPath);
+              
+              // Update the document with the real PDF path
+              const { error: updateError } = await supabase
+                .from('clinical_documents')
+                .update({ file_path: pdfPath })
+                .eq('client_id', documentInfo.clientId)
+                .eq('document_type', documentInfo.documentType)
+                .eq('document_date', documentInfo.documentDate);
+
+              if (updateError) {
+                console.error('⚠️ Error updating PDF path:', updateError);
+              }
+
+              toast({
+                title: "Success",
+                description: "Session note saved and PDF generated successfully.",
+              });
+            } else {
+              console.error('❌ PDF generation failed but metadata was saved');
+              toast({
+                title: "Partial Success",
+                description: "Session note saved to database, but PDF generation failed.",
+                variant: "default",
+              });
+            }
+          } catch (pdfError) {
+            console.error('❌ Error during PDF generation:', pdfError);
             toast({
-              title: "Success",
-              description: "Session note saved and PDF generated successfully.",
-            });
-          } else {
-            console.error('Failed to generate PDF');
-            toast({
-              title: "Warning",
-              description: "Session note saved, but PDF generation failed.",
+              title: "Partial Success",
+              description: "Session note saved to database, but PDF generation failed.",
               variant: "default",
             });
           }
-        } catch (pdfError) {
-          console.error('Error generating PDF:', pdfError);
+        } else {
+          console.log('⚠️ No content reference available for PDF generation');
           toast({
-            title: "Warning",
-            description: "Session note saved, but PDF generation failed.",
-            variant: "default",
+            title: "Success",
+            description: "Session note saved successfully.",
           });
         }
-      } else {
+
+      } catch (metadataError) {
+        console.error('❌ Error saving document metadata:', metadataError);
         toast({
-          title: "Success",
-          description: "Session note saved successfully.",
+          title: "Warning", 
+          description: "Session note data saved but document record creation failed.",
+          variant: "default",
         });
       }
 
