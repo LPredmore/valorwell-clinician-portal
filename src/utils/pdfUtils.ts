@@ -19,6 +19,16 @@ export const generateAndSavePDF = async (
   documentInfo: DocumentInfo
 ): Promise<string | null> => {
   try {
+    console.log('📄 Starting PDF generation for:', {
+      elementId,
+      documentInfo: {
+        ...documentInfo,
+        documentDate: typeof documentInfo.documentDate === 'string' 
+          ? documentInfo.documentDate 
+          : documentInfo.documentDate.toISOString().split('T')[0]
+      }
+    });
+
     // Format date for file naming
     const formattedDate = typeof documentInfo.documentDate === 'string' 
       ? documentInfo.documentDate 
@@ -27,9 +37,17 @@ export const generateAndSavePDF = async (
     // Step 1: Generate PDF from HTML element
     const element = document.getElementById(elementId);
     if (!element) {
-      console.error('Element not found:', elementId);
+      console.error('❌ Element not found for PDF generation:', elementId);
+      console.log('Available elements with IDs:', Array.from(document.querySelectorAll('[id]')).map(el => el.id));
       return null;
     }
+    
+    console.log('✅ Found element for PDF generation:', {
+      elementId,
+      elementTagName: element.tagName,
+      elementClasses: element.className,
+      hasContent: element.innerHTML.length > 0
+    });
     
     // Add a class to control styling for PDF generation
     element.classList.add('generating-pdf');
@@ -118,6 +136,12 @@ export const generateAndSavePDF = async (
     
     // Step 2: Upload PDF to Supabase storage
     const filePath = `${documentInfo.clientId}/${documentInfo.documentType}/${formattedDate}.pdf`;
+    console.log('📤 Uploading PDF to storage:', {
+      filePath,
+      blobSize: pdfBlob.size,
+      bucket: 'clinical_documents'
+    });
+    
     const { error: uploadError } = await supabase.storage
       .from('clinical_documents')
       .upload(filePath, pdfBlob, {
@@ -126,9 +150,16 @@ export const generateAndSavePDF = async (
       });
     
     if (uploadError) {
-      console.error('Error uploading PDF:', uploadError);
+      console.error('❌ Error uploading PDF:', {
+        error: uploadError,
+        filePath,
+        errorMessage: uploadError.message,
+        errorDetails: uploadError
+      });
       return null;
     }
+    
+    console.log('✅ PDF uploaded successfully to:', filePath);
     
     // Step 3: Get the URL of the uploaded file
     const { data: urlData } = supabase.storage

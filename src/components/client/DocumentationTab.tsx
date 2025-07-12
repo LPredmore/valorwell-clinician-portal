@@ -71,18 +71,34 @@ const DocumentationTab: React.FC<DocumentationTabProps> = ({
 
   const handleCloseTreatmentPlan = () => {
     setShowTreatmentPlanTemplate(false);
+    // Refresh documents when template is closed
+    if (clientId) {
+      fetchFilteredClinicalDocuments(clientId).then(docs => setDocuments(docs)).catch(err => console.error('Error refreshing documents:', err));
+    }
   };
 
   const handleCloseSessionNote = () => {
     setShowSessionNoteTemplate(false);
+    // Refresh documents when template is closed
+    if (clientId) {
+      fetchFilteredClinicalDocuments(clientId).then(docs => setDocuments(docs)).catch(err => console.error('Error refreshing documents:', err));
+    }
   };
 
   const handleClosePHQ9 = () => {
     setShowPHQ9Template(false);
+    // Refresh documents when template is closed
+    if (clientId) {
+      fetchFilteredClinicalDocuments(clientId).then(docs => setDocuments(docs)).catch(err => console.error('Error refreshing documents:', err));
+    }
   };
 
   const handleClosePCL5 = () => {
     setShowPCL5Template(false);
+    // Refresh documents when template is closed
+    if (clientId) {
+      fetchFilteredClinicalDocuments(clientId).then(docs => setDocuments(docs)).catch(err => console.error('Error refreshing documents:', err));
+    }
   };
 
   // Helper function to normalize document type for display
