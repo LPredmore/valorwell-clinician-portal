@@ -158,20 +158,15 @@ export const getCalendarTimeBounds = (
   // Create start time on current date
   const startDateTime = currentDate.set({ hour: startHour, minute: startMinute });
   
-  // Create end time on current date
+  // Create end time on current date - keep both start and end on same day
   let endDateTime = currentDate.set({ hour: endHour, minute: endMinute });
   
-  // CRITICAL: For React Big Calendar, when endTime is "23:59", 
-  // we need to roll over to next day's midnight for proper display
-  if (endTime === '23:59') {
-    endDateTime = endDateTime.plus({ minutes: 1 }); // → next day 00:00
-    console.log('[getCalendarTimeBounds] DIAGNOSTIC: 23:59 end time detected, rolling over to next day midnight');
-  } else {
-    // Ensure end time is after start time for non-rollover ranges
-    if (endDateTime <= startDateTime) {
-      endDateTime = startDateTime.plus({ hours: 1 });
-      console.log('[getCalendarTimeBounds] DIAGNOSTIC: Adjusted end time to ensure valid range');
-    }
+  // CRITICAL: For React Big Calendar, both minTime and maxTime must be on the same date
+  // Do NOT roll over to next day - keep end time as 23:59 on the same day
+  if (endDateTime <= startDateTime) {
+    // Only adjust if end time is actually before start time (not for 23:59)
+    endDateTime = startDateTime.plus({ hours: 1 });
+    console.log('[getCalendarTimeBounds] DIAGNOSTIC: Adjusted end time to ensure valid range');
   }
   
   // Convert to JavaScript Dates
