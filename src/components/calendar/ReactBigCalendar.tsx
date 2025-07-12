@@ -321,6 +321,14 @@ const ReactBigCalendar: React.FC<ExtendedReactBigCalendarProps> = ({
         offsetDifference: new Date().getTimezoneOffset(),
       }
     });
+
+    // E. FINAL RENDER SLOT CHECK - List actual time slots React Big Calendar will draw
+    const step = 30; // step in minutes
+    const slots = Array.from({ length: (24*60)/step }, (_, i) => {
+      const time = new Date(minTime.getTime() + i*step*60000);
+      return time.toString();
+    });
+    console.debug('[RBC] Time slots that will be rendered:', slots.slice(0, 10)); // Show first 10 slots
   }, [minTime, maxTime, userTimeZone]);
 
   return (
@@ -336,7 +344,11 @@ const ReactBigCalendar: React.FC<ExtendedReactBigCalendarProps> = ({
             timeslots: calendarConfig.timeslots
           });
           
-          return <Calendar {...calendarConfig} />;
+          return <Calendar 
+            {...calendarConfig}
+            onRangeChange={(range) => console.debug('[RBC] onRangeChange:', range)}
+            onNavigate={(date) => console.debug('[RBC] onNavigate:', date)}
+          />;
         } catch (error) {
           console.error('[ReactBigCalendar] DIAGNOSTIC: Calendar component failed to render:', {
             error: error.message,

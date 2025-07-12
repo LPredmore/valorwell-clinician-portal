@@ -234,6 +234,14 @@ export const useAppointments = (
       
       const { data: rawDataAny, error: queryError } = await query;
 
+      // A. SUPABASE QUERY VALIDATION - Full raw response
+      console.debug('[useAppointments] FULL RAW QUERY RESPONSE:', rawDataAny);
+      console.debug('[useAppointments] Applied Filters:', {
+        statusFilter: "status = scheduled",
+        dateFilter: { fromUTCISO, toUTCISO },
+        clinicianFilter: `clinician_id = ${formattedClinicianId}`
+      });
+
       console.log('[useAppointments] STEP 1 - Clean Supabase Query Response:', {
         hasData: !!rawDataAny,
         recordCount: rawDataAny?.length || 0,
@@ -277,6 +285,19 @@ export const useAppointments = (
           client: clientData,
           clientName: clientName,
         };
+      });
+
+      // B. POST-PROCESSING VALIDATION - Check mapped start/end values
+      console.debug('[useAppointments] AFTER Processing:', {
+        sampleDataProcessed: processedAppointments.slice(0, 3).map(apt => ({
+          id: apt.id,
+          start_at: apt.start_at,
+          end_at: apt.end_at,
+          startDate: new Date(apt.start_at),
+          endDate: new Date(apt.end_at),
+          isValidStart: !isNaN(new Date(apt.start_at).getTime()),
+          isValidEnd: !isNaN(new Date(apt.end_at).getTime())
+        }))
       });
 
       console.log('[useAppointments] STEP 3 - Final processed clean appointments:', {

@@ -120,6 +120,14 @@ const CalendarContainer: React.FC = () => {
 
     const events: CalendarEvent[] = [];
     
+    // C. MAPPING TO CALENDAR EVENT - Check raw appointments first
+    console.debug('[CalendarContainer] realEvents RAW:', appointments?.map(a => ({
+      id: a.id,
+      start_at: a.start_at,
+      end_at: a.end_at,
+      clientName: a.clientName
+    })));
+
     // Transform appointments to RBC format using unified conversion
     if (appointments) {
       appointments.forEach(apt => {
@@ -252,6 +260,18 @@ const CalendarContainer: React.FC = () => {
         }
       });
     }
+
+    // C. MAPPING TO CALENDAR EVENT - Check final mapped events
+    console.debug('[CalendarContainer] realEvents MAPPED:', events.slice(0, 3).map(e => ({
+      id: e.id,
+      title: e.title,
+      start: e.start,
+      end: e.end,
+      source: e.source,
+      isValidStart: !isNaN(e.start.getTime()),
+      isValidEnd: !isNaN(e.end.getTime()),
+      startBeforeEnd: e.start < e.end
+    })));
 
     console.log('[CalendarContainer] realEvents - Final validation:', {
       totalEvents: events.length,
