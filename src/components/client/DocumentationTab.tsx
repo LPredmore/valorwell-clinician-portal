@@ -48,27 +48,14 @@ const DocumentationTab: React.FC<DocumentationTabProps> = ({
   const clientId = useMemo(() => clientData?.id, [clientData?.id]);
 
   useEffect(() => {
-    console.log('🔍 [DocumentationTab] useEffect triggered with clientId:', clientId);
-    
     if (clientId) {
-      console.log('📥 [DocumentationTab] Starting to fetch documents for client:', clientId);
       setIsLoading(true);
       
       fetchFilteredClinicalDocuments(clientId).then(docs => {
-        console.log('✅ [DocumentationTab] Received documents:', {
-          count: docs.length,
-          documents: docs,
-          clientId
-        });
         setDocuments(docs);
         setIsLoading(false);
       }).catch(err => {
-        console.error('❌ [DocumentationTab] Error fetching documents:', {
-          error: err,
-          clientId,
-          errorMessage: err.message,
-          errorCode: err.code
-        });
+        console.error('Error fetching documents:', err);
         setIsLoading(false);
         toast({
           title: "Error",
@@ -77,38 +64,25 @@ const DocumentationTab: React.FC<DocumentationTabProps> = ({
         });
       });
     } else {
-      console.log('⚠️ [DocumentationTab] No client ID available, skipping document fetch');
       setDocuments([]);
       setIsLoading(false);
     }
-  }, [clientId, toast]);
+  }, [clientId]);
 
   const handleCloseTreatmentPlan = () => {
     setShowTreatmentPlanTemplate(false);
-    if (clientId) {
-      fetchFilteredClinicalDocuments(clientId).then(docs => setDocuments(docs)).catch(err => console.error('Error refreshing documents:', err));
-    }
   };
 
   const handleCloseSessionNote = () => {
     setShowSessionNoteTemplate(false);
-    if (clientId) {
-      fetchFilteredClinicalDocuments(clientId).then(docs => setDocuments(docs)).catch(err => console.error('Error refreshing documents:', err));
-    }
   };
 
   const handleClosePHQ9 = () => {
     setShowPHQ9Template(false);
-    if (clientId) {
-      fetchFilteredClinicalDocuments(clientId).then(docs => setDocuments(docs)).catch(err => console.error('Error refreshing documents:', err));
-    }
   };
 
   const handleClosePCL5 = () => {
     setShowPCL5Template(false);
-    if (clientId) {
-      fetchFilteredClinicalDocuments(clientId).then(docs => setDocuments(docs)).catch(err => console.error('Error refreshing documents:', err));
-    }
   };
 
   // Helper function to normalize document type for display
@@ -228,7 +202,13 @@ const DocumentationTab: React.FC<DocumentationTabProps> = ({
                       <TableCell>
                         <div className="flex items-center gap-1">
                           <Calendar className="h-4 w-4 text-gray-500" />
-                          {format(new Date(doc.document_date), 'MMM d, yyyy')}
+                          {(() => {
+                            try {
+                              return format(new Date(doc.document_date), 'MMM d, yyyy');
+                            } catch {
+                              return doc.document_date;
+                            }
+                          })()}
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
