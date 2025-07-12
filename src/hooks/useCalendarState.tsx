@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { getClinicianTimeZone, getClinicianById } from '@/hooks/useClinicianData';
+import { getClinicianById } from '@/hooks/useClinicianData';
 import { TimeZoneService } from '@/utils/timeZoneService';
 
 interface Client {

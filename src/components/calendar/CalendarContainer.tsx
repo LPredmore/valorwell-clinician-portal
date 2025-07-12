@@ -17,7 +17,7 @@ import { useNylasEvents } from "@/hooks/useNylasEvents";
 import { useClinicianAvailability } from "@/hooks/useClinicianAvailability";
 import { useBlockedTime } from "@/hooks/useBlockedTime";
 import { getWeekRange } from "@/utils/dateRangeUtils";
-import { getClinicianTimeZone } from "@/hooks/useClinicianData";
+// Removed getClinicianTimeZone import - using browser timezone only
 import { TimeZoneService } from "@/utils/timeZoneService";
 import { CalendarEvent } from "./types";
 import { utcToCalendarDate, getCalendarTimeBounds } from "@/utils/timezoneHelpers";

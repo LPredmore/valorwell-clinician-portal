@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { getClinicianTimeZone } from '@/hooks/useClinicianData';
+// Removed getClinicianTimeZone import - using browser timezone only
 import { formInputToUTC } from '@/utils/timezoneHelpers';
 import { useBlockedTime } from '@/hooks/useBlockedTime';
 

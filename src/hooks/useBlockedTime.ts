@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { temporalOverlapQuery } from '@/utils/dateRangeUtils';
-import { getClinicianTimeZone } from '@/hooks/useClinicianData';
+// Removed getClinicianTimeZone import - using browser timezone only
 import { DateTime } from 'luxon';
 
 // Helper function to validate Date objects

@@ -19,7 +19,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { videoRoomService } from '@/utils/videoRoomService';
-import { getClinicianTimeZone } from '@/hooks/useClinicianData';
+// Removed getClinicianTimeZone import - using browser timezone only
 import { formInputToUTC } from '@/utils/timezoneHelpers';
 import { DateTime } from 'luxon';
 import RecurringOptions, { RecurrenceFrequency } from './RecurringOptions';

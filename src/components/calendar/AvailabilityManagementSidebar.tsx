@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { TimeZoneService } from '@/utils/timeZoneService';
-import { getClinicianTimeZone } from '@/hooks/useClinicianData';
+// Removed getClinicianTimeZone import - using browser timezone only
 import { formInputToUTC, utcToFormInput } from '@/utils/timezoneHelpers';
 import { Clock, Save, Trash2 } from 'lucide-react';
 
@@ -40,7 +40,7 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
   const [currentAvailability, setCurrentAvailability] = useState<AvailabilitySlot[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [clinicianTimeZone, setClinicianTimeZone] = useState<string>('loading');
+  const browserTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const { toast } = useToast();
 
   const daysOfWeek = [
@@ -76,36 +76,17 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
   // Load current availability when component mounts or clinician changes
   useEffect(() => {
     if (clinicianId) {
-      loadClinicianTimeZoneAndAvailability();
+      loadCurrentAvailability();
     }
   }, [clinicianId]);
-
-  const loadClinicianTimeZoneAndAvailability = async () => {
-    if (!clinicianId) return;
-    
-    try {
-      const timeZone = await getClinicianTimeZone(clinicianId);
-      setClinicianTimeZone(timeZone);
-      await loadCurrentAvailability(timeZone);
-    } catch (error) {
-      console.error('Error loading clinician timezone:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load timezone settings',
-        variant: 'destructive'
-      });
-    }
-  };
 
   // Load selected slot when day or slot changes
   useEffect(() => {
     loadSelectedSlot();
   }, [selectedDay, selectedSlot, currentAvailability]);
 
-  const loadCurrentAvailability = async (timeZone?: string) => {
+  const loadCurrentAvailability = async () => {
     if (!clinicianId) return;
-    const tz = timeZone || clinicianTimeZone;
-    if (tz === 'loading') return;
 
     try {
       setIsLoading(true);
@@ -224,10 +205,10 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
   };
 
   const saveAvailability = async () => {
-    if (!clinicianId || !clinicianTimeZone || clinicianTimeZone === 'loading') {
+    if (!clinicianId) {
       toast({
         title: 'Error',
-        description: 'Missing required data for saving availability',
+        description: 'Missing clinician ID for saving availability',
         variant: 'destructive'
       });
       return;
@@ -264,7 +245,7 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
       };
 
       console.log('[AvailabilityManagementSidebar] Saving availability as TIME values:', {
-        clinicianTimeZone,
+        browserTimeZone,
         localTimes: { startTime, endTime },
         updateData
       });
@@ -486,7 +467,7 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
 
         {/* Timezone Info */}
         <div className="text-sm text-gray-500">
-          Times in: {TimeZoneService.getTimeZoneDisplayName(clinicianTimeZone)}
+          Times in: {TimeZoneService.getTimeZoneDisplayName(browserTimeZone)}
         </div>
 
         {/* Action Buttons */}

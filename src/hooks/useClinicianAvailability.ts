@@ -9,7 +9,7 @@ export interface AvailabilitySlot {
   slot: number;          // 1–3
   startTime: string;     // "09:00"
   endTime: string;       // "17:00"
-  clinicianTimeZone: string; // clinician's timezone
+  clinicianTimeZone: string; // now contains browser timezone
 }
 
 export function useClinicianAvailability(
@@ -29,7 +29,7 @@ export function useClinicianAvailability(
         const { data, error } = await supabase
           .from('clinicians')
           .select(`
-            clinician_time_zone,
+            // Removed clinician_time_zone - using browser timezone only
             clinician_availability_start_monday_1, clinician_availability_end_monday_1,
             clinician_availability_start_monday_2, clinician_availability_end_monday_2,
             clinician_availability_start_monday_3, clinician_availability_end_monday_3,
@@ -59,7 +59,7 @@ export function useClinicianAvailability(
 
         const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
         const availabilitySlots: AvailabilitySlot[] = [];
-        const clinicianTimeZone = data.clinician_time_zone || 'America/New_York';
+        const browserTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
         
         days.forEach(day => {
           for (let i = 1; i <= 3; i++) {
@@ -78,7 +78,7 @@ export function useClinicianAvailability(
                 slot: i, 
                 startTime: formattedStartTime,
                 endTime: formattedEndTime,
-                clinicianTimeZone
+                clinicianTimeZone: browserTimeZone
               });
             }
           }

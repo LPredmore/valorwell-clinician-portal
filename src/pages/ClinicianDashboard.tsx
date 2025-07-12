@@ -6,7 +6,7 @@ import VideoChat from '@/components/video/VideoChat';
 import { TimeZoneService } from '@/utils/timeZoneService';
 import { AppointmentsList } from '@/components/dashboard/AppointmentsList';
 import SessionNoteTemplate from '@/components/templates/SessionNoteTemplate';
-import { getClinicianTimeZone } from '@/hooks/useClinicianData';
+// Removed getClinicianTimeZone import - using browser timezone only
 import { SessionDidNotOccurDialog } from '@/components/dashboard/SessionDidNotOccurDialog';
 import { Appointment } from '@/types/appointment';
 import { ClientDetails } from '@/types/client';
@@ -19,10 +19,10 @@ const ClinicianDashboard = () => {
   const { toast } = useToast();
   const [clinicianProfile, setClinicianProfile] = useState<any>(null);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [clinicianTimeZone, setClinicianTimeZone] = useState<string>('loading'); // CRITICAL: Start in loading state
+  const browserTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [isLoadingAppointments, setIsLoadingAppointments] = useState(true);
-  const [isLoadingTimeZone, setIsLoadingTimeZone] = useState(true);
+  // Removed isLoadingTimeZone - using browser timezone directly
   const [error, setError] = useState<Error | null>(null);
   
   // Video and session states
@@ -40,9 +40,8 @@ const ClinicianDashboard = () => {
   // Circuit breaker to prevent infinite loops
   const dataFetchCountRef = useRef(0);
 
-  // Ensure timezone is always a string
-  const safeClinicianTimeZone = Array.isArray(clinicianTimeZone) ? clinicianTimeZone[0] : clinicianTimeZone;
-  const timeZoneDisplay = TimeZoneService.getTimeZoneDisplayName(safeClinicianTimeZone);
+  // Use browser timezone for all operations
+  const timeZoneDisplay = TimeZoneService.getTimeZoneDisplayName(browserTimeZone);
 
   // Fetch clinician profile
   useEffect(() => {
@@ -64,32 +63,7 @@ const ClinicianDashboard = () => {
     fetchProfile();
   }, [userId]);
 
-  // Fetch clinician's timezone
-  useEffect(() => {
-    if (!userId) return;
-    
-    const fetchTimeZone = async () => {
-      setIsLoadingTimeZone(true);
-      try {
-        const timeZone = await getClinicianTimeZone(userId);
-        console.log("[ClinicianDashboard] Fetched clinician timezone:", { timeZone, type: typeof timeZone, isArray: Array.isArray(timeZone) });
-        
-        // Ensure timezone is a string
-        const safeTimeZone = Array.isArray(timeZone) ? timeZone[0] : timeZone;
-        console.log("[ClinicianDashboard] Safe timezone after conversion:", { safeTimeZone, type: typeof safeTimeZone });
-        
-        setClinicianTimeZone(safeTimeZone);
-      } catch (error) {
-        console.error("CRITICAL: Error fetching clinician timezone:", error);
-        // CRITICAL: NO fallback timezone - keep in loading state
-        setClinicianTimeZone('loading');
-      } finally {
-        setIsLoadingTimeZone(false);
-      }
-    };
-    
-    fetchTimeZone();
-  }, [userId]);
+  // Removed timezone fetching - using browser timezone directly
 
   // Fetch clinician's appointments with circuit breaker
   useEffect(() => {
@@ -127,13 +101,13 @@ const ClinicianDashboard = () => {
       return { today: [], upcoming: [], outstanding: [] };
     }
 
-    // Use clinician timezone for all date calculations
-    const now = TimeZoneService.now(safeClinicianTimeZone);
+    // Use browser timezone for all date calculations
+    const now = TimeZoneService.now(browserTimeZone);
     const todayStart = now.startOf('day');
     const todayEnd = now.endOf('day');
 
-    console.log('[ClinicianDashboard] Categorizing appointments using clinician timezone:', {
-      clinicianTimeZone: safeClinicianTimeZone,
+    console.log('[ClinicianDashboard] Categorizing appointments using browser timezone:', {
+      browserTimeZone,
       todayStart: todayStart.toISO(),
       todayEnd: todayEnd.toISO(),
       totalAppointments: appointments.length
@@ -144,19 +118,19 @@ const ClinicianDashboard = () => {
 
     const categorized = {
       today: activeAppointments.filter(apt => {
-        const aptDateTime = TimeZoneService.fromUTC(apt.start_at, safeClinicianTimeZone);
+        const aptDateTime = TimeZoneService.fromUTC(apt.start_at, browserTimeZone);
         const isToday = aptDateTime >= todayStart && aptDateTime <= todayEnd;
         return isToday;
       }).sort((a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime()),
       
       outstanding: activeAppointments.filter(apt => {
-        const aptDateTime = TimeZoneService.fromUTC(apt.start_at, safeClinicianTimeZone);
+        const aptDateTime = TimeZoneService.fromUTC(apt.start_at, browserTimeZone);
         const isTodayOrEarlier = aptDateTime <= todayEnd;
         return isTodayOrEarlier;
       }).sort((a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime()),
       
       upcoming: activeAppointments.filter(apt => {
-        const aptDateTime = TimeZoneService.fromUTC(apt.start_at, safeClinicianTimeZone);
+        const aptDateTime = TimeZoneService.fromUTC(apt.start_at, browserTimeZone);
         const isFuture = aptDateTime > todayEnd;
         return isFuture;
       }).sort((a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime())
@@ -169,7 +143,7 @@ const ClinicianDashboard = () => {
     });
 
     return categorized;
-  }, [appointments, safeClinicianTimeZone]);
+  }, [appointments, browserTimeZone]);
 
   // Video session handlers
   const startVideoSession = (appointment: Appointment) => {
@@ -297,12 +271,9 @@ const ClinicianDashboard = () => {
     return clientData as ClientDetails;
   };
 
-  console.log("[ClinicianDashboard] Rendering with stabilized data management:", {
-    clinicianTimeZone,
-    safeClinicianTimeZone,
+  console.log("[ClinicianDashboard] Rendering with browser timezone:", {
+    browserTimeZone,
     timeZoneDisplay,
-    type: typeof safeClinicianTimeZone,
-    isArray: Array.isArray(clinicianTimeZone),
     totalAppointments: appointments.length,
     todayCount: appointmentCategories.today.length,
     upcomingCount: appointmentCategories.upcoming.length,
@@ -334,11 +305,11 @@ const ClinicianDashboard = () => {
               title="Today's Appointments"
               icon={<Calendar className="h-5 w-5 mr-2" />}
               appointments={appointmentCategories.today}
-              isLoading={isLoadingAppointments || isLoadingTimeZone}
+              isLoading={isLoadingAppointments}
               error={error}
               emptyMessage="No appointments scheduled for today."
               timeZoneDisplay={timeZoneDisplay}
-              userTimeZone={safeClinicianTimeZone}
+              userTimeZone={browserTimeZone}
               showStartButton={true}
               onStartSession={startVideoSession}
             />
@@ -350,11 +321,11 @@ const ClinicianDashboard = () => {
               title="Outstanding Documentation"
               icon={<AlertCircle className="h-5 w-5 mr-2" />}
               appointments={appointmentCategories.outstanding}
-              isLoading={isLoadingAppointments || isLoadingTimeZone || isLoadingClientData}
+              isLoading={isLoadingAppointments || isLoadingClientData}
               error={error}
               emptyMessage="No outstanding documentation."
               timeZoneDisplay={timeZoneDisplay}
-              userTimeZone={safeClinicianTimeZone}
+              userTimeZone={browserTimeZone}
               onDocumentSession={openSessionTemplate}
               onSessionDidNotOccur={handleSessionDidNotOccur}
             />
@@ -366,11 +337,11 @@ const ClinicianDashboard = () => {
               title="Upcoming Appointments"
               icon={<Calendar className="h-5 w-5 mr-2" />}
               appointments={appointmentCategories.upcoming}
-              isLoading={isLoadingAppointments || isLoadingTimeZone}
+              isLoading={isLoadingAppointments}
               error={error}
               emptyMessage="No upcoming appointments scheduled."
               timeZoneDisplay={timeZoneDisplay}
-              userTimeZone={safeClinicianTimeZone}
+              userTimeZone={browserTimeZone}
               showViewAllButton={true}
             />
           </div>

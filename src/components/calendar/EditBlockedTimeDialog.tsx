@@ -35,7 +35,7 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { TimeZoneService } from '@/utils/timeZoneService';
 import { useBlockedTime } from '@/hooks/useBlockedTime';
-import { getClinicianTimeZone } from '@/hooks/useClinicianData';
+// Removed getClinicianTimeZone import - using browser timezone only
 import { DateTime } from 'luxon';
 
 interface BlockedTime {
@@ -87,7 +87,7 @@ const EditBlockedTimeDialog: React.FC<EditBlockedTimeDialogProps> = ({
   const [blockLabel, setBlockLabel] = useState('');
   const [notes, setNotes] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [clinicianTimeZone, setClinicianTimeZone] = useState<string>('loading');
+  const browserTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const { toast } = useToast();
   const { updateBlockedTime, deleteBlockedTime } = useBlockedTime(blockedTime?.clinician_id || '');
 
@@ -98,17 +98,13 @@ const EditBlockedTimeDialog: React.FC<EditBlockedTimeDialogProps> = ({
     if (isOpen && blockedTime) {
       console.log('[EditBlockedTimeDialog] Initializing form with blocked time:', blockedTime);
       
-      const loadClinicianTimeZoneAndForm = async () => {
+      const loadForm = async () => {
         try {
-          // Get clinician timezone from database
-          const timeZone = await getClinicianTimeZone(blockedTime.clinician_id);
-          setClinicianTimeZone(timeZone);
-          
-          // Parse the UTC timestamps and convert to the clinician timezone
+          // Parse the UTC timestamps and convert to the browser timezone
           const startDateTime = DateTime.fromISO(blockedTime.start_at, { zone: 'UTC' })
-            .setZone(timeZone);
+            .setZone(browserTimeZone);
           const endDateTime = DateTime.fromISO(blockedTime.end_at, { zone: 'UTC' })
-            .setZone(timeZone);
+            .setZone(browserTimeZone);
 
           // Set form values
           setSelectedDate(startDateTime.toJSDate());
@@ -122,7 +118,7 @@ const EditBlockedTimeDialog: React.FC<EditBlockedTimeDialogProps> = ({
             startTime: startDateTime.toFormat('HH:mm'),
             endTime: endDateTime.toFormat('HH:mm'),
             label: blockedTime.label,
-            timeZone
+            timeZone: browserTimeZone
           });
         } catch (error) {
           console.error('[EditBlockedTimeDialog] Error initializing form:', error);
@@ -134,7 +130,7 @@ const EditBlockedTimeDialog: React.FC<EditBlockedTimeDialogProps> = ({
         }
       };
       
-      loadClinicianTimeZoneAndForm();
+      loadForm();
     }
   }, [isOpen, blockedTime, toast]);
 
@@ -144,10 +140,10 @@ const EditBlockedTimeDialog: React.FC<EditBlockedTimeDialogProps> = ({
     setIsLoading(true);
 
     try {
-      // Convert local date/time back to UTC for storage using clinician timezone
+      // Convert local date/time back to UTC for storage using browser timezone
       const dateString = format(selectedDate, 'yyyy-MM-dd');
-      const startDateTime = DateTime.fromISO(`${dateString}T${startTime}`, { zone: clinicianTimeZone });
-      const endDateTime = DateTime.fromISO(`${dateString}T${endTime}`, { zone: clinicianTimeZone });
+      const startDateTime = DateTime.fromISO(`${dateString}T${startTime}`, { zone: browserTimeZone });
+      const endDateTime = DateTime.fromISO(`${dateString}T${endTime}`, { zone: browserTimeZone });
 
       const updates = {
         start_at: startDateTime.toUTC().toISO(),
