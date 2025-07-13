@@ -56,7 +56,7 @@ export const ClientInfoSection: React.FC<ClientInfoSectionProps> = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+      <div className={`grid grid-cols-1 ${formState.planType || formState.treatmentFrequency ? 'md:grid-cols-3' : 'md:grid-cols-1'} gap-6 mb-6`}>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Diagnosis</label>
           {isDiagnosisEmpty ? (
@@ -73,26 +73,30 @@ export const ClientInfoSection: React.FC<ClientInfoSectionProps> = ({
             />
           )}
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Plan Type</label>
-          <Input
-            placeholder="Select plan length"
-            value={formState.planType}
-            onChange={(e) => handleChange('planType', e.target.value)}
-            readOnly
-            className="bg-gray-100"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Treatment Frequency</label>
-          <Input
-            placeholder="Select frequency"
-            value={formState.treatmentFrequency}
-            onChange={(e) => handleChange('treatmentFrequency', e.target.value)}
-            readOnly
-            className="bg-gray-100"
-          />
-        </div>
+        {formState.planType && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Plan Type</label>
+            <Input
+              placeholder="Select plan length"
+              value={formState.planType}
+              onChange={(e) => handleChange('planType', e.target.value)}
+              readOnly
+              className="bg-gray-100"
+            />
+          </div>
+        )}
+        {formState.treatmentFrequency && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Treatment Frequency</label>
+            <Input
+              placeholder="Select frequency"
+              value={formState.treatmentFrequency}
+              onChange={(e) => handleChange('treatmentFrequency', e.target.value)}
+              readOnly
+              className="bg-gray-100"
+            />
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">

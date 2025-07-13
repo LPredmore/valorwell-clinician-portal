@@ -337,11 +337,48 @@ export const useSessionNoteForm = ({
     }
   };
 
+  // Dynamic form validation
+  const getRequiredFields = () => {
+    const requiredFields = [
+      'patientName', 'patientDOB', 'clinicianName', 'sessionDate', 'diagnosis',
+      'medications', 'sessionType', 'personsInAttendance', 'appearance', 'attitude',
+      'behavior', 'speech', 'affect', 'thoughtProcess', 'perception', 'orientation',
+      'memoryConcentration', 'insightJudgement', 'mood', 'substanceAbuseRisk',
+      'suicidalIdeation', 'homicidalIdeation', 'primaryObjective', 'intervention1',
+      'currentSymptoms', 'functioning', 'prognosis', 'progress', 'sessionNarrative',
+      'signature'
+    ];
+    
+    // Add conditionally required fields only if they are displayed (have values)
+    if (formState.planType) requiredFields.push('planType');
+    if (formState.treatmentFrequency) requiredFields.push('treatmentFrequency');
+    if (formState.nextTreatmentPlanUpdate) requiredFields.push('nextTreatmentPlanUpdate');
+    
+    return requiredFields;
+  };
+
+  const isFormValid = () => {
+    const requiredFields = getRequiredFields();
+    return requiredFields.every(field => {
+      const value = formState[field as keyof typeof formState];
+      return value && value.toString().trim() !== '';
+    });
+  };
+
   const handleSave = async () => {
     if (!clientData?.id) {
       toast({
         title: "Error",
         description: "No client ID found. Cannot save session note.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!isFormValid()) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill out all required fields before saving.",
         variant: "destructive",
       });
       return;
@@ -532,7 +569,7 @@ export const useSessionNoteForm = ({
     handleChange,
     toggleEditMode,
     handleSave,
-    // AI Assist functionality
+    isFormValid,
     isAiAssistMode,
     selectedInterventions,
     isGeneratingNote,

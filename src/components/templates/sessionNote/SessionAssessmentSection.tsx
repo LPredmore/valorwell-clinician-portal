@@ -199,20 +199,22 @@ export const SessionAssessmentSection: React.FC<SessionAssessmentSectionProps> =
 
       <h4 className="text-md font-medium text-gray-800 mb-4">Plan & Signature</h4>
 
-      <div className="mb-6 pdf-section">
-        <label className="block text-sm font-medium text-gray-700 mb-1">Next Treatment Plan Update</label>
-        <Input
-          placeholder="When will this plan be reviewed next"
-          value={formState.nextTreatmentPlanUpdate}
-          onChange={(e) => handleChange('nextTreatmentPlanUpdate', e.target.value)}
-          readOnly
-          className="bg-gray-100"
-          data-field-name="Next Treatment Plan Update"
-          data-pdf-value={formState.nextTreatmentPlanUpdate}
-        />
-        {/* Hidden div for PDF output */}
-        <div className="hidden pdf-only">{formState.nextTreatmentPlanUpdate}</div>
-      </div>
+      {formState.nextTreatmentPlanUpdate && (
+        <div className="mb-6 pdf-section">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Next Treatment Plan Update</label>
+          <Input
+            placeholder="When will this plan be reviewed next"
+            value={formState.nextTreatmentPlanUpdate}
+            onChange={(e) => handleChange('nextTreatmentPlanUpdate', e.target.value)}
+            readOnly
+            className="bg-gray-100"
+            data-field-name="Next Treatment Plan Update"
+            data-pdf-value={formState.nextTreatmentPlanUpdate}
+          />
+          {/* Hidden div for PDF output */}
+          <div className="hidden pdf-only">{formState.nextTreatmentPlanUpdate}</div>
+        </div>
+      )}
 
       <div className="mb-6 pdf-section">
         <label className="block text-sm font-medium text-gray-700 mb-1">Signature</label>

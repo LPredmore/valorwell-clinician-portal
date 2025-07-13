@@ -34,7 +34,8 @@ const SessionNoteTemplate: React.FC<SessionNoteTemplateProps> = ({
     isGeneratingNote,
     toggleAiAssistMode,
     toggleInterventionSelection,
-    handleAiAssist
+    handleAiAssist,
+    isFormValid
   } = useSessionNoteForm({
     clientData,
     clinicianName,
@@ -151,7 +152,7 @@ const SessionNoteTemplate: React.FC<SessionNoteTemplateProps> = ({
         <Button
           className="bg-valorwell-700 hover:bg-valorwell-800"
           onClick={handleSave}
-          disabled={isSubmitting}
+          disabled={isSubmitting || !isFormValid()}
         >
           {isSubmitting ? 'Saving...' : 'Save Session Note'}
         </Button>
