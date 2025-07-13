@@ -432,6 +432,86 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
       </CardHeader>
       
       <CardContent className="space-y-4">
+        {/* Calendar Display Settings */}
+        <div className="p-3 border rounded-md">
+          <h4 className="font-medium mb-2">Calendar Display</h4>
+          <p className="text-sm text-muted-foreground mb-3">
+            Set the time range displayed in your calendar view
+          </p>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-xs">Start Time</Label>
+                <div className="flex gap-1">
+                  <Select value={calendarStartHour} onValueChange={setCalendarStartHour}>
+                    <SelectTrigger className="h-8 flex-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {hourOptions.map((hour) => (
+                        <SelectItem key={hour.value} value={hour.value}>
+                          {hour.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={calendarStartAMPM} onValueChange={setCalendarStartAMPM}>
+                    <SelectTrigger className="h-8 w-16">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ampmOptions.map((ampm) => (
+                        <SelectItem key={ampm.value} value={ampm.value}>
+                          {ampm.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs">End Time</Label>
+                <div className="flex gap-1">
+                  <Select value={calendarEndHour} onValueChange={setCalendarEndHour}>
+                    <SelectTrigger className="h-8 flex-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {hourOptions.map((hour) => (
+                        <SelectItem key={hour.value} value={hour.value}>
+                          {hour.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={calendarEndAMPM} onValueChange={setCalendarEndAMPM}>
+                    <SelectTrigger className="h-8 w-16">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ampmOptions.map((ampm) => (
+                        <SelectItem key={ampm.value} value={ampm.value}>
+                          {ampm.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="w-full"
+              onClick={saveCalendarDisplaySettings}
+              disabled={isSavingDisplay || isLoading}
+            >
+              <Save className="h-3 w-3 mr-1" />
+              {isSavingDisplay ? 'Saving...' : 'Save Display Settings'}
+            </Button>
+          </div>
+        </div>
+
         {/* Day Selection */}
         <div>
           <Label htmlFor="day">Day of Week</Label>
@@ -578,85 +658,6 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
           </Button>
         </div>
 
-        {/* Calendar Display Settings */}
-        <div className="mt-6 p-3 border rounded-md">
-          <h4 className="font-medium mb-2">Calendar Display</h4>
-          <p className="text-sm text-muted-foreground mb-3">
-            Set the time range displayed in your calendar view
-          </p>
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <Label className="text-xs">Start Time</Label>
-                <div className="flex gap-1">
-                  <Select value={calendarStartHour} onValueChange={setCalendarStartHour}>
-                    <SelectTrigger className="h-8 flex-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {hourOptions.map((hour) => (
-                        <SelectItem key={hour.value} value={hour.value}>
-                          {hour.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Select value={calendarStartAMPM} onValueChange={setCalendarStartAMPM}>
-                    <SelectTrigger className="h-8 w-16">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ampmOptions.map((ampm) => (
-                        <SelectItem key={ampm.value} value={ampm.value}>
-                          {ampm.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div>
-                <Label className="text-xs">End Time</Label>
-                <div className="flex gap-1">
-                  <Select value={calendarEndHour} onValueChange={setCalendarEndHour}>
-                    <SelectTrigger className="h-8 flex-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {hourOptions.map((hour) => (
-                        <SelectItem key={hour.value} value={hour.value}>
-                          {hour.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Select value={calendarEndAMPM} onValueChange={setCalendarEndAMPM}>
-                    <SelectTrigger className="h-8 w-16">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ampmOptions.map((ampm) => (
-                        <SelectItem key={ampm.value} value={ampm.value}>
-                          {ampm.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </div>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="w-full"
-              onClick={saveCalendarDisplaySettings}
-              disabled={isSavingDisplay || isLoading}
-            >
-              <Save className="h-3 w-3 mr-1" />
-              {isSavingDisplay ? 'Saving...' : 'Save Display Settings'}
-            </Button>
-          </div>
-        </div>
 
         {/* Current Availability Summary */}
         <div className="mt-6">
