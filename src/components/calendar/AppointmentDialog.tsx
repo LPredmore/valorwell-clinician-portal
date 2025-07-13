@@ -332,7 +332,9 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
         end_at: endAtUTC.toISO(),
         type: 'therapy_session',
         status: 'scheduled',
-        notes: notes || null
+        notes: notes || null,
+        client_name: formatClientNameFromId(selectedClientId),
+        date_of_session: startAtUTC.toISODate(),
       };
 
       console.log('[AppointmentDialog] Appointment data:', appointmentData);
@@ -687,6 +689,14 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
     const preferredName = client.client_preferred_name || client.client_first_name;
     const lastName = client.client_last_name;
     return `${preferredName || ''} ${lastName || ''}`.trim() || 'Unknown Client';
+  };
+
+  const formatClientNameFromId = (clientId: string) => {
+    const client = clients.find(c => c.id === clientId);
+    if (!client) return '';
+    const preferredName = client.client_preferred_name || client.client_first_name || '';
+    const lastName = client.client_last_name || '';
+    return `${preferredName} ${lastName}`.trim();
   };
 
   return (

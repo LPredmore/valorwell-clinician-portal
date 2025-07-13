@@ -140,16 +140,33 @@ const AppointmentBookingDialog: React.FC<AppointmentBookingDialogProps> = ({
     }).toISO();
 
     try {
+      // Get current user info for client_name
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      // Get client info for the logged-in user
+      const { data: clientData } = await supabase
+        .from('clients')
+        .select('client_preferred_name, client_first_name, client_last_name')
+        .eq('id', user?.id)
+        .single();
+
+      const clientName = clientData 
+        ? `${clientData.client_preferred_name || clientData.client_first_name || ''} ${clientData.client_last_name || ''}`.trim()
+        : '';
+
       const { data: newAppointment, error } = await supabase
         .from('appointments')
         .insert([
           {
+            client_id: user?.id,
             clinician_id: clinicianId,
             start_at: start,
             end_at: end,
             type: 'therapy_session',
             status: 'scheduled',
             notes: notes,
+            client_name: clientName,
+            date_of_session: DateTime.fromISO(start).toISODate(),
           },
         ])
         .select()

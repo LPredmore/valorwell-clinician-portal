@@ -195,9 +195,11 @@ export type Database = {
           claim_status_last_checked: string | null
           claimid: string | null
           client_id: string
+          client_name: string | null
           clinician_id: string
           cpt_code: string | null
           created_at: string
+          date_of_session: string | null
           denial_details_json: Json | null
           diagnosis_code_pointers: string | null
           end_at: string
@@ -246,9 +248,11 @@ export type Database = {
           claim_status_last_checked?: string | null
           claimid?: string | null
           client_id: string
+          client_name?: string | null
           clinician_id: string
           cpt_code?: string | null
           created_at?: string
+          date_of_session?: string | null
           denial_details_json?: Json | null
           diagnosis_code_pointers?: string | null
           end_at: string
@@ -297,9 +301,11 @@ export type Database = {
           claim_status_last_checked?: string | null
           claimid?: string | null
           client_id?: string
+          client_name?: string | null
           clinician_id?: string
           cpt_code?: string | null
           created_at?: string
+          date_of_session?: string | null
           denial_details_json?: Json | null
           diagnosis_code_pointers?: string | null
           end_at?: string
