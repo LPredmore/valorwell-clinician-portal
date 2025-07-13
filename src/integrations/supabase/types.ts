@@ -184,55 +184,26 @@ export type Database = {
       appointments: {
         Row: {
           appointment_recurring: string | null
-          billed_amount: number | null
-          billing_notes: string | null
           buffer_after: number | null
           buffer_before: number | null
-          claim_claimmd_batch_id: string | null
-          claim_last_submission_date: string | null
-          claim_response_json: Json | null
-          claim_status: string | null
-          claim_status_last_checked: string | null
-          claimid: string | null
           client_email: string | null
           client_id: string
-          client_name: string | null
           clinician_email: string | null
           clinician_id: string
           clinician_name: string | null
-          cpt_code: string | null
           created_at: string
-          date_of_session: string | null
-          denial_details_json: Json | null
-          diagnosis_code_pointers: string | null
           end_at: string
-          era_check_eft_number: string | null
-          era_claimmd_id: string | null
-          era_payment_date: string | null
           flexibility_window: Json | null
-          google_calendar_event_id: string | null
           id: string
-          insurance_adjustment_amount: number | null
-          insurance_adjustment_details_json: Json | null
-          insurance_paid_amount: number | null
           is_flexible: boolean | null
           last_real_time_update: string | null
-          last_statement_to_patient_date: string | null
           last_synced_at: string | null
-          modifiers: string[] | null
           notes: string | null
-          patient_paid_amount: number | null
-          patient_payment_date: string | null
-          patient_payment_status: string | null
-          patient_responsibility_amount: number | null
-          place_of_service_code: string | null
           priority: number | null
           real_time_update_source: string | null
           recurring_group_id: string | null
-          requires_billing_review: boolean | null
           start_at: string
           status: string
-          stripe_charge_ids: string[] | null
           template_id: string | null
           type: string
           updated_at: string
@@ -240,55 +211,26 @@ export type Database = {
         }
         Insert: {
           appointment_recurring?: string | null
-          billed_amount?: number | null
-          billing_notes?: string | null
           buffer_after?: number | null
           buffer_before?: number | null
-          claim_claimmd_batch_id?: string | null
-          claim_last_submission_date?: string | null
-          claim_response_json?: Json | null
-          claim_status?: string | null
-          claim_status_last_checked?: string | null
-          claimid?: string | null
           client_email?: string | null
           client_id: string
-          client_name?: string | null
           clinician_email?: string | null
           clinician_id: string
           clinician_name?: string | null
-          cpt_code?: string | null
           created_at?: string
-          date_of_session?: string | null
-          denial_details_json?: Json | null
-          diagnosis_code_pointers?: string | null
           end_at: string
-          era_check_eft_number?: string | null
-          era_claimmd_id?: string | null
-          era_payment_date?: string | null
           flexibility_window?: Json | null
-          google_calendar_event_id?: string | null
           id?: string
-          insurance_adjustment_amount?: number | null
-          insurance_adjustment_details_json?: Json | null
-          insurance_paid_amount?: number | null
           is_flexible?: boolean | null
           last_real_time_update?: string | null
-          last_statement_to_patient_date?: string | null
           last_synced_at?: string | null
-          modifiers?: string[] | null
           notes?: string | null
-          patient_paid_amount?: number | null
-          patient_payment_date?: string | null
-          patient_payment_status?: string | null
-          patient_responsibility_amount?: number | null
-          place_of_service_code?: string | null
           priority?: number | null
           real_time_update_source?: string | null
           recurring_group_id?: string | null
-          requires_billing_review?: boolean | null
           start_at: string
           status?: string
-          stripe_charge_ids?: string[] | null
           template_id?: string | null
           type: string
           updated_at?: string
@@ -296,55 +238,26 @@ export type Database = {
         }
         Update: {
           appointment_recurring?: string | null
-          billed_amount?: number | null
-          billing_notes?: string | null
           buffer_after?: number | null
           buffer_before?: number | null
-          claim_claimmd_batch_id?: string | null
-          claim_last_submission_date?: string | null
-          claim_response_json?: Json | null
-          claim_status?: string | null
-          claim_status_last_checked?: string | null
-          claimid?: string | null
           client_email?: string | null
           client_id?: string
-          client_name?: string | null
           clinician_email?: string | null
           clinician_id?: string
           clinician_name?: string | null
-          cpt_code?: string | null
           created_at?: string
-          date_of_session?: string | null
-          denial_details_json?: Json | null
-          diagnosis_code_pointers?: string | null
           end_at?: string
-          era_check_eft_number?: string | null
-          era_claimmd_id?: string | null
-          era_payment_date?: string | null
           flexibility_window?: Json | null
-          google_calendar_event_id?: string | null
           id?: string
-          insurance_adjustment_amount?: number | null
-          insurance_adjustment_details_json?: Json | null
-          insurance_paid_amount?: number | null
           is_flexible?: boolean | null
           last_real_time_update?: string | null
-          last_statement_to_patient_date?: string | null
           last_synced_at?: string | null
-          modifiers?: string[] | null
           notes?: string | null
-          patient_paid_amount?: number | null
-          patient_payment_date?: string | null
-          patient_payment_status?: string | null
-          patient_responsibility_amount?: number | null
-          place_of_service_code?: string | null
           priority?: number | null
           real_time_update_source?: string | null
           recurring_group_id?: string | null
-          requires_billing_review?: boolean | null
           start_at?: string
           status?: string
-          stripe_charge_ids?: string[] | null
           template_id?: string | null
           type?: string
           updated_at?: string
