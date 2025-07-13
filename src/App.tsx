@@ -21,6 +21,7 @@ import NylasOAuthCallback from "./pages/NylasOAuthCallback";
 import MonitoringPage from "./pages/MonitoringPage";
 import AppointmentCreate from "./pages/AppointmentCreate";
 import BlockedTimeCreate from "./pages/BlockedTimeCreate";
+import Training from "./pages/Training";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -140,6 +141,14 @@ const App = () => {
                 element={
                   <ProtectedRoute allowedRoles={['admin']}>
                     <MonitoringPage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/training" 
+                element={
+                  <ProtectedRoute allowedRoles={['clinician', 'admin']}>
+                    <Training />
                   </ProtectedRoute>
                 } 
               />

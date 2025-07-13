@@ -11,7 +11,8 @@ import {
   ChevronLeft,
   UserCheck,
   LayoutDashboard,
-  User
+  User,
+  GraduationCap
 } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { useState, useEffect } from 'react';
@@ -114,6 +115,14 @@ const Sidebar = () => {
         >
           <Calendar size={18} />
           <span>Calendar</span>
+        </Link>
+        
+        <Link 
+          to="/training" 
+          className={`sidebar-link ${isActive('/training') ? 'active' : ''}`}
+        >
+          <GraduationCap size={18} />
+          <span>Training</span>
         </Link>
         
         {/* Admin/Staff only links */}
