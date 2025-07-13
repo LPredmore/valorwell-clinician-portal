@@ -344,7 +344,7 @@ export const useSessionNoteForm = ({
       'medications', 'sessionType', 'personsInAttendance', 'appearance', 'attitude',
       'behavior', 'speech', 'affect', 'thoughtProcess', 'perception', 'orientation',
       'memoryConcentration', 'insightJudgement', 'mood', 'substanceAbuseRisk',
-      'suicidalIdeation', 'homicidalIdeation', 'primaryObjective', 'intervention1',
+      'suicidalIdeation', 'homicidalIdeation',
       'currentSymptoms', 'functioning', 'prognosis', 'progress', 'sessionNarrative',
       'signature'
     ];
