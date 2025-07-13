@@ -188,10 +188,12 @@ export type Database = {
           buffer_before: number | null
           client_email: string | null
           client_id: string
+          client_name: string | null
           clinician_email: string | null
           clinician_id: string
           clinician_name: string | null
           created_at: string
+          date_of_session: string | null
           end_at: string
           flexibility_window: Json | null
           id: string
@@ -215,10 +217,12 @@ export type Database = {
           buffer_before?: number | null
           client_email?: string | null
           client_id: string
+          client_name?: string | null
           clinician_email?: string | null
           clinician_id: string
           clinician_name?: string | null
           created_at?: string
+          date_of_session?: string | null
           end_at: string
           flexibility_window?: Json | null
           id?: string
@@ -242,10 +246,12 @@ export type Database = {
           buffer_before?: number | null
           client_email?: string | null
           client_id?: string
+          client_name?: string | null
           clinician_email?: string | null
           clinician_id?: string
           clinician_name?: string | null
           created_at?: string
+          date_of_session?: string | null
           end_at?: string
           flexibility_window?: Json | null
           id?: string
