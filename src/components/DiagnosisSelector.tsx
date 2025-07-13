@@ -46,7 +46,17 @@ export const DiagnosisSelector: React.FC<DiagnosisSelectorProps> = ({
   return <div className="space-y-4">
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          
+          <Button 
+            variant="outline" 
+            className="w-full justify-start text-left font-normal"
+            type="button"
+          >
+            {selectedCodes.length === 0 ? (
+              <span className="text-muted-foreground">Select diagnosis codes...</span>
+            ) : (
+              <span>{selectedCodes.length} diagnosis code{selectedCodes.length > 1 ? 's' : ''} selected</span>
+            )}
+          </Button>
         </PopoverTrigger>
         <PopoverContent className="p-0" align="start">
           <Command>
