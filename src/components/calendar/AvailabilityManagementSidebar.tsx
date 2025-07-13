@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -420,274 +419,278 @@ const AvailabilityManagementSidebar: React.FC<AvailabilityManagementSidebarProps
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Clock className="h-5 w-5" />
-          Manage Availability
-        </CardTitle>
-        <CardDescription>
-          Set your available time slots for appointments
-        </CardDescription>
-      </CardHeader>
-      
-      <CardContent className="space-y-4">
-        {/* Calendar Display Settings */}
-        <div className="p-3 border rounded-md">
-          <h4 className="font-medium mb-2">Calendar Display</h4>
-          <p className="text-sm text-muted-foreground mb-3">
+    <div className="space-y-4">
+      {/* Calendar Display Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Calendar Display</CardTitle>
+          <CardDescription>
             Set the time range displayed in your calendar view
-          </p>
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <Label className="text-xs">Start Time</Label>
-                <div className="flex gap-1">
-                  <Select value={calendarStartHour} onValueChange={setCalendarStartHour}>
-                    <SelectTrigger className="h-8 flex-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {hourOptions.map((hour) => (
-                        <SelectItem key={hour.value} value={hour.value}>
-                          {hour.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Select value={calendarStartAMPM} onValueChange={setCalendarStartAMPM}>
-                    <SelectTrigger className="h-8 w-16">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ampmOptions.map((ampm) => (
-                        <SelectItem key={ampm.value} value={ampm.value}>
-                          {ampm.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div>
-                <Label className="text-xs">End Time</Label>
-                <div className="flex gap-1">
-                  <Select value={calendarEndHour} onValueChange={setCalendarEndHour}>
-                    <SelectTrigger className="h-8 flex-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {hourOptions.map((hour) => (
-                        <SelectItem key={hour.value} value={hour.value}>
-                          {hour.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Select value={calendarEndAMPM} onValueChange={setCalendarEndAMPM}>
-                    <SelectTrigger className="h-8 w-16">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ampmOptions.map((ampm) => (
-                        <SelectItem key={ampm.value} value={ampm.value}>
-                          {ampm.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <Label className="text-xs">Start Time</Label>
+              <div className="flex gap-1">
+                <Select value={calendarStartHour} onValueChange={setCalendarStartHour}>
+                  <SelectTrigger className="h-8 flex-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {hourOptions.map((hour) => (
+                      <SelectItem key={hour.value} value={hour.value}>
+                        {hour.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={calendarStartAMPM} onValueChange={setCalendarStartAMPM}>
+                  <SelectTrigger className="h-8 w-16">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ampmOptions.map((ampm) => (
+                      <SelectItem key={ampm.value} value={ampm.value}>
+                        {ampm.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="w-full"
-              onClick={saveCalendarDisplaySettings}
-              disabled={isSavingDisplay || isLoading}
+            <div>
+              <Label className="text-xs">End Time</Label>
+              <div className="flex gap-1">
+                <Select value={calendarEndHour} onValueChange={setCalendarEndHour}>
+                  <SelectTrigger className="h-8 flex-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {hourOptions.map((hour) => (
+                      <SelectItem key={hour.value} value={hour.value}>
+                        {hour.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={calendarEndAMPM} onValueChange={setCalendarEndAMPM}>
+                  <SelectTrigger className="h-8 w-16">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ampmOptions.map((ampm) => (
+                      <SelectItem key={ampm.value} value={ampm.value}>
+                        {ampm.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="w-full"
+            onClick={saveCalendarDisplaySettings}
+            disabled={isSavingDisplay || isLoading}
+          >
+            <Save className="h-3 w-3 mr-1" />
+            {isSavingDisplay ? 'Saving...' : 'Save Display Settings'}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Manage Availability */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="h-5 w-5" />
+            Manage Availability
+          </CardTitle>
+          <CardDescription>
+            Set your available time slots for appointments
+          </CardDescription>
+        </CardHeader>
+        
+        <CardContent className="space-y-4">
+          {/* Day Selection */}
+          <div>
+            <Label htmlFor="day">Day of Week</Label>
+            <Select value={selectedDay} onValueChange={setSelectedDay}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {daysOfWeek.map(day => (
+                  <SelectItem key={day.value} value={day.value}>
+                    {day.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Slot Selection */}
+          <div>
+            <Label htmlFor="slot">Time Slot</Label>
+            <Select value={selectedSlot.toString()} onValueChange={(value) => setSelectedSlot(parseInt(value))}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1">Slot 1</SelectItem>
+                <SelectItem value="2">Slot 2</SelectItem>
+                <SelectItem value="3">Slot 3</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Time Inputs */}
+          <div className="space-y-4">
+            <div>
+              <Label>Start Time</Label>
+              <div className="flex gap-2 mt-1">
+                <Select value={startHour} onValueChange={setStartHour}>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Hour" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {hourOptions.map((hour) => (
+                      <SelectItem key={hour.value} value={hour.value}>
+                        {hour.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <span className="self-center">:</span>
+                <Select value={startMinute} onValueChange={setStartMinute}>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Min" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {minuteOptions.map((minute) => (
+                      <SelectItem key={minute.value} value={minute.value}>
+                        {minute.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={startAMPM} onValueChange={setStartAMPM}>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="AM/PM" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ampmOptions.map((ampm) => (
+                      <SelectItem key={ampm.value} value={ampm.value}>
+                        {ampm.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            <div>
+              <Label>End Time</Label>
+              <div className="flex gap-2 mt-1">
+                <Select value={endHour} onValueChange={setEndHour}>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Hour" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {hourOptions.map((hour) => (
+                      <SelectItem key={hour.value} value={hour.value}>
+                        {hour.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <span className="self-center">:</span>
+                <Select value={endMinute} onValueChange={setEndMinute}>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Min" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {minuteOptions.map((minute) => (
+                      <SelectItem key={minute.value} value={minute.value}>
+                        {minute.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={endAMPM} onValueChange={setEndAMPM}>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="AM/PM" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ampmOptions.map((ampm) => (
+                      <SelectItem key={ampm.value} value={ampm.value}>
+                        {ampm.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+
+          {/* Timezone Info */}
+          <div className="text-sm text-gray-500">
+            Times in: {TimeZoneService.getTimeZoneDisplayName(browserTimeZone)}
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-2">
+            <Button
+              onClick={saveAvailability}
+              disabled={isSaving || isLoading}
+              className="flex-1"
             >
-              <Save className="h-3 w-3 mr-1" />
-              {isSavingDisplay ? 'Saving...' : 'Save Display Settings'}
+              <Save className="h-4 w-4 mr-2" />
+              {isSaving ? 'Saving...' : 'Save'}
+            </Button>
+            
+            <Button
+              onClick={deleteAvailability}
+              disabled={isSaving || isLoading}
+              variant="outline"
+            >
+              <Trash2 className="h-4 w-4" />
             </Button>
           </div>
-        </div>
 
-        {/* Day Selection */}
-        <div>
-          <Label htmlFor="day">Day of Week</Label>
-          <Select value={selectedDay} onValueChange={setSelectedDay}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {daysOfWeek.map(day => (
-                <SelectItem key={day.value} value={day.value}>
-                  {day.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Slot Selection */}
-        <div>
-          <Label htmlFor="slot">Time Slot</Label>
-          <Select value={selectedSlot.toString()} onValueChange={(value) => setSelectedSlot(parseInt(value))}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="1">Slot 1</SelectItem>
-              <SelectItem value="2">Slot 2</SelectItem>
-              <SelectItem value="3">Slot 3</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Time Inputs */}
-        <div className="space-y-4">
-          <div>
-            <Label>Start Time</Label>
-            <div className="flex gap-2 mt-1">
-              <Select value={startHour} onValueChange={setStartHour}>
-                <SelectTrigger className="flex-1">
-                  <SelectValue placeholder="Hour" />
-                </SelectTrigger>
-                <SelectContent>
-                  {hourOptions.map((hour) => (
-                    <SelectItem key={hour.value} value={hour.value}>
-                      {hour.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <span className="self-center">:</span>
-              <Select value={startMinute} onValueChange={setStartMinute}>
-                <SelectTrigger className="flex-1">
-                  <SelectValue placeholder="Min" />
-                </SelectTrigger>
-                <SelectContent>
-                  {minuteOptions.map((minute) => (
-                    <SelectItem key={minute.value} value={minute.value}>
-                      {minute.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={startAMPM} onValueChange={setStartAMPM}>
-                <SelectTrigger className="flex-1">
-                  <SelectValue placeholder="AM/PM" />
-                </SelectTrigger>
-                <SelectContent>
-                  {ampmOptions.map((ampm) => (
-                    <SelectItem key={ampm.value} value={ampm.value}>
-                      {ampm.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          {/* Current Availability Summary */}
+          <div className="mt-6">
+            <h4 className="font-medium mb-2">Current Availability</h4>
+            {isLoading ? (
+              <div className="text-sm text-gray-500">Loading...</div>
+            ) : currentAvailability.length === 0 ? (
+              <div className="text-sm text-gray-500">No availability set</div>
+            ) : (
+              <div className="space-y-2">
+                {daysOfWeek.map(day => {
+                  const daySlots = currentAvailability.filter(a => a.day === day.value);
+                  if (daySlots.length === 0) return null;
+                  
+                  return (
+                    <div key={day.value} className="text-sm">
+                      <div className="font-medium">{day.label}</div>
+                      {daySlots.map(slot => (
+                        <div key={slot.slot} className="ml-2 text-gray-600">
+                          Slot {slot.slot}: {formatTimeForDisplay(slot.startTime)} - {formatTimeForDisplay(slot.endTime)}
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
-          
-          <div>
-            <Label>End Time</Label>
-            <div className="flex gap-2 mt-1">
-              <Select value={endHour} onValueChange={setEndHour}>
-                <SelectTrigger className="flex-1">
-                  <SelectValue placeholder="Hour" />
-                </SelectTrigger>
-                <SelectContent>
-                  {hourOptions.map((hour) => (
-                    <SelectItem key={hour.value} value={hour.value}>
-                      {hour.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <span className="self-center">:</span>
-              <Select value={endMinute} onValueChange={setEndMinute}>
-                <SelectTrigger className="flex-1">
-                  <SelectValue placeholder="Min" />
-                </SelectTrigger>
-                <SelectContent>
-                  {minuteOptions.map((minute) => (
-                    <SelectItem key={minute.value} value={minute.value}>
-                      {minute.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={endAMPM} onValueChange={setEndAMPM}>
-                <SelectTrigger className="flex-1">
-                  <SelectValue placeholder="AM/PM" />
-                </SelectTrigger>
-                <SelectContent>
-                  {ampmOptions.map((ampm) => (
-                    <SelectItem key={ampm.value} value={ampm.value}>
-                      {ampm.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </div>
-
-        {/* Timezone Info */}
-        <div className="text-sm text-gray-500">
-          Times in: {TimeZoneService.getTimeZoneDisplayName(browserTimeZone)}
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex gap-2">
-          <Button
-            onClick={saveAvailability}
-            disabled={isSaving || isLoading}
-            className="flex-1"
-          >
-            <Save className="h-4 w-4 mr-2" />
-            {isSaving ? 'Saving...' : 'Save'}
-          </Button>
-          
-          <Button
-            onClick={deleteAvailability}
-            disabled={isSaving || isLoading}
-            variant="outline"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
-
-
-        {/* Current Availability Summary */}
-        <div className="mt-6">
-          <h4 className="font-medium mb-2">Current Availability</h4>
-          {isLoading ? (
-            <div className="text-sm text-gray-500">Loading...</div>
-          ) : currentAvailability.length === 0 ? (
-            <div className="text-sm text-gray-500">No availability set</div>
-          ) : (
-            <div className="space-y-2">
-              {daysOfWeek.map(day => {
-                const daySlots = currentAvailability.filter(a => a.day === day.value);
-                if (daySlots.length === 0) return null;
-                
-                return (
-                  <div key={day.value} className="text-sm">
-                    <div className="font-medium">{day.label}</div>
-                    {daySlots.map(slot => (
-                      <div key={slot.slot} className="ml-2 text-gray-600">
-                        Slot {slot.slot}: {formatTimeForDisplay(slot.startTime)} - {formatTimeForDisplay(slot.endTime)}
-                      </div>
-                    ))}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 
