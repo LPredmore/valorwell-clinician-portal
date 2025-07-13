@@ -7,6 +7,7 @@ import { Calendar, Eye, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { getCurrentUser, fetchFilteredClinicalDocuments, getDocumentDownloadURL } from '@/integrations/supabase/client';
+import DocumentViewerDialog from '@/components/ui/DocumentViewerDialog';
 
 interface ClinicalDocument {
   id: string;
@@ -20,6 +21,13 @@ interface ClinicalDocument {
 const MyDocuments: React.FC<{ clientId?: string }> = ({ clientId }) => {
   const [documents, setDocuments] = useState<ClinicalDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState<{
+    url: string;
+    title: string;
+    type: string;
+    date: string;
+  } | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -55,26 +63,26 @@ const MyDocuments: React.FC<{ clientId?: string }> = ({ clientId }) => {
     loadDocuments();
   }, [clientId, toast]);
 
-  const handleViewDocument = async (filePath: string) => {
+  const handleViewDocument = async (document: ClinicalDocument) => {
     try {
-      console.log('📄 [MyDocuments] Attempting to view document:', filePath);
+      console.log('📄 [MyDocuments] Attempting to view document:', document.file_path);
       
       // Check if this is a problematic file path
-      if (filePath.startsWith('pending-pdf-generation-') || 
-          filePath.startsWith('pdf-generation-failed-') ||
-          filePath.startsWith('pdf-generation-error-') ||
-          filePath.startsWith('no-content-for-pdf-')) {
+      if (document.file_path.startsWith('pending-pdf-generation-') || 
+          document.file_path.startsWith('pdf-generation-failed-') ||
+          document.file_path.startsWith('pdf-generation-error-') ||
+          document.file_path.startsWith('no-content-for-pdf-')) {
         
-        console.warn('📄 [MyDocuments] Document has problematic file path:', filePath);
+        console.warn('📄 [MyDocuments] Document has problematic file path:', document.file_path);
         
-        const errorType = filePath.split('-')[0];
+        const errorType = document.file_path.split('-')[0];
         let message = "This document is not available for viewing.";
         
         if (errorType === 'pending') {
           message = "This document is still being processed. Please try again in a moment.";
-        } else if (errorType === 'pdf' && filePath.includes('failed')) {
+        } else if (errorType === 'pdf' && document.file_path.includes('failed')) {
           message = "PDF generation failed for this document. Please contact support.";
-        } else if (errorType === 'pdf' && filePath.includes('error')) {
+        } else if (errorType === 'pdf' && document.file_path.includes('error')) {
           message = "An error occurred during PDF generation. Please contact support.";
         } else if (errorType === 'no') {
           message = "No content was available for this document.";
@@ -88,10 +96,16 @@ const MyDocuments: React.FC<{ clientId?: string }> = ({ clientId }) => {
         return;
       }
       
-      const url = await getDocumentDownloadURL(filePath);
+      const url = await getDocumentDownloadURL(document.file_path);
       if (url) {
-        console.log('✅ [MyDocuments] Opening document in new tab');
-        window.open(url, '_blank');
+        console.log('✅ [MyDocuments] Opening document in dialog');
+        setSelectedDocument({
+          url,
+          title: document.document_title,
+          type: getDisplayDocumentType(document.document_type),
+          date: format(new Date(document.document_date), 'MMM d, yyyy')
+        });
+        setIsDialogOpen(true);
       } else {
         console.error('❌ [MyDocuments] No download URL returned');
         toast({
@@ -167,7 +181,7 @@ const MyDocuments: React.FC<{ clientId?: string }> = ({ clientId }) => {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleViewDocument(doc.file_path)}
+                        onClick={() => handleViewDocument(doc)}
                       >
                         <Eye className="h-4 w-4 mr-1" />
                         View
@@ -180,6 +194,17 @@ const MyDocuments: React.FC<{ clientId?: string }> = ({ clientId }) => {
           </div>
         )}
       </CardContent>
+      
+      {selectedDocument && (
+        <DocumentViewerDialog
+          isOpen={isDialogOpen}
+          onClose={() => setIsDialogOpen(false)}
+          documentUrl={selectedDocument.url}
+          documentTitle={selectedDocument.title}
+          documentType={selectedDocument.type}
+          documentDate={selectedDocument.date}
+        />
+      )}
     </Card>
   );
 };

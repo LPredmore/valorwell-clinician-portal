@@ -12,6 +12,7 @@ import { fetchFilteredClinicalDocuments, getDocumentDownloadURL } from "@/integr
 import { format } from "date-fns";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
+import DocumentViewerDialog from "@/components/ui/DocumentViewerDialog";
 
 interface DocumentationTabProps {
   clientData?: ClientDetails | null;
@@ -36,6 +37,13 @@ const DocumentationTab: React.FC<DocumentationTabProps> = ({
   const [showPCL5Template, setShowPCL5Template] = useState(false);
   const [documents, setDocuments] = useState<ClinicalDocument[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState<{
+    url: string;
+    title: string;
+    type: string;
+    date: string;
+  } | null>(null);
 
   const {
     clinicianData
@@ -113,20 +121,20 @@ const DocumentationTab: React.FC<DocumentationTabProps> = ({
     }
   };
 
-  const handleViewDocument = async (filePath: string) => {
+  const handleViewDocument = async (document: ClinicalDocument) => {
     try {
-      console.log('📄 [DocumentationTab] Attempting to view document:', filePath);
+      console.log('📄 [DocumentationTab] Attempting to view document:', document.file_path);
       
       // Check for invalid file paths that should never be displayed
-      if (filePath.startsWith('pending-pdf-generation-') || 
-          filePath.startsWith('pdf-generation-failed-') ||
-          filePath.startsWith('pdf-generation-error-') ||
-          filePath.startsWith('no-content-for-pdf-') ||
-          filePath.startsWith('temp/') ||
-          filePath === 'placeholder-path' ||
-          !filePath || filePath.trim() === '') {
+      if (document.file_path.startsWith('pending-pdf-generation-') || 
+          document.file_path.startsWith('pdf-generation-failed-') ||
+          document.file_path.startsWith('pdf-generation-error-') ||
+          document.file_path.startsWith('no-content-for-pdf-') ||
+          document.file_path.startsWith('temp/') ||
+          document.file_path === 'placeholder-path' ||
+          !document.file_path || document.file_path.trim() === '') {
         
-        console.warn('📄 [DocumentationTab] Invalid file path detected:', filePath);
+        console.warn('📄 [DocumentationTab] Invalid file path detected:', document.file_path);
         
         toast({
           title: "Document Not Available",
@@ -136,10 +144,22 @@ const DocumentationTab: React.FC<DocumentationTabProps> = ({
         return;
       }
       
-      const url = await getDocumentDownloadURL(filePath);
+      const url = await getDocumentDownloadURL(document.file_path);
       if (url) {
-        console.log('✅ [DocumentationTab] Opening document in new tab');
-        window.open(url, '_blank');
+        console.log('✅ [DocumentationTab] Opening document in dialog');
+        setSelectedDocument({
+          url,
+          title: document.document_title,
+          type: getDisplayDocumentType(document.document_type),
+          date: (() => {
+            try {
+              return format(new Date(document.document_date), 'MMM d, yyyy');
+            } catch {
+              return document.document_date;
+            }
+          })()
+        });
+        setIsDialogOpen(true);
       } else {
         console.error('❌ [DocumentationTab] No download URL returned');
         toast({
@@ -251,7 +271,7 @@ const DocumentationTab: React.FC<DocumentationTabProps> = ({
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button variant="outline" size="sm" className="ml-2" onClick={() => handleViewDocument(doc.file_path)}>
+                        <Button variant="outline" size="sm" className="ml-2" onClick={() => handleViewDocument(doc)}>
                           <Eye className="h-4 w-4 mr-1" />
                           View
                         </Button>
@@ -262,6 +282,17 @@ const DocumentationTab: React.FC<DocumentationTabProps> = ({
             </div>}
         </CardContent>
       </Card>
+      
+      {selectedDocument && (
+        <DocumentViewerDialog
+          isOpen={isDialogOpen}
+          onClose={() => setIsDialogOpen(false)}
+          documentUrl={selectedDocument.url}
+          documentTitle={selectedDocument.title}
+          documentType={selectedDocument.type}
+          documentDate={selectedDocument.date}
+        />
+      )}
     </div>;
 };
 
