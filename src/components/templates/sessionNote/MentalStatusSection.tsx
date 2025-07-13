@@ -14,14 +14,17 @@ interface MentalStatusSectionProps {
   editModes: any;
   handleChange: (field: string, value: string) => void;
   toggleEditMode: (field: string, value: string) => void;
+  phq9Data?: any;
 }
 
 export const MentalStatusSection: React.FC<MentalStatusSectionProps> = ({
   formState,
   editModes,
   handleChange,
-  toggleEditMode
+  toggleEditMode,
+  phq9Data
 }) => {
+  const isHighRisk = phq9Data?.question_9 > 0;
   return (
     <>
       <h4 className="text-md font-medium text-gray-800 mb-4">Mental Status Examination</h4>
@@ -304,7 +307,7 @@ export const MentalStatusSection: React.FC<MentalStatusSectionProps> = ({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-        <div>
+        <div className={isHighRisk ? "p-3 rounded-md bg-red-50 border border-red-200" : ""}>
           <label className="block text-sm font-medium text-gray-700 mb-1">Suicidal Ideation</label>
           <Select
             value={formState.suicidalIdeation}

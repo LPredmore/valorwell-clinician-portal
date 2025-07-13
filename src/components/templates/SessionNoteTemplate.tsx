@@ -81,7 +81,8 @@ const SessionNoteTemplate: React.FC<SessionNoteTemplateProps> = ({
             formState={formState} 
             editModes={editModes} 
             handleChange={handleChange} 
-            toggleEditMode={toggleEditMode} 
+            toggleEditMode={toggleEditMode}
+            phq9Data={phq9Data}
           />
         </div>
         
