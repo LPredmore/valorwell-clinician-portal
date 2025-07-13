@@ -20,7 +20,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { videoRoomService } from '@/utils/videoRoomService';
 // Removed getClinicianTimeZone import - using browser timezone only
-import { formInputToUTC } from '@/utils/timezoneHelpers';
+import { formInputToUTC, utcToFormInput } from '@/utils/timezoneHelpers';
 import { DateTime } from 'luxon';
 import RecurringOptions, { RecurrenceFrequency } from './RecurringOptions';
 import RecurringActionDialog from './RecurringActionDialog';
@@ -129,12 +129,29 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
         let startDateTime: DateTime | null = null;
         
         if (editingAppointment.start_at) {
-          startDateTime = DateTime.fromISO(editingAppointment.start_at, { zone: 'UTC' });
+          // Convert UTC timestamp to browser's local time for display
+          const localDateTimeString = utcToFormInput(editingAppointment.start_at);
+          console.log('[AppointmentDialog] Converting UTC to local time:', {
+            utcTime: editingAppointment.start_at,
+            localTime: localDateTimeString
+          });
+          
+          // Parse the local datetime string (format: YYYY-MM-DDTHH:MM)
+          const [datePart, timePart] = localDateTimeString.split('T');
+          const [hourStr, minuteStr] = timePart.split(':');
+          
+          setDate(datePart);
+          
+          // Convert 24-hour to 12-hour format
+          const hour24 = parseInt(hourStr);
+          const hour12 = hour24 === 0 ? 12 : hour24 > 12 ? hour24 - 12 : hour24;
+          const ampm = hour24 >= 12 ? 'PM' : 'AM';
+          
+          setStartHour(hour12.toString().padStart(2, '0'));
+          setStartMinute(minuteStr);
+          setStartAMPM(ampm);
         } else if (editingAppointment.start) {
           startDateTime = DateTime.fromJSDate(editingAppointment.start);
-        }
-        
-        if (startDateTime) {
           setDate(startDateTime.toFormat('yyyy-MM-dd'));
           const hour24 = startDateTime.hour;
           const hour12 = hour24 === 0 ? 12 : hour24 > 12 ? hour24 - 12 : hour24;
