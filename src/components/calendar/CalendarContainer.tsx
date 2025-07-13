@@ -68,15 +68,24 @@ const CalendarContainer: React.FC = () => {
     }
   }, [navigationStateError]);
 
-  // Calculate week boundaries using browser timezone
+  // Calculate extended date range (3 weeks) to ensure all appointments are visible
   const { start: weekStart, end: weekEnd } = useMemo(() => {
     if (!shouldExecuteHooks) {
       return { start: new Date(), end: new Date() };
     }
     try {
-      return getWeekRange(currentDate, userTimeZone);
+      const { start: currentWeekStart, end: currentWeekEnd } = getWeekRange(currentDate, userTimeZone);
+      
+      // Extend range by 1 week before and 1 week after to create 3-week window
+      const extendedStart = new Date(currentWeekStart);
+      extendedStart.setDate(extendedStart.getDate() - 7); // 1 week before
+      
+      const extendedEnd = new Date(currentWeekEnd);
+      extendedEnd.setDate(extendedEnd.getDate() + 7); // 1 week after
+      
+      return { start: extendedStart, end: extendedEnd };
     } catch (error) {
-      console.error('[CalendarContainer] Error calculating week range:', error);
+      console.error('[CalendarContainer] Error calculating extended date range:', error);
       return { start: new Date(), end: new Date() };
     }
   }, [currentDate, userTimeZone, shouldExecuteHooks]);
