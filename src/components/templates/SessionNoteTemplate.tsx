@@ -28,6 +28,7 @@ const SessionNoteTemplate: React.FC<SessionNoteTemplateProps> = ({
     phq9Data,
     handleChange,
     toggleEditMode,
+    clearField,
     handleSave,
     isAiAssistMode,
     selectedInterventions,
@@ -82,6 +83,7 @@ const SessionNoteTemplate: React.FC<SessionNoteTemplateProps> = ({
             editModes={editModes} 
             handleChange={handleChange} 
             toggleEditMode={toggleEditMode}
+            clearField={clearField}
             phq9Data={phq9Data}
           />
         </div>

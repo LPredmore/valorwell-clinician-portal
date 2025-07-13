@@ -278,6 +278,11 @@ export const useSessionNoteForm = ({
     }
   };
 
+  const clearField = (field: string) => {
+    setEditModes({ ...editModes, [field]: false });
+    handleChange(field, '');
+  };
+
   const toggleAiAssistMode = () => {
     setIsAiAssistMode(!isAiAssistMode);
     setSelectedInterventions([]);
@@ -392,6 +397,11 @@ export const useSessionNoteForm = ({
         client_diagnosis = formState.diagnosis.split(',').map(d => d.trim()).filter(Boolean);
       }
 
+      // Convert empty date strings to null for database compatibility
+      const nextTreatmentPlanUpdate = formState.nextTreatmentPlanUpdate?.trim() 
+        ? formState.nextTreatmentPlanUpdate 
+        : null;
+
       const updates = {
         client_appearance: formState.appearance,
         client_attitude: formState.attitude,
@@ -429,7 +439,7 @@ export const useSessionNoteForm = ({
         client_diagnosis: client_diagnosis,
         client_privatenote: formState.privateNote,
 
-        client_nexttreatmentplanupdate: formState.nextTreatmentPlanUpdate,
+        client_nexttreatmentplanupdate: nextTreatmentPlanUpdate,
       };
 
       const { error } = await supabase
@@ -568,6 +578,7 @@ export const useSessionNoteForm = ({
     phq9Data,
     handleChange,
     toggleEditMode,
+    clearField,
     handleSave,
     isFormValid,
     isAiAssistMode,

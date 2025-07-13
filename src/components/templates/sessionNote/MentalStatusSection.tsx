@@ -1,6 +1,8 @@
 
 import React from 'react';
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { X } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -14,6 +16,7 @@ interface MentalStatusSectionProps {
   editModes: any;
   handleChange: (field: string, value: string) => void;
   toggleEditMode: (field: string, value: string) => void;
+  clearField: (field: string) => void;
   phq9Data?: any;
 }
 
@@ -22,6 +25,7 @@ export const MentalStatusSection: React.FC<MentalStatusSectionProps> = ({
   editModes,
   handleChange,
   toggleEditMode,
+  clearField,
   phq9Data
 }) => {
   const isHighRisk = phq9Data?.question_9 > 0;
@@ -33,12 +37,23 @@ export const MentalStatusSection: React.FC<MentalStatusSectionProps> = ({
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Appearance</label>
           {editModes.appearance ? (
-            <Input
-              value={formState.appearance}
-              onChange={(e) => handleChange('appearance', e.target.value)}
-              placeholder="Describe appearance"
-              className="w-full"
-            />
+            <div className="relative">
+              <Input
+                value={formState.appearance}
+                onChange={(e) => handleChange('appearance', e.target.value)}
+                placeholder="Describe appearance"
+                className="w-full pr-8"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                onClick={() => clearField('appearance')}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
           ) : (
             <Select
               value={formState.appearance}
@@ -57,12 +72,23 @@ export const MentalStatusSection: React.FC<MentalStatusSectionProps> = ({
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Attitude</label>
           {editModes.attitude ? (
-            <Input
-              value={formState.attitude}
-              onChange={(e) => handleChange('attitude', e.target.value)}
-              placeholder="Describe attitude"
-              className="w-full"
-            />
+            <div className="relative">
+              <Input
+                value={formState.attitude}
+                onChange={(e) => handleChange('attitude', e.target.value)}
+                placeholder="Describe attitude"
+                className="w-full pr-8"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                onClick={() => clearField('attitude')}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
           ) : (
             <Select
               value={formState.attitude}
@@ -81,12 +107,23 @@ export const MentalStatusSection: React.FC<MentalStatusSectionProps> = ({
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Behavior</label>
           {editModes.behavior ? (
-            <Input
-              value={formState.behavior}
-              onChange={(e) => handleChange('behavior', e.target.value)}
-              placeholder="Describe behavior"
-              className="w-full"
-            />
+            <div className="relative">
+              <Input
+                value={formState.behavior}
+                onChange={(e) => handleChange('behavior', e.target.value)}
+                placeholder="Describe behavior"
+                className="w-full pr-8"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                onClick={() => clearField('behavior')}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
           ) : (
             <Select
               value={formState.behavior}
@@ -108,12 +145,23 @@ export const MentalStatusSection: React.FC<MentalStatusSectionProps> = ({
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Speech</label>
           {editModes.speech ? (
-            <Input
-              value={formState.speech}
-              onChange={(e) => handleChange('speech', e.target.value)}
-              placeholder="Describe speech"
-              className="w-full"
-            />
+            <div className="relative">
+              <Input
+                value={formState.speech}
+                onChange={(e) => handleChange('speech', e.target.value)}
+                placeholder="Describe speech"
+                className="w-full pr-8"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                onClick={() => clearField('speech')}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
           ) : (
             <Select
               value={formState.speech}
@@ -132,12 +180,23 @@ export const MentalStatusSection: React.FC<MentalStatusSectionProps> = ({
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Affect</label>
           {editModes.affect ? (
-            <Input
-              value={formState.affect}
-              onChange={(e) => handleChange('affect', e.target.value)}
-              placeholder="Describe affect"
-              className="w-full"
-            />
+            <div className="relative">
+              <Input
+                value={formState.affect}
+                onChange={(e) => handleChange('affect', e.target.value)}
+                placeholder="Describe affect"
+                className="w-full pr-8"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                onClick={() => clearField('affect')}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
           ) : (
             <Select
               value={formState.affect}
@@ -156,12 +215,23 @@ export const MentalStatusSection: React.FC<MentalStatusSectionProps> = ({
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Thought Process</label>
           {editModes.thoughtProcess ? (
-            <Input
-              value={formState.thoughtProcess}
-              onChange={(e) => handleChange('thoughtProcess', e.target.value)}
-              placeholder="Describe thought process"
-              className="w-full"
-            />
+            <div className="relative">
+              <Input
+                value={formState.thoughtProcess}
+                onChange={(e) => handleChange('thoughtProcess', e.target.value)}
+                placeholder="Describe thought process"
+                className="w-full pr-8"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                onClick={() => clearField('thoughtProcess')}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
           ) : (
             <Select
               value={formState.thoughtProcess}
@@ -183,12 +253,23 @@ export const MentalStatusSection: React.FC<MentalStatusSectionProps> = ({
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Perception</label>
           {editModes.perception ? (
-            <Input
-              value={formState.perception}
-              onChange={(e) => handleChange('perception', e.target.value)}
-              placeholder="Describe perception"
-              className="w-full"
-            />
+            <div className="relative">
+              <Input
+                value={formState.perception}
+                onChange={(e) => handleChange('perception', e.target.value)}
+                placeholder="Describe perception"
+                className="w-full pr-8"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                onClick={() => clearField('perception')}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
           ) : (
             <Select
               value={formState.perception}
@@ -207,12 +288,23 @@ export const MentalStatusSection: React.FC<MentalStatusSectionProps> = ({
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Orientation</label>
           {editModes.orientation ? (
-            <Input
-              value={formState.orientation}
-              onChange={(e) => handleChange('orientation', e.target.value)}
-              placeholder="Describe orientation"
-              className="w-full"
-            />
+            <div className="relative">
+              <Input
+                value={formState.orientation}
+                onChange={(e) => handleChange('orientation', e.target.value)}
+                placeholder="Describe orientation"
+                className="w-full pr-8"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                onClick={() => clearField('orientation')}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
           ) : (
             <Select
               value={formState.orientation}
@@ -231,12 +323,23 @@ export const MentalStatusSection: React.FC<MentalStatusSectionProps> = ({
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Memory/Concentration</label>
           {editModes.memoryConcentration ? (
-            <Input
-              value={formState.memoryConcentration}
-              onChange={(e) => handleChange('memoryConcentration', e.target.value)}
-              placeholder="Describe memory/concentration"
-              className="w-full"
-            />
+            <div className="relative">
+              <Input
+                value={formState.memoryConcentration}
+                onChange={(e) => handleChange('memoryConcentration', e.target.value)}
+                placeholder="Describe memory/concentration"
+                className="w-full pr-8"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                onClick={() => clearField('memoryConcentration')}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
           ) : (
             <Select
               value={formState.memoryConcentration}
@@ -258,12 +361,23 @@ export const MentalStatusSection: React.FC<MentalStatusSectionProps> = ({
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Insight/Judgement</label>
           {editModes.insightJudgement ? (
-            <Input
-              value={formState.insightJudgement}
-              onChange={(e) => handleChange('insightJudgement', e.target.value)}
-              placeholder="Describe insight/judgement"
-              className="w-full"
-            />
+            <div className="relative">
+              <Input
+                value={formState.insightJudgement}
+                onChange={(e) => handleChange('insightJudgement', e.target.value)}
+                placeholder="Describe insight/judgement"
+                className="w-full pr-8"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                onClick={() => clearField('insightJudgement')}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
           ) : (
             <Select
               value={formState.insightJudgement}
