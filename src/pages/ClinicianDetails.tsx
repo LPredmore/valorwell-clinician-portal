@@ -321,13 +321,6 @@ const ClinicianDetails = () => {
                     onSave={(value) => updateClinicianField('clinician_professional_name', value as string)}
                     placeholder="Enter professional name"
                   />
-                  <EditableField
-                    label="Status"
-                    value={clinicianData.clinician_status}
-                    onSave={(value) => updateClinicianField('clinician_status', value as string)}
-                    type="select"
-                    options={statusOptions}
-                  />
                 </div>
                 
                 <EditableField
