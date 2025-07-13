@@ -194,9 +194,12 @@ export type Database = {
           claim_status: string | null
           claim_status_last_checked: string | null
           claimid: string | null
+          client_email: string | null
           client_id: string
           client_name: string | null
+          clinician_email: string | null
           clinician_id: string
+          clinician_name: string | null
           cpt_code: string | null
           created_at: string
           date_of_session: string | null
@@ -247,9 +250,12 @@ export type Database = {
           claim_status?: string | null
           claim_status_last_checked?: string | null
           claimid?: string | null
+          client_email?: string | null
           client_id: string
           client_name?: string | null
+          clinician_email?: string | null
           clinician_id: string
+          clinician_name?: string | null
           cpt_code?: string | null
           created_at?: string
           date_of_session?: string | null
@@ -300,9 +306,12 @@ export type Database = {
           claim_status?: string | null
           claim_status_last_checked?: string | null
           claimid?: string | null
+          client_email?: string | null
           client_id?: string
           client_name?: string | null
+          clinician_email?: string | null
           clinician_id?: string
+          clinician_name?: string | null
           cpt_code?: string | null
           created_at?: string
           date_of_session?: string | null

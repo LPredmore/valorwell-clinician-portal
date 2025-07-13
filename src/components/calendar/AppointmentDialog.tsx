@@ -30,6 +30,7 @@ interface Client {
   client_first_name: string | null;
   client_last_name: string | null;
   client_preferred_name: string | null;
+  client_email: string | null;
 }
 
 interface AppointmentDialogProps {
@@ -64,6 +65,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
   const [notes, setNotes] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingClients, setIsLoadingClients] = useState(false);
+  const [clinicianData, setClinicianData] = useState<any>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -104,6 +106,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
   useEffect(() => {
     if (isOpen && clinicianId) {
       loadClients();
+      loadClinicianData();
     }
   }, [isOpen, clinicianId]);
 
@@ -209,7 +212,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
       setIsLoadingClients(true);
       const { data, error } = await supabase
         .from('clients')
-        .select('id, client_first_name, client_last_name, client_preferred_name')
+        .select('id, client_first_name, client_last_name, client_preferred_name, client_email')
         .eq('client_assigned_therapist', clinicianId)
         .order('client_first_name');
 
@@ -224,6 +227,27 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
       });
     } finally {
       setIsLoadingClients(false);
+    }
+  };
+
+  const loadClinicianData = async () => {
+    if (!clinicianId) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('clinicians')
+        .select('clinician_email, clinician_first_name, clinician_last_name, clinician_professional_name')
+        .eq('id', clinicianId)
+        .single();
+
+      if (error) {
+        console.error('[AppointmentDialog] Error loading clinician data:', error);
+        return;
+      }
+
+      setClinicianData(data);
+    } catch (error) {
+      console.error('[AppointmentDialog] Exception loading clinician data:', error);
     }
   };
 
@@ -335,6 +359,9 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
         notes: notes || null,
         client_name: formatClientNameFromId(selectedClientId),
         date_of_session: startAtUTC.toISODate(),
+        client_email: getClientEmail(selectedClientId),
+        clinician_email: clinicianData?.clinician_email || '',
+        clinician_name: formatClinicianName(clinicianData),
       };
 
       console.log('[AppointmentDialog] Appointment data:', appointmentData);
@@ -697,6 +724,17 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
     const preferredName = client.client_preferred_name || client.client_first_name || '';
     const lastName = client.client_last_name || '';
     return `${preferredName} ${lastName}`.trim();
+  };
+
+  const getClientEmail = (clientId: string) => {
+    const client = clients.find(c => c.id === clientId);
+    return client?.client_email || '';
+  };
+
+  const formatClinicianName = (clinician: any) => {
+    if (!clinician) return '';
+    return clinician.clinician_professional_name || 
+           `${clinician.clinician_first_name || ''} ${clinician.clinician_last_name || ''}`.trim();
   };
 
   return (

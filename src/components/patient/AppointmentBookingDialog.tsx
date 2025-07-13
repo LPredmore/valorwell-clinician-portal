@@ -146,12 +146,24 @@ const AppointmentBookingDialog: React.FC<AppointmentBookingDialogProps> = ({
       // Get client info for the logged-in user
       const { data: clientData } = await supabase
         .from('clients')
-        .select('client_preferred_name, client_first_name, client_last_name')
+        .select('client_preferred_name, client_first_name, client_last_name, client_email')
         .eq('id', user?.id)
+        .single();
+
+      // Get clinician info
+      const { data: clinicianData } = await supabase
+        .from('clinicians')
+        .select('clinician_email, clinician_first_name, clinician_last_name, clinician_professional_name')
+        .eq('id', clinicianId)
         .single();
 
       const clientName = clientData 
         ? `${clientData.client_preferred_name || clientData.client_first_name || ''} ${clientData.client_last_name || ''}`.trim()
+        : '';
+
+      const clinicianName = clinicianData 
+        ? clinicianData.clinician_professional_name || 
+          `${clinicianData.clinician_first_name || ''} ${clinicianData.clinician_last_name || ''}`.trim()
         : '';
 
       const { data: newAppointment, error } = await supabase
@@ -167,6 +179,9 @@ const AppointmentBookingDialog: React.FC<AppointmentBookingDialogProps> = ({
             notes: notes,
             client_name: clientName,
             date_of_session: DateTime.fromISO(start).toISODate(),
+            client_email: clientData?.client_email || '',
+            clinician_email: clinicianData?.clinician_email || '',
+            clinician_name: clinicianName,
           },
         ])
         .select()
