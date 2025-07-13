@@ -71,8 +71,20 @@ export const formInputToUTC = (datetimeLocalStr: string): string => {
  * @returns String in YYYY-MM-DDTHH:MM format for datetime-local input
  */
 export const utcToFormInput = (utcString: string): string => {
-  // Convert UTC to browser timezone
-  const localDateTime = DateTime.fromISO(utcString, { zone: 'UTC' });
+  // Get the browser's timezone
+  const browserTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  
+  // Parse as UTC, then convert to browser timezone
+  const utcDateTime = DateTime.fromISO(utcString, { zone: 'UTC' });
+  const localDateTime = utcDateTime.setZone(browserTimeZone);
+  
+  console.log('[utcToFormInput] Converting UTC to local time:', {
+    utcString,
+    browserTimeZone,
+    utcDateTime: utcDateTime.toISO(),
+    localDateTime: localDateTime.toISO(),
+    formatted: localDateTime.toFormat("yyyy-MM-dd'T'HH:mm")
+  });
   
   // Format for datetime-local input
   return localDateTime.toFormat("yyyy-MM-dd'T'HH:mm");
