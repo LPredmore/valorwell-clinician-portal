@@ -28,6 +28,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 const CalendarContainer: React.FC = () => {
   const { userId, authInitialized, userRole } = useUser();
@@ -641,13 +642,13 @@ const CalendarContainer: React.FC = () => {
                 Set your available time slots for appointments
               </SheetDescription>
             </SheetHeader>
-            <div className="mt-6">
+            <ScrollArea className="h-[calc(100vh-180px)] mt-6">
               <AvailabilityManagementSidebar
                 clinicianId={userId}
                 refreshTrigger={refreshTrigger}
                 onRefresh={handleAvailabilityRefresh}
               />
-            </div>
+            </ScrollArea>
           </SheetContent>
         </Sheet>
 
