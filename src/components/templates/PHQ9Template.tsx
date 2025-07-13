@@ -101,7 +101,7 @@ const PHQ9Template: React.FC<PHQ9TemplateProps> = ({ onClose, clinicianName, cli
           question_8: scores[7],
           question_9: scores[8],
           total_score: totalScore,
-          additional_notes: additionalNotes
+          phq9_narrative: additionalNotes
         };
         
         // Save the assessment to the database

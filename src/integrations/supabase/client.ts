@@ -432,7 +432,7 @@ export interface PHQ9Assessment {
   question_8: number;
   question_9: number;
   total_score: number;
-  additional_notes?: string;
+  phq9_narrative?: string;
 }
 
 // New function to save PHQ-9 assessment
