@@ -4,10 +4,12 @@ import { Textarea } from "@/components/ui/textarea";
 
 interface PHQ9AssessmentSectionProps {
   phq9Data: any;
+  handleChange?: (field: string, value: string) => void;
 }
 
 export const PHQ9AssessmentSection: React.FC<PHQ9AssessmentSectionProps> = ({
-  phq9Data
+  phq9Data,
+  handleChange
 }) => {
   if (!phq9Data) {
     return null; // Don't render anything if no PHQ-9 data is available
@@ -21,10 +23,11 @@ export const PHQ9AssessmentSection: React.FC<PHQ9AssessmentSectionProps> = ({
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-1">PHQ-9 Narrative</label>
           <Textarea 
-            className="min-h-[100px] bg-gray-100 resize-y" 
+            className="min-h-[100px] resize-y" 
             value={phq9Data.phq9_narrative || ''} 
-            readOnly 
+            onChange={(e) => handleChange?.('phq9_narrative', e.target.value)}
             data-field-name="PHQ-9 Narrative"
+            placeholder="Enter PHQ-9 narrative details..."
           />
         </div>
       )}

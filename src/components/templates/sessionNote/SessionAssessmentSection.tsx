@@ -190,7 +190,12 @@ export const SessionAssessmentSection: React.FC<SessionAssessmentSectionProps> =
       </div>
       
       {/* PHQ-9 Assessment Section - Now positioned right before the Plan & Signature */}
-      {phq9Data && <PHQ9AssessmentSection phq9Data={phq9Data} />}
+      {phq9Data && (
+        <PHQ9AssessmentSection 
+          phq9Data={phq9Data} 
+          handleChange={handleChange}
+        />
+      )}
 
       <h4 className="text-md font-medium text-gray-800 mb-4">Plan & Signature</h4>
 
