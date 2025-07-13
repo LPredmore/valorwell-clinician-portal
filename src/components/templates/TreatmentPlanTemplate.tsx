@@ -310,7 +310,31 @@ const TreatmentPlanTemplate: React.FC<TreatmentPlanTemplateProps> = ({
           
           if (pdfPath) {
             console.log('✅ PDF generated and saved successfully:', pdfPath);
-            pdfSuccess = true;
+
+            // Step 8: Save clinical document metadata (critical for UI display)
+            console.log('💾 Saving treatment plan metadata to clinical_documents table...');
+            const { error: dbError } = await supabase
+              .from('clinical_documents')
+              .insert({
+                client_id: documentInfo.clientId,
+                document_type: documentInfo.documentType,
+                document_date: documentInfo.documentDate,
+                document_title: documentInfo.documentTitle,
+                file_path: pdfPath,
+                created_by: documentInfo.createdBy
+              });
+
+            if (dbError) {
+              console.error('❌ Failed to save clinical document metadata:', dbError);
+              toast({
+                title: "Warning",
+                description: "Treatment plan saved but may not appear in document list. Please refresh the page.",
+                variant: "default"
+              });
+            } else {
+              console.log('✅ Clinical document metadata saved successfully');
+              pdfSuccess = true;
+            }
           } else {
             console.warn('⚠️ PDF generation returned null - check PDF utils for details');
           }
@@ -321,7 +345,7 @@ const TreatmentPlanTemplate: React.FC<TreatmentPlanTemplateProps> = ({
         console.warn('⚠️ Treatment plan content ref not available for PDF generation');
       }
 
-      // Step 8: Show appropriate success message
+      // Step 9: Show appropriate success message
       if (pdfSuccess) {
         toast({
           title: "Success",
