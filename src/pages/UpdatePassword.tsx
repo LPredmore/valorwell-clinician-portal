@@ -22,23 +22,30 @@ const UpdatePassword = () => {
   useEffect(() => {
     const checkSession = async () => {
       try {
-        // Check if we have a hash parameter in the URL which indicates we're coming from a password reset email
-        const hash = window.location.hash;
-        console.log("[UpdatePassword] Checking URL hash:", hash);
+        // Check if we have a reset token in either hash or query parameters
+        const url = new URL(window.location.href);
+        const hash = url.hash;                          // `#access_token=...`
+        const query = url.search;                       // `?token=...&type=recovery`
+        console.log("[UpdatePassword] Checking URL - hash:", hash, "query:", query);
         
-        // Check specifically for the recovery token pattern
-        const hasResetToken = hash.includes('type=recovery') && hash.includes('access_token=');
+        // Accept either fragment or query parameters
+        const hasResetToken =
+          (hash.includes('type=recovery') && hash.includes('access_token=')) ||
+          (query.includes('type=recovery') && query.includes('token='));
         setHashPresent(hasResetToken);
         
-        // Log detailed hash information for debugging
+        // Log detailed token information for debugging
         setDebugInfo(prev => ({
           ...prev,
-          hashCheck: {
+          tokenCheck: {
             status: hasResetToken ? 'success' : 'warning',
             message: hasResetToken ? 'Valid reset token found' : 'No valid reset token found',
             hash: hash,
-            hasType: hash.includes('type=recovery'),
-            hasToken: hash.includes('access_token='),
+            query: query,
+            hashHasType: hash.includes('type=recovery'),
+            hashHasToken: hash.includes('access_token='),
+            queryHasType: query.includes('type=recovery'),
+            queryHasToken: query.includes('token='),
             timestamp: new Date().toISOString()
           }
         }));
@@ -173,11 +180,16 @@ const UpdatePassword = () => {
     }, 45000); // Increased to 45 seconds for more reliable operation
 
     try {
-      // Update the user's password
+      // Extract token from either hash or query parameters
+      const url = new URL(window.location.href);
+      const params = new URLSearchParams(
+        url.hash.slice(1) || url.search
+      );
+      const accessToken = params.get('access_token') || params.get('token');
+      
+      // Update the user's password - Supabase will automatically use the token from the session
       const { data, error } = await debugAuthOperation("updatePassword", () =>
-        supabase.auth.updateUser({
-          password: password
-        })
+        supabase.auth.updateUser({ password: password })
       );
 
       // Clear the timeout since the operation completed
