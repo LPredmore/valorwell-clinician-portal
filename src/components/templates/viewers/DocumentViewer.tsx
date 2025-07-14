@@ -1,6 +1,8 @@
 import React from 'react';
 import SessionNoteViewer from './SessionNoteViewer';
 import TreatmentPlanViewer from './TreatmentPlanViewer';
+import InformedConsentViewer from './InformedConsentViewer';
+import ClientHistoryViewer from './ClientHistoryViewer';
 
 interface DocumentViewerProps {
   document: {
@@ -30,6 +32,14 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({ document, onClose }) =>
     case 'treatment_plan':
     case 'treatment plan':
       return <TreatmentPlanViewer document={document} onClose={onClose} />;
+    
+    case 'informed_consent':
+    case 'informed consent':
+      return <InformedConsentViewer document={document} onClose={onClose} />;
+    
+    case 'client_history':
+    case 'client history':
+      return <ClientHistoryViewer document={document} onClose={onClose} />;
     
     default:
       return (
