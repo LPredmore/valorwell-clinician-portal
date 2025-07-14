@@ -6,8 +6,8 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@
 import { Calendar, Eye, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
-import { getCurrentUser, fetchFilteredClinicalDocuments, getDocumentDownloadURL } from '@/integrations/supabase/client';
-import DocumentViewerDialog from '@/components/ui/DocumentViewerDialog';
+import { getCurrentUser, fetchFilteredClinicalDocuments } from '@/integrations/supabase/client';
+import DocumentViewer from '@/components/templates/viewers/DocumentViewer';
 
 interface ClinicalDocument {
   id: string;
@@ -16,18 +16,14 @@ interface ClinicalDocument {
   document_date: string;
   file_path: string;
   created_at: string;
+  client_id: string;
 }
 
 const MyDocuments: React.FC<{ clientId?: string }> = ({ clientId }) => {
   const [documents, setDocuments] = useState<ClinicalDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [selectedDocument, setSelectedDocument] = useState<{
-    url: string;
-    title: string;
-    type: string;
-    date: string;
-  } | null>(null);
+  const [isViewerOpen, setIsViewerOpen] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState<ClinicalDocument | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -63,65 +59,17 @@ const MyDocuments: React.FC<{ clientId?: string }> = ({ clientId }) => {
     loadDocuments();
   }, [clientId, toast]);
 
-  const handleViewDocument = async (document: ClinicalDocument) => {
-    try {
-      console.log('📄 [MyDocuments] Attempting to view document:', document.file_path);
-      
-      // Check if this is a problematic file path
-      if (document.file_path.startsWith('pending-pdf-generation-') || 
-          document.file_path.startsWith('pdf-generation-failed-') ||
-          document.file_path.startsWith('pdf-generation-error-') ||
-          document.file_path.startsWith('no-content-for-pdf-')) {
-        
-        console.warn('📄 [MyDocuments] Document has problematic file path:', document.file_path);
-        
-        const errorType = document.file_path.split('-')[0];
-        let message = "This document is not available for viewing.";
-        
-        if (errorType === 'pending') {
-          message = "This document is still being processed. Please try again in a moment.";
-        } else if (errorType === 'pdf' && document.file_path.includes('failed')) {
-          message = "PDF generation failed for this document. Please contact support.";
-        } else if (errorType === 'pdf' && document.file_path.includes('error')) {
-          message = "An error occurred during PDF generation. Please contact support.";
-        } else if (errorType === 'no') {
-          message = "No content was available for this document.";
-        }
-        
-        toast({
-          title: "Document Not Available",
-          description: message,
-          variant: "default",
-        });
-        return;
-      }
-      
-      const url = await getDocumentDownloadURL(document.file_path);
-      if (url) {
-        console.log('✅ [MyDocuments] Opening document in dialog');
-        setSelectedDocument({
-          url,
-          title: document.document_title,
-          type: getDisplayDocumentType(document.document_type),
-          date: format(new Date(document.document_date), 'MMM d, yyyy')
-        });
-        setIsDialogOpen(true);
-      } else {
-        console.error('❌ [MyDocuments] No download URL returned');
-        toast({
-          title: "Error",
-          description: "Unable to retrieve document. The file may not exist or access was denied.",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      console.error('❌ [MyDocuments] Error viewing document:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load document. Please try again later.",
-        variant: "destructive",
-      });
-    }
+  const handleViewDocument = (document: ClinicalDocument) => {
+    console.log('📄 [MyDocuments] Opening document in viewer:', document.document_title);
+    
+    // Add client_id to the document object if it's missing
+    const documentWithClientId = {
+      ...document,
+      client_id: document.client_id || clientId || ''
+    };
+    
+    setSelectedDocument(documentWithClientId);
+    setIsViewerOpen(true);
   };
 
   // Helper function to normalize document type for display
@@ -195,15 +143,18 @@ const MyDocuments: React.FC<{ clientId?: string }> = ({ clientId }) => {
         )}
       </CardContent>
       
-      {selectedDocument && (
-        <DocumentViewerDialog
-          isOpen={isDialogOpen}
-          onClose={() => setIsDialogOpen(false)}
-          documentUrl={selectedDocument.url}
-          documentTitle={selectedDocument.title}
-          documentType={selectedDocument.type}
-          documentDate={selectedDocument.date}
-        />
+      {selectedDocument && isViewerOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-6xl max-h-[90vh] w-full overflow-y-auto">
+            <DocumentViewer
+              document={selectedDocument}
+              onClose={() => {
+                setIsViewerOpen(false);
+                setSelectedDocument(null);
+              }}
+            />
+          </div>
+        </div>
       )}
     </Card>
   );
