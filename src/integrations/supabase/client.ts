@@ -325,19 +325,32 @@ export const getDocumentDownloadURL = async (filePath: string) => {
       return null;
     }
     
-    // Validate file path format
+    // Validate file path format - support both 2-part and 3-part paths
     const pathParts = filePath.split('/');
-    if (pathParts.length < 3) {
-      console.error('❌ [DOC-DOWNLOAD] Invalid file path format. Expected: clientId/docType/filename.pdf, got:', filePath);
+    if (pathParts.length < 2) {
+      console.error('❌ [DOC-DOWNLOAD] Invalid file path format. Expected: clientId/filename.pdf or clientId/docType/filename.pdf, got:', filePath);
       return null;
     }
+    
+    // Handle both 2-part and 3-part file paths
+    const is3PartPath = pathParts.length >= 3;
+    const pathInfo = is3PartPath 
+      ? {
+          clientId: pathParts[0],
+          docType: pathParts[1],
+          filename: pathParts[2]
+        }
+      : {
+          clientId: pathParts[0],
+          docType: null,
+          filename: pathParts[1]
+        };
     
     console.log('📂 [DOC-DOWNLOAD] File path analysis:', {
       fullPath: filePath,
       pathParts,
-      clientId: pathParts[0],
-      docType: pathParts[1],
-      filename: pathParts[2]
+      is3PartPath,
+      ...pathInfo
     });
     
     // Check if file exists before creating signed URL
