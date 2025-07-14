@@ -17,6 +17,7 @@ import ClientDetails from "./pages/ClientDetails";
 import ClinicianDetails from "./pages/ClinicianDetails";
 import Settings from "./pages/Settings";
 import ResetPassword from "./pages/ResetPassword";
+import UpdatePassword from "./pages/UpdatePassword";
 import NylasOAuthCallback from "./pages/NylasOAuthCallback";
 import MonitoringPage from "./pages/MonitoringPage";
 import AppointmentCreate from "./pages/AppointmentCreate";
@@ -63,6 +64,7 @@ const App = () => {
               {/* Public Routes */}
               <Route path="/login" element={<Login />} />
               <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/update-password" element={<UpdatePassword />} />
               <Route path="/portal" element={<PatientDashboard />} />
               <Route path="/nylas-oauth-callback" element={<NylasOAuthCallback />} />
               
