@@ -60,7 +60,11 @@ serve(async (req) => {
       email,
       password: userData.temp_password,
       email_confirm: true,
-      user_metadata: userData
+      user_metadata: {
+        ...userData,
+        // Include is_admin flag for clinician-admin dual roles
+        is_admin: userData.is_admin || false
+      }
     });
 
     if (createError) {

@@ -60,19 +60,42 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   /**
-   * Determine user role from metadata and database
+   * Determine user role from metadata and database (supports dual admin-clinician roles)
    */
   const determineUserRole = useCallback(async (currentAuthUser: SupabaseUser): Promise<string> => {
     try {
       // First, check user metadata for role
       const metadataRole = currentAuthUser.user_metadata?.role;
-      if (metadataRole && ['admin', 'clinician', 'client'].includes(metadataRole)) {
-        logInfo('[UserContext] Role from metadata:', metadataRole);
-        return metadataRole;
+      
+      if (metadataRole === 'admin') {
+        logInfo('[UserContext] Role from metadata: admin');
+        return 'admin';
+      }
+      
+      if (metadataRole === 'clinician') {
+        // Check if clinician has admin privileges
+        const { data: clinicianData, error: clinicianError } = await supabase
+          .from('clinicians')
+          .select('id, is_admin')
+          .eq('id', currentAuthUser.id)
+          .single();
+
+        if (!clinicianError && clinicianData) {
+          const role = clinicianData.is_admin ? 'admin' : 'clinician';
+          logInfo('[UserContext] Clinician role determined:', role);
+          return role;
+        }
+        
+        return 'clinician'; // Fallback if not found in table
+      }
+      
+      if (metadataRole === 'client') {
+        logInfo('[UserContext] Role from metadata: client');
+        return 'client';
       }
 
       // If no metadata role, check which table the user exists in
-      // Check admins table
+      // Check admins table first
       const { data: adminData, error: adminError } = await supabase
         .from('admins')
         .select('id')
@@ -80,21 +103,25 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .single();
 
       if (!adminError && adminData) {
+        logInfo('[UserContext] Role determined from admins table: admin');
         return 'admin';
       }
 
       // Check clinicians table
       const { data: clinicianData, error: clinicianError } = await supabase
         .from('clinicians')
-        .select('id')
+        .select('id, is_admin')
         .eq('id', currentAuthUser.id)
         .single();
 
       if (!clinicianError && clinicianData) {
-        return 'clinician';
+        const role = clinicianData.is_admin ? 'admin' : 'clinician';
+        logInfo('[UserContext] Role determined from clinicians table:', role);
+        return role;
       }
 
       // Default to client if not found elsewhere
+      logInfo('[UserContext] Role defaulted to: client');
       return 'client';
     } catch (error) {
       logError('[UserContext] Error determining user role:', error);

@@ -49,37 +49,76 @@ export type Database = {
       }
       api_logs: {
         Row: {
+          client_context: Json | null
           client_id: string | null
+          correlation_id: string | null
           created_at: string
           endpoint: string
+          error_category: Database["public"]["Enums"]["error_category"] | null
           error_message: string | null
+          error_severity: Database["public"]["Enums"]["error_severity"] | null
           id: string
           processing_time_ms: number | null
           request_payload: Json | null
+          resolution_notes: string | null
+          resolution_status:
+            | Database["public"]["Enums"]["resolution_status"]
+            | null
+          resolved_at: string | null
+          resolved_by: string | null
           response_data: Json | null
+          response_time_ms: number | null
+          retry_count: number | null
           status: string
+          user_context: Json | null
         }
         Insert: {
+          client_context?: Json | null
           client_id?: string | null
+          correlation_id?: string | null
           created_at?: string
           endpoint: string
+          error_category?: Database["public"]["Enums"]["error_category"] | null
           error_message?: string | null
+          error_severity?: Database["public"]["Enums"]["error_severity"] | null
           id?: string
           processing_time_ms?: number | null
           request_payload?: Json | null
+          resolution_notes?: string | null
+          resolution_status?:
+            | Database["public"]["Enums"]["resolution_status"]
+            | null
+          resolved_at?: string | null
+          resolved_by?: string | null
           response_data?: Json | null
+          response_time_ms?: number | null
+          retry_count?: number | null
           status: string
+          user_context?: Json | null
         }
         Update: {
+          client_context?: Json | null
           client_id?: string | null
+          correlation_id?: string | null
           created_at?: string
           endpoint?: string
+          error_category?: Database["public"]["Enums"]["error_category"] | null
           error_message?: string | null
+          error_severity?: Database["public"]["Enums"]["error_severity"] | null
           id?: string
           processing_time_ms?: number | null
           request_payload?: Json | null
+          resolution_notes?: string | null
+          resolution_status?:
+            | Database["public"]["Enums"]["resolution_status"]
+            | null
+          resolved_at?: string | null
+          resolved_by?: string | null
           response_data?: Json | null
+          response_time_ms?: number | null
+          retry_count?: number | null
           status?: string
+          user_context?: Json | null
         }
         Relationships: [
           {
@@ -913,6 +952,7 @@ export type Database = {
           client_last_name: string | null
           client_medications: string | null
           client_memoryconcentration: string | null
+          client_middle_name: string | null
           client_minor: string | null
           client_mood: string | null
           client_nexttreatmentplanupdate: string | null
@@ -973,12 +1013,26 @@ export type Database = {
           client_zip_code: string | null
           created_at: string
           eligibility_claimmd_id_primary: string | null
+          eligibility_claimmd_id_secondary: string | null
+          eligibility_claimmd_id_tertiary: string | null
           eligibility_coinsurance_primary_percent: number | null
+          eligibility_coinsurance_secondary_percent: number | null
+          eligibility_coinsurance_tertiary_percent: number | null
           eligibility_copay_primary: number | null
+          eligibility_copay_secondary: number | null
+          eligibility_copay_tertiary: number | null
           eligibility_deductible_primary: number | null
+          eligibility_deductible_secondary: number | null
+          eligibility_deductible_tertiary: number | null
           eligibility_last_checked_primary: string | null
+          eligibility_last_checked_secondary: string | null
+          eligibility_last_checked_tertiary: string | null
           eligibility_response_details_primary_json: Json | null
+          eligibility_response_details_secondary_json: Json | null
+          eligibility_response_details_tertiary_json: Json | null
           eligibility_status_primary: string | null
+          eligibility_status_secondary: string | null
+          eligibility_status_tertiary: string | null
           id: string
           role: Database["public"]["Enums"]["app_role"]
           stripe_customer_id: string | null
@@ -1025,6 +1079,7 @@ export type Database = {
           client_last_name?: string | null
           client_medications?: string | null
           client_memoryconcentration?: string | null
+          client_middle_name?: string | null
           client_minor?: string | null
           client_mood?: string | null
           client_nexttreatmentplanupdate?: string | null
@@ -1085,12 +1140,26 @@ export type Database = {
           client_zip_code?: string | null
           created_at?: string
           eligibility_claimmd_id_primary?: string | null
+          eligibility_claimmd_id_secondary?: string | null
+          eligibility_claimmd_id_tertiary?: string | null
           eligibility_coinsurance_primary_percent?: number | null
+          eligibility_coinsurance_secondary_percent?: number | null
+          eligibility_coinsurance_tertiary_percent?: number | null
           eligibility_copay_primary?: number | null
+          eligibility_copay_secondary?: number | null
+          eligibility_copay_tertiary?: number | null
           eligibility_deductible_primary?: number | null
+          eligibility_deductible_secondary?: number | null
+          eligibility_deductible_tertiary?: number | null
           eligibility_last_checked_primary?: string | null
+          eligibility_last_checked_secondary?: string | null
+          eligibility_last_checked_tertiary?: string | null
           eligibility_response_details_primary_json?: Json | null
+          eligibility_response_details_secondary_json?: Json | null
+          eligibility_response_details_tertiary_json?: Json | null
           eligibility_status_primary?: string | null
+          eligibility_status_secondary?: string | null
+          eligibility_status_tertiary?: string | null
           id: string
           role?: Database["public"]["Enums"]["app_role"]
           stripe_customer_id?: string | null
@@ -1137,6 +1206,7 @@ export type Database = {
           client_last_name?: string | null
           client_medications?: string | null
           client_memoryconcentration?: string | null
+          client_middle_name?: string | null
           client_minor?: string | null
           client_mood?: string | null
           client_nexttreatmentplanupdate?: string | null
@@ -1197,12 +1267,26 @@ export type Database = {
           client_zip_code?: string | null
           created_at?: string
           eligibility_claimmd_id_primary?: string | null
+          eligibility_claimmd_id_secondary?: string | null
+          eligibility_claimmd_id_tertiary?: string | null
           eligibility_coinsurance_primary_percent?: number | null
+          eligibility_coinsurance_secondary_percent?: number | null
+          eligibility_coinsurance_tertiary_percent?: number | null
           eligibility_copay_primary?: number | null
+          eligibility_copay_secondary?: number | null
+          eligibility_copay_tertiary?: number | null
           eligibility_deductible_primary?: number | null
+          eligibility_deductible_secondary?: number | null
+          eligibility_deductible_tertiary?: number | null
           eligibility_last_checked_primary?: string | null
+          eligibility_last_checked_secondary?: string | null
+          eligibility_last_checked_tertiary?: string | null
           eligibility_response_details_primary_json?: Json | null
+          eligibility_response_details_secondary_json?: Json | null
+          eligibility_response_details_tertiary_json?: Json | null
           eligibility_status_primary?: string | null
+          eligibility_status_secondary?: string | null
+          eligibility_status_tertiary?: string | null
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           stripe_customer_id?: string | null
@@ -1397,6 +1481,7 @@ export type Database = {
           clinician_type: string | null
           created_at: string
           id: string
+          is_admin: boolean
           last_google_sync: string | null
           profile_id: string | null
           updated_at: string
@@ -1498,6 +1583,7 @@ export type Database = {
           clinician_type?: string | null
           created_at?: string
           id: string
+          is_admin?: boolean
           last_google_sync?: string | null
           profile_id?: string | null
           updated_at?: string
@@ -1599,6 +1685,7 @@ export type Database = {
           clinician_type?: string | null
           created_at?: string
           id?: string
+          is_admin?: boolean
           last_google_sync?: string | null
           profile_id?: string | null
           updated_at?: string
@@ -1942,6 +2029,145 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      eligibility_audit: {
+        Row: {
+          claimmd_transaction_id: string | null
+          client_id: string
+          coinsurance_percent: number | null
+          copay: number | null
+          created_at: string | null
+          deductible: number | null
+          error_message: string | null
+          id: string
+          insurance_level: string
+          processing_time_ms: number | null
+          request_payload: Json | null
+          response_payload: Json | null
+          status: string
+          verification_date: string | null
+        }
+        Insert: {
+          claimmd_transaction_id?: string | null
+          client_id: string
+          coinsurance_percent?: number | null
+          copay?: number | null
+          created_at?: string | null
+          deductible?: number | null
+          error_message?: string | null
+          id?: string
+          insurance_level: string
+          processing_time_ms?: number | null
+          request_payload?: Json | null
+          response_payload?: Json | null
+          status: string
+          verification_date?: string | null
+        }
+        Update: {
+          claimmd_transaction_id?: string | null
+          client_id?: string
+          coinsurance_percent?: number | null
+          copay?: number | null
+          created_at?: string | null
+          deductible?: number | null
+          error_message?: string | null
+          id?: string
+          insurance_level?: string
+          processing_time_ms?: number | null
+          request_payload?: Json | null
+          response_payload?: Json | null
+          status?: string
+          verification_date?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "eligibility_audit_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      error_monitoring: {
+        Row: {
+          alert_enabled: boolean
+          created_at: string
+          error_pattern: string
+          id: string
+          last_triggered_at: string | null
+          threshold_count: number
+          time_window_minutes: number
+          updated_at: string
+        }
+        Insert: {
+          alert_enabled?: boolean
+          created_at?: string
+          error_pattern: string
+          id?: string
+          last_triggered_at?: string | null
+          threshold_count?: number
+          time_window_minutes?: number
+          updated_at?: string
+        }
+        Update: {
+          alert_enabled?: boolean
+          created_at?: string
+          error_pattern?: string
+          id?: string
+          last_triggered_at?: string | null
+          threshold_count?: number
+          time_window_minutes?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      error_resolution_workflow: {
+        Row: {
+          actual_resolution_time: unknown | null
+          api_log_id: string
+          assigned_to: string | null
+          created_at: string
+          estimated_resolution_time: unknown | null
+          id: string
+          priority: number
+          stage_notes: string | null
+          updated_at: string
+          workflow_stage: string
+        }
+        Insert: {
+          actual_resolution_time?: unknown | null
+          api_log_id: string
+          assigned_to?: string | null
+          created_at?: string
+          estimated_resolution_time?: unknown | null
+          id?: string
+          priority?: number
+          stage_notes?: string | null
+          updated_at?: string
+          workflow_stage?: string
+        }
+        Update: {
+          actual_resolution_time?: unknown | null
+          api_log_id?: string
+          assigned_to?: string | null
+          created_at?: string
+          estimated_resolution_time?: unknown | null
+          id?: string
+          priority?: number
+          stage_notes?: string | null
+          updated_at?: string
+          workflow_stage?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "error_resolution_workflow_api_log_id_fkey"
+            columns: ["api_log_id"]
+            isOneToOne: false
+            referencedRelation: "api_logs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       external_calendar_mappings: {
         Row: {
@@ -2947,6 +3173,33 @@ export type Database = {
           },
         ]
       }
+      system_health_metrics: {
+        Row: {
+          context: Json | null
+          id: string
+          metric_name: string
+          metric_type: string
+          metric_value: number
+          recorded_at: string
+        }
+        Insert: {
+          context?: Json | null
+          id?: string
+          metric_name: string
+          metric_type: string
+          metric_value: number
+          recorded_at?: string
+        }
+        Update: {
+          context?: Json | null
+          id?: string
+          metric_name?: string
+          metric_type?: string
+          metric_value?: number
+          recorded_at?: string
+        }
+        Relationships: []
+      }
       system_settings: {
         Row: {
           created_at: string | null
@@ -3136,6 +3389,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      categorize_error: {
+        Args: { error_message: string; endpoint: string; status: string }
+        Returns: Database["public"]["Enums"]["error_category"]
+      }
       check_blocked_time_integrity: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -3144,6 +3401,10 @@ export type Database = {
           count: number
           message: string
         }[]
+      }
+      check_error_thresholds: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
       }
       check_table_exists: {
         Args: { check_table_name: string }
@@ -3198,6 +3459,21 @@ export type Database = {
         }
         Returns: boolean
       }
+      determine_error_severity: {
+        Args: {
+          error_category: Database["public"]["Enums"]["error_category"]
+          retry_count: number
+        }
+        Returns: Database["public"]["Enums"]["error_severity"]
+      }
+      format_date_for_claimmd: {
+        Args: { input_date: string }
+        Returns: string
+      }
+      format_timestamp_for_claimmd: {
+        Args: { input_timestamp: string }
+        Returns: string
+      }
       get_clinician_availability_instances: {
         Args: {
           p_clinician_id: string
@@ -3249,6 +3525,10 @@ export type Database = {
         Args: { p_user_id: string; p_notification_ids?: string[] }
         Returns: number
       }
+      parse_claimmd_date: {
+        Args: { claimmd_date: string }
+        Returns: string
+      }
       standardize_uuid: {
         Args: { input_id: string }
         Returns: string
@@ -3263,6 +3543,10 @@ export type Database = {
           p_last_sync_hash: string
         }
         Returns: undefined
+      }
+      user_has_admin_privileges: {
+        Args: { user_id: string }
+        Returns: boolean
       }
       user_has_admin_role: {
         Args: { user_id: string }
@@ -3317,6 +3601,15 @@ export type Database = {
         | "consent_form"
         | "therapy_note"
         | "questionnaire"
+      error_category:
+        | "api_authentication"
+        | "network_error"
+        | "data_validation"
+        | "rate_limiting"
+        | "provider_enrollment"
+        | "payer_specific"
+        | "system_error"
+      error_severity: "critical" | "high" | "medium" | "low" | "informational"
       event_type: "appointment" | "time_off" | "availability"
       insurance_type:
         | "PPO"
@@ -3327,6 +3620,12 @@ export type Database = {
         | "Medicaid"
         | "CHIP"
         | "Other"
+      resolution_status:
+        | "new"
+        | "in_progress"
+        | "resolved"
+        | "escalated"
+        | "closed"
       states:
         | "Alabama"
         | "Alaska"
@@ -3563,6 +3862,16 @@ export const Constants = {
         "therapy_note",
         "questionnaire",
       ],
+      error_category: [
+        "api_authentication",
+        "network_error",
+        "data_validation",
+        "rate_limiting",
+        "provider_enrollment",
+        "payer_specific",
+        "system_error",
+      ],
+      error_severity: ["critical", "high", "medium", "low", "informational"],
       event_type: ["appointment", "time_off", "availability"],
       insurance_type: [
         "PPO",
@@ -3573,6 +3882,13 @@ export const Constants = {
         "Medicaid",
         "CHIP",
         "Other",
+      ],
+      resolution_status: [
+        "new",
+        "in_progress",
+        "resolved",
+        "escalated",
+        "closed",
       ],
       states: [
         "Alabama",

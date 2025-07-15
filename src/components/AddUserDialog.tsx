@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const userFormSchema = z.object({
   firstName: z.string().min(2, { message: "First name is required" }),
@@ -39,6 +40,7 @@ const userFormSchema = z.object({
   role: z.enum(["admin", "client", "clinician"], {
     required_error: "Please select a role",
   }),
+  isAdmin: z.boolean().default(false),
 });
 
 type UserFormValues = z.infer<typeof userFormSchema>;
@@ -60,6 +62,7 @@ export function AddUserDialog({ open, onOpenChange, onUserAdded }: AddUserDialog
       email: "",
       phone: "",
       role: "client",
+      isAdmin: false,
     },
   });
 
@@ -74,7 +77,8 @@ export function AddUserDialog({ open, onOpenChange, onUserAdded }: AddUserDialog
         last_name: data.lastName,
         phone: data.phone || "",
         role: data.role,
-        temp_password: "temppass1234" // Default temp password
+        temp_password: "temppass1234", // Default temp password
+        is_admin: data.role === "clinician" ? data.isAdmin : false // Only apply admin flag for clinicians
       };
       
       console.log("User metadata to be saved:", userData);
@@ -205,6 +209,30 @@ export function AddUserDialog({ open, onOpenChange, onUserAdded }: AddUserDialog
                 </FormItem>
               )}
             />
+            {form.watch("role") === "clinician" && (
+              <FormField
+                control={form.control}
+                name="isAdmin"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel>
+                        Grant Admin Privileges
+                      </FormLabel>
+                      <p className="text-sm text-muted-foreground">
+                        This clinician will have admin access to manage other users and system settings
+                      </p>
+                    </div>
+                  </FormItem>
+                )}
+              />
+            )}
             <DialogFooter>
               <Button
                 type="button" 
