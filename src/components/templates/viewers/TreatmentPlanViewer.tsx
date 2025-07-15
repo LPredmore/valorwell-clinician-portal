@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { X, FileText, Calendar, User, Target } from 'lucide-react';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
 
 interface TreatmentPlanViewerProps {
   document: {
@@ -22,7 +21,6 @@ interface TreatmentPlanViewerProps {
 const TreatmentPlanViewer: React.FC<TreatmentPlanViewerProps> = ({ document, onClose }) => {
   const [clientData, setClientData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const { toast } = useToast();
 
   useEffect(() => {
     const fetchClientData = async () => {
@@ -35,29 +33,19 @@ const TreatmentPlanViewer: React.FC<TreatmentPlanViewerProps> = ({ document, onC
 
         if (error) {
           console.error('Error fetching client data:', error);
-          toast({
-            title: "Error",
-            description: "Failed to load treatment plan data",
-            variant: "destructive"
-          });
           return;
         }
 
         setClientData(data);
       } catch (error) {
         console.error('Error loading treatment plan:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load treatment plan",
-          variant: "destructive"
-        });
       } finally {
         setLoading(false);
       }
     };
 
     fetchClientData();
-  }, [document.client_id, toast]);
+  }, [document.client_id]);
 
   if (loading) {
     return (

@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { X, FileText, Calendar, User, Pill } from 'lucide-react';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
 
 interface SessionNoteViewerProps {
   document: {
@@ -22,7 +21,6 @@ interface SessionNoteViewerProps {
 const SessionNoteViewer: React.FC<SessionNoteViewerProps> = ({ document, onClose }) => {
   const [clientData, setClientData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const { toast } = useToast();
 
   useEffect(() => {
     const fetchClientData = async () => {
@@ -35,29 +33,19 @@ const SessionNoteViewer: React.FC<SessionNoteViewerProps> = ({ document, onClose
 
         if (error) {
           console.error('Error fetching client data:', error);
-          toast({
-            title: "Error",
-            description: "Failed to load session note data",
-            variant: "destructive"
-          });
           return;
         }
 
         setClientData(data);
       } catch (error) {
         console.error('Error loading session note:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load session note",
-          variant: "destructive"
-        });
       } finally {
         setLoading(false);
       }
     };
 
     fetchClientData();
-  }, [document.client_id, toast]);
+  }, [document.client_id]);
 
   if (loading) {
     return (

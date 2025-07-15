@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import DocumentViewerDialog from '@/components/ui/DocumentViewerDialog';
 import { getDocumentDownloadURL } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
 
 interface ClientHistoryViewerProps {
   document: {
@@ -19,7 +18,6 @@ interface ClientHistoryViewerProps {
 const ClientHistoryViewer: React.FC<ClientHistoryViewerProps> = ({ document, onClose }) => {
   const [documentUrl, setDocumentUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const { toast } = useToast();
 
   useEffect(() => {
     const loadDocument = async () => {
@@ -29,27 +27,16 @@ const ClientHistoryViewer: React.FC<ClientHistoryViewerProps> = ({ document, onC
         
         if (url) {
           setDocumentUrl(url);
-        } else {
-          toast({
-            title: "Error",
-            description: "Failed to load document. The file may not exist.",
-            variant: "destructive"
-          });
         }
       } catch (error) {
         console.error('Error loading client history document:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load client history document",
-          variant: "destructive"
-        });
       } finally {
         setLoading(false);
       }
     };
 
     loadDocument();
-  }, [document.file_path, toast]);
+  }, [document.file_path]);
 
   if (loading) {
     return (
