@@ -1,6 +1,9 @@
 
 project_id = "gqlkritspnhjxfejvgfg"
 
+[functions.create-user]
+verify_jwt = false
+
 [functions.create-daily-room]
 verify_jwt = true
 
