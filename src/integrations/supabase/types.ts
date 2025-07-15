@@ -189,6 +189,7 @@ export type Database = {
           client_email: string | null
           client_id: string
           client_name: string | null
+          client_timezone: Database["public"]["Enums"]["time_zones"] | null
           clinician_email: string | null
           clinician_id: string
           clinician_name: string | null
@@ -218,6 +219,7 @@ export type Database = {
           client_email?: string | null
           client_id: string
           client_name?: string | null
+          client_timezone?: Database["public"]["Enums"]["time_zones"] | null
           clinician_email?: string | null
           clinician_id: string
           clinician_name?: string | null
@@ -247,6 +249,7 @@ export type Database = {
           client_email?: string | null
           client_id?: string
           client_name?: string | null
+          client_timezone?: Database["public"]["Enums"]["time_zones"] | null
           clinician_email?: string | null
           clinician_id?: string
           clinician_name?: string | null

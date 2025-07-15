@@ -30,3 +30,24 @@ verify_jwt = true
 
 [functions.appointment-reminder-emails]
 verify_jwt = false
+
+[functions.appointment-reminder-eastern]
+verify_jwt = false
+
+[functions.appointment-reminder-central]
+verify_jwt = false
+
+[functions.appointment-reminder-mountain]
+verify_jwt = false
+
+[functions.appointment-reminder-pacific]
+verify_jwt = false
+
+[functions.appointment-reminder-alaska]
+verify_jwt = false
+
+[functions.appointment-reminder-hawaii]
+verify_jwt = false
+
+[functions.appointment-reminder-arizona]
+verify_jwt = false
