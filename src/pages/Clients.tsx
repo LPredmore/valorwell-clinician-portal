@@ -75,7 +75,7 @@ const Clients = () => {
 
         console.log('Found clinician ID:', data.id);
         setClinicianId(data.id);
-        fetchClients(data.id);
+        fetchClients();
       } catch (error) {
         console.error('Error getting clinician info:', error);
         // Get fresh toast instance inside the effect
@@ -92,17 +92,15 @@ const Clients = () => {
     getClinicianInfo();
   }, [userId]); // Only userId dependency - no navigate or toast
 
-  const fetchClients = async (clinicianId: string) => {
+  const fetchClients = async () => {
     try {
       setLoading(true);
       
-      console.log('Fetching clients for clinician ID:', clinicianId);
+      console.log('Fetching all clients');
       
       const { data, error } = await supabase
         .from('clients')
         .select('id, client_first_name, client_last_name, client_email, client_phone, client_date_of_birth, client_status, client_assigned_therapist')
-        .eq('client_assigned_therapist', clinicianId)
-        // CLEANED: Removed legacy blocked time client filter
         .order('created_at', { ascending: false });
       
       if (error) {
@@ -125,10 +123,8 @@ const Clients = () => {
   };
 
   const handleSearch = () => {
-    if (!searchQuery.trim() || !clinicianId) {
-      if (clinicianId) {
-        fetchClients(clinicianId);
-      }
+    if (!searchQuery.trim()) {
+      fetchClients();
       return;
     }
 
@@ -144,9 +140,7 @@ const Clients = () => {
 
   const handleClearSearch = () => {
     setSearchQuery('');
-    if (clinicianId) {
-      fetchClients(clinicianId);
-    }
+    fetchClients();
   };
 
   const formatDateOfBirth = (dateString: string | null) => {
@@ -168,7 +162,7 @@ const Clients = () => {
     <Layout>
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <h2 className="text-2xl font-semibold">My Clients</h2>
+          <h2 className="text-2xl font-semibold">All Clients</h2>
           <span className="bg-valorwell-700 text-white text-xs px-2 py-0.5 rounded-full">{clients.length}</span>
         </div>
       </div>
@@ -218,7 +212,7 @@ const Clients = () => {
               </button>
               <button 
                 className="p-2 border rounded text-gray-700 hover:bg-gray-50 transition-colors"
-                onClick={() => clinicianId && fetchClients(clinicianId)}
+                onClick={() => fetchClients()}
               >
                 <RotateCcw size={16} />
               </button>
