@@ -10,6 +10,7 @@ interface Client {
   id: string;
   client_first_name: string | null;
   client_last_name: string | null;
+  client_preferred_name: string | null;
   client_email: string | null;
   client_phone: string | null;
   client_date_of_birth: string | null;
@@ -85,7 +86,7 @@ const MyClients = () => {
       
       const { data, error } = await supabase
         .from('clients')
-        .select('id, client_first_name, client_last_name, client_email, client_phone, client_date_of_birth, client_status, client_assigned_therapist')
+        .select('id, client_first_name, client_last_name, client_preferred_name, client_email, client_phone, client_date_of_birth, client_status, client_assigned_therapist')
         .eq('client_assigned_therapist', clinicianId)
         .order('created_at', { ascending: false });
       
@@ -116,6 +117,7 @@ const MyClients = () => {
     const filtered = clients.filter(client => 
       (client.client_first_name && client.client_first_name.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (client.client_last_name && client.client_last_name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (client.client_preferred_name && client.client_preferred_name.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (client.client_email && client.client_email.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (client.client_phone && client.client_phone.includes(searchQuery))
     );
