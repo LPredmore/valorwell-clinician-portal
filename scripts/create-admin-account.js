@@ -15,7 +15,7 @@ async function createAdminAccount() {
           first_name: 'Lucas',
           last_name: 'Predmore',
           preferred_name: 'Luke',
-          role: 'admin',
+          role: 'clinician',
           temp_password: '$V@l0rW3ll',
           is_admin: true
         }
