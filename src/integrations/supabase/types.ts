@@ -3790,6 +3790,15 @@ export type Database = {
         Args: { user_id: string }
         Returns: boolean
       }
+      validate_clinician_email_consistency: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          clinician_id: string
+          auth_email: string
+          clinician_email: string
+          status: string
+        }[]
+      }
       validate_timezone_integrity: {
         Args: Record<PropertyKey, never>
         Returns: {

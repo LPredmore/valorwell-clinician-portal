@@ -11,7 +11,7 @@ interface EditableFieldProps {
   label: string;
   value: string | string[] | null;
   onSave: (value: string | string[]) => Promise<void>;
-  type?: 'text' | 'textarea' | 'select' | 'multiselect';
+  type?: 'text' | 'textarea' | 'select' | 'multiselect' | 'email';
   options?: string[];
   placeholder?: string;
   disabled?: boolean;
@@ -42,6 +42,15 @@ export const EditableField: React.FC<EditableFieldProps> = ({
   const handleSave = async () => {
     try {
       setIsLoading(true);
+      
+      // Email validation
+      if (type === 'email') {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(editValue as string)) {
+          throw new Error('Please enter a valid email address');
+        }
+      }
+      
       const valueToSave = valueMapper ? valueMapper(editValue as string) : editValue;
       await onSave(valueToSave);
       setIsEditing(false);
@@ -128,6 +137,7 @@ export const EditableField: React.FC<EditableFieldProps> = ({
               value={editValue as string}
               onChange={(e) => setEditValue(e.target.value)}
               placeholder={placeholder}
+              type={type === 'email' ? 'email' : 'text'}
             />
           )}
         </div>

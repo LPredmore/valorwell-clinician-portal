@@ -133,6 +133,32 @@ const ClinicianDetails = () => {
   // Update clinician field function
   const updateClinicianField = async (field: string, value: string | string[]) => {
     try {
+      // Special handling for email updates
+      if (field === 'clinician_email') {
+        const { error } = await supabase.functions.invoke('update-clinician-email', {
+          body: {
+            clinician_id: clinicianId,
+            new_email: value
+          }
+        });
+
+        if (error) throw error;
+
+        // Update local state
+        setClinicianData((prev: any) => ({
+          ...prev,
+          [field]: value
+        }));
+
+        const toastInstance = useToast();
+        toastInstance.toast({
+          title: "Success",
+          description: "Email updated successfully. Please use your new email for future logins.",
+        });
+        return;
+      }
+
+      // Standard field updates
       const { error } = await supabase
         .from('clinicians')
         .update({ [field]: value })
@@ -345,6 +371,7 @@ const ClinicianDetails = () => {
                     label="Email"
                     value={clinicianData.clinician_email}
                     onSave={(value) => updateClinicianField('clinician_email', value as string)}
+                    type="email"
                     placeholder="Enter email address"
                   />
                   <EditableField
