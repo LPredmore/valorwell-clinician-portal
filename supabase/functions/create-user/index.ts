@@ -80,11 +80,37 @@ serve(async (req) => {
       );
     }
 
+    console.log("User created in auth.users, now creating clinician record");
+
+    // Create clinician record if role is clinician
+    if (userData.role === 'clinician') {
+      const { error: clinicianError } = await supabaseAdmin
+        .from('clinicians')
+        .insert({
+          id: user.user.id,
+          clinician_email: email,
+          clinician_first_name: userData.first_name,
+          clinician_last_name: userData.last_name,
+          clinician_phone: userData.phone || null,
+          clinician_status: 'Active',
+          is_admin: userData.is_admin || false
+        });
+
+      if (clinicianError) {
+        console.error("Error creating clinician record:", clinicianError);
+        // Don't fail the entire request, just log the error
+        console.log("User created in auth but clinician record failed");
+      } else {
+        console.log("Clinician record created successfully");
+      }
+    }
+
     // Return success response
     return new Response(
       JSON.stringify({ 
         message: "User created successfully", 
-        user 
+        user,
+        clinician_created: userData.role === 'clinician'
       }),
       {
         status: 200,
