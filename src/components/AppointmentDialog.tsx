@@ -20,6 +20,7 @@ import { DateTime } from 'luxon';
 interface Client {
   id: string;
   name: string;
+  client_time_zone: string | null;
 }
 
 interface AppointmentDialogProps {
@@ -50,6 +51,7 @@ export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
   const { toast } = useToast();
   const [clients, setClients] = useState<Client[]>([]);
   const [isLoadingClients, setIsLoadingClients] = useState(false);
+  const [selectedClientTimezone, setSelectedClientTimezone] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     clientId: '',
     notes: '',
@@ -65,7 +67,7 @@ export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
       try {
         const { data, error } = await supabase
           .from('clients')
-          .select('id, client_first_name, client_last_name, client_preferred_name')
+          .select('id, client_first_name, client_last_name, client_preferred_name, client_time_zone')
           .eq('client_assigned_therapist', clinicianId)
           .order('client_first_name');
 
@@ -73,7 +75,8 @@ export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
         
         const clientList = (data || []).map(c => ({
           id: c.id,
-          name: `${c.client_preferred_name || c.client_first_name || ''} ${c.client_last_name || ''}`.trim() || 'Unknown Client'
+          name: `${c.client_preferred_name || c.client_first_name || ''} ${c.client_last_name || ''}`.trim() || 'Unknown Client',
+          client_time_zone: c.client_time_zone
         }));
         
         setClients(clientList);
@@ -166,7 +169,8 @@ export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
           end_at: endUtc,
           type: 'therapy_session',
           status: 'scheduled',
-          notes: formData.notes || null
+          notes: formData.notes || null,
+          client_timezone: selectedClientTimezone
         })
         .select()
         .single();
@@ -222,7 +226,12 @@ export const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
             <Label className="text-right">Client *</Label>
             <Select
               value={formData.clientId}
-              onValueChange={(value) => handleInputChange('clientId', value)}
+              onValueChange={(clientId) => {
+                handleInputChange('clientId', clientId);
+                // Set the client timezone when client is selected
+                const client = clients.find(c => c.id === clientId);
+                setSelectedClientTimezone(client?.client_time_zone || null);
+              }}
               disabled={isLoadingClients}
             >
               <SelectTrigger className="col-span-3">

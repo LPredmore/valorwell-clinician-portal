@@ -37,11 +37,30 @@ const AppointmentBookingDialog: React.FC<AppointmentBookingDialogProps> = ({
   const [notes, setNotes] = useState('');
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
+  const [currentUserTimezone, setCurrentUserTimezone] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
     fetchAvailableSlots();
+    fetchCurrentUserTimezone();
   }, [selectedDate, clinicianId]);
+
+  const fetchCurrentUserTimezone = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: clientData } = await supabase
+          .from('clients')
+          .select('client_time_zone')
+          .eq('id', user.id)
+          .single();
+        
+        setCurrentUserTimezone(clientData?.client_time_zone || null);
+      }
+    } catch (error) {
+      console.error('Error fetching user timezone:', error);
+    }
+  };
 
   const fetchAvailableSlots = async () => {
     if (!selectedDate) return;
@@ -146,7 +165,7 @@ const AppointmentBookingDialog: React.FC<AppointmentBookingDialogProps> = ({
       // Get client info for the logged-in user
       const { data: clientData } = await supabase
         .from('clients')
-        .select('client_preferred_name, client_first_name, client_last_name, client_email')
+        .select('client_preferred_name, client_first_name, client_last_name, client_email, client_time_zone')
         .eq('id', user?.id)
         .single();
 
@@ -182,6 +201,7 @@ const AppointmentBookingDialog: React.FC<AppointmentBookingDialogProps> = ({
             client_email: clientData?.client_email || '',
             clinician_email: clinicianData?.clinician_email || '',
             clinician_name: clinicianName,
+            client_timezone: clientData?.client_time_zone || null,
           },
         ])
         .select()

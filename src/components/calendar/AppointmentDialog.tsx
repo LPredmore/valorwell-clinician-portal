@@ -31,6 +31,7 @@ interface Client {
   client_last_name: string | null;
   client_preferred_name: string | null;
   client_email: string | null;
+  client_time_zone: string | null;
 }
 
 interface AppointmentDialogProps {
@@ -58,6 +59,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
 }) => {
   const [clients, setClients] = useState<Client[]>([]);
   const [selectedClientId, setSelectedClientId] = useState<string>('');
+  const [selectedClientTimezone, setSelectedClientTimezone] = useState<string | null>(null);
   const [date, setDate] = useState<string>('');
   const [startHour, setStartHour] = useState<string>('09');
   const [startMinute, setStartMinute] = useState<string>('00');
@@ -125,6 +127,9 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
       if (editingAppointment) {
         if (editingAppointment.client_id) {
           setSelectedClientId(editingAppointment.client_id);
+          // Set the client timezone when editing
+          const client = clients.find(c => c.id === editingAppointment.client_id);
+          setSelectedClientTimezone(client?.client_time_zone || null);
         }
         
         setNotes(editingAppointment.notes || '');
@@ -178,6 +183,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
       } else {
         // Reset form for new appointments
         setSelectedClientId('');
+        setSelectedClientTimezone(null);
         setDate('');
         setStartHour('09');
         setStartMinute('00');
@@ -195,6 +201,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
 
   const resetForm = () => {
     setSelectedClientId('');
+    setSelectedClientTimezone(null);
     setDate('');
     setStartHour('09');
     setStartMinute('00');
@@ -212,7 +219,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
       setIsLoadingClients(true);
       const { data, error } = await supabase
         .from('clients')
-        .select('id, client_first_name, client_last_name, client_preferred_name, client_email')
+        .select('id, client_first_name, client_last_name, client_preferred_name, client_email, client_time_zone')
         .eq('client_assigned_therapist', clinicianId)
         .order('client_first_name');
 
@@ -362,6 +369,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
         client_email: getClientEmail(selectedClientId),
         clinician_email: clinicianData?.clinician_email || '',
         clinician_name: formatClinicianName(clinicianData),
+        client_timezone: selectedClientTimezone,
       };
 
       console.log('[AppointmentDialog] Appointment data:', appointmentData);
@@ -757,7 +765,12 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
                 ) : (
                   <Select
                     value={selectedClientId}
-                    onValueChange={setSelectedClientId}
+                    onValueChange={(clientId) => {
+                      setSelectedClientId(clientId);
+                      // Set the client timezone when client is selected
+                      const client = clients.find(c => c.id === clientId);
+                      setSelectedClientTimezone(client?.client_time_zone || null);
+                    }}
                     disabled={isLoadingClients}
                   >
                     <SelectTrigger>
