@@ -9,6 +9,7 @@ const corsHeaders = {
 interface UpdateEmailRequest {
   clinician_id: string;
   new_email: string;
+  correlation_id?: string;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -25,9 +26,15 @@ const handler = async (req: Request): Promise<Response> => {
     );
 
     // Get request data
-    const { clinician_id, new_email }: UpdateEmailRequest = await req.json();
+    const { clinician_id, new_email, correlation_id }: UpdateEmailRequest = await req.json();
+    const logPrefix = correlation_id ? `[${correlation_id}]` : '[EMAIL-UPDATE]';
 
-    console.log('Updating email for clinician:', clinician_id, 'to:', new_email);
+    console.log(`${logPrefix} Starting email update process:`, {
+      clinician_id,
+      new_email,
+      timestamp: new Date().toISOString(),
+      correlation_id
+    });
 
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -75,22 +82,39 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     // Update auth.users email first
+    console.log(`${logPrefix} Updating auth.users email...`);
+    const authStartTime = Date.now();
+    
     const { data: authUpdateData, error: authUpdateError } = await supabaseAdmin.auth.admin.updateUserById(
       clinician_id,
       { email: new_email }
     );
 
+    const authDuration = Date.now() - authStartTime;
+
     if (authUpdateError) {
-      console.error('Error updating auth.users email:', authUpdateError);
+      console.error(`${logPrefix} Error updating auth.users email:`, {
+        error: authUpdateError,
+        duration: authDuration,
+        timestamp: new Date().toISOString()
+      });
       return new Response(
         JSON.stringify({ error: 'Failed to update authentication email: ' + authUpdateError.message }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log('Auth email updated successfully');
+    console.log(`${logPrefix} Auth email updated successfully:`, {
+      duration: authDuration,
+      old_email: authUpdateData?.user?.email,
+      new_email,
+      timestamp: new Date().toISOString()
+    });
 
     // Update clinicians table email
+    console.log(`${logPrefix} Updating clinicians table email...`);
+    const clinicianStartTime = Date.now();
+    
     const { data: clinicianUpdateData, error: clinicianUpdateError } = await supabaseAdmin
       .from('clinicians')
       .update({ 
@@ -101,18 +125,30 @@ const handler = async (req: Request): Promise<Response> => {
       .select()
       .single();
 
+    const clinicianDuration = Date.now() - clinicianStartTime;
+
     if (clinicianUpdateError) {
-      console.error('Error updating clinician email:', clinicianUpdateError);
+      console.error(`${logPrefix} Error updating clinician email:`, {
+        error: clinicianUpdateError,
+        duration: clinicianDuration,
+        timestamp: new Date().toISOString()
+      });
       
       // Rollback auth.users email change
+      console.log(`${logPrefix} Rolling back auth.users email change...`);
       try {
+        const rollbackStartTime = Date.now();
         await supabaseAdmin.auth.admin.updateUserById(
           clinician_id,
           { email: authUpdateData?.user?.email || '' }
         );
-        console.log('Rolled back auth email change');
+        const rollbackDuration = Date.now() - rollbackStartTime;
+        console.log(`${logPrefix} Rolled back auth email change successfully:`, {
+          duration: rollbackDuration,
+          timestamp: new Date().toISOString()
+        });
       } catch (rollbackError) {
-        console.error('Failed to rollback auth email change:', rollbackError);
+        console.error(`${logPrefix} Failed to rollback auth email change:`, rollbackError);
       }
 
       return new Response(
@@ -121,13 +157,60 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    console.log('Clinician email updated successfully');
+    console.log(`${logPrefix} Clinician email updated successfully:`, {
+      duration: clinicianDuration,
+      old_email: clinicianUpdateData?.clinician_email,
+      new_email,
+      timestamp: new Date().toISOString()
+    });
+
+    // Final verification step
+    console.log(`${logPrefix} Verifying email sync after update...`);
+    const verifyStartTime = Date.now();
+    
+    try {
+      const { data: verifyData, error: verifyError } = await supabaseAdmin.rpc('validate_clinician_email_consistency');
+      const verifyDuration = Date.now() - verifyStartTime;
+      
+      if (verifyError) {
+        console.warn(`${logPrefix} Email sync verification failed:`, {
+          error: verifyError,
+          duration: verifyDuration
+        });
+      } else {
+        const mismatch = verifyData?.find((row: any) => row.clinician_id === clinician_id);
+        if (mismatch) {
+          console.warn(`${logPrefix} EMAIL SYNC MISMATCH DETECTED AFTER UPDATE:`, {
+            clinician_id: mismatch.clinician_id,
+            auth_email: mismatch.auth_email,
+            clinician_email: mismatch.clinician_email,
+            status: mismatch.status,
+            duration: verifyDuration
+          });
+        } else {
+          console.log(`${logPrefix} Email sync verification passed:`, {
+            duration: verifyDuration,
+            timestamp: new Date().toISOString()
+          });
+        }
+      }
+    } catch (verifyError) {
+      console.error(`${logPrefix} Email sync verification error:`, verifyError);
+    }
+
+    console.log(`${logPrefix} Email update process completed successfully:`, {
+      total_duration: Date.now() - authStartTime,
+      auth_duration: authDuration,
+      clinician_duration: clinicianDuration,
+      timestamp: new Date().toISOString()
+    });
 
     return new Response(
       JSON.stringify({ 
         success: true, 
         message: 'Email updated successfully',
-        data: clinicianUpdateData
+        data: clinicianUpdateData,
+        correlation_id
       }),
       { 
         status: 200, 

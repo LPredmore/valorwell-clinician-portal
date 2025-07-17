@@ -132,23 +132,80 @@ const ClinicianDetails = () => {
 
   // Update clinician field function
   const updateClinicianField = async (field: string, value: string | string[]) => {
+    const correlationId = `email-update-${Date.now()}`;
+    
     try {
-      // Special handling for email updates
+      // Enhanced logging for email updates
       if (field === 'clinician_email') {
-        const { error } = await supabase.functions.invoke('update-clinician-email', {
+        console.log(`[ClinicianDetails] ${correlationId} - Starting email update:`, {
+          clinicianId,
+          oldEmail: clinicianData?.clinician_email,
+          newEmail: value,
+          timestamp: new Date().toISOString(),
+          userRole,
+          userId
+        });
+
+        const startTime = Date.now();
+        const { data, error } = await supabase.functions.invoke('update-clinician-email', {
           body: {
             clinician_id: clinicianId,
-            new_email: value
+            new_email: value,
+            correlation_id: correlationId
           }
         });
 
-        if (error) throw error;
+        const duration = Date.now() - startTime;
+
+        if (error) {
+          console.error(`[ClinicianDetails] ${correlationId} - Email update failed:`, {
+            error,
+            duration,
+            timestamp: new Date().toISOString()
+          });
+          throw error;
+        }
+
+        console.log(`[ClinicianDetails] ${correlationId} - Email update edge function completed:`, {
+          success: true,
+          duration,
+          response: data,
+          timestamp: new Date().toISOString()
+        });
 
         // Update local state
         setClinicianData((prev: any) => ({
           ...prev,
           [field]: value
         }));
+
+        // Log the email sync verification
+        setTimeout(async () => {
+          try {
+            console.log(`[ClinicianDetails] ${correlationId} - Verifying email sync after update`);
+            
+            const { data: verifyData, error: verifyError } = await supabase.rpc('validate_clinician_email_consistency');
+            
+            if (verifyError) {
+              console.error(`[ClinicianDetails] ${correlationId} - Email sync verification failed:`, verifyError);
+            } else {
+              const mismatch = verifyData?.find((row: any) => row.clinician_id === clinicianId);
+              
+              if (mismatch) {
+                console.warn(`[ClinicianDetails] ${correlationId} - EMAIL SYNC MISMATCH DETECTED:`, {
+                  clinician_id: mismatch.clinician_id,
+                  auth_email: mismatch.auth_email,
+                  clinician_email: mismatch.clinician_email,
+                  status: mismatch.status
+                });
+              } else {
+                console.log(`[ClinicianDetails] ${correlationId} - Email sync verification passed`);
+              }
+            }
+          } catch (verificationError) {
+            console.error(`[ClinicianDetails] ${correlationId} - Email sync verification error:`, verificationError);
+          }
+        }, 2000); // Wait 2 seconds for triggers to process
 
         const toastInstance = useToast();
         toastInstance.toast({
