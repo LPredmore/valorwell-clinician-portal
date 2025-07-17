@@ -1,0 +1,13 @@
+{
+  "name": "email-mismatch-scripts",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Scripts to fix clinician email mismatches",
+  "scripts": {
+    "fix-emails": "node fix-email-mismatches.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.2",
+    "dotenv": "^16.3.1"
+  }
+}
