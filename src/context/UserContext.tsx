@@ -78,7 +78,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
           .from('clinicians')
           .select('id, is_admin')
           .eq('id', currentAuthUser.id)
-          .single();
+          .maybeSingle();
 
         if (!clinicianError && clinicianData) {
           const role = clinicianData.is_admin ? 'admin' : 'clinician';
@@ -100,7 +100,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .from('admins')
         .select('id')
         .eq('id', currentAuthUser.id)
-        .single();
+        .maybeSingle();
 
       if (!adminError && adminData) {
         logInfo('[UserContext] Role determined from admins table: admin');
@@ -112,7 +112,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .from('clinicians')
         .select('id, is_admin')
         .eq('id', currentAuthUser.id)
-        .single();
+        .maybeSingle();
 
       if (!clinicianError && clinicianData) {
         const role = clinicianData.is_admin ? 'admin' : 'clinician';
@@ -165,7 +165,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
             .from('clients')
             .select('*')
             .eq('id', currentAuthUser.id)
-            .single();
+            .maybeSingle();
 
           if (error) {
             if (error.code === 'PGRST116') {

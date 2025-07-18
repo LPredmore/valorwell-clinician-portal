@@ -38,7 +38,7 @@ const Header: React.FC<HeaderProps> = ({
             .from('admins')
             .select('admin_first_name, admin_last_name')
             .eq('id', userId)
-            .single();
+            .maybeSingle();
             
           if (error) throw error;
           
@@ -52,7 +52,7 @@ const Header: React.FC<HeaderProps> = ({
             .from('clinicians')
             .select('clinician_first_name, clinician_last_name')
             .eq('id', userId)
-            .single();
+            .maybeSingle();
             
           if (error) throw error;
           
@@ -66,7 +66,7 @@ const Header: React.FC<HeaderProps> = ({
             .from('clients')
             .select('client_first_name, client_last_name')
             .eq('id', userId)
-            .single();
+            .maybeSingle();
             
           if (error) throw error;
           
