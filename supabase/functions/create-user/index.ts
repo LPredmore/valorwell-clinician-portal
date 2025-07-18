@@ -92,7 +92,7 @@ serve(async (req) => {
           clinician_first_name: userData.first_name,
           clinician_last_name: userData.last_name,
           clinician_phone: userData.phone || null,
-          clinician_status: 'Active',
+          clinician_status: 'New',
           is_admin: userData.is_admin || false
         });
 
