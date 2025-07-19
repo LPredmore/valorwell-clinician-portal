@@ -4,7 +4,7 @@ import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "@/hooks/use-toast";
-import { createUser } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
   DialogContent,
@@ -81,13 +81,21 @@ export function AddUserDialog({ open, onOpenChange, onUserAdded }: AddUserDialog
       };
       
       console.log('[AddUserDialog] 🛠️ Adding user with metadata:', userData);
-      const { data: createUserResponse, error: createUserError } = await createUser(data.email, userData);
       
-      if (createUserError) {
-        console.error('[AddUserDialog] 🚨 createUser error:', createUserError);
-        throw createUserError;
+      // Bypass edge function and use Supabase admin directly
+      const { data: { user }, error: signUpError } = await supabase.auth.signUp({
+        email: data.email,
+        password: "temppass1234",
+        options: {
+          data: userData
+        }
+      });
+      
+      if (signUpError) {
+        console.error('[AddUserDialog] 🚨 signUp error:', signUpError);
+        throw signUpError;
       } else {
-        console.log('[AddUserDialog] ✅ User created successfully:', createUserResponse);
+        console.log('[AddUserDialog] ✅ User created successfully:', user);
       }
       
       toast({
