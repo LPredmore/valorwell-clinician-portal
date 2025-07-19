@@ -30,6 +30,8 @@ export async function createUser(email: string, userData: any) {
     body: { email, userData }
   });
   console.log('[client] ⬇️ create-user response object:', res);
+  console.log('[client] 📋 Response data:', res.data);
+  console.log('[client] 📋 Response error:', res.error);
   if (res.error) {
     console.error('[client] ❗ create-user returned error:', res.error);
   }
