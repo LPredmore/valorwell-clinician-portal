@@ -4,7 +4,7 @@ import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { createUser } from "@/integrations/supabase/client";
 import {
   Dialog,
   DialogContent,
@@ -21,13 +21,6 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -37,9 +30,6 @@ const userFormSchema = z.object({
   lastName: z.string().min(2, { message: "Last name is required" }),
   email: z.string().email({ message: "Invalid email address" }),
   phone: z.string().optional(),
-  role: z.enum(["admin", "client", "clinician"], {
-    required_error: "Please select a role",
-  }),
   isAdmin: z.boolean().default(false),
 });
 
@@ -61,7 +51,6 @@ export function AddUserDialog({ open, onOpenChange, onUserAdded }: AddUserDialog
       lastName: "",
       email: "",
       phone: "",
-      role: "client",
       isAdmin: false,
     },
   });
@@ -70,37 +59,29 @@ export function AddUserDialog({ open, onOpenChange, onUserAdded }: AddUserDialog
     setIsSubmitting(true);
 
     try {
-      // User metadata to be saved
       const userData = {
         first_name: data.firstName,
         last_name: data.lastName,
         phone: data.phone || "",
-        role: data.role,
-        temp_password: "temppass1234", // Default temp password
-        is_admin: data.role === "clinician" ? data.isAdmin : false // Only apply admin flag for clinicians
+        role: "clinician",
+        temp_password: "temppass1234",
+        is_admin: data.isAdmin,
       };
       
-      console.log('[AddUserDialog] 🛠️ Adding user with metadata:', userData);
+      console.log('[AddUserDialog] 👩‍⚕️ Creating clinician via Edge Function:', userData);
       
-      // Bypass edge function and use Supabase admin directly
-      const { data: { user }, error: signUpError } = await supabase.auth.signUp({
-        email: data.email,
-        password: "temppass1234",
-        options: {
-          data: userData
-        }
-      });
+      const { data: createUserResponse, error: createUserError } = await createUser(data.email, userData);
       
-      if (signUpError) {
-        console.error('[AddUserDialog] 🚨 signUp error:', signUpError);
-        throw signUpError;
+      if (createUserError) {
+        console.error('[AddUserDialog] 🚨 createUser error:', createUserError);
+        throw createUserError;
       } else {
-        console.log('[AddUserDialog] ✅ User created successfully:', user);
+        console.log('[AddUserDialog] ✅ Clinician created successfully:', createUserResponse);
       }
       
       toast({
         title: "Success",
-        description: "User added successfully with default password: temppass1234. Please note they will need to confirm their email before logging in.",
+        description: "Clinician added successfully with default password: temppass1234.",
       });
 
       form.reset();
@@ -109,8 +90,7 @@ export function AddUserDialog({ open, onOpenChange, onUserAdded }: AddUserDialog
     } catch (err) {
       console.error('[AddUserDialog] 🔥 Unexpected failure:', err);
       
-      // More user-friendly error message
-      let errorMessage = "Failed to add user";
+      let errorMessage = "Failed to add clinician";
       if (err.message) {
         errorMessage += `: ${err.message}`;
       } else if (err.error_description) {
@@ -133,9 +113,9 @@ export function AddUserDialog({ open, onOpenChange, onUserAdded }: AddUserDialog
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Add New User</DialogTitle>
+          <DialogTitle>Add Clinician</DialogTitle>
           <DialogDescription>
-            Enter user details below. A default password of "temppass1234" will be assigned. The user will need to confirm their email before logging in.
+            Enter clinician details below. A default password of "temppass1234" will be assigned.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -194,50 +174,26 @@ export function AddUserDialog({ open, onOpenChange, onUserAdded }: AddUserDialog
             />
             <FormField
               control={form.control}
-              name="role"
+              name="isAdmin"
               render={({ field }) => (
-                <FormItem>
-                  <FormLabel>User Role</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a role" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="admin">Admin</SelectItem>
-                      <SelectItem value="client">Client</SelectItem>
-                      <SelectItem value="clinician">Clinician</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel>
+                      Grant Admin Privileges
+                    </FormLabel>
+                    <p className="text-sm text-muted-foreground">
+                      This clinician will have admin access to manage other users and system settings
+                    </p>
+                  </div>
                 </FormItem>
               )}
             />
-            {form.watch("role") === "clinician" && (
-              <FormField
-                control={form.control}
-                name="isAdmin"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                    <FormControl>
-                      <Checkbox
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </FormControl>
-                    <div className="space-y-1 leading-none">
-                      <FormLabel>
-                        Grant Admin Privileges
-                      </FormLabel>
-                      <p className="text-sm text-muted-foreground">
-                        This clinician will have admin access to manage other users and system settings
-                      </p>
-                    </div>
-                  </FormItem>
-                )}
-              />
-            )}
             <DialogFooter>
               <Button
                 type="button" 
@@ -247,7 +203,7 @@ export function AddUserDialog({ open, onOpenChange, onUserAdded }: AddUserDialog
                 Cancel
               </Button>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Adding..." : "Add User"}
+                {isSubmitting ? "Adding..." : "Add Clinician"}
               </Button>
             </DialogFooter>
           </form>
