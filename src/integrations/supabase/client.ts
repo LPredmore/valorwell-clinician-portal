@@ -506,28 +506,15 @@ export interface PracticeInfo {
 
 // User management functions
 export const createUser = async (email: string, userData: any) => {
-  try {
-    // Use the functions API instead of direct admin calls
-    console.log("Creating user via Edge Function:", email);
-    
-    // Call Supabase Edge Function to create user
-    const { data, error } = await supabase.functions.invoke('create-user', {
-      body: {
-        email,
-        userData
-      }
-    });
-    
-    if (error) {
-      console.error('Error calling create-user function:', error);
-      return { data: null, error };
-    }
-    
-    return { data, error: null };
-  } catch (error) {
-    console.error('Error creating user:', error);
-    return { data: null, error };
+  console.log('▶️ Invoking create-user with:', { email, userData });
+  const res = await supabase.functions.invoke('create-user', {
+    body: { email, userData }
+  });
+  console.log('⬇️ Received response:', res);
+  if (res.error) {
+    console.error('❗ create-user returned error:', res.error);
   }
+  return res;
 };
 
 // User data functions

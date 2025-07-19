@@ -68,7 +68,6 @@ export function AddUserDialog({ open, onOpenChange, onUserAdded }: AddUserDialog
 
   async function onSubmit(data: UserFormValues) {
     setIsSubmitting(true);
-    console.log("Submitting user data:", data);
 
     try {
       // User metadata to be saved
@@ -81,17 +80,15 @@ export function AddUserDialog({ open, onOpenChange, onUserAdded }: AddUserDialog
         is_admin: data.role === "clinician" ? data.isAdmin : false // Only apply admin flag for clinicians
       };
       
-      console.log("User metadata to be saved:", userData);
-      
-      // Create user using our helper function that now uses the edge function
+      console.log('🛠️ Adding user with metadata:', userData);
       const { data: createUserResponse, error: createUserError } = await createUser(data.email, userData);
-
+      
       if (createUserError) {
-        console.error("Error creating user:", createUserError);
+        console.error('🚨 createUser threw:', createUserError);
         throw createUserError;
+      } else {
+        console.log('✅ User created:', createUserResponse);
       }
-
-      console.log("User created successfully:", createUserResponse);
       
       toast({
         title: "Success",
@@ -101,15 +98,15 @@ export function AddUserDialog({ open, onOpenChange, onUserAdded }: AddUserDialog
       form.reset();
       onUserAdded();
       onOpenChange(false);
-    } catch (error) {
-      console.error("Error adding user:", error);
+    } catch (err) {
+      console.error('🔥 Unexpected failure in AddUserDialog:', err);
       
       // More user-friendly error message
       let errorMessage = "Failed to add user";
-      if (error.message) {
-        errorMessage += `: ${error.message}`;
-      } else if (error.error_description) {
-        errorMessage += `: ${error.error_description}`;
+      if (err.message) {
+        errorMessage += `: ${err.message}`;
+      } else if (err.error_description) {
+        errorMessage += `: ${err.error_description}`;
       } else {
         errorMessage += ". Please try again.";
       }
