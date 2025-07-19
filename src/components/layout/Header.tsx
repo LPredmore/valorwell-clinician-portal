@@ -35,16 +35,16 @@ const Header: React.FC<HeaderProps> = ({
         // Get user data from the appropriate table based on role
         if (userRole === 'admin') {
           const { data, error } = await supabase
-            .from('admins')
-            .select('admin_first_name, admin_last_name')
+            .from('clinicians')
+            .select('clinician_first_name, clinician_last_name')
             .eq('id', userId)
             .maybeSingle();
             
           if (error) throw error;
           
           if (data) {
-            setFirstName(data.admin_first_name || '');
-            setLastName(data.admin_last_name || '');
+            setFirstName(data.clinician_first_name || '');
+            setLastName(data.clinician_last_name || '');
             updateInitials(data.admin_first_name, data.admin_last_name);
           }
         } else if (userRole === 'clinician') {

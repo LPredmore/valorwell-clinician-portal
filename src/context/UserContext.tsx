@@ -95,24 +95,23 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       // If no metadata role, check which table the user exists in
-      // Check admins table first
-      const { data: adminData, error: adminError } = await supabase
-        .from('admins')
-        .select('id')
-        .eq('id', currentAuthUser.id)
-        .maybeSingle();
-
-      if (!adminError && adminData) {
-        logInfo('[UserContext] Role determined from admins table: admin');
-        return 'admin';
-      }
-
       // Check clinicians table
       const { data: clinicianData, error: clinicianError } = await supabase
         .from('clinicians')
         .select('id, is_admin')
         .eq('id', currentAuthUser.id)
         .maybeSingle();
+
+      if (!clinicianError && clinicianData) {
+        // If clinician has admin flag, they are an admin
+        if (clinicianData.is_admin) {
+          logInfo('[UserContext] Role determined from clinicians table: admin (is_admin=true)');
+          return 'admin';
+        } else {
+          logInfo('[UserContext] Role determined from clinicians table: clinician');
+          return 'clinician';
+        }
+      }
 
       if (!clinicianError && clinicianData) {
         const role = clinicianData.is_admin ? 'admin' : 'clinician';
@@ -187,7 +186,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setClientStatus('ErrorFetchingStatus');
           setClientProfile(null);
         }
-      } else {
+        } else {
         // For admins and clinicians, clear client-specific data
         setClientStatus(null);
         setClientProfile(null);

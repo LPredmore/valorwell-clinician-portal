@@ -57,14 +57,14 @@ serve(async (req) => {
       );
     }
     
-    // Check if calling user is admin by querying admins table
-    const { data: adminCheck, error: adminError } = await supabase
-      .from('admins')
-      .select('id')
+    // Check if calling user is admin by checking is_admin flag in clinicians table
+    const { data: clinician, error: clinicianError } = await supabase
+      .from('clinicians')
+      .select('is_admin')
       .eq('id', callingUser.id)
-      .single();
+      .maybeSingle();
     
-    if (adminError || !adminCheck) {
+    if (clinicianError || !clinician || !clinician.is_admin) {
       return new Response(
         JSON.stringify({ error: 'Only administrators can delete users' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
