@@ -80,14 +80,14 @@ export function AddUserDialog({ open, onOpenChange, onUserAdded }: AddUserDialog
         is_admin: data.role === "clinician" ? data.isAdmin : false // Only apply admin flag for clinicians
       };
       
-      console.log('🛠️ Adding user with metadata:', userData);
+      console.log('[AddUserDialog] 🛠️ Adding user with metadata:', userData);
       const { data: createUserResponse, error: createUserError } = await createUser(data.email, userData);
       
       if (createUserError) {
-        console.error('🚨 createUser threw:', createUserError);
+        console.error('[AddUserDialog] 🚨 createUser error:', createUserError);
         throw createUserError;
       } else {
-        console.log('✅ User created:', createUserResponse);
+        console.log('[AddUserDialog] ✅ User created successfully:', createUserResponse);
       }
       
       toast({
@@ -99,7 +99,7 @@ export function AddUserDialog({ open, onOpenChange, onUserAdded }: AddUserDialog
       onUserAdded();
       onOpenChange(false);
     } catch (err) {
-      console.error('🔥 Unexpected failure in AddUserDialog:', err);
+      console.error('[AddUserDialog] 🔥 Unexpected failure:', err);
       
       // More user-friendly error message
       let errorMessage = "Failed to add user";

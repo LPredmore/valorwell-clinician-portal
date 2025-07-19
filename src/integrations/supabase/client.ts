@@ -23,6 +23,19 @@ export const supabase = createClient(
 // Use our centralized date parsing utility
 export { parseDateString, formatDateForDB };
 
+// Function to create a new user
+export async function createUser(email: string, userData: any) {
+  console.log('[client] ▶️ Invoking create-user with payload:', { email, userData });
+  const res = await supabase.functions.invoke('create-user', {
+    body: { email, userData }
+  });
+  console.log('[client] ⬇️ create-user response object:', res);
+  if (res.error) {
+    console.error('[client] ❗ create-user returned error:', res.error);
+  }
+  return res;
+}
+
 // Import the new video room service
 import { videoRoomService } from '@/utils/videoRoomService';
 
@@ -504,18 +517,7 @@ export interface PracticeInfo {
   practice_zip: string;
 }
 
-// User management functions
-export const createUser = async (email: string, userData: any) => {
-  console.log('▶️ Invoking create-user with:', { email, userData });
-  const res = await supabase.functions.invoke('create-user', {
-    body: { email, userData }
-  });
-  console.log('⬇️ Received response:', res);
-  if (res.error) {
-    console.error('❗ create-user returned error:', res.error);
-  }
-  return res;
-};
+// User management functions (duplicate removed - using the one above)
 
 // User data functions
 export const getCurrentUser = async () => {
