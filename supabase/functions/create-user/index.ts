@@ -15,49 +15,43 @@ const supabaseAdmin = createClient(
 );
 
 serve(async (req) => {
+  // CORS headers
+  const corsHeaders = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  };
+
+  // Handle OPTIONS request for CORS preflight
+  if (req.method === "OPTIONS") {
+    return new Response(null, {
+      headers: corsHeaders,
+      status: 204,
+    });
+  }
+
+  console.log(`=== CREATE USER DEBUG START ===`);
+  console.log(`Request method: ${req.method}`);
+  console.log(`Request URL: ${req.url}`);
+
+  // JSON parse guard at the very top to catch malformed JSON
+  let body: any;
   try {
-    // CORS headers
-    const corsHeaders = {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-    };
+    body = await req.json();
+  } catch (err) {
+    console.error('⚠️ JSON parse failed:', err);
+    return new Response(
+      JSON.stringify({ error: 'Bad JSON' }),
+      { 
+        status: 400, 
+        headers: corsHeaders 
+      }
+    );
+  }
+  console.log('📥 create-user received body:', body);
 
-    // Handle OPTIONS request for CORS preflight
-    if (req.method === "OPTIONS") {
-      return new Response(null, {
-        headers: corsHeaders,
-        status: 204,
-      });
-    }
-
-    console.log(`=== CREATE USER DEBUG START ===`);
-    console.log(`Request method: ${req.method}`);
-    console.log(`Request URL: ${req.url}`);
-
-    // Parse the request body
-    let requestBody;
-    try {
-      requestBody = await req.json();
-      console.log(`Request body parsed successfully:`, requestBody);
-    } catch (parseError) {
-      console.error(`Failed to parse request body:`, parseError);
-      return new Response(
-        JSON.stringify({ 
-          error: "Invalid JSON in request body",
-          details: parseError.message 
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
-
-    const { email, userData } = requestBody;
-    
-    console.log(`Extracted email: ${email}`);
-    console.log(`Extracted userData:`, userData);
+  try {
+    const { email, userData } = body;
     
     if (!email) {
       console.error("Email is missing from request");
