@@ -1647,27 +1647,6 @@ export type Database = {
           clinician_availability_start_wednesday_1: string | null
           clinician_availability_start_wednesday_2: string | null
           clinician_availability_start_wednesday_3: string | null
-          clinician_availability_timezone_friday_1: string | null
-          clinician_availability_timezone_friday_2: string | null
-          clinician_availability_timezone_friday_3: string | null
-          clinician_availability_timezone_monday_1: string | null
-          clinician_availability_timezone_monday_2: string | null
-          clinician_availability_timezone_monday_3: string | null
-          clinician_availability_timezone_saturday_1: string | null
-          clinician_availability_timezone_saturday_2: string | null
-          clinician_availability_timezone_saturday_3: string | null
-          clinician_availability_timezone_sunday_1: string | null
-          clinician_availability_timezone_sunday_2: string | null
-          clinician_availability_timezone_sunday_3: string | null
-          clinician_availability_timezone_thursday_1: string | null
-          clinician_availability_timezone_thursday_2: string | null
-          clinician_availability_timezone_thursday_3: string | null
-          clinician_availability_timezone_tuesday_1: string | null
-          clinician_availability_timezone_tuesday_2: string | null
-          clinician_availability_timezone_tuesday_3: string | null
-          clinician_availability_timezone_wednesday_1: string | null
-          clinician_availability_timezone_wednesday_2: string | null
-          clinician_availability_timezone_wednesday_3: string | null
           clinician_bio: string | null
           clinician_calendar_end_time: string | null
           clinician_calendar_start_time: string | null
@@ -1747,27 +1726,6 @@ export type Database = {
           clinician_availability_start_wednesday_1?: string | null
           clinician_availability_start_wednesday_2?: string | null
           clinician_availability_start_wednesday_3?: string | null
-          clinician_availability_timezone_friday_1?: string | null
-          clinician_availability_timezone_friday_2?: string | null
-          clinician_availability_timezone_friday_3?: string | null
-          clinician_availability_timezone_monday_1?: string | null
-          clinician_availability_timezone_monday_2?: string | null
-          clinician_availability_timezone_monday_3?: string | null
-          clinician_availability_timezone_saturday_1?: string | null
-          clinician_availability_timezone_saturday_2?: string | null
-          clinician_availability_timezone_saturday_3?: string | null
-          clinician_availability_timezone_sunday_1?: string | null
-          clinician_availability_timezone_sunday_2?: string | null
-          clinician_availability_timezone_sunday_3?: string | null
-          clinician_availability_timezone_thursday_1?: string | null
-          clinician_availability_timezone_thursday_2?: string | null
-          clinician_availability_timezone_thursday_3?: string | null
-          clinician_availability_timezone_tuesday_1?: string | null
-          clinician_availability_timezone_tuesday_2?: string | null
-          clinician_availability_timezone_tuesday_3?: string | null
-          clinician_availability_timezone_wednesday_1?: string | null
-          clinician_availability_timezone_wednesday_2?: string | null
-          clinician_availability_timezone_wednesday_3?: string | null
           clinician_bio?: string | null
           clinician_calendar_end_time?: string | null
           clinician_calendar_start_time?: string | null
@@ -1849,27 +1807,6 @@ export type Database = {
           clinician_availability_start_wednesday_1?: string | null
           clinician_availability_start_wednesday_2?: string | null
           clinician_availability_start_wednesday_3?: string | null
-          clinician_availability_timezone_friday_1?: string | null
-          clinician_availability_timezone_friday_2?: string | null
-          clinician_availability_timezone_friday_3?: string | null
-          clinician_availability_timezone_monday_1?: string | null
-          clinician_availability_timezone_monday_2?: string | null
-          clinician_availability_timezone_monday_3?: string | null
-          clinician_availability_timezone_saturday_1?: string | null
-          clinician_availability_timezone_saturday_2?: string | null
-          clinician_availability_timezone_saturday_3?: string | null
-          clinician_availability_timezone_sunday_1?: string | null
-          clinician_availability_timezone_sunday_2?: string | null
-          clinician_availability_timezone_sunday_3?: string | null
-          clinician_availability_timezone_thursday_1?: string | null
-          clinician_availability_timezone_thursday_2?: string | null
-          clinician_availability_timezone_thursday_3?: string | null
-          clinician_availability_timezone_tuesday_1?: string | null
-          clinician_availability_timezone_tuesday_2?: string | null
-          clinician_availability_timezone_tuesday_3?: string | null
-          clinician_availability_timezone_wednesday_1?: string | null
-          clinician_availability_timezone_wednesday_2?: string | null
-          clinician_availability_timezone_wednesday_3?: string | null
           clinician_bio?: string | null
           clinician_calendar_end_time?: string | null
           clinician_calendar_start_time?: string | null

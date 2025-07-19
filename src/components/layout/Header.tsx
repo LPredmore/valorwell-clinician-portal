@@ -45,7 +45,7 @@ const Header: React.FC<HeaderProps> = ({
           if (data) {
             setFirstName(data.clinician_first_name || '');
             setLastName(data.clinician_last_name || '');
-            updateInitials(data.admin_first_name, data.admin_last_name);
+            updateInitials(data.clinician_first_name, data.clinician_last_name);
           }
         } else if (userRole === 'clinician') {
           const { data, error } = await supabase

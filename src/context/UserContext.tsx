@@ -113,10 +113,16 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
-      if (!clinicianError && clinicianData) {
-        const role = clinicianData.is_admin ? 'admin' : 'clinician';
-        logInfo('[UserContext] Role determined from clinicians table:', role);
-        return role;
+      // Check clients table
+      const { data: clientData, error: clientError } = await supabase
+        .from('clients')
+        .select('id')
+        .eq('id', currentAuthUser.id)
+        .maybeSingle();
+
+      if (!clientError && clientData) {
+        logInfo('[UserContext] Role determined from clients table: client');
+        return 'client';
       }
 
       // Default to client if not found elsewhere
