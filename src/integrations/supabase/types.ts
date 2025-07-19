@@ -14,39 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      admins: {
-        Row: {
-          admin_email: string
-          admin_first_name: string | null
-          admin_last_name: string | null
-          admin_phone: string | null
-          admin_status: string | null
-          created_at: string
-          id: string
-          updated_at: string
-        }
-        Insert: {
-          admin_email: string
-          admin_first_name?: string | null
-          admin_last_name?: string | null
-          admin_phone?: string | null
-          admin_status?: string | null
-          created_at?: string
-          id: string
-          updated_at?: string
-        }
-        Update: {
-          admin_email?: string
-          admin_first_name?: string | null
-          admin_last_name?: string | null
-          admin_phone?: string | null
-          admin_status?: string | null
-          created_at?: string
-          id?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
       api_logs: {
         Row: {
           client_context: Json | null

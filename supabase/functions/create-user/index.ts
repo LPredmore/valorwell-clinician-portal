@@ -184,10 +184,11 @@ serve(async (req) => {
         verificationResult = { success: true, record: clientRecord };
       }
     } else if (userData.role === 'admin') {
+      // For admin role, verify the record was created successfully in clinicians table with is_admin=true
       console.log("=== VERIFYING ADMIN RECORD CREATION ===");
-      const { data: adminRecord, error: verifyError } = await supabaseAdmin
-        .from('admins')
-        .select('id, admin_email, admin_status')
+      const { data: clinicianRecord, error: verifyError } = await supabaseAdmin
+        .from('clinicians')
+        .select('id, clinician_email, is_admin')
         .eq('id', user.user.id)
         .single();
         
@@ -195,10 +196,13 @@ serve(async (req) => {
         console.error("=== VERIFICATION FAILED: Admin record not found ===");
         console.error("Verification error:", verifyError);
         verificationResult = { success: false, error: verifyError.message };
+      } else if (!clinicianRecord.is_admin) {
+        console.error("=== VERIFICATION FAILED: Admin flag not set ===");
+        verificationResult = { success: false, error: "Admin flag not set in clinician record" };
       } else {
         console.log("=== VERIFICATION SUCCESS: Admin record found ===");
-        console.log("Admin record:", adminRecord);
-        verificationResult = { success: true, record: adminRecord };
+        console.log("Admin record:", clinicianRecord);
+        verificationResult = { success: true, record: clinicianRecord };
       }
     }
 
