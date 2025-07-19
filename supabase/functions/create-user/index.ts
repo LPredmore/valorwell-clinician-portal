@@ -72,26 +72,27 @@ serve(async (req) => {
       );
     }
 
-    console.log(`=== STEP 1: CHECKING DATABASE SCHEMA ===`);
+    console.log(`=== STEP 1: CHECK FOR EXISTING USER ===`);
     
-    // Check if clinician_status_enum exists
+    // Check if user already exists
     try {
-      const { data: enumCheck, error: enumError } = await supabaseAdmin
-        .rpc('check_table_exists', { check_table_name: 'clinicians' });
-      
-      console.log(`Clinicians table exists check:`, { data: enumCheck, error: enumError });
-      
-      // Try to get enum values
-      const { data: enumData, error: enumQueryError } = await supabaseAdmin
-        .from('information_schema.columns')
-        .select('*')
-        .eq('table_name', 'clinicians')
-        .eq('column_name', 'clinician_status');
-        
-      console.log(`Clinician status column info:`, { data: enumData, error: enumQueryError });
-      
-    } catch (schemaError) {
-      console.error("Schema check failed:", schemaError);
+      const { data: existingUser, error: getUserError } = await supabaseAdmin.auth.admin.getUserById(email);
+      if (existingUser && !getUserError) {
+        console.log("=== USER ALREADY EXISTS ===");
+        return new Response(
+          JSON.stringify({ 
+            error: "User already exists with this email",
+            debug_step: "user_existence_check"
+          }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+    } catch (existenceError) {
+      // User doesn't exist, which is what we want
+      console.log("User doesn't exist, proceeding with creation");
     }
 
     console.log(`=== STEP 2: CREATING AUTH USER ===`);
@@ -141,80 +142,63 @@ serve(async (req) => {
     console.log("Created user:", user);
     console.log("User ID:", user.user.id);
 
-    // Create clinician record if role is clinician
+    console.log(`=== STEP 3: WAITING FOR TRIGGER TO PROCESS ===`);
+    
+    // Small delay to allow trigger to complete
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    // Verify that the trigger created the appropriate record
+    let verificationResult = null;
     if (userData.role === 'clinician') {
-      console.log(`=== STEP 3: CREATING CLINICIAN RECORD ===`);
-      
-      const clinicianData = {
-        id: user.user.id,
-        clinician_email: email,
-        clinician_first_name: userData.first_name,
-        clinician_last_name: userData.last_name,
-        clinician_phone: userData.phone || null,
-        is_admin: userData.is_admin || false
-      };
-      
-      console.log("Clinician data to insert:", clinicianData);
-      
-      // Try without clinician_status first to see if enum is the issue
-      console.log("=== TESTING: Inserting without clinician_status ===");
-      const { data: testData, error: testError } = await supabaseAdmin
+      console.log("=== VERIFYING CLINICIAN RECORD CREATION ===");
+      const { data: clinicianRecord, error: verifyError } = await supabaseAdmin
         .from('clinicians')
-        .insert(clinicianData)
-        .select();
-
-      if (testError) {
-        console.error("=== CLINICIAN CREATION FAILED (without status) ===");
-        console.error("Error details:", testError);
-        console.error("Error message:", testError.message);
-        console.error("Error code:", testError.code);
-        console.error("Error hint:", testError.hint);
-        console.error("Error details:", testError.details);
+        .select('id, clinician_email, clinician_status')
+        .eq('id', user.user.id)
+        .single();
         
-        // Try to get more details about the clinicians table
-        try {
-          const { data: tableInfo, error: tableError } = await supabaseAdmin
-            .from('information_schema.tables')
-            .select('*')
-            .eq('table_name', 'clinicians');
-          console.log("Clinicians table info:", { data: tableInfo, error: tableError });
-        } catch (infoError) {
-          console.error("Failed to get table info:", infoError);
-        }
-        
-        return new Response(
-          JSON.stringify({ 
-            error: testError.message,
-            debug_step: "clinician_record_creation",
-            error_code: testError.code,
-            error_details: testError.details,
-            error_hint: testError.hint,
-            inserted_data: clinicianData
-          }),
-          {
-            status: 400,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
+      if (verifyError) {
+        console.error("=== VERIFICATION FAILED: Clinician record not found ===");
+        console.error("Verification error:", verifyError);
+        verificationResult = { success: false, error: verifyError.message };
       } else {
-        console.log("=== CLINICIAN CREATION SUCCESS (without status) ===");
-        console.log("Created clinician:", testData);
+        console.log("=== VERIFICATION SUCCESS: Clinician record found ===");
+        console.log("Clinician record:", clinicianRecord);
+        verificationResult = { success: true, record: clinicianRecord };
+      }
+    } else if (userData.role === 'client') {
+      console.log("=== VERIFYING CLIENT RECORD CREATION ===");
+      const { data: clientRecord, error: verifyError } = await supabaseAdmin
+        .from('clients')
+        .select('id, client_email, client_status')
+        .eq('id', user.user.id)
+        .single();
         
-        // Now try to update with status
-        console.log("=== TESTING: Updating with clinician_status ===");
-        const { data: updateData, error: updateError } = await supabaseAdmin
-          .from('clinicians')
-          .update({ clinician_status: 'New' })
-          .eq('id', user.user.id)
-          .select();
-          
-        if (updateError) {
-          console.error("=== STATUS UPDATE FAILED ===");
-          console.error("Update error:", updateError);
-        } else {
-          console.log("=== STATUS UPDATE SUCCESS ===");
-          console.log("Updated clinician:", updateData);
-        }
+      if (verifyError) {
+        console.error("=== VERIFICATION FAILED: Client record not found ===");
+        console.error("Verification error:", verifyError);
+        verificationResult = { success: false, error: verifyError.message };
+      } else {
+        console.log("=== VERIFICATION SUCCESS: Client record found ===");
+        console.log("Client record:", clientRecord);
+        verificationResult = { success: true, record: clientRecord };
+      }
+    } else if (userData.role === 'admin') {
+      console.log("=== VERIFYING ADMIN RECORD CREATION ===");
+      const { data: adminRecord, error: verifyError } = await supabaseAdmin
+        .from('admins')
+        .select('id, admin_email, admin_status')
+        .eq('id', user.user.id)
+        .single();
+        
+      if (verifyError) {
+        console.error("=== VERIFICATION FAILED: Admin record not found ===");
+        console.error("Verification error:", verifyError);
+        verificationResult = { success: false, error: verifyError.message };
+      } else {
+        console.log("=== VERIFICATION SUCCESS: Admin record found ===");
+        console.log("Admin record:", adminRecord);
+        verificationResult = { success: true, record: adminRecord };
       }
     }
 
@@ -225,11 +209,12 @@ serve(async (req) => {
       JSON.stringify({ 
         message: "User created successfully", 
         user,
-        clinician_created: userData.role === 'clinician',
+        trigger_verification: verificationResult,
         debug_info: {
           user_id: user.user.id,
           role: userData.role,
-          email: email
+          email: email,
+          trigger_handled_creation: true
         }
       }),
       {
