@@ -18,8 +18,6 @@ export const ClientInfoSection: React.FC<ClientInfoSectionProps> = ({
       formState.diagnosis.split(',').map(d => d.trim()).filter(Boolean) : 
       formState.diagnosis) : 
     [];
-  
-  const isDiagnosisEmpty = !diagnosisArray.length;
 
   return (
     <>
@@ -59,19 +57,10 @@ export const ClientInfoSection: React.FC<ClientInfoSectionProps> = ({
       <div className={`grid grid-cols-1 ${formState.planType || formState.treatmentFrequency ? 'md:grid-cols-3' : 'md:grid-cols-1'} gap-6 mb-6`}>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Diagnosis</label>
-          {isDiagnosisEmpty ? (
-            <DiagnosisSelector 
-              value={diagnosisArray}
-              onChange={(value) => handleChange('diagnosis', value)}
-            />
-          ) : (
-            <Input
-              placeholder="Select diagnosis code"
-              value={formState.diagnosis}
-              readOnly
-              className="bg-gray-100"
-            />
-          )}
+          <DiagnosisSelector 
+            value={diagnosisArray}
+            onChange={(value) => handleChange('diagnosis', value)}
+          />
         </div>
         {formState.planType && (
           <div>
