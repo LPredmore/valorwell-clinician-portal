@@ -91,7 +91,6 @@ serve(async (req) => {
         enable_chat: true, // Enable text chat
         start_video_off: true, // Start with video off
         start_audio_off: false, // Start with audio on
-        audio: true, // Ensure audio constraint is always included
       }
     };
     
