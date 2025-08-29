@@ -398,11 +398,20 @@ const ClinicianDetails = () => {
                     onSave={(value) => updateClinicianField('clinician_last_name', value as string)}
                     placeholder="Enter last name"
                   />
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
                   <EditableField
                     label="Professional Name"
                     value={clinicianData.clinician_professional_name}
                     onSave={(value) => updateClinicianField('clinician_professional_name', value as string)}
                     placeholder="Enter professional name"
+                  />
+                  <EditableField
+                    label="Name for Insurance"
+                    value={clinicianData.clinician_nameinsurance}
+                    onSave={(value) => updateClinicianField('clinician_nameinsurance', value as string)}
+                    placeholder="Enter name for insurance"
                   />
                 </div>
                 
