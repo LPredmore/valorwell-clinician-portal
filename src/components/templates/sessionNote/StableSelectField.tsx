@@ -31,15 +31,14 @@ export const StableSelectField: React.FC<StableSelectFieldProps> = memo(({
         value={value || ""}
         onValueChange={onValueChange}
       >
-        <SelectTrigger className="w-full bg-background border-input transition-none">
+        <SelectTrigger className="w-full bg-background border-input">
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
-        <SelectContent className="bg-background border border-border shadow-lg z-50 animate-none">
+        <SelectContent className="bg-background border border-border shadow-lg z-50">
           {options.map((option) => (
             <SelectItem 
               key={option.value} 
               value={option.value}
-              className="transition-none"
             >
               {option.label}
             </SelectItem>

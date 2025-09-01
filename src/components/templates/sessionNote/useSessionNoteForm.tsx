@@ -467,32 +467,22 @@ export const useSessionNoteForm = ({
         createdBy: clinicianName
       };
 
-      console.log('📄 [SAVE-NOTE] Starting PDF generation for:', documentInfo);
-
       // Step 1: Generate PDF first (without saving metadata)
       if (!contentRef?.current) {
-        console.error('❌ [SAVE-NOTE] No content element found for PDF generation');
         throw new Error('No content available for PDF generation');
       }
 
-      try {
-        console.log('📄 [SAVE-NOTE] Attempting PDF generation...');
-        
+      try {        
         const pdfFilePath = await generateAndSavePDF(
           'session-note-content',
           documentInfo
         );
 
         if (!pdfFilePath) {
-          console.error('❌ [SAVE-NOTE] PDF generation failed');
           throw new Error('PDF generation failed: No file path returned');
         }
 
-        console.log('✅ [SAVE-NOTE] PDF generated successfully:', pdfFilePath);
-
-        // Step 2: Only save metadata AFTER successful PDF generation
-        console.log('💾 Saving session note metadata to database:', documentInfo);
-        
+        // Step 2: Only save metadata AFTER successful PDF generation        
         const { error: dbError } = await supabase
           .from('clinical_documents')
           .insert({
@@ -508,8 +498,6 @@ export const useSessionNoteForm = ({
           console.error('❌ Error saving document metadata:', dbError);
           throw new Error(`Failed to save document metadata: ${dbError.message}`);
         }
-
-        console.log('✅ Document metadata saved successfully');
         
         toast({
           title: "Success",

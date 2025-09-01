@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Input } from "@/components/ui/input";
 import { DiagnosisSelector } from "@/components/DiagnosisSelector";
 
@@ -8,16 +8,17 @@ interface ClientInfoSectionProps {
   handleChange: (field: string, value: string | string[]) => void;
 }
 
-export const ClientInfoSection: React.FC<ClientInfoSectionProps> = ({
+export const ClientInfoSection: React.FC<ClientInfoSectionProps> = React.memo(({
   formState,
   handleChange
 }) => {
-  // Convert string diagnosis to array if needed for DiagnosisSelector
-  const diagnosisArray = formState.diagnosis ? 
-    (typeof formState.diagnosis === 'string' ? 
+  // Memoize diagnosis array conversion to prevent reference changes
+  const diagnosisArray = useMemo(() => {
+    if (!formState.diagnosis) return [];
+    return typeof formState.diagnosis === 'string' ? 
       formState.diagnosis.split(',').map(d => d.trim()).filter(Boolean) : 
-      formState.diagnosis) : 
-    [];
+      formState.diagnosis;
+  }, [formState.diagnosis]);
 
   return (
     <>
@@ -54,7 +55,7 @@ export const ClientInfoSection: React.FC<ClientInfoSectionProps> = ({
         </div>
       </div>
 
-      <div className={`grid grid-cols-1 ${formState.planType || formState.treatmentFrequency ? 'md:grid-cols-3' : 'md:grid-cols-1'} gap-6 mb-6`}>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Diagnosis</label>
           <DiagnosisSelector 
@@ -62,30 +63,26 @@ export const ClientInfoSection: React.FC<ClientInfoSectionProps> = ({
             onChange={(value) => handleChange('diagnosis', value)}
           />
         </div>
-        {formState.planType && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Plan Type</label>
-            <Input
-              placeholder="Select plan length"
-              value={formState.planType}
-              onChange={(e) => handleChange('planType', e.target.value)}
-              readOnly
-              className="bg-gray-100"
-            />
-          </div>
-        )}
-        {formState.treatmentFrequency && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Treatment Frequency</label>
-            <Input
-              placeholder="Select frequency"
-              value={formState.treatmentFrequency}
-              onChange={(e) => handleChange('treatmentFrequency', e.target.value)}
-              readOnly
-              className="bg-gray-100"
-            />
-          </div>
-        )}
+        <div className={formState.planType ? '' : 'hidden'}>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Plan Type</label>
+          <Input
+            placeholder="Select plan length"
+            value={formState.planType}
+            onChange={(e) => handleChange('planType', e.target.value)}
+            readOnly
+            className="bg-gray-100"
+          />
+        </div>
+        <div className={formState.treatmentFrequency ? '' : 'hidden'}>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Treatment Frequency</label>
+          <Input
+            placeholder="Select frequency"
+            value={formState.treatmentFrequency}
+            onChange={(e) => handleChange('treatmentFrequency', e.target.value)}
+            readOnly
+            className="bg-gray-100"
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
@@ -128,4 +125,4 @@ export const ClientInfoSection: React.FC<ClientInfoSectionProps> = ({
       </div>
     </>
   );
-};
+});

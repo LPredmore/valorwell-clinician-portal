@@ -24,9 +24,21 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
       const textarea = textareaRef.current;
       if (!textarea) return;
       
-      textarea.style.height = 'auto';
-      textarea.style.height = `${textarea.scrollHeight}px`;
+      // Use requestAnimationFrame to prevent layout thrashing
+      requestAnimationFrame(() => {
+        textarea.style.height = 'auto';
+        textarea.style.height = `${textarea.scrollHeight}px`;
+      });
     }, []);
+
+    // Debounced resize to prevent excessive calls
+    const debouncedResize = React.useCallback(() => {
+      const timeoutId = setTimeout(() => {
+        resizeTextarea();
+      }, 10);
+      
+      return () => clearTimeout(timeoutId);
+    }, [resizeTextarea]);
 
     React.useEffect(() => {
       const textarea = textareaRef.current;
@@ -34,25 +46,24 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
       
       resizeTextarea();
       
-      const handleInput = () => resizeTextarea();
+      const handleInput = () => debouncedResize();
+      const handleResize = () => debouncedResize();
       
       textarea.addEventListener('input', handleInput);
-      
-      // Also resize on window resize in case container width changes
-      window.addEventListener('resize', resizeTextarea);
+      window.addEventListener('resize', handleResize);
       
       return () => {
         textarea.removeEventListener('input', handleInput);
-        window.removeEventListener('resize', resizeTextarea);
+        window.removeEventListener('resize', handleResize);
       };
-    }, [resizeTextarea]);
+    }, [resizeTextarea, debouncedResize]);
 
     // Resize if value changes from outside (e.g. form state)
     React.useEffect(() => {
-      if (props.value) {
-        resizeTextarea();
+      if (props.value !== undefined) {
+        debouncedResize();
       }
-    }, [props.value, resizeTextarea]);
+    }, [props.value, debouncedResize]);
 
     // Data attributes to help with PDF generation
     const pdfAttributes = pdfVisible ? {
