@@ -1,4 +1,4 @@
-import { useState, useEffect, RefObject } from 'react';
+import { useState, useEffect, RefObject, useMemo, useCallback } from 'react';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { ClientDetails } from '@/types/client';
@@ -93,128 +93,96 @@ export const useSessionNoteForm = ({
 
   useEffect(() => {
     const fetchClinicianInsuranceName = async () => {
-      if (!clientData) return;
+      if (!clientData?.client_assigned_therapist) return;
       
       try {
-        const clinicianId = clientData.client_assigned_therapist;
-        
-        if (clinicianId) {
-          const { data, error } = await supabase
-            .from('clinicians')
-            .select('clinician_nameinsurance')
-            .eq('id', clinicianId)
-            .single();
-            
-          if (error) {
-            console.error('Error fetching clinician insurance name:', error);
-            return;
-          }
+        const { data, error } = await supabase
+          .from('clinicians')
+          .select('clinician_nameinsurance')
+          .eq('id', clientData.client_assigned_therapist)
+          .single();
           
-          if (data && data.clinician_nameinsurance) {
-            setFormState(prevState => ({
-              ...prevState,
-              clinicianName: data.clinician_nameinsurance
-            }));
-          }
+        if (error) return;
+        
+        if (data?.clinician_nameinsurance) {
+          setFormState(prevState => ({
+            ...prevState,
+            clinicianName: data.clinician_nameinsurance
+          }));
         }
       } catch (error) {
-        console.error('Error in fetchClinicianInsuranceName:', error);
+        // Silent fail - not critical
       }
     };
     
     fetchClinicianInsuranceName();
-  }, [clientData]);
+  }, [clientData?.client_assigned_therapist]);
 
   useEffect(() => {
-    console.log('[useSessionNoteForm] STEP 8 - clientData received:', {
-      hasClientData: !!clientData,
-      clientDataType: typeof clientData,
-      clientId: clientData?.id,
-      clientName: clientData ? `${clientData.client_first_name} ${clientData.client_last_name}` : 'No client data',
-      clientDOB: clientData?.client_date_of_birth,
-      primaryObjective: clientData?.client_primaryobjective,
-      intervention1: clientData?.client_intervention1,
-      totalFields: clientData ? Object.keys(clientData).length : 0
+    if (!clientData) return;
+
+    const newFormState = {
+      patientName: `${clientData.client_first_name || ''} ${clientData.client_last_name || ''}`,
+      patientDOB: clientData.client_date_of_birth || '',
+      diagnosis: (clientData.client_diagnosis || []).join(', '),
+      planType: clientData.client_planlength || '',
+      treatmentFrequency: clientData.client_treatmentfrequency || '',
+      medications: clientData.client_medications || '',
+      personsInAttendance: clientData.client_personsinattendance || '',
+
+      appearance: clientData.client_appearance || '',
+      attitude: clientData.client_attitude || '',
+      behavior: clientData.client_behavior || '',
+      speech: clientData.client_speech || '',
+      affect: clientData.client_affect || '',
+      thoughtProcess: clientData.client_thoughtprocess || '',
+      perception: clientData.client_perception || '',
+      orientation: clientData.client_orientation || '',
+      memoryConcentration: clientData.client_memoryconcentration || '',
+      insightJudgement: clientData.client_insightjudgement || '',
+      mood: clientData.client_mood || '',
+      substanceAbuseRisk: clientData.client_substanceabuserisk || '',
+      suicidalIdeation: clientData.client_suicidalideation || '',
+      homicidalIdeation: clientData.client_homicidalideation || '',
+
+      primaryObjective: clientData.client_primaryobjective || '',
+      secondaryObjective: clientData.client_secondaryobjective || '',
+      tertiaryObjective: clientData.client_tertiaryobjective || '',
+      intervention1: clientData.client_intervention1 || '',
+      intervention2: clientData.client_intervention2 || '',
+      intervention3: clientData.client_intervention3 || '',
+      intervention4: clientData.client_intervention4 || '',
+      intervention5: clientData.client_intervention5 || '',
+      intervention6: clientData.client_intervention6 || '',
+
+      functioning: clientData.client_functioning || '',
+      prognosis: clientData.client_prognosis || '',
+      progress: clientData.client_progress || '',
+      problemNarrative: clientData.client_problem || '',
+      treatmentGoalNarrative: clientData.client_treatmentgoal || '',
+      sessionNarrative: clientData.client_sessionnarrative || '',
+      nextTreatmentPlanUpdate: clientData.client_nexttreatmentplanupdate || '',
+      privateNote: clientData.client_privatenote || ''
+    };
+
+    setFormState(prevState => ({
+      ...prevState,
+      ...newFormState
+    }));
+
+    setEditModes({
+      appearance: clientData.client_appearance && !['Normal Appearance & Grooming'].includes(clientData.client_appearance),
+      attitude: clientData.client_attitude && !['Calm & Cooperative'].includes(clientData.client_attitude),
+      behavior: clientData.client_behavior && !['No unusual behavior or psychomotor changes'].includes(clientData.client_behavior),
+      speech: clientData.client_speech && !['Normal rate/tone/volume w/out pressure'].includes(clientData.client_speech),
+      affect: clientData.client_affect && !['Normal range/congruent'].includes(clientData.client_affect),
+      thoughtProcess: clientData.client_thoughtprocess && !['Goal Oriented/Directed'].includes(clientData.client_thoughtprocess),
+      perception: clientData.client_perception && !['No Hallucinations or Delusions'].includes(clientData.client_perception),
+      orientation: clientData.client_orientation && !['Oriented x3'].includes(clientData.client_orientation),
+      memoryConcentration: clientData.client_memoryconcentration && !['Short & Long Term Intact'].includes(clientData.client_memoryconcentration),
+      insightJudgement: clientData.client_insightjudgement && !['Good'].includes(clientData.client_insightjudgement)
     });
-
-    if (clientData) {
-      const newFormState = {
-        patientName: `${clientData.client_first_name || ''} ${clientData.client_last_name || ''}`,
-        patientDOB: clientData.client_date_of_birth || '',
-        diagnosis: (clientData.client_diagnosis || []).join(', '),
-        planType: clientData.client_planlength || '',
-        treatmentFrequency: clientData.client_treatmentfrequency || '',
-        medications: clientData.client_medications || '',
-        personsInAttendance: clientData.client_personsinattendance || '',
-
-        appearance: clientData.client_appearance || '',
-        attitude: clientData.client_attitude || '',
-        behavior: clientData.client_behavior || '',
-        speech: clientData.client_speech || '',
-        affect: clientData.client_affect || '',
-        thoughtProcess: clientData.client_thoughtprocess || '',
-        perception: clientData.client_perception || '',
-        orientation: clientData.client_orientation || '',
-        memoryConcentration: clientData.client_memoryconcentration || '',
-        insightJudgement: clientData.client_insightjudgement || '',
-        mood: clientData.client_mood || '',
-        substanceAbuseRisk: clientData.client_substanceabuserisk || '',
-        suicidalIdeation: clientData.client_suicidalideation || '',
-        homicidalIdeation: clientData.client_homicidalideation || '',
-
-        primaryObjective: clientData.client_primaryobjective || '',
-        secondaryObjective: clientData.client_secondaryobjective || '',
-        tertiaryObjective: clientData.client_tertiaryobjective || '',
-        intervention1: clientData.client_intervention1 || '',
-        intervention2: clientData.client_intervention2 || '',
-        intervention3: clientData.client_intervention3 || '',
-        intervention4: clientData.client_intervention4 || '',
-        intervention5: clientData.client_intervention5 || '',
-        intervention6: clientData.client_intervention6 || '',
-
-        functioning: clientData.client_functioning || '',
-        prognosis: clientData.client_prognosis || '',
-        progress: clientData.client_progress || '',
-        problemNarrative: clientData.client_problem || '',
-        treatmentGoalNarrative: clientData.client_treatmentgoal || '',
-        sessionNarrative: clientData.client_sessionnarrative || '',
-        nextTreatmentPlanUpdate: clientData.client_nexttreatmentplanupdate || '',
-        privateNote: clientData.client_privatenote || ''
-      };
-
-      console.log('[useSessionNoteForm] STEP 9 - Setting form state with data:', {
-        patientName: newFormState.patientName,
-        patientDOB: newFormState.patientDOB,
-        primaryObjective: newFormState.primaryObjective,
-        intervention1: newFormState.intervention1,
-        diagnosis: newFormState.diagnosis,
-        hasObjectives: !!(newFormState.primaryObjective || newFormState.secondaryObjective || newFormState.tertiaryObjective),
-        hasInterventions: !!(newFormState.intervention1 || newFormState.intervention2 || newFormState.intervention3)
-      });
-
-      setFormState(prevState => ({
-        ...prevState,
-        ...newFormState
-      }));
-
-      setEditModes({
-        appearance: clientData.client_appearance && !['Normal Appearance & Grooming'].includes(clientData.client_appearance),
-        attitude: clientData.client_attitude && !['Calm & Cooperative'].includes(clientData.client_attitude),
-        behavior: clientData.client_behavior && !['No unusual behavior or psychomotor changes'].includes(clientData.client_behavior),
-        speech: clientData.client_speech && !['Normal rate/tone/volume w/out pressure'].includes(clientData.client_speech),
-        affect: clientData.client_affect && !['Normal range/congruent'].includes(clientData.client_affect),
-        thoughtProcess: clientData.client_thoughtprocess && !['Goal Oriented/Directed'].includes(clientData.client_thoughtprocess),
-        perception: clientData.client_perception && !['No Hallucinations or Delusions'].includes(clientData.client_perception),
-        orientation: clientData.client_orientation && !['Oriented x3'].includes(clientData.client_orientation),
-        memoryConcentration: clientData.client_memoryconcentration && !['Short & Long Term Intact'].includes(clientData.client_memoryconcentration),
-        insightJudgement: clientData.client_insightjudgement && !['Good'].includes(clientData.client_insightjudgement)
-      });
-
-      console.log('[useSessionNoteForm] STEP 10 - Form state updated successfully');
-    } else {
-      console.log('[useSessionNoteForm] STEP 8b - No client data provided, skipping form population');
-    }
-  }, [clientData, clinicianName]);
+  }, [clientData?.id]);
 
   useEffect(() => {
     if (appointment && appointment.client) {
@@ -254,34 +222,35 @@ export const useSessionNoteForm = ({
     }
   };
 
-  const handleChange = (field: string, value: string | string[]) => {
-    if (field === 'diagnosis' && Array.isArray(value)) {
-      setFormState({
-        ...formState,
-        [field]: value.join(', ')
-      });
-    } else {
-      setFormState({
-        ...formState,
+  const handleChange = useCallback((field: string, value: string | string[]) => {
+    setFormState(prevState => {
+      if (field === 'diagnosis' && Array.isArray(value)) {
+        return {
+          ...prevState,
+          [field]: value.join(', ')
+        };
+      }
+      return {
+        ...prevState,
         [field]: value
-      });
-    }
-  };
+      };
+    });
+  }, []);
 
-  const toggleEditMode = (field: string, value: string) => {
+  const toggleEditMode = useCallback((field: string, value: string) => {
     if (value === 'Other') {
-      setEditModes({ ...editModes, [field]: true });
+      setEditModes(prev => ({ ...prev, [field]: true }));
       handleChange(field, '');
     } else {
-      setEditModes({ ...editModes, [field]: false });
+      setEditModes(prev => ({ ...prev, [field]: false }));
       handleChange(field, value);
     }
-  };
+  }, [handleChange]);
 
-  const clearField = (field: string) => {
-    setEditModes({ ...editModes, [field]: false });
+  const clearField = useCallback((field: string) => {
+    setEditModes(prev => ({ ...prev, [field]: false }));
     handleChange(field, '');
-  };
+  }, [handleChange]);
 
   const toggleAiAssistMode = () => {
     setIsAiAssistMode(!isAiAssistMode);
@@ -342,9 +311,9 @@ export const useSessionNoteForm = ({
     }
   };
 
-  // Dynamic form validation
-  const getRequiredFields = () => {
-    const requiredFields = [
+  // Memoized form validation
+  const requiredFields = useMemo(() => {
+    const fields = [
       'patientName', 'patientDOB', 'clinicianName', 'sessionDate', 'diagnosis',
       'medications', 'sessionType', 'personsInAttendance', 'appearance', 'attitude',
       'behavior', 'speech', 'affect', 'thoughtProcess', 'perception', 'orientation',
@@ -355,20 +324,19 @@ export const useSessionNoteForm = ({
     ];
     
     // Add conditionally required fields only if they are displayed (have values)
-    if (formState.planType) requiredFields.push('planType');
-    if (formState.treatmentFrequency) requiredFields.push('treatmentFrequency');
-    if (formState.nextTreatmentPlanUpdate) requiredFields.push('nextTreatmentPlanUpdate');
+    if (formState.planType) fields.push('planType');
+    if (formState.treatmentFrequency) fields.push('treatmentFrequency');
+    if (formState.nextTreatmentPlanUpdate) fields.push('nextTreatmentPlanUpdate');
     
-    return requiredFields;
-  };
+    return fields;
+  }, [formState.planType, formState.treatmentFrequency, formState.nextTreatmentPlanUpdate]);
 
-  const isFormValid = () => {
-    const requiredFields = getRequiredFields();
+  const isFormValid = useMemo(() => {
     return requiredFields.every(field => {
       const value = formState[field as keyof typeof formState];
       return value && value.toString().trim() !== '';
     });
-  };
+  }, [formState, requiredFields]);
 
   const handleSave = async () => {
     if (!clientData?.id) {
@@ -380,7 +348,7 @@ export const useSessionNoteForm = ({
       return;
     }
 
-    if (!isFormValid()) {
+    if (!isFormValid) {
       toast({
         title: "Validation Error",
         description: "Please fill out all required fields before saving.",
@@ -465,16 +433,11 @@ export const useSessionNoteForm = ({
             variant: "default",
           });
         } else {
-          console.log(`Appointment ${appointment.id} marked as completed`);
-          
           // Create CMS1500 claims after successfully marking appointment as completed
           try {
             const claimsResult = await createCMS1500ClaimsForCompletedAppointment(appointment.id);
             
-            if (claimsResult.success) {
-              console.log(`Successfully created ${claimsResult.claimsCreated} CMS1500 claims`);
-            } else {
-              console.error('Failed to create CMS1500 claims:', claimsResult.error);
+            if (!claimsResult.success) {
               toast({
                 title: "Warning",
                 description: "Session note saved but claims creation failed.",

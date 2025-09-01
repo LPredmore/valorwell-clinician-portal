@@ -1,8 +1,10 @@
 
-/* PDF-specific styles */
+/* PDF-specific styles - Optimized to prevent animation conflicts */
 .generating-pdf {
-  /* Remove any scrollbars during PDF generation */
+  /* Remove any scrollbars and animations during PDF generation */
   overflow: visible !important;
+  animation: none !important;
+  transition: none !important;
   /* Ensure white background */
   background-color: white !important;
   /* Set dimensions more appropriate for print */
@@ -17,6 +19,8 @@
   /* Ensure proper font rendering */
   font-family: Arial, sans-serif !important;
   color: #000000 !important;
+  /* Prevent layout shifts */
+  contain: layout style !important;
 }
 
 /* Add page break controls for PDF sections */
@@ -160,8 +164,11 @@
 .generating-pdf [data-radix-select-trigger],
 .generating-pdf .lucide,
 .generating-pdf [data-radix-popover-trigger],
-.generating-pdf [data-radix-popover-content] {
+.generating-pdf [data-radix-popover-content],
+.generating-pdf [data-radix-select-content] {
   display: none !important;
+  animation: none !important;
+  transition: none !important;
 }
 
 /* Unhide certain elements needed for PDF */

@@ -5,7 +5,7 @@ import { X, FileText } from 'lucide-react';
 import { ClientDetails, SessionNoteTemplateProps } from '@/types/client';
 import { useSessionNoteForm } from './sessionNote/useSessionNoteForm';
 import { ClientInfoSection } from './sessionNote/ClientInfoSection';
-import { MentalStatusSection } from './sessionNote/MentalStatusSection';
+import { MentalStatusSection } from './sessionNote/OptimizedMentalStatusSection';
 import { TreatmentObjectivesSection } from './sessionNote/TreatmentObjectivesSection';
 import { SessionAssessmentSection } from './sessionNote/SessionAssessmentSection';
 import { Textarea } from "@/components/ui/textarea";
@@ -155,7 +155,7 @@ const SessionNoteTemplate: React.FC<SessionNoteTemplateProps> = ({
         <Button
           className="bg-valorwell-700 hover:bg-valorwell-800"
           onClick={handleSave}
-          disabled={isSubmitting || !isFormValid()}
+          disabled={isSubmitting || !isFormValid}
         >
           {isSubmitting ? 'Saving...' : 'Save Session Note'}
         </Button>

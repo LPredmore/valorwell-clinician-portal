@@ -1,16 +1,10 @@
 
-import React from 'react';
+import React, { memo } from 'react';
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue 
-} from "@/components/ui/select";
 import { PHQ9AssessmentSection } from './PHQ9AssessmentSection';
+import { StableSelectField } from './StableSelectField';
 import { Sparkles, Check } from 'lucide-react';
 
 interface SessionAssessmentSectionProps {
@@ -26,7 +20,7 @@ interface SessionAssessmentSectionProps {
   handleAiAssist?: () => void;
 }
 
-export const SessionAssessmentSection: React.FC<SessionAssessmentSectionProps> = ({
+export const SessionAssessmentSection: React.FC<SessionAssessmentSectionProps> = memo(({
   formState,
   handleChange,
   phq9Data,
@@ -37,39 +31,39 @@ export const SessionAssessmentSection: React.FC<SessionAssessmentSectionProps> =
   toggleInterventionSelection,
   handleAiAssist
 }) => {
-  // Options for the dropdown menus
-  const functioningOptions = [
-    "Excellent - Fully capable in all areas of life",
-    "Good - Managing well with minimal impairment",
-    "Satisfactory - Some challenges but maintaining essential functions",
-    "Fair - Moderate impairment in one or more areas",
-    "Limited - Significant impairment in multiple areas",
-    "Poor - Severe impairment in daily functioning",
-    "Very poor - Unable to function independently in most areas",
-    "Crisis - Immediate intervention needed"
-  ];
+  // Memoized options for the dropdown menus
+  const functioningOptions = React.useMemo(() => [
+    { value: "Excellent - Fully capable in all areas of life", label: "Excellent - Fully capable in all areas of life" },
+    { value: "Good - Managing well with minimal impairment", label: "Good - Managing well with minimal impairment" },
+    { value: "Satisfactory - Some challenges but maintaining essential functions", label: "Satisfactory - Some challenges but maintaining essential functions" },
+    { value: "Fair - Moderate impairment in one or more areas", label: "Fair - Moderate impairment in one or more areas" },
+    { value: "Limited - Significant impairment in multiple areas", label: "Limited - Significant impairment in multiple areas" },
+    { value: "Poor - Severe impairment in daily functioning", label: "Poor - Severe impairment in daily functioning" },
+    { value: "Very poor - Unable to function independently in most areas", label: "Very poor - Unable to function independently in most areas" },
+    { value: "Crisis - Immediate intervention needed", label: "Crisis - Immediate intervention needed" }
+  ], []);
 
-  const prognosisOptions = [
-    "Excellent - Highly likely to achieve all treatment goals",
-    "Very Good - Strong likelihood of achieving most treatment goals",
-    "Good - Likely to achieve primary treatment goals",
-    "Fair - May achieve some treatment goals with consistent effort",
-    "Guarded - Limited expectation of achieving treatment goals",
-    "Poor - Significant barriers to achieving treatment goals",
-    "Uncertain - Unable to determine likelihood at this time"
-  ];
+  const prognosisOptions = React.useMemo(() => [
+    { value: "Excellent - Highly likely to achieve all treatment goals", label: "Excellent - Highly likely to achieve all treatment goals" },
+    { value: "Very Good - Strong likelihood of achieving most treatment goals", label: "Very Good - Strong likelihood of achieving most treatment goals" },
+    { value: "Good - Likely to achieve primary treatment goals", label: "Good - Likely to achieve primary treatment goals" },
+    { value: "Fair - May achieve some treatment goals with consistent effort", label: "Fair - May achieve some treatment goals with consistent effort" },
+    { value: "Guarded - Limited expectation of achieving treatment goals", label: "Guarded - Limited expectation of achieving treatment goals" },
+    { value: "Poor - Significant barriers to achieving treatment goals", label: "Poor - Significant barriers to achieving treatment goals" },
+    { value: "Uncertain - Unable to determine likelihood at this time", label: "Uncertain - Unable to determine likelihood at this time" }
+  ], []);
 
-  const progressOptions = [
-    "Exceptional - Exceeding expectations in all goal areas",
-    "Substantial - Significant improvement toward most goals",
-    "Steady - Consistent improvement at expected pace",
-    "Moderate - Some improvement in key areas",
-    "Minimal - Slight improvements noted",
-    "Fluctuating - Inconsistent progress with periods of improvement and regression",
-    "Stalled - No significant changes since last assessment",
-    "Early stage - Too early in treatment to evaluate progress",
-    "Regression - Decline in functioning or symptoms worsening"
-  ];
+  const progressOptions = React.useMemo(() => [
+    { value: "Exceptional - Exceeding expectations in all goal areas", label: "Exceptional - Exceeding expectations in all goal areas" },
+    { value: "Substantial - Significant improvement toward most goals", label: "Substantial - Significant improvement toward most goals" },
+    { value: "Steady - Consistent improvement at expected pace", label: "Steady - Consistent improvement at expected pace" },
+    { value: "Moderate - Some improvement in key areas", label: "Moderate - Some improvement in key areas" },
+    { value: "Minimal - Slight improvements noted", label: "Minimal - Slight improvements noted" },
+    { value: "Fluctuating - Inconsistent progress with periods of improvement and regression", label: "Fluctuating - Inconsistent progress with periods of improvement and regression" },
+    { value: "Stalled - No significant changes since last assessment", label: "Stalled - No significant changes since last assessment" },
+    { value: "Early stage - Too early in treatment to evaluate progress", label: "Early stage - Too early in treatment to evaluate progress" },
+    { value: "Regression - Decline in functioning or symptoms worsening", label: "Regression - Decline in functioning or symptoms worsening" }
+  ], []);
 
   return (
     <>
@@ -86,68 +80,32 @@ export const SessionAssessmentSection: React.FC<SessionAssessmentSectionProps> =
         />
       </div>
 
-      <div className="mb-6 pdf-section">
-        <label className="block text-sm font-medium text-gray-700 mb-1">Functioning</label>
-        <Select 
-          value={formState.functioning || ""}
-          onValueChange={(value) => handleChange('functioning', value)}
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder="Select client's level of functioning" />
-          </SelectTrigger>
-          <SelectContent>
-            {functioningOptions.map((option) => (
-              <SelectItem key={option} value={option}>{option}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {/* Hidden span for PDF rendering that will be shown in PDF mode */}
-        <span className="hidden pdf-only" data-pdf-value={formState.functioning}>
-          {formState.functioning}
-        </span>
-      </div>
+      <StableSelectField
+        value={formState.functioning}
+        onValueChange={(value) => handleChange('functioning', value)}
+        placeholder="Select client's level of functioning"
+        options={functioningOptions}
+        label="Functioning"
+        className="mb-6 pdf-section"
+      />
 
-      <div className="mb-6 pdf-section">
-        <label className="block text-sm font-medium text-gray-700 mb-1">Prognosis</label>
-        <Select 
-          value={formState.prognosis || ""}
-          onValueChange={(value) => handleChange('prognosis', value)}
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder="Select client's prognosis" />
-          </SelectTrigger>
-          <SelectContent>
-            {prognosisOptions.map((option) => (
-              <SelectItem key={option} value={option}>{option}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {/* Hidden span for PDF rendering */}
-        <span className="hidden pdf-only" data-pdf-value={formState.prognosis}>
-          {formState.prognosis}
-        </span>
-      </div>
+      <StableSelectField
+        value={formState.prognosis}
+        onValueChange={(value) => handleChange('prognosis', value)}
+        placeholder="Select client's prognosis"
+        options={prognosisOptions}
+        label="Prognosis"
+        className="mb-6 pdf-section"
+      />
 
-      <div className="mb-6 pdf-section">
-        <label className="block text-sm font-medium text-gray-700 mb-1">Progress</label>
-        <Select 
-          value={formState.progress || ""}
-          onValueChange={(value) => handleChange('progress', value)}
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder="Select client's progress level" />
-          </SelectTrigger>
-          <SelectContent>
-            {progressOptions.map((option) => (
-              <SelectItem key={option} value={option}>{option}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {/* Hidden span for PDF rendering */}
-        <span className="hidden pdf-only" data-pdf-value={formState.progress}>
-          {formState.progress}
-        </span>
-      </div>
+      <StableSelectField
+        value={formState.progress}
+        onValueChange={(value) => handleChange('progress', value)}
+        placeholder="Select client's progress level"
+        options={progressOptions}
+        label="Progress"
+        className="mb-6 pdf-section"
+      />
 
       <div className="mb-6 pdf-section">
         <div className="flex items-center gap-2 mb-1">
@@ -243,4 +201,6 @@ export const SessionAssessmentSection: React.FC<SessionAssessmentSectionProps> =
       </div>
     </>
   );
-};
+});
+
+SessionAssessmentSection.displayName = 'SessionAssessmentSection';
