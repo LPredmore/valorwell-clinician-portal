@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Mic, MicOff, Video, VideoOff, Maximize, Phone } from "lucide-react";
-import { useCallFrame } from '@daily-co/daily-react';
+import { useCallFrame, useDaily } from '@daily-co/daily-react';
 import { toast } from "sonner";
 
 interface VideoSessionDialogProps {
@@ -22,11 +22,10 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({
   console.log(`🔥 ${timestamp()} [VideoSessionDialog] Rendering with Daily React`, {
     roomUrl,
     isOpen,
-    roomUrlValid: !!roomUrl,
-    useCallFrameAvailable: typeof useCallFrame === 'function'
+    roomUrlValid: !!roomUrl
   });
 
-  // Use Daily React's useCallFrame hook for proper integration
+  // Use Daily React hooks
   const callFrame = useCallFrame({
     options: {
       iframeStyle: {
@@ -42,18 +41,21 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({
       showParticipantsBar: true
     }
   });
+  const daily = useDaily();
 
   const [isAudioMuted, setIsAudioMuted] = React.useState(false);
   const [isVideoMuted, setIsVideoMuted] = React.useState(false);
-  const [isFullscreen, setIsFullscreen] = React.useState(false);
   const [isJoining, setIsJoining] = React.useState(false);
   const [hasJoined, setHasJoined] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
-  // Join the call when dialog opens and room URL is available
+  // Daily iframe container ref
+  const iframeContainerRef = React.useRef<HTMLDivElement>(null);
+
+  // Join call when dialog opens
   React.useEffect(() => {
     if (isOpen && roomUrl && callFrame && !hasJoined && !isJoining) {
-      console.log(`🔥 ${timestamp()} [VideoSessionDialog] Joining call`, { roomUrl });
+      console.log(`🔥 ${timestamp()} [VideoSessionDialog] Starting to join call`, { roomUrl });
       setIsJoining(true);
       setError(null);
       
@@ -72,7 +74,7 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({
     }
   }, [isOpen, roomUrl, callFrame, hasJoined, isJoining]);
 
-  // Listen for call events
+  // Listen for Daily events
   React.useEffect(() => {
     if (!callFrame) return;
 
@@ -89,7 +91,7 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({
       setIsJoining(false);
     };
 
-    const handleError = (event: any) => {
+    const handleCallError = (event: any) => {
       console.error(`🔥 ${timestamp()} [VideoSessionDialog] Call error:`, event);
       setError(event.errorMsg || 'Video session error occurred');
       setIsJoining(false);
@@ -98,14 +100,30 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({
 
     callFrame.on('joined-meeting', handleJoinedMeeting);
     callFrame.on('left-meeting', handleLeftMeeting);
-    callFrame.on('error', handleError);
+    callFrame.on('error', handleCallError);
 
     return () => {
       callFrame.off('joined-meeting', handleJoinedMeeting);
       callFrame.off('left-meeting', handleLeftMeeting);
-      callFrame.off('error', handleError);
+      callFrame.off('error', handleCallError);
     };
   }, [callFrame]);
+
+  // Create iframe when we have a room URL
+  React.useEffect(() => {
+    if (roomUrl && iframeContainerRef.current && callFrame && !iframeContainerRef.current.querySelector('iframe')) {
+      console.log(`🔥 ${timestamp()} [VideoSessionDialog] Creating Daily iframe`);
+      
+      const iframe = callFrame.iframe();
+      if (iframe) {
+        iframe.style.width = '100%';
+        iframe.style.height = '400px';
+        iframe.style.border = 'none';
+        iframe.style.borderRadius = '8px';
+        iframeContainerRef.current.appendChild(iframe);
+      }
+    }
+  }, [roomUrl, callFrame]);
 
   const handleClose = async () => {
     console.log(`🔥 ${timestamp()} [VideoSessionDialog] Closing dialog`);
@@ -117,6 +135,11 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({
       } catch (err) {
         console.error(`🔥 ${timestamp()} [VideoSessionDialog] Error leaving call:`, err);
       }
+    }
+    
+    // Clean up iframe
+    if (iframeContainerRef.current) {
+      iframeContainerRef.current.innerHTML = '';
     }
     
     setHasJoined(false);
@@ -150,23 +173,6 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({
     } catch (err) {
       console.error(`🔥 ${timestamp()} [VideoSessionDialog] Error toggling video:`, err);
       toast.error("Failed to toggle video");
-    }
-  };
-
-  const toggleFullscreen = () => {
-    const dialogElement = document.querySelector('[role="dialog"]');
-    if (!dialogElement) return;
-
-    if (!isFullscreen) {
-      if (dialogElement.requestFullscreen) {
-        dialogElement.requestFullscreen();
-        setIsFullscreen(true);
-      }
-    } else {
-      if (document.exitFullscreen) {
-        document.exitFullscreen();
-        setIsFullscreen(false);
-      }
     }
   };
 
@@ -210,10 +216,13 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({
       );
     }
 
-    // The Daily React callFrame automatically handles the iframe rendering
+    // Container for Daily iframe
     return (
-      <div className="relative h-[400px] w-full bg-muted rounded-lg overflow-hidden">
-        {/* The Daily React call frame will render here automatically */}
+      <div className="h-[400px] w-full bg-background rounded-lg overflow-hidden">
+        <div 
+          ref={iframeContainerRef}
+          className="w-full h-full"
+        />
         {!hasJoined && !isJoining && (
           <div className="absolute inset-0 flex items-center justify-center bg-background/80">
             <div className="text-center">
@@ -242,51 +251,43 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({
             </DialogHeader>
           </CardHeader>
           <CardContent className="pt-0">
-            {renderVideoContent()}
+            <div className="relative">
+              {renderVideoContent()}
             
-            {/* Control buttons */}
-            <div className="flex justify-center gap-2 mt-4 p-4 bg-muted/50 rounded-lg">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={toggleAudio}
-                disabled={!hasJoined}
-                className="flex items-center gap-2"
-              >
-                {isAudioMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-                {isAudioMuted ? 'Unmute' : 'Mute'}
-              </Button>
-              
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={toggleVideo}
-                disabled={!hasJoined}
-                className="flex items-center gap-2"
-              >
-                {isVideoMuted ? <VideoOff className="h-4 w-4" /> : <Video className="h-4 w-4" />}
-                {isVideoMuted ? 'Turn On' : 'Turn Off'}
-              </Button>
-              
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={toggleFullscreen}
-                className="flex items-center gap-2"
-              >
-                <Maximize className="h-4 w-4" />
-                Fullscreen
-              </Button>
-              
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={handleClose}
-                className="flex items-center gap-2"
-              >
-                <Phone className="h-4 w-4" />
-                End Call
-              </Button>
+              {/* Control buttons */}
+              <div className="flex justify-center gap-2 mt-4 p-4 bg-muted/50 rounded-lg">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={toggleAudio}
+                  disabled={!hasJoined}
+                  className="flex items-center gap-2"
+                >
+                  {isAudioMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                  {isAudioMuted ? 'Unmute' : 'Mute'}
+                </Button>
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={toggleVideo}
+                  disabled={!hasJoined}
+                  className="flex items-center gap-2"
+                >
+                  {isVideoMuted ? <VideoOff className="h-4 w-4" /> : <Video className="h-4 w-4" />}
+                  {isVideoMuted ? 'Turn On' : 'Turn Off'}
+                </Button>
+                
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleClose}
+                  className="flex items-center gap-2"
+                >
+                  <Phone className="h-4 w-4" />
+                  End Call
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
