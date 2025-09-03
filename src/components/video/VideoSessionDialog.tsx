@@ -21,19 +21,77 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({ roomUrl, isOpen
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isReconnecting, setIsReconnecting] = useState(false);
   const [callObj, setCallObj] = useState<any>(null);
+  const [iframeMounted, setIframeMounted] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   
-  // Effect 1: Create Daily frame when iframe container mounts (like client portal)
+  // Iframe mounting detection effect
+  useEffect(() => {
+    console.log('🔍 [VideoDebug] Iframe mounting check:', {
+      isOpen,
+      iframeRef: !!iframeRef.current,
+      iframeMounted,
+      containerRef: !!containerRef.current,
+      timestamp: new Date().toISOString()
+    });
+
+    if (isOpen && iframeRef.current && !iframeMounted) {
+      console.log('✅ [VideoDebug] Iframe detected in DOM, marking as mounted');
+      setIframeMounted(true);
+    } else if (!isOpen) {
+      console.log('🔄 [VideoDebug] Dialog closed, resetting iframe mounted state');
+      setIframeMounted(false);
+    }
+  }, [isOpen, iframeMounted]);
+
+  // Periodic iframe existence check (every 100ms until mounted)
+  useEffect(() => {
+    if (!isOpen || iframeMounted) return;
+
+    console.log('⏰ [VideoDebug] Starting periodic iframe check...');
+    
+    const checkInterval = setInterval(() => {
+      console.log('🔍 [VideoDebug] Periodic iframe check:', {
+        iframeExists: !!iframeRef.current,
+        iframeMounted,
+        containerExists: !!containerRef.current,
+        renderingState: { isLoading, error: !!error },
+        timestamp: new Date().toISOString()
+      });
+
+      if (iframeRef.current && !iframeMounted) {
+        console.log('✅ [VideoDebug] Iframe found via periodic check!');
+        setIframeMounted(true);
+      }
+    }, 100);
+
+    // Safety timeout - stop checking after 10 seconds
+    const timeoutId = setTimeout(() => {
+      console.warn('⚠️ [VideoDebug] Iframe mounting timeout after 10 seconds');
+      clearInterval(checkInterval);
+      if (!iframeMounted) {
+        setError('Video interface failed to initialize (iframe not found)');
+      }
+    }, 10000);
+
+    return () => {
+      console.log('🧹 [VideoDebug] Cleaning up periodic iframe check');
+      clearInterval(checkInterval);
+      clearTimeout(timeoutId);
+    };
+  }, [isOpen, iframeMounted, isLoading, error]);
+
+  // Effect 1: Create Daily frame when iframe is confirmed mounted
   useEffect(() => {
     console.log('🔄 [VideoDebug] Frame creation effect triggered:', {
       isOpen,
+      iframeMounted,
       iframeExists: !!iframeRef.current,
       callObjExists: !!callObj,
       timestamp: new Date().toISOString()
     });
 
-    if (isOpen && iframeRef.current && !callObj) {
+    if (isOpen && iframeMounted && iframeRef.current && !callObj) {
       console.log('✅ [VideoDebug] Creating Daily frame - iframe is mounted');
       
       const frameStartTime = performance.now();
@@ -203,7 +261,7 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({ roomUrl, isOpen
       console.log('🔄 [VideoDebug] Dialog closed, clearing call object');
       setCallObj(null);
     }
-  }, [isOpen, callObj]);
+  }, [isOpen, iframeMounted, callObj]);
 
   // Effect 2: Join call after callObj is created (like client portal)
   useEffect(() => {
@@ -492,40 +550,67 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({ roomUrl, isOpen
     };
   }, []);
 
-  const renderVideoContent = () => (
-    <div ref={containerRef} className="relative w-full h-full">
-      {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 z-10">
-          <div className="text-center text-white">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
-            <p>{isReconnecting ? 'Reconnecting...' : 'Loading video session...'}</p>
-          </div>
-        </div>
-      )}
-      {error ? (
-        <div className="h-full flex items-center justify-center">
-          <div className="text-center">
-            <p className="text-red-500 mb-4">{error}</p>
-            <div className="space-x-2">
-              <Button onClick={handleReconnect} disabled={isReconnecting}>
-                <RotateCcw className="h-4 w-4 mr-2" />
-                {isReconnecting ? 'Reconnecting...' : 'Reconnect'}
-              </Button>
-              <Button variant="outline" onClick={handleClose}>Close</Button>
-            </div>
-          </div>
-        </div>
-      ) : (
+  const renderVideoContent = () => {
+    console.log('🎨 [VideoDebug] Rendering video content:', {
+      isLoading,
+      error: !!error,
+      errorMessage: error,
+      iframeMounted,
+      iframeExists: !!iframeRef.current,
+      timestamp: new Date().toISOString()
+    });
+
+    return (
+      <div ref={containerRef} className="relative w-full h-full">
+        {/* Always render iframe but control visibility */}
         <div className="w-full h-full">
           <iframe
             ref={iframeRef}
             className="w-full h-full border-0 rounded-lg"
             allow="camera; microphone; fullscreen; display-capture"
+            style={{ 
+              visibility: error ? 'hidden' : 'visible',
+              position: error ? 'absolute' : 'relative'
+            }}
           />
         </div>
-      )}
-    </div>
-  );
+        
+        {/* Loading overlay */}
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 z-10">
+            <div className="text-center text-white">
+              <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
+              <p>{isReconnecting ? 'Reconnecting...' : 'Loading video session...'}</p>
+              <p className="text-xs mt-2 opacity-75">
+                Iframe: {iframeMounted ? '✅ Mounted' : '⏳ Waiting'} | 
+                Call: {callObj ? '✅ Ready' : '⏳ Waiting'}
+              </p>
+            </div>
+          </div>
+        )}
+        
+        {/* Error overlay */}
+        {error && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-90 z-20">
+            <div className="text-center text-white">
+              <p className="text-red-400 mb-4">{error}</p>
+              <div className="space-x-2">
+                <Button onClick={handleReconnect} disabled={isReconnecting}>
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  {isReconnecting ? 'Reconnecting...' : 'Reconnect'}
+                </Button>
+                <Button variant="outline" onClick={handleClose}>Close</Button>
+              </div>
+              <p className="text-xs mt-4 opacity-75">
+                Debug: Iframe {iframeMounted ? 'mounted' : 'not mounted'}, 
+                Call {callObj ? 'created' : 'not created'}
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const renderControls = () => (
     <CardFooter className="flex justify-center items-center space-x-4 p-4">
