@@ -68,7 +68,6 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({ roomUrl, isOpen
       console.log('🏗️ [VideoDebug] Frame created in:', performance.now() - frameStartTime, 'ms');
       console.log('📊 [VideoDebug] Initial call state:', {
         meetingState: callRef.current.meetingState(),
-        accessState: callRef.current.accessState(),
         participantCounts: callRef.current.participantCounts()
       });
 
@@ -102,7 +101,6 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({ roomUrl, isOpen
           console.log('🎉 [VideoDebug] Joined meeting successfully:', {
             event,
             meetingState: callRef.current?.meetingState(),
-            accessState: callRef.current?.accessState(),
             participants: callRef.current?.participantCounts(),
             totalTime: performance.now() - initStartTime,
             timestamp: new Date().toISOString()
@@ -125,7 +123,6 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({ roomUrl, isOpen
             action: event.action,
             type: event.type,
             meetingState: callRef.current?.meetingState(),
-            accessState: callRef.current?.accessState(),
             timestamp: new Date().toISOString()
           });
           setError(`Connection error: ${event.errorMsg || 'Unknown error'}`);
@@ -216,7 +213,6 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({ roomUrl, isOpen
       setTimeout(() => {
         console.log('⏰ [VideoDebug] 5 seconds after join - meeting state:', {
           meetingState: callRef.current?.meetingState(),
-          accessState: callRef.current?.accessState(),
           participantCounts: callRef.current?.participantCounts(),
           elapsedTime: performance.now() - joinStartTime
         });
@@ -226,7 +222,6 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({ roomUrl, isOpen
       setTimeout(() => {
         console.log('⏰ [VideoDebug] 10 seconds after join - meeting state:', {
           meetingState: callRef.current?.meetingState(),
-          accessState: callRef.current?.accessState(),
           participantCounts: callRef.current?.participantCounts(),
           elapsedTime: performance.now() - joinStartTime
         });
@@ -235,7 +230,6 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({ roomUrl, isOpen
       setTimeout(() => {
         console.log('⏰ [VideoDebug] 15 seconds after join - meeting state:', {
           meetingState: callRef.current?.meetingState(),
-          accessState: callRef.current?.accessState(),
           participantCounts: callRef.current?.participantCounts(),
           elapsedTime: performance.now() - joinStartTime
         });
@@ -246,7 +240,6 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({ roomUrl, isOpen
       
       console.log('✅ [VideoDebug] Join promise resolved:', {
         meetingState: callRef.current.meetingState(),
-        accessState: callRef.current.accessState(),
         joinTime: performance.now() - joinStartTime,
         totalInitTime: performance.now() - initStartTime
       });
@@ -257,7 +250,6 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({ roomUrl, isOpen
         message: err instanceof Error ? err.message : 'Unknown error',
         stack: err instanceof Error ? err.stack : undefined,
         meetingState: callRef.current?.meetingState(),
-        accessState: callRef.current?.accessState(),
         timestamp: new Date().toISOString()
       });
       setError(`Failed to connect: ${err instanceof Error ? err.message : 'Unknown error'}`);
@@ -270,7 +262,6 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({ roomUrl, isOpen
     if (callRef.current) {
       console.log('🧹 [VideoDebug] Cleaning up Daily.js call:', {
         meetingState: callRef.current.meetingState(),
-        accessState: callRef.current.accessState(),
         participantCounts: callRef.current.participantCounts(),
         timestamp: new Date().toISOString()
       });
