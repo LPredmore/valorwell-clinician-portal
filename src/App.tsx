@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-route
 import { UserProvider } from "@/context/UserContext";
 import { useEffect } from "react";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
+import { DailyProvider } from '@daily-co/daily-react';
 
 // Pages
 import Login from "./pages/Login";
@@ -52,11 +53,12 @@ const RouteMonitor = () => {
 const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
-      <UserProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
+      <DailyProvider>
+        <UserProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
             {/* Add route monitoring in development */}
             {process.env.NODE_ENV === 'development' && <RouteMonitor />}
             
@@ -171,7 +173,8 @@ const App = () => {
           </BrowserRouter>
         </TooltipProvider>
       </UserProvider>
-    </QueryClientProvider>
+    </DailyProvider>
+  </QueryClientProvider>
   );
 };
 

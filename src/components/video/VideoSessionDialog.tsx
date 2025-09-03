@@ -1,10 +1,10 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Loader2, Mic, MicOff, Video, VideoOff, X, Maximize } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import DailyIframe from '@daily-co/daily-js';
+import React from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Mic, MicOff, Video, VideoOff, Maximize, Phone } from "lucide-react";
+import { useCallFrame } from '@daily-co/daily-react';
+import { toast } from "sonner";
 
 interface VideoSessionDialogProps {
   roomUrl: string;
@@ -12,342 +12,214 @@ interface VideoSessionDialogProps {
   onClose: () => void;
 }
 
-const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({ roomUrl, isOpen, onClose }) => {
-  // 🔥 INSANE LOGGING: Timestamp helper
+const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({ 
+  roomUrl, 
+  isOpen, 
+  onClose 
+}) => {
   const timestamp = () => `[${new Date().toISOString()}]`;
-  const logId = `VideoSessionDialog-${Math.random().toString(36).substr(2, 9)}`;
   
-  console.log(`🔥 ${timestamp()} [${logId}] Component initialized with props:`, {
+  console.log(`🔥 ${timestamp()} [VideoSessionDialog] Rendering with Daily React`, {
     roomUrl,
     isOpen,
-    onClose: typeof onClose,
     roomUrlValid: !!roomUrl,
-    roomUrlLength: roomUrl?.length || 0,
-    roomUrlType: typeof roomUrl,
-    roomUrlStartsWith: roomUrl?.substring(0, 30),
-    timestamp: new Date().toISOString()
+    useCallFrameAvailable: typeof useCallFrame === 'function'
   });
 
-  const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isAudioEnabled, setIsAudioEnabled] = useState(true);
-  const [isVideoEnabled, setIsVideoEnabled] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [callObj, setCallObj] = useState<any>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  // 🔥 INSANE LOGGING: State change tracker
-  useEffect(() => {
-    console.log(`🔥 ${timestamp()} [${logId}] State change - isLoading:`, {
-      isLoading,
-      timestamp: new Date().toISOString()
-    });
-  }, [isLoading]);
-
-  useEffect(() => {
-    console.log(`🔥 ${timestamp()} [${logId}] State change - error:`, {
-      error,
-      timestamp: new Date().toISOString()
-    });
-  }, [error]);
-
-  useEffect(() => {
-    console.log(`🔥 ${timestamp()} [${logId}] State change - callObj:`, {
-      hasCallObj: !!callObj,
-      callObjType: typeof callObj,
-      timestamp: new Date().toISOString()
-    });
-  }, [callObj]);
-  
-  // 🔥 INSANE LOGGING: Effect 1 - Create Daily frame when container is ready
-  useEffect(() => {
-    console.log(`🔥 ${timestamp()} [${logId}] Effect 1 triggered:`, {
-      isOpen,
-      hasContainer: !!containerRef.current,
-      hasCallObj: !!callObj,
-      containerElement: containerRef.current ? 'HTMLElement' : null,
-      shouldCreateFrame: isOpen && containerRef.current && !callObj,
-      timestamp: new Date().toISOString()
-    });
-
-    if (isOpen && containerRef.current && !callObj) {
-      console.log(`🔥 ${timestamp()} [${logId}] CREATING DAILY FRAME - All conditions met`);
-      console.log(`🔥 ${timestamp()} [${logId}] Container ref details:`, {
-        container: containerRef.current,
-        containerTagName: containerRef.current?.tagName,
-        containerClientWidth: containerRef.current?.clientWidth,
-        containerClientHeight: containerRef.current?.clientHeight,
-        timestamp: new Date().toISOString()
-      });
-      
-      try {
-        console.log(`🔥 ${timestamp()} [${logId}] Calling DailyIframe.createFrame...`);
-        const frameStartTime = performance.now();
-        
-        const newCall = DailyIframe.createFrame(containerRef.current, {
-          iframeStyle: {
-            width: '100%',
-            height: '100%',
-            border: '0',
-            borderRadius: '8px',
-          },
-          showLeaveButton: false,
-          showFullscreenButton: false,
-          activeSpeakerMode: true,
-        });
-
-        const frameEndTime = performance.now();
-        console.log(`🔥 ${timestamp()} [${logId}] Daily frame created successfully:`, {
-          creationTime: `${frameEndTime - frameStartTime}ms`,
-          callObject: !!newCall,
-          callObjectType: typeof newCall,
-          timestamp: new Date().toISOString()
-        });
-
-        // 🔥 INSANE LOGGING: Event listeners with detailed logging
-        console.log(`🔥 ${timestamp()} [${logId}] Setting up event listeners...`);
-        
-        newCall
-          .on('loaded', (event: any) => {
-            console.log(`🔥 ${timestamp()} [${logId}] 🎉 DAILY EVENT: loaded`, {
-              event,
-              timestamp: new Date().toISOString()
-            });
-            setIsLoading(false);
-          })
-          .on('joined-meeting', (event: any) => {
-            console.log(`🔥 ${timestamp()} [${logId}] 🎉 DAILY EVENT: joined-meeting`, {
-              event,
-              timestamp: new Date().toISOString()
-            });
-            setIsLoading(false);
-          })
-          .on('left-meeting', (event: any) => {
-            console.log(`🔥 ${timestamp()} [${logId}] 🎉 DAILY EVENT: left-meeting`, {
-              event,
-              timestamp: new Date().toISOString()
-            });
-            onClose();
-          })
-          .on('error', (event: any) => {
-            console.log(`🔥 ${timestamp()} [${logId}] 🚨 DAILY EVENT: error`, {
-              event,
-              errorMsg: event.errorMsg,
-              timestamp: new Date().toISOString()
-            });
-            setError(`Connection error: ${event.errorMsg || 'Unknown error'}`);
-            setIsLoading(false);
-          })
-          .on('meeting-session-updated', (event: any) => {
-            console.log(`🔥 ${timestamp()} [${logId}] 🎉 DAILY EVENT: meeting-session-updated`, {
-              event,
-              timestamp: new Date().toISOString()
-            });
-          })
-          .on('participant-joined', (event: any) => {
-            console.log(`🔥 ${timestamp()} [${logId}] 🎉 DAILY EVENT: participant-joined`, {
-              event,
-              timestamp: new Date().toISOString()
-            });
-          });
-
-        console.log(`🔥 ${timestamp()} [${logId}] Event listeners set up, storing callObj...`);
-        setCallObj(newCall);
-        console.log(`🔥 ${timestamp()} [${logId}] CallObj stored in state`);
-
-      } catch (err) {
-        console.log(`🔥 ${timestamp()} [${logId}] 🚨 ERROR creating Daily frame:`, {
-          error: err,
-          errorMessage: err instanceof Error ? err.message : 'Unknown error',
-          errorStack: err instanceof Error ? err.stack : null,
-          timestamp: new Date().toISOString()
-        });
-        setError(`Failed to initialize: ${err instanceof Error ? err.message : 'Unknown error'}`);
-        setIsLoading(false);
-      }
-    } else if (!isOpen) {
-      console.log(`🔥 ${timestamp()} [${logId}] Dialog closed - clearing callObj`);
-      setCallObj(null);
-    } else {
-      console.log(`🔥 ${timestamp()} [${logId}] Effect 1 - conditions not met:`, {
-        isOpen,
-        hasContainer: !!containerRef.current,
-        hasCallObj: !!callObj,
-        timestamp: new Date().toISOString()
-      });
+  // Use Daily React's useCallFrame hook for proper integration
+  const callFrame = useCallFrame({
+    options: {
+      iframeStyle: {
+        position: 'relative',
+        width: '100%',
+        height: '400px',
+        border: 'none',
+        borderRadius: '8px'
+      },
+      showLeaveButton: false,
+      showFullscreenButton: false,
+      showLocalVideo: true,
+      showParticipantsBar: true
     }
-  }, [isOpen, containerRef.current, callObj]);
+  });
 
-  // 🔥 INSANE LOGGING: Effect 2 - Join call after callObj is created
-  useEffect(() => {
-    console.log(`🔥 ${timestamp()} [${logId}] Effect 2 triggered - Join meeting:`, {
-      hasCallObj: !!callObj,
-      roomUrl,
-      roomUrlValid: !!roomUrl,
-      roomUrlLength: roomUrl?.length || 0,
-      roomUrlType: typeof roomUrl,
-      roomUrlStartsWith: roomUrl?.substring(0, 30),
-      shouldJoin: !!(callObj && roomUrl),
-      timestamp: new Date().toISOString()
-    });
+  const [isAudioMuted, setIsAudioMuted] = React.useState(false);
+  const [isVideoMuted, setIsVideoMuted] = React.useState(false);
+  const [isFullscreen, setIsFullscreen] = React.useState(false);
+  const [isJoining, setIsJoining] = React.useState(false);
+  const [hasJoined, setHasJoined] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
 
-    if (callObj && roomUrl) {
-      console.log(`🔥 ${timestamp()} [${logId}] 🚀 JOINING MEETING - All conditions met`);
-      console.log(`🔥 ${timestamp()} [${logId}] Join parameters:`, {
-        url: roomUrl,
-        startVideoOff: false,
-        startAudioOff: false,
-        timestamp: new Date().toISOString()
-      });
+  // Join the call when dialog opens and room URL is available
+  React.useEffect(() => {
+    if (isOpen && roomUrl && callFrame && !hasJoined && !isJoining) {
+      console.log(`🔥 ${timestamp()} [VideoSessionDialog] Joining call`, { roomUrl });
+      setIsJoining(true);
+      setError(null);
       
-      const joinStartTime = performance.now();
-      
-      callObj.join({ 
-        url: roomUrl, 
-        startVideoOff: false, 
-        startAudioOff: false 
-      }).then((result: any) => {
-        const joinEndTime = performance.now();
-        console.log(`🔥 ${timestamp()} [${logId}] 🎉 JOIN SUCCESSFUL:`, {
-          result,
-          joinTime: `${joinEndTime - joinStartTime}ms`,
-          timestamp: new Date().toISOString()
+      callFrame.join({ url: roomUrl })
+        .then(() => {
+          console.log(`🔥 ${timestamp()} [VideoSessionDialog] Successfully joined call`);
+          setHasJoined(true);
+          setIsJoining(false);
+        })
+        .catch((err) => {
+          console.error(`🔥 ${timestamp()} [VideoSessionDialog] Failed to join call:`, err);
+          setError(`Failed to join video session: ${err.message}`);
+          setIsJoining(false);
+          toast.error("Failed to join video session");
         });
-      }).catch((err: any) => {
-        const joinEndTime = performance.now();
-        console.log(`🔥 ${timestamp()} [${logId}] 🚨 JOIN FAILED:`, {
-          error: err,
-          errorMessage: err.message || 'Unknown error',
-          errorStack: err.stack,
-          joinTime: `${joinEndTime - joinStartTime}ms`,
-          roomUrl,
-          timestamp: new Date().toISOString()
-        });
-        setError(`Failed to connect: ${err.message || 'Unknown error'}`);
-        setIsLoading(false);
-      });
-    } else {
-      console.log(`🔥 ${timestamp()} [${logId}] Effect 2 - conditions not met for joining:`, {
-        hasCallObj: !!callObj,
-        hasRoomUrl: !!roomUrl,
-        roomUrl,
-        timestamp: new Date().toISOString()
-      });
     }
-  }, [callObj, roomUrl]);
+  }, [isOpen, roomUrl, callFrame, hasJoined, isJoining]);
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (callObj) {
-        callObj.destroy();
-      }
+  // Listen for call events
+  React.useEffect(() => {
+    if (!callFrame) return;
+
+    const handleJoinedMeeting = () => {
+      console.log(`🔥 ${timestamp()} [VideoSessionDialog] Joined meeting event`);
+      setHasJoined(true);
+      setIsJoining(false);
+      setError(null);
     };
-  }, [callObj]);
 
-  const handleClose = () => {
-    if (callObj) {
-      callObj.destroy();
+    const handleLeftMeeting = () => {
+      console.log(`🔥 ${timestamp()} [VideoSessionDialog] Left meeting event`);
+      setHasJoined(false);
+      setIsJoining(false);
+    };
+
+    const handleError = (event: any) => {
+      console.error(`🔥 ${timestamp()} [VideoSessionDialog] Call error:`, event);
+      setError(event.errorMsg || 'Video session error occurred');
+      setIsJoining(false);
+      toast.error("Video session error occurred");
+    };
+
+    callFrame.on('joined-meeting', handleJoinedMeeting);
+    callFrame.on('left-meeting', handleLeftMeeting);
+    callFrame.on('error', handleError);
+
+    return () => {
+      callFrame.off('joined-meeting', handleJoinedMeeting);
+      callFrame.off('left-meeting', handleLeftMeeting);
+      callFrame.off('error', handleError);
+    };
+  }, [callFrame]);
+
+  const handleClose = async () => {
+    console.log(`🔥 ${timestamp()} [VideoSessionDialog] Closing dialog`);
+    
+    if (callFrame && hasJoined) {
+      try {
+        await callFrame.leave();
+        console.log(`🔥 ${timestamp()} [VideoSessionDialog] Left call successfully`);
+      } catch (err) {
+        console.error(`🔥 ${timestamp()} [VideoSessionDialog] Error leaving call:`, err);
+      }
     }
+    
+    setHasJoined(false);
+    setIsJoining(false);
+    setError(null);
     onClose();
   };
 
   const toggleAudio = async () => {
-    if (!callObj) return;
+    if (!callFrame) return;
     
     try {
-      const newAudioState = !isAudioEnabled;
-      await callObj.setLocalAudio(newAudioState);
-      setIsAudioEnabled(newAudioState);
-      
-      toast({
-        title: newAudioState ? 'Microphone enabled' : 'Microphone disabled',
-        description: newAudioState ? 'Your microphone is now on' : 'Your microphone is now off',
-      });
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to toggle microphone',
-        variant: 'destructive',
-      });
+      const newMutedState = !isAudioMuted;
+      await callFrame.setLocalAudio(!newMutedState);
+      setIsAudioMuted(newMutedState);
+      console.log(`🔥 ${timestamp()} [VideoSessionDialog] Audio ${newMutedState ? 'muted' : 'unmuted'}`);
+    } catch (err) {
+      console.error(`🔥 ${timestamp()} [VideoSessionDialog] Error toggling audio:`, err);
+      toast.error("Failed to toggle audio");
     }
   };
 
   const toggleVideo = async () => {
-    if (!callObj) return;
+    if (!callFrame) return;
     
     try {
-      const newVideoState = !isVideoEnabled;
-      await callObj.setLocalVideo(newVideoState);
-      setIsVideoEnabled(newVideoState);
-      
-      toast({
-        title: newVideoState ? 'Camera enabled' : 'Camera disabled',
-        description: newVideoState ? 'Your camera is now on' : 'Your camera is now off',
-      });
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to toggle camera',
-        variant: 'destructive',
-      });
+      const newMutedState = !isVideoMuted;
+      await callFrame.setLocalVideo(!newMutedState);
+      setIsVideoMuted(newMutedState);
+      console.log(`🔥 ${timestamp()} [VideoSessionDialog] Video ${newMutedState ? 'muted' : 'unmuted'}`);
+    } catch (err) {
+      console.error(`🔥 ${timestamp()} [VideoSessionDialog] Error toggling video:`, err);
+      toast.error("Failed to toggle video");
     }
   };
 
   const toggleFullscreen = () => {
-    if (!containerRef.current) return;
-    
-    try {
-      if (!isFullscreen) {
-        if (containerRef.current.requestFullscreen) {
-          containerRef.current.requestFullscreen();
-        }
-      } else {
-        if (document.exitFullscreen) {
-          document.exitFullscreen();
-        }
+    const dialogElement = document.querySelector('[role="dialog"]');
+    if (!dialogElement) return;
+
+    if (!isFullscreen) {
+      if (dialogElement.requestFullscreen) {
+        dialogElement.requestFullscreen();
+        setIsFullscreen(true);
       }
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to toggle fullscreen',
-        variant: 'destructive',
-      });
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+        setIsFullscreen(false);
+      }
     }
   };
 
-  // Listen for fullscreen changes
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
-    };
-    
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => {
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
-    };
-  }, []);
-
   const renderVideoContent = () => {
-    return (
-      <div ref={containerRef} className="relative w-full h-full">
-        {/* Loading overlay */}
-        {isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 z-10">
-            <div className="text-center text-white">
-              <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
-              <p>Loading video session...</p>
-            </div>
+    if (error) {
+      return (
+        <div className="flex flex-col items-center justify-center h-[400px] text-center">
+          <div className="text-destructive mb-4">
+            <Phone className="h-12 w-12 mx-auto mb-2" />
+            <p className="text-lg font-medium">Video Session Error</p>
+            <p className="text-sm text-muted-foreground mt-2">{error}</p>
           </div>
-        )}
-        
-        {/* Error overlay */}
-        {error && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-90 z-20">
-            <div className="text-center text-white">
-              <p className="text-red-400 mb-4">{error}</p>
-              <Button variant="outline" onClick={handleClose}>Close</Button>
+          <Button onClick={() => setError(null)} variant="outline">
+            Try Again
+          </Button>
+        </div>
+      );
+    }
+
+    if (isJoining) {
+      return (
+        <div className="flex flex-col items-center justify-center h-[400px]">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-4"></div>
+          <p className="text-lg font-medium">Joining video session...</p>
+          <p className="text-sm text-muted-foreground mt-2">
+            Please wait while we connect you
+          </p>
+        </div>
+      );
+    }
+
+    if (!roomUrl) {
+      return (
+        <div className="flex flex-col items-center justify-center h-[400px]">
+          <Phone className="h-12 w-12 text-muted-foreground mb-4" />
+          <p className="text-lg font-medium">No video room available</p>
+          <p className="text-sm text-muted-foreground mt-2">
+            Please contact support if this issue persists
+          </p>
+        </div>
+      );
+    }
+
+    // The Daily React callFrame automatically handles the iframe rendering
+    return (
+      <div className="relative h-[400px] w-full bg-muted rounded-lg overflow-hidden">
+        {/* The Daily React call frame will render here automatically */}
+        {!hasJoined && !isJoining && (
+          <div className="absolute inset-0 flex items-center justify-center bg-background/80">
+            <div className="text-center">
+              <Phone className="h-12 w-12 mx-auto mb-4 text-primary" />
+              <p className="text-lg font-medium">Ready to join</p>
+              <p className="text-sm text-muted-foreground">Video session is ready</p>
             </div>
           </div>
         )}
@@ -355,54 +227,68 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({ roomUrl, isOpen
     );
   };
 
-  const renderControls = () => (
-    <CardFooter className="flex justify-center items-center space-x-4 p-4">
-      <Button
-        variant={isAudioEnabled ? "default" : "outline"}
-        size="icon"
-        onClick={toggleAudio}
-        disabled={!callObj}
-      >
-        {isAudioEnabled ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
-      </Button>
-      <Button
-        variant={isVideoEnabled ? "default" : "outline"}
-        size="icon"
-        onClick={toggleVideo}
-        disabled={!callObj}
-      >
-        {isVideoEnabled ? <Video className="h-4 w-4" /> : <VideoOff className="h-4 w-4" />}
-      </Button>
-      <Button
-        variant="outline"
-        size="icon"
-        onClick={toggleFullscreen}
-        title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
-      >
-        <Maximize className="h-4 w-4" />
-      </Button>
-      <Button variant="destructive" onClick={handleClose}>
-        End Call
-      </Button>
-    </CardFooter>
-  );
+  if (!isOpen) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-4xl p-0 overflow-hidden">
-        <DialogTitle className="sr-only">Video Session</DialogTitle>
-        <DialogDescription className="sr-only">Video call session interface</DialogDescription>
-        <Card className="w-full h-[600px] border-0">
-          <CardHeader className="flex flex-row items-center justify-between p-4">
-            <h3 className="font-semibold">Video Session</h3>
-            <Button variant="ghost" size="icon" onClick={handleClose}>
-              <X className="h-4 w-4" />
-            </Button>
+      <DialogContent className="max-w-4xl max-h-[90vh] p-0">
+        <Card className="border-none shadow-none">
+          <CardHeader className="pb-4">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Phone className="h-5 w-5" />
+                Video Session
+              </DialogTitle>
+            </DialogHeader>
           </CardHeader>
-          <CardContent className="p-0 h-[450px]">
+          <CardContent className="pt-0">
             {renderVideoContent()}
+            
+            {/* Control buttons */}
+            <div className="flex justify-center gap-2 mt-4 p-4 bg-muted/50 rounded-lg">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={toggleAudio}
+                disabled={!hasJoined}
+                className="flex items-center gap-2"
+              >
+                {isAudioMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                {isAudioMuted ? 'Unmute' : 'Mute'}
+              </Button>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={toggleVideo}
+                disabled={!hasJoined}
+                className="flex items-center gap-2"
+              >
+                {isVideoMuted ? <VideoOff className="h-4 w-4" /> : <Video className="h-4 w-4" />}
+                {isVideoMuted ? 'Turn On' : 'Turn Off'}
+              </Button>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={toggleFullscreen}
+                className="flex items-center gap-2"
+              >
+                <Maximize className="h-4 w-4" />
+                Fullscreen
+              </Button>
+              
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleClose}
+                className="flex items-center gap-2"
+              >
+                <Phone className="h-4 w-4" />
+                End Call
+              </Button>
+            </div>
           </CardContent>
-          {renderControls()}
         </Card>
       </DialogContent>
     </Dialog>
