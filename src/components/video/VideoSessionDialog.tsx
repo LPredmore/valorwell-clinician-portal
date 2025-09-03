@@ -20,255 +20,285 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({ roomUrl, isOpen
   const [isVideoEnabled, setIsVideoEnabled] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isReconnecting, setIsReconnecting] = useState(false);
-  const [canInit, setCanInit] = useState(false);
-  const callRef = useRef<any>(null);
+  const [callObj, setCallObj] = useState<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   
-  // Initialize Daily.js call
-  const initializeCall = useCallback(async () => {
-    if (!roomUrl || !isOpen) return;
-    
-    const initStartTime = performance.now();
-    console.log('🎬 [VideoDebug] INIT START:', {
-      roomUrl,
+  // Effect 1: Create Daily frame when iframe container mounts (like client portal)
+  useEffect(() => {
+    console.log('🔄 [VideoDebug] Frame creation effect triggered:', {
       isOpen,
-      timestamp: new Date().toISOString(),
-      userAgent: navigator.userAgent,
-      connection: navigator.onLine ? 'online' : 'offline'
+      iframeExists: !!iframeRef.current,
+      callObjExists: !!callObj,
+      timestamp: new Date().toISOString()
     });
-    
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      // Pre-validation checks
-      console.log('🔍 [VideoDebug] Pre-validation:', {
-        roomUrl,
-        isValidUrl: /^https:\/\/.*\.daily\.co\//.test(roomUrl),
-        iframeRef: !!iframeRef.current,
-        callRef: !!callRef.current
-      });
 
-      // Create call instance
-      console.log('🏗️ [VideoDebug] Creating Daily frame...');
+    if (isOpen && iframeRef.current && !callObj) {
+      console.log('✅ [VideoDebug] Creating Daily frame - iframe is mounted');
+      
       const frameStartTime = performance.now();
       
-      callRef.current = DailyIframe.createFrame(iframeRef.current, {
-        iframeStyle: {
-          width: '100%',
-          height: '100%',
-          border: '0',
-          borderRadius: '8px',
-        },
-        showLeaveButton: false,
-        showFullscreenButton: false,
-        activeSpeakerMode: true,
-      });
-      
-      console.log('🏗️ [VideoDebug] Frame created in:', performance.now() - frameStartTime, 'ms');
-      console.log('📊 [VideoDebug] Initial call state:', {
-        meetingState: callRef.current.meetingState(),
-        participantCounts: callRef.current.participantCounts()
-      });
-
-      // Set up comprehensive event listeners
-      callRef.current
-        .on('loading', (event: any) => {
-          console.log('⏳ [VideoDebug] Daily.js loading event:', {
-            event,
-            meetingState: callRef.current?.meetingState(),
-            timestamp: new Date().toISOString()
-          });
-          setIsLoading(true);
-        })
-        .on('loaded', (event: any) => {
-          console.log('✅ [VideoDebug] Daily.js loaded event:', {
-            event,
-            meetingState: callRef.current?.meetingState(),
-            loadTime: performance.now() - initStartTime,
-            timestamp: new Date().toISOString()
-          });
-          setIsLoading(false);
-        })
-        .on('joining-meeting', (event: any) => {
-          console.log('🚪 [VideoDebug] Joining meeting event:', {
-            event,
-            meetingState: callRef.current?.meetingState(),
-            timestamp: new Date().toISOString()
-          });
-        })
-        .on('joined-meeting', (event: any) => {
-          console.log('🎉 [VideoDebug] Joined meeting successfully:', {
-            event,
-            meetingState: callRef.current?.meetingState(),
-            participants: callRef.current?.participantCounts(),
-            totalTime: performance.now() - initStartTime,
-            timestamp: new Date().toISOString()
-          });
-          setIsLoading(false);
-          setIsReconnecting(false);
-        })
-        .on('left-meeting', (event: any) => {
-          console.log('👋 [VideoDebug] Left meeting:', {
-            event,
-            meetingState: callRef.current?.meetingState(),
-            timestamp: new Date().toISOString()
-          });
-          onClose();
-        })
-        .on('error', (event: any) => {
-          console.error('❌ [VideoDebug] Daily.js error:', {
-            event,
-            errorMsg: event.errorMsg,
-            action: event.action,
-            type: event.type,
-            meetingState: callRef.current?.meetingState(),
-            timestamp: new Date().toISOString()
-          });
-          setError(`Connection error: ${event.errorMsg || 'Unknown error'}`);
-          setIsLoading(false);
-          
-          // Attempt reconnection for network errors
-          if (event.action === 'camera-error' || event.action === 'connection-error') {
-            handleReconnect();
-          }
-        })
-        .on('network-quality-change', (event: any) => {
-          console.log('📶 [VideoDebug] Network quality change:', {
-            quality: event.quality,
-            threshold: event.threshold,
-            meetingState: callRef.current?.meetingState(),
-            timestamp: new Date().toISOString()
-          });
-          if (event.quality === 'low' || event.quality === 'very-low') {
-            console.warn('⚠️ [VideoDebug] Poor network quality detected:', event.quality);
-          }
-        })
-        .on('track-stopped', (event: any) => {
-          console.log('🛑 [VideoDebug] Track stopped:', {
-            event,
-            meetingState: callRef.current?.meetingState(),
-            timestamp: new Date().toISOString()
-          });
-        })
-        .on('participant-joined', (event: any) => {
-          console.log('👤 [VideoDebug] Participant joined:', {
-            participant: event.participant,
-            participantCounts: callRef.current?.participantCounts(),
-            timestamp: new Date().toISOString()
-          });
-        })
-        .on('participant-left', (event: any) => {
-          console.log('👤 [VideoDebug] Participant left:', {
-            participant: event.participant,
-            participantCounts: callRef.current?.participantCounts(),
-            timestamp: new Date().toISOString()
-          });
-        })
-        .on('camera-error', (event: any) => {
-          console.error('📷 [VideoDebug] Camera error:', {
-            event,
-            meetingState: callRef.current?.meetingState(),
-            timestamp: new Date().toISOString()
-          });
-        })
-        .on('recording-error', (event: any) => {
-          console.error('🎥 [VideoDebug] Recording error:', event);
-        })
-        .on('app-message', (event: any) => {
-          console.log('💬 [VideoDebug] App message:', event);
-        })
-        .on('network-connection', (event: any) => {
-          console.log('🌐 [VideoDebug] Network connection event:', {
-            event,
-            meetingState: callRef.current?.meetingState(),
-            timestamp: new Date().toISOString()
-          });
-        })
-        .on('recording-started', (event: any) => {
-          console.log('🔴 [VideoDebug] Recording started:', event);
-        })
-        .on('recording-stopped', (event: any) => {
-          console.log('⏹️ [VideoDebug] Recording stopped:', event);
+      try {
+        console.log('🏗️ [VideoDebug] Pre-frame validation:', {
+          roomUrl,
+          isValidUrl: /^https:\/\/.*\.daily\.co\//.test(roomUrl),
+          iframeRef: !!iframeRef.current,
+          callObj: !!callObj,
+          userAgent: navigator.userAgent,
+          connection: navigator.onLine ? 'online' : 'offline'
         });
 
+        const newCall = DailyIframe.createFrame(iframeRef.current, {
+          iframeStyle: {
+            width: '100%',
+            height: '100%',
+            border: '0',
+            borderRadius: '8px',
+          },
+          showLeaveButton: false,
+          showFullscreenButton: false,
+          activeSpeakerMode: true,
+        });
+
+        console.log('🏗️ [VideoDebug] Frame created in:', performance.now() - frameStartTime, 'ms');
+        console.log('📊 [VideoDebug] Initial call state:', {
+          meetingState: newCall.meetingState(),
+          participantCounts: newCall.participantCounts()
+        });
+
+        // Set up comprehensive event listeners
+        newCall
+          .on('loading', (event: any) => {
+            console.log('⏳ [VideoDebug] Daily.js loading event:', {
+              event,
+              meetingState: newCall?.meetingState(),
+              timestamp: new Date().toISOString()
+            });
+            setIsLoading(true);
+          })
+          .on('loaded', (event: any) => {
+            console.log('✅ [VideoDebug] Daily.js loaded event:', {
+              event,
+              meetingState: newCall?.meetingState(),
+              loadTime: performance.now() - frameStartTime,
+              timestamp: new Date().toISOString()
+            });
+            setIsLoading(false);
+          })
+          .on('joining-meeting', (event: any) => {
+            console.log('🚪 [VideoDebug] Joining meeting event:', {
+              event,
+              meetingState: newCall?.meetingState(),
+              timestamp: new Date().toISOString()
+            });
+          })
+          .on('joined-meeting', (event: any) => {
+            console.log('🎉 [VideoDebug] Joined meeting successfully:', {
+              event,
+              meetingState: newCall?.meetingState(),
+              participants: newCall?.participantCounts(),
+              timestamp: new Date().toISOString()
+            });
+            setIsLoading(false);
+            setIsReconnecting(false);
+          })
+          .on('left-meeting', (event: any) => {
+            console.log('👋 [VideoDebug] Left meeting:', {
+              event,
+              meetingState: newCall?.meetingState(),
+              timestamp: new Date().toISOString()
+            });
+            onClose();
+          })
+          .on('error', (event: any) => {
+            console.error('❌ [VideoDebug] Daily.js error:', {
+              event,
+              errorMsg: event.errorMsg,
+              action: event.action,
+              type: event.type,
+              meetingState: newCall?.meetingState(),
+              timestamp: new Date().toISOString()
+            });
+            setError(`Connection error: ${event.errorMsg || 'Unknown error'}`);
+            setIsLoading(false);
+            
+            // Attempt reconnection for network errors
+            if (event.action === 'camera-error' || event.action === 'connection-error') {
+              handleReconnect();
+            }
+          })
+          .on('network-quality-change', (event: any) => {
+            console.log('📶 [VideoDebug] Network quality change:', {
+              quality: event.quality,
+              threshold: event.threshold,
+              meetingState: newCall?.meetingState(),
+              timestamp: new Date().toISOString()
+            });
+            if (event.quality === 'low' || event.quality === 'very-low') {
+              console.warn('⚠️ [VideoDebug] Poor network quality detected:', event.quality);
+            }
+          })
+          .on('track-stopped', (event: any) => {
+            console.log('🛑 [VideoDebug] Track stopped:', {
+              event,
+              meetingState: newCall?.meetingState(),
+              timestamp: new Date().toISOString()
+            });
+          })
+          .on('participant-joined', (event: any) => {
+            console.log('👤 [VideoDebug] Participant joined:', {
+              participant: event.participant,
+              participantCounts: newCall?.participantCounts(),
+              timestamp: new Date().toISOString()
+            });
+          })
+          .on('participant-left', (event: any) => {
+            console.log('👤 [VideoDebug] Participant left:', {
+              participant: event.participant,
+              participantCounts: newCall?.participantCounts(),
+              timestamp: new Date().toISOString()
+            });
+          })
+          .on('camera-error', (event: any) => {
+            console.error('📷 [VideoDebug] Camera error:', {
+              event,
+              meetingState: newCall?.meetingState(),
+              timestamp: new Date().toISOString()
+            });
+          })
+          .on('recording-error', (event: any) => {
+            console.error('🎥 [VideoDebug] Recording error:', event);
+          })
+          .on('app-message', (event: any) => {
+            console.log('💬 [VideoDebug] App message:', event);
+          })
+          .on('network-connection', (event: any) => {
+            console.log('🌐 [VideoDebug] Network connection event:', {
+              event,
+              meetingState: newCall?.meetingState(),
+              timestamp: new Date().toISOString()
+            });
+          })
+          .on('recording-started', (event: any) => {
+            console.log('🔴 [VideoDebug] Recording started:', event);
+          })
+          .on('recording-stopped', (event: any) => {
+            console.log('⏹️ [VideoDebug] Recording stopped:', event);
+          });
+
+        setCallObj(newCall);
+        console.log('✅ [VideoDebug] Call object stored in state');
+
+      } catch (err) {
+        console.error('💥 [VideoDebug] Failed to create Daily frame:', {
+          error: err,
+          message: err instanceof Error ? err.message : 'Unknown error',
+          stack: err instanceof Error ? err.stack : undefined,
+          timestamp: new Date().toISOString()
+        });
+        setError(`Failed to initialize: ${err instanceof Error ? err.message : 'Unknown error'}`);
+        setIsLoading(false);
+      }
+    } else if (!isOpen) {
+      console.log('🔄 [VideoDebug] Dialog closed, clearing call object');
+      setCallObj(null);
+    }
+  }, [isOpen, callObj]);
+
+  // Effect 2: Join call after callObj is created (like client portal)
+  useEffect(() => {
+    console.log('🎯 [VideoDebug] Join effect triggered:', {
+      callObjExists: !!callObj,
+      roomUrl,
+      hasRoomUrl: !!roomUrl,
+      timestamp: new Date().toISOString()
+    });
+
+    if (callObj && roomUrl) {
+      console.log('✅ [VideoDebug] Call object ready, joining meeting');
+      
+      const joinStartTime = performance.now();
+      
       // Join the call with detailed logging
       console.log('🚀 [VideoDebug] Initiating join call with config:', {
         url: roomUrl,
         startVideoOff: true,
         startAudioOff: false,
-        meetingState: callRef.current.meetingState()
-      });
-      
-      const joinStartTime = performance.now();
-      const joinPromise = callRef.current.join({
-        url: roomUrl,
-        startVideoOff: true,
-        startAudioOff: false,
+        meetingState: callObj.meetingState()
       });
 
-      console.log('🔄 [VideoDebug] Join call initiated, meeting state:', callRef.current.meetingState());
+      const joinCall = async () => {
+        try {
+          const joinPromise = callObj.join({
+            url: roomUrl,
+            startVideoOff: true,
+            startAudioOff: false,
+          });
 
-      // Add timeout to log state progression
-      setTimeout(() => {
-        console.log('⏰ [VideoDebug] 5 seconds after join - meeting state:', {
-          meetingState: callRef.current?.meetingState(),
-          participantCounts: callRef.current?.participantCounts(),
-          elapsedTime: performance.now() - joinStartTime
-        });
-      }, 5000);
+          console.log('🔄 [VideoDebug] Join call initiated, meeting state:', callObj.meetingState());
 
-      // Additional state checks at intervals
-      setTimeout(() => {
-        console.log('⏰ [VideoDebug] 10 seconds after join - meeting state:', {
-          meetingState: callRef.current?.meetingState(),
-          participantCounts: callRef.current?.participantCounts(),
-          elapsedTime: performance.now() - joinStartTime
-        });
-      }, 10000);
+          // Add timeout to log state progression
+          setTimeout(() => {
+            console.log('⏰ [VideoDebug] 5 seconds after join - meeting state:', {
+              meetingState: callObj?.meetingState(),
+              participantCounts: callObj?.participantCounts(),
+              elapsedTime: performance.now() - joinStartTime
+            });
+          }, 5000);
 
-      setTimeout(() => {
-        console.log('⏰ [VideoDebug] 15 seconds after join - meeting state:', {
-          meetingState: callRef.current?.meetingState(),
-          participantCounts: callRef.current?.participantCounts(),
-          elapsedTime: performance.now() - joinStartTime
-        });
-      }, 15000);
+          // Additional state checks at intervals
+          setTimeout(() => {
+            console.log('⏰ [VideoDebug] 10 seconds after join - meeting state:', {
+              meetingState: callObj?.meetingState(),
+              participantCounts: callObj?.participantCounts(),
+              elapsedTime: performance.now() - joinStartTime
+            });
+          }, 10000);
 
-      // Wait for join to complete
-      await joinPromise;
-      
-      console.log('✅ [VideoDebug] Join promise resolved:', {
-        meetingState: callRef.current.meetingState(),
-        joinTime: performance.now() - joinStartTime,
-        totalInitTime: performance.now() - initStartTime
-      });
+          setTimeout(() => {
+            console.log('⏰ [VideoDebug] 15 seconds after join - meeting state:', {
+              meetingState: callObj?.meetingState(),
+              participantCounts: callObj?.participantCounts(),
+              elapsedTime: performance.now() - joinStartTime
+            });
+          }, 15000);
 
-    } catch (err) {
-      console.error('💥 [VideoDebug] Failed to initialize Daily.js call:', {
-        error: err,
-        message: err instanceof Error ? err.message : 'Unknown error',
-        stack: err instanceof Error ? err.stack : undefined,
-        meetingState: callRef.current?.meetingState(),
-        timestamp: new Date().toISOString()
-      });
-      setError(`Failed to connect: ${err instanceof Error ? err.message : 'Unknown error'}`);
-      setIsLoading(false);
+          // Wait for join to complete
+          await joinPromise;
+          
+          console.log('✅ [VideoDebug] Join promise resolved:', {
+            meetingState: callObj.meetingState(),
+            joinTime: performance.now() - joinStartTime
+          });
+
+        } catch (err) {
+          console.error('💥 [VideoDebug] Failed to join Daily.js call:', {
+            error: err,
+            message: err instanceof Error ? err.message : 'Unknown error',
+            stack: err instanceof Error ? err.stack : undefined,
+            meetingState: callObj?.meetingState(),
+            timestamp: new Date().toISOString()
+          });
+          setError(`Failed to connect: ${err instanceof Error ? err.message : 'Unknown error'}`);
+          setIsLoading(false);
+        }
+      };
+
+      joinCall();
     }
-  }, [roomUrl, isOpen, onClose]);
+  }, [callObj, roomUrl]);
 
   // Cleanup call on unmount or close
   const cleanupCall = useCallback(() => {
-    if (callRef.current) {
+    if (callObj) {
       console.log('🧹 [VideoDebug] Cleaning up Daily.js call:', {
-        meetingState: callRef.current.meetingState(),
-        participantCounts: callRef.current.participantCounts(),
+        meetingState: callObj.meetingState(),
+        participantCounts: callObj.participantCounts(),
         timestamp: new Date().toISOString()
       });
       try {
-        callRef.current.destroy();
-        callRef.current = null;
+        callObj.destroy();
+        setCallObj(null);
         console.log('✅ [VideoDebug] Call cleanup completed successfully');
       } catch (err) {
         console.error('❌ [VideoDebug] Error cleaning up call:', {
@@ -280,7 +310,7 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({ roomUrl, isOpen
     } else {
       console.log('ℹ️ [VideoDebug] No active call to cleanup');
     }
-  }, []);
+  }, [callObj]);
 
   // Reconnection logic
   const handleReconnect = useCallback(async () => {
@@ -291,7 +321,7 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({ roomUrl, isOpen
     
     console.log('🔄 [VideoDebug] Starting reconnection process:', {
       isReconnecting,
-      currentMeetingState: callRef.current?.meetingState(),
+      currentMeetingState: callObj?.meetingState(),
       timestamp: new Date().toISOString()
     });
     setIsReconnecting(true);
@@ -300,80 +330,26 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({ roomUrl, isOpen
     // Clean up existing call
     cleanupCall();
     
-    // Wait a moment before reconnecting
+    // Wait a moment before reconnecting - this will trigger the first effect again
     setTimeout(() => {
-      console.log('⏰ [VideoDebug] Reconnection delay complete, reinitializing call');
-      initializeCall();
+      console.log('⏰ [VideoDebug] Reconnection delay complete, will recreate frame');
+      // The first effect will handle recreation since callObj is now null
     }, 2000);
-  }, [isReconnecting, cleanupCall, initializeCall]);
+  }, [isReconnecting, cleanupCall]);
 
-  // Wait for iframe container to mount before initializing
+  // Cleanup on dialog close or unmount
   useEffect(() => {
-    console.log('🔄 [VideoDebug] useEffect triggered for dialog state:', {
-      isOpen,
-      roomUrl,
-      hasRoomUrl: !!roomUrl,
-      timestamp: new Date().toISOString()
-    });
-    
-    if (isOpen) {
-      // Allow the iframeRef to attach on next render tick
-      requestAnimationFrame(() => {
-        if (iframeRef.current) {
-          console.log('✅ [VideoDebug] Iframe container mounted, enabling initialization');
-          setCanInit(true);
-        } else {
-          console.warn('⚠️ [VideoDebug] Iframe container not yet available after requestAnimationFrame');
-        }
-      });
-    } else {
-      console.log('🔄 [VideoDebug] Dialog closed, disabling initialization');
-      setCanInit(false);
-    }
-    
-    return () => {
-      console.log('🧹 [VideoDebug] Dialog state cleanup triggered:', {
-        isOpen,
-        timestamp: new Date().toISOString()
-      });
-      if (!isOpen) {
-        cleanupCall();
-      }
-    };
-  }, [isOpen, cleanupCall]);
-
-  // Initialize call only after iframe container is ready
-  useEffect(() => {
-    console.log('🎯 [VideoDebug] Initialization useEffect triggered:', {
-      canInit,
-      roomUrl,
-      hasRoomUrl: !!roomUrl,
-      timestamp: new Date().toISOString()
-    });
-    
-    if (canInit && roomUrl) {
-      console.log('✅ [VideoDebug] Iframe mounted and conditions met, now safe to initialize call');
-      initializeCall();
-    } else {
-      console.log('❌ [VideoDebug] Conditions not met for initialization:', {
-        canInit,
-        hasRoomUrl: !!roomUrl
-      });
-    }
-  }, [canInit, roomUrl, initializeCall]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    console.log('🎯 [VideoDebug] Component mounted, setting up unmount cleanup');
     return () => {
       console.log('🎯 [VideoDebug] Component unmounting, cleaning up');
-      cleanupCall();
+      if (callObj) {
+        callObj.destroy();
+      }
     };
-  }, [cleanupCall]);
+  }, [callObj]);
 
   const handleClose = () => {
     console.log('❌ [VideoDebug] handleClose triggered:', {
-      meetingState: callRef.current?.meetingState(),
+      meetingState: callObj?.meetingState(),
       timestamp: new Date().toISOString()
     });
     cleanupCall();
@@ -381,7 +357,7 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({ roomUrl, isOpen
   };
 
   const toggleAudio = async () => {
-    if (!callRef.current) {
+    if (!callObj) {
       console.warn('⚠️ [VideoDebug] toggleAudio called but no active call');
       return;
     }
@@ -389,12 +365,12 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({ roomUrl, isOpen
     console.log('🎤 [VideoDebug] toggleAudio called:', {
       currentState: isAudioEnabled,
       newState: !isAudioEnabled,
-      meetingState: callRef.current.meetingState()
+      meetingState: callObj.meetingState()
     });
     
     try {
       const newAudioState = !isAudioEnabled;
-      await callRef.current.setLocalAudio(newAudioState);
+      await callObj.setLocalAudio(newAudioState);
       setIsAudioEnabled(newAudioState);
       
       console.log('✅ [VideoDebug] Audio toggle successful:', newAudioState);
@@ -406,7 +382,7 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({ roomUrl, isOpen
     } catch (error) {
       console.error('❌ [VideoDebug] Error toggling audio:', {
         error,
-        meetingState: callRef.current?.meetingState(),
+        meetingState: callObj?.meetingState(),
         timestamp: new Date().toISOString()
       });
       toast({
@@ -418,7 +394,7 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({ roomUrl, isOpen
   };
 
   const toggleVideo = async () => {
-    if (!callRef.current) {
+    if (!callObj) {
       console.warn('⚠️ [VideoDebug] toggleVideo called but no active call');
       return;
     }
@@ -426,12 +402,12 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({ roomUrl, isOpen
     console.log('📹 [VideoDebug] toggleVideo called:', {
       currentState: isVideoEnabled,
       newState: !isVideoEnabled,
-      meetingState: callRef.current.meetingState()
+      meetingState: callObj.meetingState()
     });
     
     try {
       const newVideoState = !isVideoEnabled;
-      await callRef.current.setLocalVideo(newVideoState);
+      await callObj.setLocalVideo(newVideoState);
       setIsVideoEnabled(newVideoState);
       
       console.log('✅ [VideoDebug] Video toggle successful:', newVideoState);
@@ -443,7 +419,7 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({ roomUrl, isOpen
     } catch (error) {
       console.error('❌ [VideoDebug] Error toggling video:', {
         error,
-        meetingState: callRef.current?.meetingState(),
+        meetingState: callObj?.meetingState(),
         timestamp: new Date().toISOString()
       });
       toast({
@@ -557,7 +533,7 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({ roomUrl, isOpen
         variant={isAudioEnabled ? "default" : "outline"}
         size="icon"
         onClick={toggleAudio}
-        disabled={!callRef.current}
+        disabled={!callObj}
       >
         {isAudioEnabled ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
       </Button>
@@ -565,7 +541,7 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({ roomUrl, isOpen
         variant={isVideoEnabled ? "default" : "outline"}
         size="icon"
         onClick={toggleVideo}
-        disabled={!callRef.current}
+        disabled={!callObj}
       >
         {isVideoEnabled ? <Video className="h-4 w-4" /> : <VideoOff className="h-4 w-4" />}
       </Button>
