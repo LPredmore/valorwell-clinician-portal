@@ -28,12 +28,31 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({ roomUrl, isOpen
   const initializeCall = useCallback(async () => {
     if (!roomUrl || !isOpen) return;
     
-    console.log('Initializing Daily.js call for room:', roomUrl);
+    const initStartTime = performance.now();
+    console.log('🎬 [VideoDebug] INIT START:', {
+      roomUrl,
+      isOpen,
+      timestamp: new Date().toISOString(),
+      userAgent: navigator.userAgent,
+      connection: navigator.onLine ? 'online' : 'offline'
+    });
+    
     setIsLoading(true);
     setError(null);
     
     try {
+      // Pre-validation checks
+      console.log('🔍 [VideoDebug] Pre-validation:', {
+        roomUrl,
+        isValidUrl: /^https:\/\/.*\.daily\.co\//.test(roomUrl),
+        iframeRef: !!iframeRef.current,
+        callRef: !!callRef.current
+      });
+
       // Create call instance
+      console.log('🏗️ [VideoDebug] Creating Daily frame...');
+      const frameStartTime = performance.now();
+      
       callRef.current = DailyIframe.createFrame(iframeRef.current, {
         iframeStyle: {
           width: '100%',
@@ -43,31 +62,72 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({ roomUrl, isOpen
         },
         showLeaveButton: false,
         showFullscreenButton: false,
-        // Do not disable microphone - let Chrome 140 handle gracefully
         activeSpeakerMode: true,
       });
+      
+      console.log('🏗️ [VideoDebug] Frame created in:', performance.now() - frameStartTime, 'ms');
+      console.log('📊 [VideoDebug] Initial call state:', {
+        meetingState: callRef.current.meetingState(),
+        accessState: callRef.current.accessState(),
+        participantCounts: callRef.current.participantCounts()
+      });
 
-      // Set up event listeners
+      // Set up comprehensive event listeners
       callRef.current
-        .on('loading', () => {
-          console.log('Daily.js loading');
+        .on('loading', (event: any) => {
+          console.log('⏳ [VideoDebug] Daily.js loading event:', {
+            event,
+            meetingState: callRef.current?.meetingState(),
+            timestamp: new Date().toISOString()
+          });
           setIsLoading(true);
         })
-        .on('loaded', () => {
-          console.log('Daily.js loaded');
+        .on('loaded', (event: any) => {
+          console.log('✅ [VideoDebug] Daily.js loaded event:', {
+            event,
+            meetingState: callRef.current?.meetingState(),
+            loadTime: performance.now() - initStartTime,
+            timestamp: new Date().toISOString()
+          });
           setIsLoading(false);
         })
-        .on('joined-meeting', () => {
-          console.log('Joined meeting successfully');
+        .on('joining-meeting', (event: any) => {
+          console.log('🚪 [VideoDebug] Joining meeting event:', {
+            event,
+            meetingState: callRef.current?.meetingState(),
+            timestamp: new Date().toISOString()
+          });
+        })
+        .on('joined-meeting', (event: any) => {
+          console.log('🎉 [VideoDebug] Joined meeting successfully:', {
+            event,
+            meetingState: callRef.current?.meetingState(),
+            accessState: callRef.current?.accessState(),
+            participants: callRef.current?.participantCounts(),
+            totalTime: performance.now() - initStartTime,
+            timestamp: new Date().toISOString()
+          });
           setIsLoading(false);
           setIsReconnecting(false);
         })
-        .on('left-meeting', () => {
-          console.log('Left meeting');
+        .on('left-meeting', (event: any) => {
+          console.log('👋 [VideoDebug] Left meeting:', {
+            event,
+            meetingState: callRef.current?.meetingState(),
+            timestamp: new Date().toISOString()
+          });
           onClose();
         })
         .on('error', (event: any) => {
-          console.error('Daily.js error:', event);
+          console.error('❌ [VideoDebug] Daily.js error:', {
+            event,
+            errorMsg: event.errorMsg,
+            action: event.action,
+            type: event.type,
+            meetingState: callRef.current?.meetingState(),
+            accessState: callRef.current?.accessState(),
+            timestamp: new Date().toISOString()
+          });
           setError(`Connection error: ${event.errorMsg || 'Unknown error'}`);
           setIsLoading(false);
           
@@ -77,24 +137,129 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({ roomUrl, isOpen
           }
         })
         .on('network-quality-change', (event: any) => {
+          console.log('📶 [VideoDebug] Network quality change:', {
+            quality: event.quality,
+            threshold: event.threshold,
+            meetingState: callRef.current?.meetingState(),
+            timestamp: new Date().toISOString()
+          });
           if (event.quality === 'low' || event.quality === 'very-low') {
-            console.warn('Poor network quality detected:', event.quality);
+            console.warn('⚠️ [VideoDebug] Poor network quality detected:', event.quality);
           }
         })
         .on('track-stopped', (event: any) => {
-          console.log('Track stopped:', event);
-          // Handle track stopping gracefully
+          console.log('🛑 [VideoDebug] Track stopped:', {
+            event,
+            meetingState: callRef.current?.meetingState(),
+            timestamp: new Date().toISOString()
+          });
+        })
+        .on('participant-joined', (event: any) => {
+          console.log('👤 [VideoDebug] Participant joined:', {
+            participant: event.participant,
+            participantCounts: callRef.current?.participantCounts(),
+            timestamp: new Date().toISOString()
+          });
+        })
+        .on('participant-left', (event: any) => {
+          console.log('👤 [VideoDebug] Participant left:', {
+            participant: event.participant,
+            participantCounts: callRef.current?.participantCounts(),
+            timestamp: new Date().toISOString()
+          });
+        })
+        .on('camera-error', (event: any) => {
+          console.error('📷 [VideoDebug] Camera error:', {
+            event,
+            meetingState: callRef.current?.meetingState(),
+            timestamp: new Date().toISOString()
+          });
+        })
+        .on('recording-error', (event: any) => {
+          console.error('🎥 [VideoDebug] Recording error:', event);
+        })
+        .on('app-message', (event: any) => {
+          console.log('💬 [VideoDebug] App message:', event);
+        })
+        .on('network-connection', (event: any) => {
+          console.log('🌐 [VideoDebug] Network connection event:', {
+            event,
+            meetingState: callRef.current?.meetingState(),
+            timestamp: new Date().toISOString()
+          });
+        })
+        .on('recording-started', (event: any) => {
+          console.log('🔴 [VideoDebug] Recording started:', event);
+        })
+        .on('recording-stopped', (event: any) => {
+          console.log('⏹️ [VideoDebug] Recording stopped:', event);
         });
 
-      // Join the call
-      await callRef.current.join({
+      // Join the call with detailed logging
+      console.log('🚀 [VideoDebug] Initiating join call with config:', {
         url: roomUrl,
         startVideoOff: true,
-        startAudioOff: false, // Start with audio on, let browser handle mic permissions
+        startAudioOff: false,
+        meetingState: callRef.current.meetingState()
+      });
+      
+      const joinStartTime = performance.now();
+      const joinPromise = callRef.current.join({
+        url: roomUrl,
+        startVideoOff: true,
+        startAudioOff: false,
+      });
+
+      console.log('🔄 [VideoDebug] Join call initiated, meeting state:', callRef.current.meetingState());
+
+      // Add timeout to log state progression
+      setTimeout(() => {
+        console.log('⏰ [VideoDebug] 5 seconds after join - meeting state:', {
+          meetingState: callRef.current?.meetingState(),
+          accessState: callRef.current?.accessState(),
+          participantCounts: callRef.current?.participantCounts(),
+          elapsedTime: performance.now() - joinStartTime
+        });
+      }, 5000);
+
+      // Additional state checks at intervals
+      setTimeout(() => {
+        console.log('⏰ [VideoDebug] 10 seconds after join - meeting state:', {
+          meetingState: callRef.current?.meetingState(),
+          accessState: callRef.current?.accessState(),
+          participantCounts: callRef.current?.participantCounts(),
+          elapsedTime: performance.now() - joinStartTime
+        });
+      }, 10000);
+
+      setTimeout(() => {
+        console.log('⏰ [VideoDebug] 15 seconds after join - meeting state:', {
+          meetingState: callRef.current?.meetingState(),
+          accessState: callRef.current?.accessState(),
+          participantCounts: callRef.current?.participantCounts(),
+          elapsedTime: performance.now() - joinStartTime
+        });
+      }, 15000);
+
+      // Wait for join to complete
+      await joinPromise;
+      
+      console.log('✅ [VideoDebug] Join promise resolved:', {
+        meetingState: callRef.current.meetingState(),
+        accessState: callRef.current.accessState(),
+        joinTime: performance.now() - joinStartTime,
+        totalInitTime: performance.now() - initStartTime
       });
 
     } catch (err) {
-      console.error('Failed to initialize Daily.js call:', err);
+      console.error('💥 [VideoDebug] Failed to initialize Daily.js call:', {
+        error: err,
+        message: err instanceof Error ? err.message : 'Unknown error',
+        stack: err instanceof Error ? err.stack : undefined,
+        meetingState: callRef.current?.meetingState(),
+        accessState: callRef.current?.accessState(),
+        timestamp: new Date().toISOString()
+      });
       setError(`Failed to connect: ${err instanceof Error ? err.message : 'Unknown error'}`);
       setIsLoading(false);
     }
@@ -103,21 +268,40 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({ roomUrl, isOpen
   // Cleanup call on unmount or close
   const cleanupCall = useCallback(() => {
     if (callRef.current) {
-      console.log('Cleaning up Daily.js call');
+      console.log('🧹 [VideoDebug] Cleaning up Daily.js call:', {
+        meetingState: callRef.current.meetingState(),
+        accessState: callRef.current.accessState(),
+        participantCounts: callRef.current.participantCounts(),
+        timestamp: new Date().toISOString()
+      });
       try {
         callRef.current.destroy();
         callRef.current = null;
+        console.log('✅ [VideoDebug] Call cleanup completed successfully');
       } catch (err) {
-        console.error('Error cleaning up call:', err);
+        console.error('❌ [VideoDebug] Error cleaning up call:', {
+          error: err,
+          message: err instanceof Error ? err.message : 'Unknown error',
+          timestamp: new Date().toISOString()
+        });
       }
+    } else {
+      console.log('ℹ️ [VideoDebug] No active call to cleanup');
     }
   }, []);
 
   // Reconnection logic
   const handleReconnect = useCallback(async () => {
-    if (isReconnecting) return;
+    if (isReconnecting) {
+      console.log('⚠️ [VideoDebug] Reconnection already in progress, skipping');
+      return;
+    }
     
-    console.log('Attempting to reconnect...');
+    console.log('🔄 [VideoDebug] Starting reconnection process:', {
+      isReconnecting,
+      currentMeetingState: callRef.current?.meetingState(),
+      timestamp: new Date().toISOString()
+    });
     setIsReconnecting(true);
     setError(null);
     
@@ -126,17 +310,35 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({ roomUrl, isOpen
     
     // Wait a moment before reconnecting
     setTimeout(() => {
+      console.log('⏰ [VideoDebug] Reconnection delay complete, reinitializing call');
       initializeCall();
     }, 2000);
   }, [isReconnecting, cleanupCall, initializeCall]);
 
   // Initialize call when component opens
   useEffect(() => {
+    console.log('🔄 [VideoDebug] useEffect triggered for initialization:', {
+      isOpen,
+      roomUrl,
+      hasRoomUrl: !!roomUrl,
+      timestamp: new Date().toISOString()
+    });
+    
     if (isOpen && roomUrl) {
+      console.log('✅ [VideoDebug] Conditions met, initializing call');
       initializeCall();
+    } else {
+      console.log('❌ [VideoDebug] Conditions not met for initialization:', {
+        isOpen,
+        hasRoomUrl: !!roomUrl
+      });
     }
     
     return () => {
+      console.log('🧹 [VideoDebug] useEffect cleanup triggered:', {
+        isOpen,
+        timestamp: new Date().toISOString()
+      });
       if (!isOpen) {
         cleanupCall();
       }
@@ -145,30 +347,51 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({ roomUrl, isOpen
 
   // Cleanup on unmount
   useEffect(() => {
+    console.log('🎯 [VideoDebug] Component mounted, setting up unmount cleanup');
     return () => {
+      console.log('🎯 [VideoDebug] Component unmounting, cleaning up');
       cleanupCall();
     };
   }, [cleanupCall]);
 
   const handleClose = () => {
+    console.log('❌ [VideoDebug] handleClose triggered:', {
+      meetingState: callRef.current?.meetingState(),
+      timestamp: new Date().toISOString()
+    });
     cleanupCall();
     onClose();
   };
 
   const toggleAudio = async () => {
-    if (!callRef.current) return;
+    if (!callRef.current) {
+      console.warn('⚠️ [VideoDebug] toggleAudio called but no active call');
+      return;
+    }
+    
+    console.log('🎤 [VideoDebug] toggleAudio called:', {
+      currentState: isAudioEnabled,
+      newState: !isAudioEnabled,
+      meetingState: callRef.current.meetingState()
+    });
     
     try {
       const newAudioState = !isAudioEnabled;
       await callRef.current.setLocalAudio(newAudioState);
       setIsAudioEnabled(newAudioState);
       
+      console.log('✅ [VideoDebug] Audio toggle successful:', newAudioState);
+      
       toast({
         title: newAudioState ? 'Microphone enabled' : 'Microphone disabled',
         description: newAudioState ? 'Your microphone is now on' : 'Your microphone is now off',
       });
     } catch (error) {
-      console.error('Error toggling audio:', error);
+      console.error('❌ [VideoDebug] Error toggling audio:', {
+        error,
+        meetingState: callRef.current?.meetingState(),
+        timestamp: new Date().toISOString()
+      });
       toast({
         title: 'Error',
         description: 'Failed to toggle microphone',
@@ -178,19 +401,34 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({ roomUrl, isOpen
   };
 
   const toggleVideo = async () => {
-    if (!callRef.current) return;
+    if (!callRef.current) {
+      console.warn('⚠️ [VideoDebug] toggleVideo called but no active call');
+      return;
+    }
+    
+    console.log('📹 [VideoDebug] toggleVideo called:', {
+      currentState: isVideoEnabled,
+      newState: !isVideoEnabled,
+      meetingState: callRef.current.meetingState()
+    });
     
     try {
       const newVideoState = !isVideoEnabled;
       await callRef.current.setLocalVideo(newVideoState);
       setIsVideoEnabled(newVideoState);
       
+      console.log('✅ [VideoDebug] Video toggle successful:', newVideoState);
+      
       toast({
         title: newVideoState ? 'Camera enabled' : 'Camera disabled',
         description: newVideoState ? 'Your camera is now on' : 'Your camera is now off',
       });
     } catch (error) {
-      console.error('Error toggling video:', error);
+      console.error('❌ [VideoDebug] Error toggling video:', {
+        error,
+        meetingState: callRef.current?.meetingState(),
+        timestamp: new Date().toISOString()
+      });
       toast({
         title: 'Error',
         description: 'Failed to toggle camera',
@@ -200,20 +438,38 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({ roomUrl, isOpen
   };
 
   const toggleFullscreen = () => {
-    if (!containerRef.current) return;
+    if (!containerRef.current) {
+      console.warn('⚠️ [VideoDebug] toggleFullscreen called but no container ref');
+      return;
+    }
+    
+    console.log('🔳 [VideoDebug] toggleFullscreen called:', {
+      currentState: isFullscreen,
+      newState: !isFullscreen,
+      containerElement: !!containerRef.current
+    });
     
     try {
       if (!isFullscreen) {
         if (containerRef.current.requestFullscreen) {
           containerRef.current.requestFullscreen();
+          console.log('✅ [VideoDebug] Fullscreen request initiated');
+        } else {
+          console.warn('⚠️ [VideoDebug] Fullscreen not supported');
         }
       } else {
         if (document.exitFullscreen) {
           document.exitFullscreen();
+          console.log('✅ [VideoDebug] Fullscreen exit initiated');
+        } else {
+          console.warn('⚠️ [VideoDebug] Exit fullscreen not supported');
         }
       }
     } catch (error) {
-      console.error('Error toggling fullscreen:', error);
+      console.error('❌ [VideoDebug] Error toggling fullscreen:', {
+        error,
+        timestamp: new Date().toISOString()
+      });
       toast({
         title: 'Error',
         description: 'Failed to toggle fullscreen',
@@ -224,12 +480,23 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({ roomUrl, isOpen
 
   // Listen for fullscreen changes
   useEffect(() => {
+    console.log('👂 [VideoDebug] Setting up fullscreen event listeners');
+    
     const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
+      const newFullscreenState = !!document.fullscreenElement;
+      console.log('🔳 [VideoDebug] Fullscreen state changed:', {
+        previousState: isFullscreen,
+        newState: newFullscreenState,
+        fullscreenElement: document.fullscreenElement?.tagName || 'none'
+      });
+      setIsFullscreen(newFullscreenState);
     };
     
     document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      console.log('🧹 [VideoDebug] Cleaning up fullscreen event listeners');
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
   }, []);
 
   const renderVideoContent = () => (
