@@ -20,6 +20,7 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({ roomUrl, isOpen
   const [isVideoEnabled, setIsVideoEnabled] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isReconnecting, setIsReconnecting] = useState(false);
+  const [canInit, setCanInit] = useState(false);
   const callRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -306,27 +307,32 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({ roomUrl, isOpen
     }, 2000);
   }, [isReconnecting, cleanupCall, initializeCall]);
 
-  // Initialize call when component opens
+  // Wait for iframe container to mount before initializing
   useEffect(() => {
-    console.log('🔄 [VideoDebug] useEffect triggered for initialization:', {
+    console.log('🔄 [VideoDebug] useEffect triggered for dialog state:', {
       isOpen,
       roomUrl,
       hasRoomUrl: !!roomUrl,
       timestamp: new Date().toISOString()
     });
     
-    if (isOpen && roomUrl) {
-      console.log('✅ [VideoDebug] Conditions met, initializing call');
-      initializeCall();
-    } else {
-      console.log('❌ [VideoDebug] Conditions not met for initialization:', {
-        isOpen,
-        hasRoomUrl: !!roomUrl
+    if (isOpen) {
+      // Allow the iframeRef to attach on next render tick
+      requestAnimationFrame(() => {
+        if (iframeRef.current) {
+          console.log('✅ [VideoDebug] Iframe container mounted, enabling initialization');
+          setCanInit(true);
+        } else {
+          console.warn('⚠️ [VideoDebug] Iframe container not yet available after requestAnimationFrame');
+        }
       });
+    } else {
+      console.log('🔄 [VideoDebug] Dialog closed, disabling initialization');
+      setCanInit(false);
     }
     
     return () => {
-      console.log('🧹 [VideoDebug] useEffect cleanup triggered:', {
+      console.log('🧹 [VideoDebug] Dialog state cleanup triggered:', {
         isOpen,
         timestamp: new Date().toISOString()
       });
@@ -334,7 +340,27 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({ roomUrl, isOpen
         cleanupCall();
       }
     };
-  }, [isOpen, roomUrl, initializeCall, cleanupCall]);
+  }, [isOpen, cleanupCall]);
+
+  // Initialize call only after iframe container is ready
+  useEffect(() => {
+    console.log('🎯 [VideoDebug] Initialization useEffect triggered:', {
+      canInit,
+      roomUrl,
+      hasRoomUrl: !!roomUrl,
+      timestamp: new Date().toISOString()
+    });
+    
+    if (canInit && roomUrl) {
+      console.log('✅ [VideoDebug] Iframe mounted and conditions met, now safe to initialize call');
+      initializeCall();
+    } else {
+      console.log('❌ [VideoDebug] Conditions not met for initialization:', {
+        canInit,
+        hasRoomUrl: !!roomUrl
+      });
+    }
+  }, [canInit, roomUrl, initializeCall]);
 
   // Cleanup on unmount
   useEffect(() => {
