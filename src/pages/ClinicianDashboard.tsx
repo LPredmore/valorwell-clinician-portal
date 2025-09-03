@@ -148,8 +148,18 @@ const ClinicianDashboard = () => {
 
   // Video session handlers
   const startVideoSession = (appointment: Appointment) => {
+    // Don't open video dialog without a valid room URL
+    if (!appointment.video_room_url) {
+      toast({
+        title: 'No Video Room',
+        description: 'This appointment does not have a video room configured.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
     setCurrentAppointment(appointment);
-    setCurrentVideoUrl(appointment.video_room_url || '');
+    setCurrentVideoUrl(appointment.video_room_url);
     setIsVideoOpen(true);
   };
 
