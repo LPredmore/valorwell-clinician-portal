@@ -85,12 +85,14 @@ serve(async (req) => {
     // Set room properties
     const roomProperties = {
       name: roomName,
+      privacy: "public", // Make room public to avoid knocking/approval requirements
       properties: {
         exp: null, // No expiration
         enable_screenshare: false,  // Disable screen sharing for Chrome 140 compatibility
         enable_chat: true, // Enable text chat
         start_video_off: true, // Start with video off
         start_audio_off: false, // Start with audio on
+        enable_knocking: false, // Disable knocking since room is public
       }
     };
     
