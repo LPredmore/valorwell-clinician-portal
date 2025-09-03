@@ -3,8 +3,6 @@ import { Calendar, Clock, AlertCircle } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import Layout from '@/components/layout/Layout';
 import VideoChat from '@/components/video/VideoChat';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
 import { TimeZoneService } from '@/utils/timeZoneService';
 import { AppointmentsList } from '@/components/dashboard/AppointmentsList';
 import SessionNoteTemplate from '@/components/templates/SessionNoteTemplate';
@@ -13,6 +11,8 @@ import { SessionDidNotOccurDialog } from '@/components/dashboard/SessionDidNotOc
 import { Appointment } from '@/types/appointment';
 import { ClientDetails } from '@/types/client';
 import { fetchClinicianAppointments, fetchClinicianProfile } from '@/utils/clinicianDataUtils';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 const ClinicianDashboard = () => {
   const { userRole, userId } = useUser();
@@ -147,76 +147,44 @@ const ClinicianDashboard = () => {
   }, [appointments, browserTimeZone]);
 
   // 🔥 INSANE LOGGING: Video session handlers
-  const startVideoSession = async (appointment: Appointment) => {
+  const startVideoSession = (appointment: Appointment) => {
     const timestamp = () => `[${new Date().toISOString()}]`;
     
     console.log(`🔥 ${timestamp()} [ClinicianDashboard] startVideoSession called:`, {
       appointmentId: appointment.id,
-      hasExistingVideoUrl: !!appointment.video_room_url,
+      appointmentData: appointment,
+      videoRoomUrl: appointment.video_room_url,
+      hasVideoRoomUrl: !!appointment.video_room_url,
+      videoRoomUrlLength: appointment.video_room_url?.length || 0,
+      videoRoomUrlType: typeof appointment.video_room_url,
+      videoRoomUrlStartsWith: appointment.video_room_url?.substring(0, 30),
+      clientName: appointment.clientName,
+      startTime: appointment.start_at,
+      timestamp: new Date().toISOString()
+    });
+
+    // Don't open video dialog without a valid room URL
+    if (!appointment.video_room_url) {
+      console.log(`🔥 ${timestamp()} [ClinicianDashboard] 🚨 NO VIDEO ROOM URL - showing error toast`);
+      toast({
+        title: 'No Video Room',
+        description: 'This appointment does not have a video room configured.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    console.log(`🔥 ${timestamp()} [ClinicianDashboard] 🚀 Setting video session state:`, {
+      appointment: appointment,
+      videoUrl: appointment.video_room_url,
       timestamp: new Date().toISOString()
     });
     
-    try {
-      // Check if appointment has a video room URL, create one if not
-      let videoRoomUrl = appointment.video_room_url;
+    setCurrentAppointment(appointment);
+    setCurrentVideoUrl(appointment.video_room_url);
+    setIsVideoOpen(true);
 
-      if (!videoRoomUrl) {
-        console.log(`🔥 ${timestamp()} [ClinicianDashboard] Creating video room for appointment:`, appointment.id);
-        
-        const { data, error } = await supabase.functions.invoke('create-daily-room', {
-          body: { appointmentId: appointment.id }
-        });
-
-        if (error) {
-          console.error(`🔥 ${timestamp()} [ClinicianDashboard] Failed to create video room:`, error);
-          toast({
-            title: 'Error',
-            description: 'Failed to create video session',
-            variant: 'destructive',
-          });
-          return;
-        }
-
-        if (!data?.url) {
-          console.error(`🔥 ${timestamp()} [ClinicianDashboard] No video room URL returned`);
-          toast({
-            title: 'Error',
-            description: 'Failed to get video room URL',
-            variant: 'destructive',
-          });
-          return;
-        }
-
-        videoRoomUrl = data.url;
-        
-        // Update the appointment with the video room URL
-        const { error: updateError } = await supabase
-          .from('appointments')
-          .update({ video_room_url: videoRoomUrl })
-          .eq('id', appointment.id);
-
-        if (updateError) {
-          console.warn(`🔥 ${timestamp()} [ClinicianDashboard] Failed to save video room URL:`, updateError);
-          // Continue anyway since we have the URL
-        }
-
-        console.log(`🔥 ${timestamp()} [ClinicianDashboard] ✅ Video room created successfully:`, videoRoomUrl);
-      }
-
-      console.log(`🔥 ${timestamp()} [ClinicianDashboard] ✅ Opening video session with URL:`, videoRoomUrl);
-      
-      setCurrentAppointment(appointment);
-      setCurrentVideoUrl(videoRoomUrl);
-      setIsVideoOpen(true);
-
-    } catch (error) {
-      console.error(`🔥 ${timestamp()} [ClinicianDashboard] Error in startVideoSession:`, error);
-      toast({
-        title: 'Error',
-        description: 'Failed to start video session',
-        variant: 'destructive',
-      });
-    }
+    console.log(`🔥 ${timestamp()} [ClinicianDashboard] ✅ Video session state set - dialog should open`);
   };
 
   const closeVideoSession = () => {
