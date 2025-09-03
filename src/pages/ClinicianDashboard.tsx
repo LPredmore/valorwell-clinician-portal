@@ -146,10 +146,26 @@ const ClinicianDashboard = () => {
     return categorized;
   }, [appointments, browserTimeZone]);
 
-  // Video session handlers
+  // 🔥 INSANE LOGGING: Video session handlers
   const startVideoSession = (appointment: Appointment) => {
+    const timestamp = () => `[${new Date().toISOString()}]`;
+    
+    console.log(`🔥 ${timestamp()} [ClinicianDashboard] startVideoSession called:`, {
+      appointmentId: appointment.id,
+      appointmentData: appointment,
+      videoRoomUrl: appointment.video_room_url,
+      hasVideoRoomUrl: !!appointment.video_room_url,
+      videoRoomUrlLength: appointment.video_room_url?.length || 0,
+      videoRoomUrlType: typeof appointment.video_room_url,
+      videoRoomUrlStartsWith: appointment.video_room_url?.substring(0, 30),
+      clientName: appointment.clientName,
+      startTime: appointment.start_at,
+      timestamp: new Date().toISOString()
+    });
+
     // Don't open video dialog without a valid room URL
     if (!appointment.video_room_url) {
+      console.log(`🔥 ${timestamp()} [ClinicianDashboard] 🚨 NO VIDEO ROOM URL - showing error toast`);
       toast({
         title: 'No Video Room',
         description: 'This appointment does not have a video room configured.',
@@ -157,10 +173,18 @@ const ClinicianDashboard = () => {
       });
       return;
     }
+
+    console.log(`🔥 ${timestamp()} [ClinicianDashboard] 🚀 Setting video session state:`, {
+      appointment: appointment,
+      videoUrl: appointment.video_room_url,
+      timestamp: new Date().toISOString()
+    });
     
     setCurrentAppointment(appointment);
     setCurrentVideoUrl(appointment.video_room_url);
     setIsVideoOpen(true);
+
+    console.log(`🔥 ${timestamp()} [ClinicianDashboard] ✅ Video session state set - dialog should open`);
   };
 
   const closeVideoSession = () => {

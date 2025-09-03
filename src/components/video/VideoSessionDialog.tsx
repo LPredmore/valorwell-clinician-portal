@@ -13,6 +13,21 @@ interface VideoSessionDialogProps {
 }
 
 const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({ roomUrl, isOpen, onClose }) => {
+  // 🔥 INSANE LOGGING: Timestamp helper
+  const timestamp = () => `[${new Date().toISOString()}]`;
+  const logId = `VideoSessionDialog-${Math.random().toString(36).substr(2, 9)}`;
+  
+  console.log(`🔥 ${timestamp()} [${logId}] Component initialized with props:`, {
+    roomUrl,
+    isOpen,
+    onClose: typeof onClose,
+    roomUrlValid: !!roomUrl,
+    roomUrlLength: roomUrl?.length || 0,
+    roomUrlType: typeof roomUrl,
+    roomUrlStartsWith: roomUrl?.substring(0, 30),
+    timestamp: new Date().toISOString()
+  });
+
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -21,13 +36,55 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({ roomUrl, isOpen
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [callObj, setCallObj] = useState<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  
-  // Effect 1: Create Daily frame when container is ready (mirror client portal)
+
+  // 🔥 INSANE LOGGING: State change tracker
   useEffect(() => {
+    console.log(`🔥 ${timestamp()} [${logId}] State change - isLoading:`, {
+      isLoading,
+      timestamp: new Date().toISOString()
+    });
+  }, [isLoading]);
+
+  useEffect(() => {
+    console.log(`🔥 ${timestamp()} [${logId}] State change - error:`, {
+      error,
+      timestamp: new Date().toISOString()
+    });
+  }, [error]);
+
+  useEffect(() => {
+    console.log(`🔥 ${timestamp()} [${logId}] State change - callObj:`, {
+      hasCallObj: !!callObj,
+      callObjType: typeof callObj,
+      timestamp: new Date().toISOString()
+    });
+  }, [callObj]);
+  
+  // 🔥 INSANE LOGGING: Effect 1 - Create Daily frame when container is ready
+  useEffect(() => {
+    console.log(`🔥 ${timestamp()} [${logId}] Effect 1 triggered:`, {
+      isOpen,
+      hasContainer: !!containerRef.current,
+      hasCallObj: !!callObj,
+      containerElement: containerRef.current ? 'HTMLElement' : null,
+      shouldCreateFrame: isOpen && containerRef.current && !callObj,
+      timestamp: new Date().toISOString()
+    });
+
     if (isOpen && containerRef.current && !callObj) {
-      console.log('Creating Daily frame');
+      console.log(`🔥 ${timestamp()} [${logId}] CREATING DAILY FRAME - All conditions met`);
+      console.log(`🔥 ${timestamp()} [${logId}] Container ref details:`, {
+        container: containerRef.current,
+        containerTagName: containerRef.current?.tagName,
+        containerClientWidth: containerRef.current?.clientWidth,
+        containerClientHeight: containerRef.current?.clientHeight,
+        timestamp: new Date().toISOString()
+      });
       
       try {
+        console.log(`🔥 ${timestamp()} [${logId}] Calling DailyIframe.createFrame...`);
+        const frameStartTime = performance.now();
+        
         const newCall = DailyIframe.createFrame(containerRef.current, {
           iframeStyle: {
             width: '100%',
@@ -40,39 +97,142 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({ roomUrl, isOpen
           activeSpeakerMode: true,
         });
 
-        // Essential event listeners only
+        const frameEndTime = performance.now();
+        console.log(`🔥 ${timestamp()} [${logId}] Daily frame created successfully:`, {
+          creationTime: `${frameEndTime - frameStartTime}ms`,
+          callObject: !!newCall,
+          callObjectType: typeof newCall,
+          timestamp: new Date().toISOString()
+        });
+
+        // 🔥 INSANE LOGGING: Event listeners with detailed logging
+        console.log(`🔥 ${timestamp()} [${logId}] Setting up event listeners...`);
+        
         newCall
-          .on('loaded', () => setIsLoading(false))
-          .on('joined-meeting', () => setIsLoading(false))
-          .on('left-meeting', () => onClose())
+          .on('loaded', (event: any) => {
+            console.log(`🔥 ${timestamp()} [${logId}] 🎉 DAILY EVENT: loaded`, {
+              event,
+              timestamp: new Date().toISOString()
+            });
+            setIsLoading(false);
+          })
+          .on('joined-meeting', (event: any) => {
+            console.log(`🔥 ${timestamp()} [${logId}] 🎉 DAILY EVENT: joined-meeting`, {
+              event,
+              timestamp: new Date().toISOString()
+            });
+            setIsLoading(false);
+          })
+          .on('left-meeting', (event: any) => {
+            console.log(`🔥 ${timestamp()} [${logId}] 🎉 DAILY EVENT: left-meeting`, {
+              event,
+              timestamp: new Date().toISOString()
+            });
+            onClose();
+          })
           .on('error', (event: any) => {
+            console.log(`🔥 ${timestamp()} [${logId}] 🚨 DAILY EVENT: error`, {
+              event,
+              errorMsg: event.errorMsg,
+              timestamp: new Date().toISOString()
+            });
             setError(`Connection error: ${event.errorMsg || 'Unknown error'}`);
             setIsLoading(false);
+          })
+          .on('meeting-session-updated', (event: any) => {
+            console.log(`🔥 ${timestamp()} [${logId}] 🎉 DAILY EVENT: meeting-session-updated`, {
+              event,
+              timestamp: new Date().toISOString()
+            });
+          })
+          .on('participant-joined', (event: any) => {
+            console.log(`🔥 ${timestamp()} [${logId}] 🎉 DAILY EVENT: participant-joined`, {
+              event,
+              timestamp: new Date().toISOString()
+            });
           });
 
+        console.log(`🔥 ${timestamp()} [${logId}] Event listeners set up, storing callObj...`);
         setCallObj(newCall);
+        console.log(`🔥 ${timestamp()} [${logId}] CallObj stored in state`);
 
       } catch (err) {
+        console.log(`🔥 ${timestamp()} [${logId}] 🚨 ERROR creating Daily frame:`, {
+          error: err,
+          errorMessage: err instanceof Error ? err.message : 'Unknown error',
+          errorStack: err instanceof Error ? err.stack : null,
+          timestamp: new Date().toISOString()
+        });
         setError(`Failed to initialize: ${err instanceof Error ? err.message : 'Unknown error'}`);
         setIsLoading(false);
       }
     } else if (!isOpen) {
+      console.log(`🔥 ${timestamp()} [${logId}] Dialog closed - clearing callObj`);
       setCallObj(null);
+    } else {
+      console.log(`🔥 ${timestamp()} [${logId}] Effect 1 - conditions not met:`, {
+        isOpen,
+        hasContainer: !!containerRef.current,
+        hasCallObj: !!callObj,
+        timestamp: new Date().toISOString()
+      });
     }
   }, [isOpen, containerRef.current, callObj]);
 
-  // Effect 2: Join call after callObj is created (mirror client portal)  
+  // 🔥 INSANE LOGGING: Effect 2 - Join call after callObj is created
   useEffect(() => {
+    console.log(`🔥 ${timestamp()} [${logId}] Effect 2 triggered - Join meeting:`, {
+      hasCallObj: !!callObj,
+      roomUrl,
+      roomUrlValid: !!roomUrl,
+      roomUrlLength: roomUrl?.length || 0,
+      roomUrlType: typeof roomUrl,
+      roomUrlStartsWith: roomUrl?.substring(0, 30),
+      shouldJoin: !!(callObj && roomUrl),
+      timestamp: new Date().toISOString()
+    });
+
     if (callObj && roomUrl) {
-      console.log('Joining meeting');
+      console.log(`🔥 ${timestamp()} [${logId}] 🚀 JOINING MEETING - All conditions met`);
+      console.log(`🔥 ${timestamp()} [${logId}] Join parameters:`, {
+        url: roomUrl,
+        startVideoOff: false,
+        startAudioOff: false,
+        timestamp: new Date().toISOString()
+      });
+      
+      const joinStartTime = performance.now();
       
       callObj.join({ 
         url: roomUrl, 
         startVideoOff: false, 
         startAudioOff: false 
+      }).then((result: any) => {
+        const joinEndTime = performance.now();
+        console.log(`🔥 ${timestamp()} [${logId}] 🎉 JOIN SUCCESSFUL:`, {
+          result,
+          joinTime: `${joinEndTime - joinStartTime}ms`,
+          timestamp: new Date().toISOString()
+        });
       }).catch((err: any) => {
+        const joinEndTime = performance.now();
+        console.log(`🔥 ${timestamp()} [${logId}] 🚨 JOIN FAILED:`, {
+          error: err,
+          errorMessage: err.message || 'Unknown error',
+          errorStack: err.stack,
+          joinTime: `${joinEndTime - joinStartTime}ms`,
+          roomUrl,
+          timestamp: new Date().toISOString()
+        });
         setError(`Failed to connect: ${err.message || 'Unknown error'}`);
         setIsLoading(false);
+      });
+    } else {
+      console.log(`🔥 ${timestamp()} [${logId}] Effect 2 - conditions not met for joining:`, {
+        hasCallObj: !!callObj,
+        hasRoomUrl: !!roomUrl,
+        roomUrl,
+        timestamp: new Date().toISOString()
       });
     }
   }, [callObj, roomUrl]);
