@@ -1,219 +1,246 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Loader2, Mic, MicOff, Video, VideoOff, X, Maximize } from 'lucide-react';
+import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogHeader } from '@/components/ui/dialog';
+import { Mic, MicOff, Video, VideoOff, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import DailyIframe from '@daily-co/daily-js';
 
 interface VideoSessionDialogProps {
-  roomUrl: string;
+  roomUrl?: string;
   isOpen: boolean;
   onClose: () => void;
 }
 
 const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({ roomUrl, isOpen, onClose }) => {
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isAudioEnabled, setIsAudioEnabled] = useState(true);
-  const [isVideoEnabled, setIsVideoEnabled] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isConnected, setIsConnected] = useState(false);
-  const [participantCount, setParticipantCount] = useState(0);
+  const [isAudioEnabled, setIsAudioEnabled] = React.useState(true);
+  const [isVideoEnabled, setIsVideoEnabled] = React.useState(false);
+  const [participantCount, setParticipantCount] = React.useState(0);
   
-  const containerRef = useRef<HTMLDivElement>(null);
-  const callObjectRef = useRef<any>(null);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const callObjectRef = React.useRef<any>(null);
 
-  // 🔥 FIXED: Initialize Daily.js call object - USE createCallObject() NOT createFrame()
-  useEffect(() => {
-    if (!roomUrl || !isOpen || !containerRef.current) return;
+  // 1) Create & mount call object when dialog opens
+  React.useEffect(() => {
+    if (!isOpen) {
+      // Clean up on close
+      if (callObjectRef.current) {
+        console.log("[Daily] cleaning up call object");
+        callObjectRef.current.destroy();
+        callObjectRef.current = null;
+      }
+      return;
+    }
 
-    const initializeCall = async () => {
+    // Only initialize once when dialog opens and container is ready
+    if (isOpen && containerRef.current && !callObjectRef.current) {
+      console.log("[Daily] initializing call object");
       try {
-        setIsLoading(true);
-        setError(null);
-
-        // ✅ CRITICAL FIX: Use createCallObject() method
+        // Create a call object with proper options
         const callObject = DailyIframe.createCallObject({
           iframeStyle: {
             position: 'absolute',
             top: '0',
-            left: '0', 
+            left: '0',
             width: '100%',
             height: '100%',
             border: 'none',
+            borderRadius: '12px',
           },
+          showLeaveButton: false,
+          showFullscreenButton: false,
+          activeSpeakerMode: true,
         });
 
-        callObjectRef.current = callObject;
-
-        // ✅ CRITICAL FIX: Manually append iframe to container
+        // Manually append the iframe to our container div
         if (containerRef.current) {
           containerRef.current.appendChild(callObject.iframe());
         }
 
-        // Event handlers
-        callObject.on('joined-meeting', () => {
-          setIsConnected(true);
-          setIsLoading(false);
-          toast({
-            title: "Connected",
-            description: "Successfully joined the video session",
-          });
-        });
-
-        callObject.on('left-meeting', () => {
-          setIsConnected(false);
-          onClose();
-        });
-
-        callObject.on('participant-joined', (event: any) => {
-          setParticipantCount(prev => prev + 1);
-          if (event.participant.user_name) {
-            toast({
-              title: "Participant Joined", 
-              description: `${event.participant.user_name} joined the session`,
-            });
-          }
-        });
-
-        callObject.on('participant-left', (event: any) => {
-          setParticipantCount(prev => Math.max(0, prev - 1));
-          if (event.participant.user_name) {
-            toast({
-              title: "Participant Left",
-              description: `${event.participant.user_name} left the session`, 
-            });
-          }
-        });
-
-        callObject.on('error', (event: any) => {
-          console.error('Daily.js error:', event);
-          setError('Connection error occurred');
-          setIsLoading(false);
-          
-          toast({
-            title: "Video Session Error",
-            description: event.errorMsg || "An error occurred during the video session",
-            variant: "destructive",
-          });
-        });
-
-        // Join the call
-        await callObject.join({ url: roomUrl });
-
-      } catch (error) {
-        console.error('Failed to initialize call:', error);
-        setError('Unable to connect to video session. Please try again.');
-        setIsLoading(false);
+        callObjectRef.current = callObject;
+        console.log("[Daily] call object created and iframe appended");
+      } catch (err) {
+        console.error("[Daily] failed to initialize:", err);
         toast({
-          title: "Connection Failed",
-          description: "Unable to connect to video session. Please try again.",
+          title: "Initialization Failed",
+          description: "Unable to initialize video session",
           variant: "destructive",
         });
       }
+    }
+  }, [isOpen, toast]);
+
+  // 2) Wire events ONCE when call object is ready
+  React.useEffect(() => {
+    if (!callObjectRef.current) return;
+
+    const callObject = callObjectRef.current;
+
+    const onLoading = () => console.log("[Daily] loading");
+    const onLoaded = () => console.log("[Daily] loaded");
+    const onJoined = (ev: any) => {
+      console.log("[Daily] joined-meeting", ev);
+      const participants = Object.keys(ev.participants || {});
+      setParticipantCount(participants.length);
+      toast({
+        title: "Connected",
+        description: "Successfully joined the video session",
+      });
     };
-
-    initializeCall();
-
-    return () => {
-      if (callObjectRef.current) {
-        callObjectRef.current.destroy();
-        callObjectRef.current = null;
+    const onLeft = (ev: any) => {
+      console.log("[Daily] left-meeting", ev);
+      onClose();
+    };
+    const onError = (ev: any) => {
+      console.error("[Daily] error", ev);
+      toast({
+        title: "Video Session Error",
+        description: ev.errorMsg || "An error occurred during the video session",
+        variant: "destructive",
+      });
+    };
+    const onParticipantJoined = (ev: any) => {
+      console.log("[Daily] participant-joined", ev);
+      setParticipantCount(prev => prev + 1);
+      if (ev.participant.user_name) {
+        toast({
+          title: "Participant Joined", 
+          description: `${ev.participant.user_name} joined the session`,
+        });
       }
     };
-  }, [roomUrl, isOpen, onClose]);
+    const onParticipantLeft = (ev: any) => {
+      console.log("[Daily] participant-left", ev);
+      setParticipantCount(prev => Math.max(0, prev - 1));
+      if (ev.participant.user_name) {
+        toast({
+          title: "Participant Left",
+          description: `${ev.participant.user_name} left the session`, 
+        });
+      }
+    };
 
-  // Cleanup on dialog close
-  useEffect(() => {
-    if (!isOpen && callObjectRef.current) {
-      callObjectRef.current.destroy();
-      callObjectRef.current = null;
+    callObject.on("loading", onLoading);
+    callObject.on("loaded", onLoaded);
+    callObject.on("joined-meeting", onJoined);
+    callObject.on("left-meeting", onLeft);
+    callObject.on("error", onError);
+    callObject.on("participant-joined", onParticipantJoined);
+    callObject.on("participant-left", onParticipantLeft);
+
+    return () => {
+      callObject.off("loading", onLoading);
+      callObject.off("loaded", onLoaded);
+      callObject.off("joined-meeting", onJoined);
+      callObject.off("left-meeting", onLeft);
+      callObject.off("error", onError);
+      callObject.off("participant-joined", onParticipantJoined);
+      callObject.off("participant-left", onParticipantLeft);
+    };
+  }, [callObjectRef.current, toast, onClose]);
+
+  // 3) Join when dialog opens & we have a URL
+  React.useEffect(() => {
+    let cancelled = false;
+
+    async function joinCall() {
+      if (!isOpen || !roomUrl || !callObjectRef.current) return;
+
+      console.log("[Daily] about to join", {
+        meetingState: callObjectRef.current.meetingState?.(),
+        roomUrl,
+      });
+
+      try {
+        // IMPORTANT: pass the URL explicitly to join()
+        await callObjectRef.current.join({ 
+          url: roomUrl, 
+          startVideoOff: !isVideoEnabled, 
+          startAudioOff: !isAudioEnabled 
+        });
+        if (!cancelled) console.log("[Daily] join() resolved");
+      } catch (e) {
+        if (!cancelled) {
+          console.error("[Daily] join() failed", e);
+          toast({
+            title: "Connection Failed",
+            description: "Unable to connect to video session. Please try again.",
+            variant: "destructive",
+          });
+        }
+      }
     }
-  }, [isOpen]);
 
-  const handleClose = () => {
-    if (callObjectRef.current) {
-      callObjectRef.current.destroy();
-      callObjectRef.current = null;
+    void joinCall();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, roomUrl, isVideoEnabled, isAudioEnabled, toast]);
+
+  // 4) Leave on close
+  const handleClose = React.useCallback(async () => {
+    try {
+      if (callObjectRef.current) {
+        console.log("[Daily] leaving call");
+        await callObjectRef.current.leave();
+      }
+    } catch (e) {
+      console.error("[Daily] error leaving call", e);
+    } finally {
+      onClose();
     }
-    onClose();
-  };
+  }, [onClose]);
 
-  const toggleAudio = useCallback(() => {
+  const toggleAudio = React.useCallback(() => {
     if (callObjectRef.current) {
-      callObjectRef.current.setLocalAudio(!isAudioEnabled);
-      setIsAudioEnabled(!isAudioEnabled);
+      const newState = !isAudioEnabled;
+      callObjectRef.current.setLocalAudio(newState);
+      setIsAudioEnabled(newState);
+      console.log("[Daily] audio toggled:", newState);
     }
   }, [isAudioEnabled]);
 
-  const toggleVideo = useCallback(() => {
+  const toggleVideo = React.useCallback(() => {
     if (callObjectRef.current) {
-      callObjectRef.current.setLocalVideo(!isVideoEnabled);
-      setIsVideoEnabled(!isVideoEnabled);
+      const newState = !isVideoEnabled;
+      callObjectRef.current.setLocalVideo(newState);
+      setIsVideoEnabled(newState);
+      console.log("[Daily] video toggled:", newState);
     }
   }, [isVideoEnabled]);
 
-  const leaveCall = useCallback(() => {
-    if (callObjectRef.current) {
-      callObjectRef.current.leave();
-    }
-    onClose();
-  }, [onClose]);
+  const leaveCall = React.useCallback(async () => {
+    await handleClose();
+  }, [handleClose]);
 
-  if (!roomUrl) return null;
+  // Render nothing if closed (prevents accidental multiple frames)
+  if (!isOpen) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="max-w-6xl h-[80vh]">
         <DialogHeader>
           <DialogTitle>Video Session</DialogTitle>
-          {isConnected && (
-            <DialogDescription>
-              ({participantCount + 1} participant{participantCount !== 0 ? 's' : ''})
-            </DialogDescription>
-          )}
+          <DialogDescription>
+            {participantCount > 0 && `(${participantCount + 1} participants)`}
+          </DialogDescription>
         </DialogHeader>
         
         <div className="flex-1 relative bg-gray-900 rounded-lg overflow-hidden">
-          <div ref={containerRef} className="w-full h-full relative">
-            {isLoading && (
-              <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
-                <div className="text-center text-white">
-                  <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-                  <p>Connecting to video session...</p>
-                </div>
-              </div>
-            )}
-            
-            {error && (
-              <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
-                <div className="text-center text-white">
-                  <p className="text-lg font-medium mb-2">Unable to connect to video session</p>
-                  <Button 
-                    onClick={() => window.location.reload()} 
-                    variant="outline" 
-                    className="text-white border-white hover:bg-white hover:text-gray-900"
-                  >
-                    Try Again
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
+          <div ref={containerRef} className="w-full h-full" />
         </div>
         
         {/* Video Controls */}
         <div className="flex justify-center gap-4 p-4">
           <Button onClick={toggleAudio} variant="outline">
-            {isAudioEnabled ? <Mic /> : <MicOff />}
+            {isAudioEnabled ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
           </Button>
           <Button onClick={toggleVideo} variant="outline">
-            {isVideoEnabled ? <Video /> : <VideoOff />}
+            {isVideoEnabled ? <Video className="h-4 w-4" /> : <VideoOff className="h-4 w-4" />}
           </Button>
           <Button onClick={leaveCall} variant="destructive">
-            <X />
+            <X className="h-4 w-4" />
           </Button>
         </div>
       </DialogContent>
