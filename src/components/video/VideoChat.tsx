@@ -1,4 +1,6 @@
 
+console.log("[VideoChat] file loaded");
+
 import React, { useEffect } from 'react';
 import VideoSessionDialog from './VideoSessionDialog';
 

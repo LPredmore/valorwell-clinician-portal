@@ -1,9 +1,13 @@
+"use client";
+
+console.log("[VideoSessionDialog] file loaded");
+
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogHeader } from '@/components/ui/dialog';
 import { Mic, MicOff, Video, VideoOff, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import DailyIframe from '@daily-co/daily-js';
+import { useCallFrame } from '@daily-co/daily-react';
 
 interface VideoSessionDialogProps {
   roomUrl?: string;
@@ -18,66 +22,37 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({ roomUrl, isOpen
   const [participantCount, setParticipantCount] = React.useState(0);
   
   const containerRef = React.useRef<HTMLDivElement>(null);
-  const callObjectRef = React.useRef<any>(null);
 
-  // 1) Create & mount call object when dialog opens
+  // Use canonical Daily React pattern with useCallFrame
+  const callFrame = useCallFrame({
+    parentElRef: containerRef,
+    options: {
+      iframeStyle: {
+        width: "100%",
+        height: "100%", 
+        border: "0",
+        borderRadius: "12px"
+      },
+      showParticipantsBar: true,
+      showLeaveButton: false,
+      showFullscreenButton: false,
+      activeSpeakerMode: true,
+    },
+    shouldCreateInstance: () => isOpen
+  });
+
+  // Wire event listeners
   React.useEffect(() => {
-    if (!isOpen) {
-      // Clean up on close
-      if (callObjectRef.current) {
-        console.log("[Daily] cleaning up call object");
-        callObjectRef.current.destroy();
-        callObjectRef.current = null;
-      }
-      return;
-    }
+    if (!callFrame) return;
 
-    // Only initialize once when dialog opens and container is ready
-    if (isOpen && containerRef.current && !callObjectRef.current) {
-      console.log("[Daily] initializing call object");
-      try {
-        // Create a call object with proper options
-        const callObject = DailyIframe.createCallObject({
-          iframeStyle: {
-            position: 'absolute',
-            top: '0',
-            left: '0',
-            width: '100%',
-            height: '100%',
-            border: 'none',
-            borderRadius: '12px',
-          },
-          showLeaveButton: false,
-          showFullscreenButton: false,
-          activeSpeakerMode: true,
-        });
+    const onLoading = () => {
+      console.log("[Daily] loading");
+    };
 
-        // Manually append the iframe to our container div
-        if (containerRef.current) {
-          containerRef.current.appendChild(callObject.iframe());
-        }
+    const onLoaded = () => {
+      console.log("[Daily] loaded");
+    };
 
-        callObjectRef.current = callObject;
-        console.log("[Daily] call object created and iframe appended");
-      } catch (err) {
-        console.error("[Daily] failed to initialize:", err);
-        toast({
-          title: "Initialization Failed",
-          description: "Unable to initialize video session",
-          variant: "destructive",
-        });
-      }
-    }
-  }, [isOpen, toast]);
-
-  // 2) Wire events ONCE when call object is ready
-  React.useEffect(() => {
-    if (!callObjectRef.current) return;
-
-    const callObject = callObjectRef.current;
-
-    const onLoading = () => console.log("[Daily] loading");
-    const onLoaded = () => console.log("[Daily] loaded");
     const onJoined = (ev: any) => {
       console.log("[Daily] joined-meeting", ev);
       const participants = Object.keys(ev.participants || {});
@@ -87,10 +62,11 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({ roomUrl, isOpen
         description: "Successfully joined the video session",
       });
     };
+
     const onLeft = (ev: any) => {
       console.log("[Daily] left-meeting", ev);
-      onClose();
     };
+
     const onError = (ev: any) => {
       console.error("[Daily] error", ev);
       toast({
@@ -99,6 +75,7 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({ roomUrl, isOpen
         variant: "destructive",
       });
     };
+
     const onParticipantJoined = (ev: any) => {
       console.log("[Daily] participant-joined", ev);
       setParticipantCount(prev => prev + 1);
@@ -109,6 +86,7 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({ roomUrl, isOpen
         });
       }
     };
+
     const onParticipantLeft = (ev: any) => {
       console.log("[Daily] participant-left", ev);
       setParticipantCount(prev => Math.max(0, prev - 1));
@@ -120,41 +98,42 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({ roomUrl, isOpen
       }
     };
 
-    callObject.on("loading", onLoading);
-    callObject.on("loaded", onLoaded);
-    callObject.on("joined-meeting", onJoined);
-    callObject.on("left-meeting", onLeft);
-    callObject.on("error", onError);
-    callObject.on("participant-joined", onParticipantJoined);
-    callObject.on("participant-left", onParticipantLeft);
+    // Wire up event listeners
+    callFrame.on("loading", onLoading);
+    callFrame.on("loaded", onLoaded);
+    callFrame.on("joined-meeting", onJoined);
+    callFrame.on("left-meeting", onLeft);
+    callFrame.on("error", onError);
+    callFrame.on("participant-joined", onParticipantJoined);
+    callFrame.on("participant-left", onParticipantLeft);
 
+    // Cleanup listeners
     return () => {
-      callObject.off("loading", onLoading);
-      callObject.off("loaded", onLoaded);
-      callObject.off("joined-meeting", onJoined);
-      callObject.off("left-meeting", onLeft);
-      callObject.off("error", onError);
-      callObject.off("participant-joined", onParticipantJoined);
-      callObject.off("participant-left", onParticipantLeft);
+      callFrame.off("loading", onLoading);
+      callFrame.off("loaded", onLoaded);
+      callFrame.off("joined-meeting", onJoined);
+      callFrame.off("left-meeting", onLeft);
+      callFrame.off("error", onError);
+      callFrame.off("participant-joined", onParticipantJoined);
+      callFrame.off("participant-left", onParticipantLeft);
     };
-  }, [callObjectRef.current, toast, onClose]);
+  }, [callFrame, toast]);
 
-  // 3) Join when dialog opens & we have a URL
+  // Join the call when dialog opens and we have a room URL
   React.useEffect(() => {
     let cancelled = false;
 
     async function joinCall() {
-      if (!isOpen || !roomUrl || !callObjectRef.current) return;
+      if (!isOpen || !roomUrl || !callFrame) return;
 
       console.log("[Daily] about to join", {
-        meetingState: callObjectRef.current.meetingState?.(),
+        meetingState: callFrame.meetingState?.(),
         roomUrl,
       });
 
       try {
-        // IMPORTANT: pass the URL explicitly to join()
-        await callObjectRef.current.join({ 
-          url: roomUrl, 
+        await callFrame.join({ 
+          url: roomUrl,
           startVideoOff: !isVideoEnabled, 
           startAudioOff: !isAudioEnabled 
         });
@@ -176,45 +155,45 @@ const VideoSessionDialog: React.FC<VideoSessionDialogProps> = ({ roomUrl, isOpen
     return () => {
       cancelled = true;
     };
-  }, [isOpen, roomUrl, isVideoEnabled, isAudioEnabled, toast]);
+  }, [isOpen, roomUrl, callFrame, isVideoEnabled, isAudioEnabled, toast]);
 
-  // 4) Leave on close
+  // Leave on close
   const handleClose = React.useCallback(async () => {
     try {
-      if (callObjectRef.current) {
+      if (callFrame) {
         console.log("[Daily] leaving call");
-        await callObjectRef.current.leave();
+        await callFrame.leave();
       }
     } catch (e) {
       console.error("[Daily] error leaving call", e);
     } finally {
       onClose();
     }
-  }, [onClose]);
+  }, [callFrame, onClose]);
 
   const toggleAudio = React.useCallback(() => {
-    if (callObjectRef.current) {
+    if (callFrame) {
       const newState = !isAudioEnabled;
-      callObjectRef.current.setLocalAudio(newState);
+      callFrame.setLocalAudio(newState);
       setIsAudioEnabled(newState);
       console.log("[Daily] audio toggled:", newState);
     }
-  }, [isAudioEnabled]);
+  }, [callFrame, isAudioEnabled]);
 
   const toggleVideo = React.useCallback(() => {
-    if (callObjectRef.current) {
+    if (callFrame) {
       const newState = !isVideoEnabled;
-      callObjectRef.current.setLocalVideo(newState);
+      callFrame.setLocalVideo(newState);
       setIsVideoEnabled(newState);
       console.log("[Daily] video toggled:", newState);
     }
-  }, [isVideoEnabled]);
+  }, [callFrame, isVideoEnabled]);
 
   const leaveCall = React.useCallback(async () => {
     await handleClose();
   }, [handleClose]);
 
-  // Render nothing if closed (prevents accidental multiple frames)
+  // Don't render if not open
   if (!isOpen) return null;
 
   return (
