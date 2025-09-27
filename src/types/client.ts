@@ -13,7 +13,7 @@ export interface ClientDetails {
   client_time_zone: string | null;
   client_minor: string | null;
   client_status: string | null;
-  client_assigned_therapist: string | null;
+  client_assigned_therapist: string | null; // Currently TEXT, pending migration to UUID type
   client_referral_source: string | null;
   client_self_goal: string | null;
   client_diagnosis: string[] | null;
