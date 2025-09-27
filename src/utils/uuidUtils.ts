@@ -45,19 +45,18 @@ export const textToUUID = (text: string | null | undefined): string | null => {
 };
 
 /**
- * Creates a safe query filter for UUID/text type mismatches
- * Handles the case where we need to compare UUID columns with text values
- * @param columnName - Name of the UUID column
- * @param textValue - Text value to compare against
- * @returns Object with column name and cast value for Supabase queries
+ * DEPRECATED: Legacy function for UUID/text comparisons - no longer needed after 2025 migration
+ * All UUID columns now use direct UUID comparisons without casting
+ * @deprecated Use direct UUID comparisons instead
  */
 export const createUUIDTextFilter = (columnName: string, textValue: string | null | undefined) => {
+  console.warn('createUUIDTextFilter is deprecated - use direct UUID comparisons');
   if (!textValue || textValue === 'null' || textValue.trim() === '') {
     return { column: columnName, value: null };
   }
   
-  // Cast UUID column to text for comparison
-  return { column: `${columnName}::text`, value: textValue };
+  // Direct UUID comparison (no casting needed)
+  return { column: columnName, value: textValue };
 };
 
 /**

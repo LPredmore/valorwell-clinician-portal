@@ -4,6 +4,7 @@ import Layout from '../components/layout/Layout';
 import { Search, Filter, RotateCcw, MoreHorizontal } from 'lucide-react';
 import { supabase, getCurrentUser, getClinicianIdByName } from '@/integrations/supabase/client';
 import { useToast } from "@/hooks/use-toast";
+import { isValidUUID } from '@/utils/uuidUtils';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 
 interface Client {
@@ -82,6 +83,12 @@ const MyClients = () => {
         return;
       }
       
+      // Validate clinician ID is a valid UUID before querying
+      if (!clinicianId || !isValidUUID(clinicianId)) {
+        console.error('Invalid clinician UUID for query:', clinicianId);
+        throw new Error('Invalid clinician identifier');
+      }
+
       console.log('Fetching clients for clinician ID:', clinicianId);
       
       const { data, error } = await supabase

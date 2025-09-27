@@ -9,6 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Info, Loader2 } from 'lucide-react'; // Added Loader2 for visual feedback
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '@/context/UserContext'; // Import useUser
+import { isValidUUID } from '@/utils/uuidUtils';
 
 interface Client {
   client_state: string | null;
@@ -252,6 +253,13 @@ const TherapistSelection = () => {
       navigate('/login');
       return;
     }
+    // Validate therapist ID is a valid UUID before assignment
+    if (!therapist.id || !isValidUUID(therapist.id)) {
+      console.error("Invalid therapist UUID:", therapist.id);
+      toast({ title: "Error", description: "Invalid therapist selection. Please try again.", variant: "destructive" });
+      return;
+    }
+
     setSelectingTherapistId(therapist.id); // Show loading state for this specific therapist
     try {
       const { error } = await supabase
