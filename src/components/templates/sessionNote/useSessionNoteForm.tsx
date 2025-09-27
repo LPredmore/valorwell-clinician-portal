@@ -96,13 +96,17 @@ export const useSessionNoteForm = ({
       if (!clientData?.client_assigned_therapist) return;
       
       try {
+        // Cast UUID to text for comparison since client_assigned_therapist is stored as text
         const { data, error } = await supabase
           .from('clinicians')
           .select('clinician_nameinsurance')
-          .eq('id', clientData.client_assigned_therapist)
+          .eq('id::text', clientData.client_assigned_therapist)
           .single();
           
-        if (error) return;
+        if (error) {
+          console.error('Error fetching clinician insurance name:', error);
+          return;
+        }
         
         if (data?.clinician_nameinsurance) {
           setFormState(prevState => ({
@@ -111,7 +115,7 @@ export const useSessionNoteForm = ({
           }));
         }
       } catch (error) {
-        // Silent fail - not critical
+        console.error('Unexpected error in fetchClinicianInsuranceName:', error);
       }
     };
     
