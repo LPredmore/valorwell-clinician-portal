@@ -96,11 +96,11 @@ export const useSessionNoteForm = ({
       if (!clientData?.client_assigned_therapist) return;
       
       try {
-        // Cast UUID to text for comparison since client_assigned_therapist is stored as text
+        // Direct UUID comparison - client_assigned_therapist is now stored as UUID
         const { data, error } = await supabase
           .from('clinicians')
           .select('clinician_nameinsurance')
-          .eq('id::text', clientData.client_assigned_therapist)
+          .eq('id', clientData.client_assigned_therapist)
           .single();
           
         if (error) {
