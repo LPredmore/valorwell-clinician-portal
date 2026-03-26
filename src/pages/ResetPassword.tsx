@@ -304,36 +304,6 @@ const ResetPassword = () => {
               {isLoading ? "Sending..." : "Send Reset Link"}
             </Button>
             
-            {/* Test email functionality (in development) */}
-            {process.env.NODE_ENV === 'development' && (
-              <div className="mt-2">
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  size="sm"
-                  className="w-full text-xs"
-                  onClick={handleTestEmail}
-                  disabled={isLoading || !email}
-                >
-                  Test Email Delivery
-                </Button>
-              </div>
-            )}
-            
-            {process.env.NODE_ENV === 'development' && (
-              <div className="mt-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="w-full text-xs"
-                  onClick={testEdgeFunction}
-                  disabled={isLoading}
-                >
-                  Test Edge Function
-                </Button>
-              </div>
-            )}
           </form>
           
           {/* Debug info for development */}
