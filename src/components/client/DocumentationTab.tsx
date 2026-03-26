@@ -8,7 +8,7 @@ import PHQ9Template from "@/components/templates/PHQ9Template";
 import PCL5Template from "@/components/templates/PCL5Template";
 import { useClinicianData } from "@/hooks/useClinicianData";
 import { ClientDetails } from "@/types/client";
-import { fetchFilteredClinicalDocuments } from "@/integrations/supabase/client";
+import { fetchFilteredClinicalDocuments, getDocumentDownloadURL } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
