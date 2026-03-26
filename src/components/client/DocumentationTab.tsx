@@ -117,6 +117,29 @@ const DocumentationTab: React.FC<DocumentationTabProps> = ({
     }
   };
 
+  const handlePrintDocument = async (document: ClinicalDocument) => {
+    if (!document.file_path) return;
+    try {
+      const url = await getDocumentDownloadURL(document.file_path);
+      if (url) {
+        window.open(url, '_blank');
+      } else {
+        toast({
+          title: "Error",
+          description: "Could not retrieve document PDF",
+          variant: "destructive"
+        });
+      }
+    } catch (err) {
+      console.error('Error fetching document PDF:', err);
+      toast({
+        title: "Error",
+        description: "Failed to open document PDF",
+        variant: "destructive"
+      });
+    }
+  };
+
   const handleViewDocument = (document: ClinicalDocument) => {
     console.log('📄 [DocumentationTab] Opening document in viewer:', document.document_title);
     
