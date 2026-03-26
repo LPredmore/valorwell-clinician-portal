@@ -245,11 +245,16 @@ const DocumentationTab: React.FC<DocumentationTabProps> = ({
                           })()}
                         </div>
                       </TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="outline" size="sm" className="ml-2" onClick={() => handleViewDocument(doc)}>
+                      <TableCell className="text-right space-x-1">
+                        <Button variant="outline" size="sm" onClick={() => handleViewDocument(doc)}>
                           <Eye className="h-4 w-4 mr-1" />
                           View
                         </Button>
+                        {doc.file_path && !doc.file_path.startsWith('pending-') && (
+                          <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => handlePrintDocument(doc)} title="Open PDF for printing">
+                            <Printer className="h-4 w-4" />
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>)}
                 </TableBody>

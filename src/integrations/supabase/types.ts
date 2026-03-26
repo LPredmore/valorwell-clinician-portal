@@ -2263,11 +2263,11 @@ export type Database = {
       }
       error_resolution_workflow: {
         Row: {
-          actual_resolution_time: unknown | null
+          actual_resolution_time: string | null
           api_log_id: string
           assigned_to: string | null
           created_at: string
-          estimated_resolution_time: unknown | null
+          estimated_resolution_time: string | null
           id: string
           priority: number
           stage_notes: string | null
@@ -2275,11 +2275,11 @@ export type Database = {
           workflow_stage: string
         }
         Insert: {
-          actual_resolution_time?: unknown | null
+          actual_resolution_time?: string | null
           api_log_id: string
           assigned_to?: string | null
           created_at?: string
-          estimated_resolution_time?: unknown | null
+          estimated_resolution_time?: string | null
           id?: string
           priority?: number
           stage_notes?: string | null
@@ -2287,11 +2287,11 @@ export type Database = {
           workflow_stage?: string
         }
         Update: {
-          actual_resolution_time?: unknown | null
+          actual_resolution_time?: string | null
           api_log_id?: string
           assigned_to?: string | null
           created_at?: string
-          estimated_resolution_time?: unknown | null
+          estimated_resolution_time?: string | null
           id?: string
           priority?: number
           stage_notes?: string | null
@@ -2368,6 +2368,21 @@ export type Database = {
           diagnosis_name?: string
           icd10?: string
           id?: number
+        }
+        Relationships: []
+      }
+      ignore: {
+        Row: {
+          created_at: string
+          Updated: string | null
+        }
+        Insert: {
+          created_at?: string
+          Updated?: string | null
+        }
+        Update: {
+          created_at?: string
+          Updated?: string | null
         }
         Relationships: []
       }
@@ -3521,14 +3536,14 @@ export type Database = {
     }
     Functions: {
       audit_email_sync_status: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           auth_email: string
           clinician_email: string
           clinician_id: string
           last_auth_update: string
           last_clinician_update: string
-          mismatch_duration: unknown
+          mismatch_duration: string
           sync_status: string
         }[]
       }
@@ -3545,7 +3560,7 @@ export type Database = {
         Returns: Database["public"]["Enums"]["error_category"]
       }
       check_blocked_time_integrity: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           check_type: string
           count: number
@@ -3553,18 +3568,12 @@ export type Database = {
           status: string
         }[]
       }
-      check_error_thresholds: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
+      check_error_thresholds: { Args: never; Returns: undefined }
       check_table_exists: {
         Args: { check_table_name: string }
         Returns: boolean
       }
-      convert_appointment_times_to_utc: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
+      convert_appointment_times_to_utc: { Args: never; Returns: undefined }
       create_appointment_and_mapping: {
         Args: {
           p_clinician_id: string
@@ -3581,11 +3590,11 @@ export type Database = {
         Returns: undefined
       }
       create_or_replace_check_table_exists_function: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: undefined
       }
       debug_auth_context: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           current_user_id: string
           current_user_role: string
@@ -3593,8 +3602,9 @@ export type Database = {
         }[]
       }
       debug_client_therapist_matching: {
-        Args: { p_therapist_id: string }
+        Args: { p_therapist_id?: string }
         Returns: {
+          assignment_status: string
           client_id: string
           client_name: string
           therapist_id: string
@@ -3617,10 +3627,7 @@ export type Database = {
         }
         Returns: Database["public"]["Enums"]["error_severity"]
       }
-      format_date_for_claimmd: {
-        Args: { input_date: string }
-        Returns: string
-      }
+      format_date_for_claimmd: { Args: { input_date: string }; Returns: string }
       format_timestamp_for_claimmd: {
         Args: { input_timestamp: string }
         Returns: string
@@ -3660,18 +3667,9 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: number
       }
-      is_admin: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
-      is_client: {
-        Args: { user_id: string }
-        Returns: boolean
-      }
-      is_clinician: {
-        Args: { user_id: string }
-        Returns: boolean
-      }
+      is_admin: { Args: never; Returns: boolean }
+      is_client: { Args: { user_id: string }; Returns: boolean }
+      is_clinician: { Args: { user_id: string }; Returns: boolean }
       log_email_update_operation: {
         Args: {
           additional_data?: Json
@@ -3688,14 +3686,8 @@ export type Database = {
         Args: { p_notification_ids?: string[]; p_user_id: string }
         Returns: number
       }
-      parse_claimmd_date: {
-        Args: { claimmd_date: string }
-        Returns: string
-      }
-      standardize_uuid: {
-        Args: { input_id: string }
-        Returns: string
-      }
+      parse_claimmd_date: { Args: { claimmd_date: string }; Returns: string }
+      standardize_uuid: { Args: { input_id: string }; Returns: string }
       update_appointment_and_mapping: {
         Args: {
           p_appointment_id: string
@@ -3718,16 +3710,10 @@ export type Database = {
         }
         Returns: undefined
       }
-      user_has_admin_privileges: {
-        Args: { user_id: string }
-        Returns: boolean
-      }
-      user_has_admin_role: {
-        Args: { user_id: string }
-        Returns: boolean
-      }
+      user_has_admin_privileges: { Args: { user_id: string }; Returns: boolean }
+      user_has_admin_role: { Args: { user_id: string }; Returns: boolean }
       validate_clinician_email_consistency: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           auth_email: string
           clinician_email: string
@@ -3736,7 +3722,7 @@ export type Database = {
         }[]
       }
       validate_timezone_integrity: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           check_type: string
           count: number
@@ -3750,6 +3736,7 @@ export type Database = {
       appointment_status: "scheduled" | "documented" | "no show" | "cancelled"
       client_gender_identity_type: "Male" | "Female" | "Other"
       client_gender_type: "Male" | "Female"
+      client_ideation_enum: "none" | "passive" | "active"
       client_relationship_type: "Self" | "Parent/Guardian" | "Spouse" | "Child"
       client_status_type:
         | "New"
@@ -3766,6 +3753,7 @@ export type Database = {
         | "Blacklist"
         | "Do Not Contact"
         | "Scheduled"
+      client_substance_abuse_risk_enum: "none" | "low" | "medium" | "high"
       client_va_coverage_type:
         | "CHAMPVA"
         | "VA Community Care"
@@ -4007,6 +3995,7 @@ export const Constants = {
       appointment_status: ["scheduled", "documented", "no show", "cancelled"],
       client_gender_identity_type: ["Male", "Female", "Other"],
       client_gender_type: ["Male", "Female"],
+      client_ideation_enum: ["none", "passive", "active"],
       client_relationship_type: ["Self", "Parent/Guardian", "Spouse", "Child"],
       client_status_type: [
         "New",
@@ -4024,6 +4013,7 @@ export const Constants = {
         "Do Not Contact",
         "Scheduled",
       ],
+      client_substance_abuse_risk_enum: ["none", "low", "medium", "high"],
       client_va_coverage_type: [
         "CHAMPVA",
         "VA Community Care",
