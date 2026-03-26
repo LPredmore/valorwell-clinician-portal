@@ -2,7 +2,7 @@
 import { useState, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
-import { supabase, testResendEmailService } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -176,93 +176,6 @@ const ResetPassword = () => {
     }
   };
 
-  const handleTestEmail = async () => {
-    if (!email || !email.includes('@')) {
-      setErrorMessage("Please enter a valid email address");
-      return;
-    }
-    
-    setIsLoading(true);
-    setDebugInfo(prev => ({ ...prev, testingEmail: true }));
-    
-    try {
-      const result = await testResendEmailService(email);
-      setDebugInfo(prev => ({
-        ...prev,
-        directTestResult: result,
-        timestamp: new Date().toISOString()
-      }));
-      
-      if (result.success) {
-        toast({
-          title: "Test email sent",
-          description: "A test email was sent successfully. Please check your inbox.",
-        });
-      } else {
-        toast({
-          title: "Test email failed",
-          description: result.error || "Failed to send test email",
-          variant: "destructive",
-        });
-      }
-    } catch (error: any) {
-      console.error("[ResetPassword] Test email error:", error);
-      toast({
-        title: "Test email failed",
-        description: error.message || "There was a problem sending the test email",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-      setDebugInfo(prev => ({ ...prev, testingEmail: false }));
-    }
-  };
-  
-  const testEdgeFunction = async () => {
-    try {
-      setIsLoading(true);
-      setDebugInfo(prev => ({ ...prev, edgeFunctionTest: { status: 'testing' } }));
-      
-      const response = await fetch(`https://gqlkritspnhjxfejvgfg.supabase.co/functions/v1/test-resend`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      const result = await response.json();
-      setDebugInfo(prev => ({
-        ...prev,
-        edgeFunctionTest: {
-          status: 'completed',
-          result: result,
-          timestamp: new Date().toISOString()
-        }
-      }));
-      
-      toast({
-        title: "Edge Function Test",
-        description: result.status === 'ok' ? "Edge function is operational" : "Edge function test failed",
-        variant: result.status === 'ok' ? "default" : "destructive"
-      });
-    } catch (error) {
-      setDebugInfo(prev => ({
-        ...prev,
-        edgeFunctionTest: {
-          status: 'error',
-          error: error,
-          timestamp: new Date().toISOString()
-        }
-      }));
-      toast({
-        title: "Edge Function Test Failed",
-        description: "Could not connect to the edge function",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
@@ -304,36 +217,6 @@ const ResetPassword = () => {
               {isLoading ? "Sending..." : "Send Reset Link"}
             </Button>
             
-            {/* Test email functionality (in development) */}
-            {process.env.NODE_ENV === 'development' && (
-              <div className="mt-2">
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  size="sm"
-                  className="w-full text-xs"
-                  onClick={handleTestEmail}
-                  disabled={isLoading || !email}
-                >
-                  Test Email Delivery
-                </Button>
-              </div>
-            )}
-            
-            {process.env.NODE_ENV === 'development' && (
-              <div className="mt-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="w-full text-xs"
-                  onClick={testEdgeFunction}
-                  disabled={isLoading}
-                >
-                  Test Edge Function
-                </Button>
-              </div>
-            )}
           </form>
           
           {/* Debug info for development */}
