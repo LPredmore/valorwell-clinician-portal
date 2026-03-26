@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { BarChart2, ClipboardCheck, FileText, ClipboardList, Download, Calendar, Eye } from "lucide-react";
+import { BarChart2, ClipboardCheck, FileText, ClipboardList, Download, Calendar, Eye, Printer } from "lucide-react";
 import TreatmentPlanTemplate from "@/components/templates/TreatmentPlanTemplate";
 import SessionNoteTemplate from "@/components/templates/SessionNoteTemplate";
 import PHQ9Template from "@/components/templates/PHQ9Template";
 import PCL5Template from "@/components/templates/PCL5Template";
 import { useClinicianData } from "@/hooks/useClinicianData";
 import { ClientDetails } from "@/types/client";
-import { fetchFilteredClinicalDocuments } from "@/integrations/supabase/client";
+import { fetchFilteredClinicalDocuments, getDocumentDownloadURL } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
@@ -117,6 +117,29 @@ const DocumentationTab: React.FC<DocumentationTabProps> = ({
     }
   };
 
+  const handlePrintDocument = async (document: ClinicalDocument) => {
+    if (!document.file_path) return;
+    try {
+      const url = await getDocumentDownloadURL(document.file_path);
+      if (url) {
+        window.open(url, '_blank');
+      } else {
+        toast({
+          title: "Error",
+          description: "Could not retrieve document PDF",
+          variant: "destructive"
+        });
+      }
+    } catch (err) {
+      console.error('Error fetching document PDF:', err);
+      toast({
+        title: "Error",
+        description: "Failed to open document PDF",
+        variant: "destructive"
+      });
+    }
+  };
+
   const handleViewDocument = (document: ClinicalDocument) => {
     console.log('📄 [DocumentationTab] Opening document in viewer:', document.document_title);
     
@@ -222,11 +245,16 @@ const DocumentationTab: React.FC<DocumentationTabProps> = ({
                           })()}
                         </div>
                       </TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="outline" size="sm" className="ml-2" onClick={() => handleViewDocument(doc)}>
+                      <TableCell className="text-right space-x-1">
+                        <Button variant="outline" size="sm" onClick={() => handleViewDocument(doc)}>
                           <Eye className="h-4 w-4 mr-1" />
                           View
                         </Button>
+                        {doc.file_path && !doc.file_path.startsWith('pending-') && (
+                          <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => handlePrintDocument(doc)} title="Open PDF for printing">
+                            <Printer className="h-4 w-4" />
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>)}
                 </TableBody>
